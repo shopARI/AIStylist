@@ -1,0 +1,375 @@
+import logging
+from typing import Tuple, List, Dict, Any, Optional
+
+# Import required modules for memory integration from CAMEL
+from camel.memories import (
+    ChatHistoryBlock,
+    LongtermAgentMemory,
+    MemoryRecord,
+    ScoreBasedContextCreator,
+    VectorDBBlock,
+)
+from camel.messages import BaseMessage
+from camel.types import ModelType, OpenAIBackendRole
+from camel.utils import OpenAITokenCounter
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("memory_integration")
+
+def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: int = 2048) -> LongtermAgentMemory:
+    """
+    Initialize the memory system for the AI stylist using CAMEL's LongtermAgentMemory.
+    
+    Args:
+        model_type: Type of model to use for token counting
+        token_limit: Maximum token limit for context window
+    
+    Returns:
+        LongtermAgentMemory: Configured memory system for the stylist agent
+    """
+    logger.info(f"Setting up stylist memory with model type {model_type} and token limit {token_limit}")
+    
+    try:
+        # Set up token counter for the appropriate model
+        token_counter = OpenAITokenCounter(model_type)
+        
+        # Initialize the memory with appropriate context creator and blocks
+        memory = LongtermAgentMemory(
+            context_creator=ScoreBasedContextCreator(
+                token_counter=token_counter,
+                token_limit=token_limit,  # Generous context window for meta-questions
+            ),
+            chat_history_block=ChatHistoryBlock(),
+            vector_db_block=VectorDBBlock(),
+        )
+        
+        logger.info("Stylist memory setup successful")
+        return memory
+    
+    except Exception as e:
+        logger.error(f"Error setting up stylist memory: {e}")
+        # Create a minimal fallback memory if the full setup fails
+        try:
+            fallback_memory = LongtermAgentMemory(
+                context_creator=ScoreBasedContextCreator(
+                    token_counter=OpenAITokenCounter(ModelType.GPT_3_5_TURBO),
+                    token_limit=1024,
+                ),
+                chat_history_block=ChatHistoryBlock(),
+            )
+            logger.info("Created fallback memory due to error")
+            return fallback_memory
+        except Exception as e2:
+            logger.error(f"Failed to create fallback memory: {e2}")
+            # Last resort: return a very basic memory system
+            try:
+                minimal_memory = LongtermAgentMemory(
+                    context_creator=ScoreBasedContextCreator(
+                        token_counter=OpenAITokenCounter(ModelType.GPT_3_5_TURBO),
+                        token_limit=512,
+                    )
+                )
+                logger.info("Created minimal memory system")
+                return minimal_memory
+            except Exception as e3:
+                logger.error(f"Failed to create even minimal memory: {e3}")
+                raise RuntimeError("Unable to create any memory system")
+
+def add_message_to_memory(memory: LongtermAgentMemory, content: str, sender: str, 
+                         metadata: Optional[Dict[str, Any]] = None) -> bool:
+    """
+    Add a message to the agent's memory.
+    
+    Args:
+        memory: LongtermAgentMemory instance
+        content: Message content
+        sender: Message sender ('user' or 'agent')
+        metadata: Optional metadata for the message
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    if not memory:
+        logger.warning("Cannot add message to memory: memory is None")
+        return False
+    
+    try:
+        if sender == "user":
+            record = MemoryRecord(
+                message=BaseMessage.make_user_message(
+                    role_name="User",
+                    content=content,
+                ),
+                role_at_backend=OpenAIBackendRole.USER,
+                metadata=metadata or {},
+            )
+        else:
+            record = MemoryRecord(
+                message=BaseMessage.make_assistant_message(
+                    role_name="Stylist",
+                    content=content,
+                ),
+                role_at_backend=OpenAIBackendRole.ASSISTANT,
+                metadata=metadata or {},
+            )
+        
+        memory.write_records([record])
+        logger.info(f"Added {sender} message to memory: {content[:50]}...")
+        return True
+    
+    except Exception as e:
+        logger.error(f"Error adding message to memory: {e}")
+        return False
+
+def get_memory_context(memory: LongtermAgentMemory) -> Tuple[List[Dict[str, str]], int]:
+    """
+    Get context from the agent's memory.
+    
+    Args:
+        memory: LongtermAgentMemory instance
+        
+    Returns:
+        Tuple of (context messages, token count)
+    """
+    if not memory:
+        logger.warning("Cannot get context from memory: memory is None")
+        return [], 0
+    
+    try:
+        context, tokens = memory.get_context()
+        logger.info(f"Retrieved memory context with {len(context)} messages and {tokens} tokens")
+        return context, tokens
+    
+    except Exception as e:
+        logger.error(f"Error getting context from memory: {e}")
+        return [], 0
+
+def save_memory_to_disk(memory: LongtermAgentMemory, path: str) -> bool:
+    """
+    Save the memory state to disk for persistence.
+    
+    Args:
+        memory: LongtermAgentMemory instance
+        path: Path to save the memory
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    if not memory:
+        logger.warning("Cannot save memory: memory is None")
+        return False
+    
+    try:
+        memory.save(path)
+        logger.info(f"Memory saved to {path}")
+        return True
+    except Exception as e:
+        logger.error(f"Error saving memory to {path}: {e}")
+        return False
+
+def load_memory_from_disk(path: str) -> Optional[LongtermAgentMemory]:
+    """
+    Load memory state from disk.
+    
+    Args:
+        path: Path to load the memory from
+        
+    Returns:
+        LongtermAgentMemory if successful, None otherwise
+    """
+    try:
+        memory = LongtermAgentMemory.load(path)
+        logger.info(f"Memory loaded from {path}")
+        return memory
+    except Exception as e:
+        logger.error(f"Error loading memory from {path}: {e}")
+        return None
+
+def add_product_to_memory(memory: LongtermAgentMemory, product: Dict[str, Any], 
+                         interaction_type: str = "recommendation") -> bool:
+    """
+    Add product interaction information to memory.
+    
+    Args:
+        memory: LongtermAgentMemory instance
+        product: Product information dictionary
+        interaction_type: Type of interaction with the product
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    if not memory or not product:
+        logger.warning("Cannot add product to memory: invalid input")
+        return False
+        
+    try:
+        # Create a product reference message
+        product_id = product.get("id", "unknown")
+        product_title = product.get("title", "Untitled Product")
+        
+        # Build message content based on interaction type
+        if interaction_type == "recommendation":
+            content = f"I recommended {product_title} (ID: {product_id})."
+        elif interaction_type == "viewed":
+            content = f"User viewed {product_title} (ID: {product_id})."
+        elif interaction_type == "liked":
+            content = f"User liked {product_title} (ID: {product_id})."
+        else:
+            content = f"Product interaction: {product_title} (ID: {product_id})."
+            
+        # Add product categories if available
+        if product.get("categories"):
+            categories = ", ".join(product.get("categories"))
+            content += f" Categories: {categories}."
+            
+        # Add product collections if available
+        if product.get("collections"):
+            collections = ", ".join(product.get("collections"))
+            content += f" Collections: {collections}."
+            
+        # Create a memory record with product metadata
+        metadata = {
+            "type": "product_interaction",
+            "interaction_type": interaction_type,
+            "product_id": product_id,
+            "product_title": product_title,
+            "product_price": product.get("price", 0),
+        }
+        
+        # Add to memory as system message
+        record = MemoryRecord(
+            message=BaseMessage.make_system_message(
+                role_name="System",
+                content=content,
+            ),
+            role_at_backend=OpenAIBackendRole.SYSTEM,
+            metadata=metadata,
+        )
+        
+        memory.write_records([record])
+        logger.info(f"Added product interaction to memory: {product_title}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error adding product to memory: {e}")
+        return False
+
+def add_user_preference_to_memory(memory: LongtermAgentMemory, preference_type: str, 
+                                preference_value: Any) -> bool:
+    """
+    Add user preference information to memory.
+    
+    Args:
+        memory: LongtermAgentMemory instance
+        preference_type: Type of preference (e.g., "color", "style", "budget")
+        preference_value: Value of the preference
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    if not memory:
+        logger.warning("Cannot add preference to memory: memory is None")
+        return False
+        
+    try:
+        # Create preference message content
+        if isinstance(preference_value, list):
+            value_str = ", ".join(str(v) for v in preference_value)
+        else:
+            value_str = str(preference_value)
+            
+        content = f"User preference: {preference_type} = {value_str}"
+        
+        # Create a memory record with preference metadata
+        metadata = {
+            "type": "user_preference",
+            "preference_type": preference_type,
+            "preference_value": preference_value,
+        }
+        
+        # Add to memory as system message
+        record = MemoryRecord(
+            message=BaseMessage.make_system_message(
+                role_name="System",
+                content=content,
+            ),
+            role_at_backend=OpenAIBackendRole.SYSTEM,
+            metadata=metadata,
+        )
+        
+        memory.write_records([record])
+        logger.info(f"Added user preference to memory: {preference_type} = {value_str}")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error adding user preference to memory: {e}")
+        return False
+
+def clear_memory(memory: LongtermAgentMemory) -> bool:
+    """
+    Clear all memory records.
+    
+    Args:
+        memory: LongtermAgentMemory instance
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    if not memory:
+        logger.warning("Cannot clear memory: memory is None")
+        return False
+        
+    try:
+        # Add a memory reset marker
+        reset_record = MemoryRecord(
+            message=BaseMessage.make_system_message(
+                role_name="System",
+                content="Memory has been reset.",
+            ),
+            role_at_backend=OpenAIBackendRole.SYSTEM,
+        )
+        
+        # Clear existing records and add the reset marker
+        memory.clear()
+        memory.write_records([reset_record])
+        
+        logger.info("Memory has been cleared")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error clearing memory: {e}")
+        return False
+
+def optimize_memory(memory: LongtermAgentMemory) -> bool:
+    """
+    Optimize memory by removing redundant information.
+    
+    Args:
+        memory: LongtermAgentMemory instance
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    if not memory:
+        logger.warning("Cannot optimize memory: memory is None")
+        return False
+        
+    try:
+        # Get current context
+        context, _ = memory.get_context()
+        
+        if not context:
+            logger.info("No context to optimize")
+            return True
+            
+        logger.info(f"Optimizing memory with {len(context)} context items")
+        
+        # Currently a placeholder for future optimization implementations
+        # CAMEL does not yet provide direct memory optimization functions
+        
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error optimizing memory: {e}")
+        return False
