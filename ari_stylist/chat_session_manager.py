@@ -100,18 +100,43 @@ class ChatSession:
         
         return message
     
+
     def get_memory_context(self) -> Tuple[List[Dict[str, str]], int]:
         """
-        Get context from CAMEL memory
+        Get context from CAMEL memory with robust error handling for CAMEL 2.43
         
         Returns:
             Tuple of (context messages, token count)
         """
         if self.memory:
             try:
-                return self.memory.get_context()
+                # Import the get_memory_context function from memory_integration
+                from memory_integration import get_memory_context
+                
+                # Use the enhanced version with better error handling
+                return get_memory_context(self.memory)
+                
             except Exception as e:
                 logger.error(f"Error getting context from CAMEL memory: {e}")
+                
+                # Fallback: Return recent chat history directly
+                try:
+                    # Format recent messages as context
+                    recent_history = self.get_conversation_history(limit=5)
+                    context = []
+                    
+                    for msg in recent_history:
+                        role = "user" if msg["sender"] == "user" else "assistant"
+                        context.append({
+                            "role": role,
+                            "content": msg["content"]
+                        })
+                    
+                    logger.info(f"Using fallback chat history with {len(context)} messages")
+                    return context, 0
+                    
+                except Exception as e2:
+                    logger.error(f"Error creating fallback context: {e2}")
         
         return [], 0
     
@@ -246,9 +271,11 @@ class ChatManager:
         
         return session
     
+
     def _handle_meta_question(self, session: ChatSession, message: str) -> Optional[Tuple[str, Dict[str, Any]]]:
         """
         Handle follow-up responses and meta-questions using CAMEL memory
+        Compatible with CAMEL 2.43
         
         Args:
             session: Chat session
@@ -257,57 +284,63 @@ class ChatManager:
         Returns:
             Tuple of (response message, additional data) or None if not a meta-question
         """
-        # Get CAMEL memory context
-        memory_context, token_count = session.get_memory_context()
-        
-        if not memory_context:
-            return None
-        
-        # Format memory context for agent
-        context_text = ""
-        for msg in memory_context:
-            role = msg.get("role", "unknown")
-            content = msg.get("content", "")
-            context_text += f"{role.upper()}: {content}\n\n"
-        
-        # Create a meta-question detection prompt
-        meta_question_prompt = f"""
-        Based on our conversation history, I need to address your follow-up question:
-        
-        CONVERSATION HISTORY:
-        {context_text}
-        
-        LATEST QUESTION: {message}
-        
-        I'll think about how this question relates to our previous discussion about style and fashion.
-        """
-        
-        # Send to stylist agent
+        # Get CAMEL memory context with improved error handling
         try:
-            from camel.messages import BaseMessage
+            memory_context, token_count = session.get_memory_context()
             
-            # Add user message to session first
-            session.add_message(message, "user")
+            if not memory_context or len(memory_context) < 2:  # Need at least previous Q&A
+                logger.info("Insufficient context in memory for meta-question handling")
+                return None
+                
+            # Format memory context for agent
+            context_text = ""
+            for msg in memory_context:
+                role = msg.get("role", "unknown")
+                content = msg.get("content", "")
+                context_text += f"{role.upper()}: {content}\n\n"
             
-            meta_message = BaseMessage.make_user_message(
-                role_name="User",
-                content=meta_question_prompt
-            )
+            # Create a meta-question detection prompt
+            meta_question_prompt = f"""
+            Based on our conversation history, I need to address your follow-up question:
             
-            agent_response = session.stylist_agent.step(meta_message)
-            response_text = agent_response.msg.content
+            CONVERSATION HISTORY:
+            {context_text}
             
-            # Add agent message to session
-            session.add_message(response_text, "agent")
+            LATEST QUESTION: {message}
             
-            logger.info("Handled meta-question successfully")
+            I'll think about how this question relates to our previous discussion about style and fashion.
+            """
             
-            return response_text, {
-                "result_type": "meta_response",
-                "is_follow_up": True
-            }
+            # Send to stylist agent
+            try:
+                from camel.messages import BaseMessage
+                
+                # Add user message to session first
+                session.add_message(message, "user")
+                
+                meta_message = BaseMessage.make_user_message(
+                    role_name="User",
+                    content=meta_question_prompt
+                )
+                
+                agent_response = session.stylist_agent.step(meta_message)
+                response_text = agent_response.msg.content
+                
+                # Add agent message to session
+                session.add_message(response_text, "agent")
+                
+                logger.info("Handled meta-question successfully")
+                
+                return response_text, {
+                    "result_type": "meta_response",
+                    "is_follow_up": True
+                }
+            except Exception as e:
+                logger.error(f"Error handling meta-question with agent: {e}")
+                return None
+                
         except Exception as e:
-            logger.error(f"Error handling meta-question: {e}")
+            logger.warning(f"Error in meta-question handling: {e}")
             return None
     
     def _extract_parameters(self, message: str) -> Dict[str, Any]:

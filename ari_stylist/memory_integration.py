@@ -1,6 +1,16 @@
 import logging
 from typing import Tuple, List, Dict, Any, Optional
 
+# Import our adapter first to ensure OpenAI embedding compatibility
+try:
+    from openai_embedding_adapter import initialization_result
+    if initialization_result:
+        logging.info("OpenAI embedding adapter initialized successfully")
+    else:
+        logging.warning("OpenAI embedding adapter initialization failed")
+except Exception as e:
+    logging.warning(f"Failed to import OpenAI embedding adapter: {e}")
+
 # Import required modules for memory integration from CAMEL
 from camel.memories import (
     ChatHistoryBlock,
@@ -35,14 +45,30 @@ def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: 
         token_counter = OpenAITokenCounter(model_type)
         
         # Initialize the memory with appropriate context creator and blocks
-        memory = LongtermAgentMemory(
-            context_creator=ScoreBasedContextCreator(
-                token_counter=token_counter,
-                token_limit=token_limit,  # Generous context window for meta-questions
-            ),
-            chat_history_block=ChatHistoryBlock(),
-            vector_db_block=VectorDBBlock(),
-        )
+        try:
+            # Create VectorDBBlock
+            vector_block = VectorDBBlock()
+            
+            memory = LongtermAgentMemory(
+                context_creator=ScoreBasedContextCreator(
+                    token_counter=token_counter,
+                    token_limit=token_limit,
+                ),
+                chat_history_block=ChatHistoryBlock(),
+                vector_db_block=vector_block,
+            )
+            logger.info("Stylist memory setup with vector capabilities")
+        except Exception as e:
+            logger.error(f"Error setting up VectorDBBlock: {e}")
+            # Try without vector block
+            memory = LongtermAgentMemory(
+                context_creator=ScoreBasedContextCreator(
+                    token_counter=token_counter,
+                    token_limit=token_limit,
+                ),
+                chat_history_block=ChatHistoryBlock(),
+            )
+            logger.info("Stylist memory setup with chat history only (no vector capabilities)")
         
         logger.info("Stylist memory setup successful")
         return memory
@@ -51,6 +77,7 @@ def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: 
         logger.error(f"Error setting up stylist memory: {e}")
         # Create a minimal fallback memory if the full setup fails
         try:
+            # Simple memory without vector DB block to avoid embedding issues
             fallback_memory = LongtermAgentMemory(
                 context_creator=ScoreBasedContextCreator(
                     token_counter=OpenAITokenCounter(ModelType.GPT_3_5_TURBO),
@@ -58,7 +85,7 @@ def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: 
                 ),
                 chat_history_block=ChatHistoryBlock(),
             )
-            logger.info("Created fallback memory due to error")
+            logger.info("Created fallback memory due to error (chat history only)")
             return fallback_memory
         except Exception as e2:
             logger.error(f"Failed to create fallback memory: {e2}")
@@ -124,7 +151,7 @@ def add_message_to_memory(memory: LongtermAgentMemory, content: str, sender: str
 
 def get_memory_context(memory: LongtermAgentMemory) -> Tuple[List[Dict[str, str]], int]:
     """
-    Get context from the agent's memory.
+    Get context from the agent's memory with robust fallback options.
     
     Args:
         memory: LongtermAgentMemory instance
@@ -137,9 +164,39 @@ def get_memory_context(memory: LongtermAgentMemory) -> Tuple[List[Dict[str, str]
         return [], 0
     
     try:
-        context, tokens = memory.get_context()
-        logger.info(f"Retrieved memory context with {len(context)} messages and {tokens} tokens")
-        return context, tokens
+        # Try getting context - this may use embeddings which could fail with API changes
+        try:
+            context, tokens = memory.get_context()
+            logger.info(f"Retrieved memory context with {len(context)} messages and {tokens} tokens")
+            return context, tokens
+        except Exception as e:
+            logger.warning(f"Error getting full context from memory: {e}")
+            
+            # Fallback: Try to access memory records directly
+            try:
+                # Access the memory records directly if available
+                if hasattr(memory, 'chat_history_block') and hasattr(memory.chat_history_block, 'memory'):
+                    history_records = list(memory.chat_history_block.memory.values())
+                    # Format the history records into context messages
+                    context = []
+                    
+                    for record in history_records[-5:]:  # Get last 5 messages
+                        if hasattr(record, 'role_at_backend') and hasattr(record, 'message'):
+                            role = "user" if record.role_at_backend == OpenAIBackendRole.USER else "assistant"
+                            content = record.message.content if hasattr(record.message, 'content') else ""
+                            context.append({
+                                "role": role,
+                                "content": content
+                            })
+                    
+                    logger.info(f"Retrieved fallback chat history with {len(context)} messages")
+                    return context, 0  # Token count unknown in fallback mode
+                else:
+                    logger.warning("No direct access to chat history block memory")
+                    return [], 0
+            except Exception as e2:
+                logger.error(f"Error getting chat history fallback: {e2}")
+                return [], 0
     
     except Exception as e:
         logger.error(f"Error getting context from memory: {e}")
@@ -357,7 +414,7 @@ def optimize_memory(memory: LongtermAgentMemory) -> bool:
         
     try:
         # Get current context
-        context, _ = memory.get_context()
+        context, _ = get_memory_context(memory)
         
         if not context:
             logger.info("No context to optimize")

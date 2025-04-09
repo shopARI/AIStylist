@@ -2,15 +2,33 @@ import os
 import logging
 from typing import Dict, Any, Optional, Tuple
 
+# Configure logging first, before any other imports
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("ai_stylist_app")
+
 from memory_integration import setup_stylist_memory
 from stylist_agent import create_stylist_agent
 from neo4j_integration import ProductKnowledgeGraph
-from product_retriever import ProductRetriever
 from chat_session_manager import ChatManager
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("ai_stylist_app")
+# Import the appropriate ProductRetriever
+try:
+    # Try to import the Qdrant-capable version
+    from product_retriever import ProductRetriever
+    logger.info("Using ProductRetriever (standard version)")
+except ImportError:
+    logger.warning("Failed to import ProductRetriever module")
+    # Define a fallback minimal ProductRetriever if needed
+    class ProductRetriever:
+        def __init__(self, **kwargs):
+            self.initialized = False
+            logger.warning("Using minimal ProductRetriever placeholder")
+            
+        def setup_product_indexing(self, *args, **kwargs):
+            logger.warning("Product indexing not available")
+            
+        def search_products(self, *args, **kwargs):
+            return []
 
 class AIStylistApp:
     """
@@ -34,6 +52,11 @@ class AIStylistApp:
         self.neo4j_username = neo4j_username or os.environ.get("NEO4J_USERNAME", "neo4j")
         self.neo4j_password = neo4j_password or os.environ.get("NEO4J_PASSWORD", "shopari1234")
         
+        # Read Qdrant configuration from environment
+        self.qdrant_url = os.environ.get("QDRANT_URL")
+        self.qdrant_api_key = os.environ.get("QDRANT_API_KEY")
+        self.qdrant_collection_name = os.environ.get("QDRANT_COLLECTION_NAME", "products")
+        
         # Set up Neo4j integration
         logger.info(f"Connecting to Neo4j at {self.neo4j_url}")
         self.product_kg = ProductKnowledgeGraph(
@@ -47,7 +70,19 @@ class AIStylistApp:
         
         # Set up product retriever with vector-based search
         logger.info("Initializing product retriever...")
-        self.product_retriever = ProductRetriever()
+        
+        # Use remote Qdrant if configurations are available
+        if self.qdrant_url and self.qdrant_api_key:
+            logger.info(f"Using remote Qdrant at {self.qdrant_url}")
+            self.product_retriever = ProductRetriever(
+                vector_storage_path="product_data/embeddings",
+                qdrant_url=self.qdrant_url,
+                qdrant_api_key=self.qdrant_api_key,
+                qdrant_collection_name=self.qdrant_collection_name
+            )
+        else:
+            logger.info("Using local vector storage (remote Qdrant configuration not provided)")
+            self.product_retriever = ProductRetriever()
         
         # Configure product retriever with Neo4j connection
         logger.info("Setting up product indexing...")

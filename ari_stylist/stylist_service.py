@@ -11,7 +11,7 @@ from typing import Dict, Any, Optional, Callable, List, Union
 from ai_stylist_app import AIStylistApp
 from memory_integration import setup_stylist_memory
 from neo4j_integration import ProductKnowledgeGraph
-from product_retriever import ProductRetriever
+from AIStylist.ari_stylist.product_retriever_qdrant import ProductRetriever
 
 # Configure logging
 logging.basicConfig(
