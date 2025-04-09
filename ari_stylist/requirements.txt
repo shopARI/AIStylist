@@ -1,0 +1,29 @@
+# Python version recommendation: >=3.8,<3.11
+
+# Core AI and agent framework
+camel-ai==0.2.43
+
+# Database connections
+neo4j>=5.26.0
+qdrant-client>=1.1.0,<2.0.0  # Compatible with Qdrant v1.13.6
+
+# Deep learning (as required by CAMEL-AI)
+torch>=1.10.0
+
+# LLM and embeddings
+openai>=1.0.0
+
+# Web framework for API service
+flask>=2.0.0
+
+# Utilities
+python-dotenv>=0.19.0
+typing-extensions>=4.0.0
+requests>=2.25.0
+
+# Production deployment (optional)
+gunicorn>=20.1.0
+
+# Testing (optional)
+pytest>=7.0.0
+pytest-cov>=4.0.0
