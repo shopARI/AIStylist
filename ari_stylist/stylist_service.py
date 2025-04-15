@@ -1,3 +1,4 @@
+#export $(grep -v '^#' .env | xargs)
 import os
 import time
 import logging
@@ -11,7 +12,7 @@ from typing import Dict, Any, Optional, Callable, List, Union
 from ai_stylist_app import AIStylistApp
 from memory_integration import setup_stylist_memory
 from neo4j_integration import ProductKnowledgeGraph
-from AIStylist.ari_stylist.product_retriever_qdrant import ProductRetriever
+from product_retriever import ProductRetriever
 
 # Configure logging
 logging.basicConfig(

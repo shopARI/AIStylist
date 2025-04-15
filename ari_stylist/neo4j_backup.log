@@ -1,0 +1,29 @@
+2025-04-15 03:11:28,414 - INFO - Created backup directory: ./neo4j_backup
+2025-04-15 03:11:28,414 - INFO - Backing up Neo4j database to ./neo4j_backup/neo4j_backup_2025-04-15_03-11-28.dump
+2025-04-15 03:11:28,415 - ERROR - Backup failed: Command 'cypher-shell -a bolt://34.135.40.119:7687 -u neo4j -p shopari1234 --format plain '
+        MATCH (n)
+        OPTIONAL MATCH (n)-[r]->(m)
+        RETURN n, r, m
+        ' > ./neo4j_backup/neo4j_backup_2025-04-15_03-11-28.dump' returned non-zero exit status 127.
+2025-04-15 03:11:28,415 - INFO - Attempting backup using neo4j-admin dump (requires server access)
+2025-04-15 03:13:40,077 - INFO - Backing up Neo4j database to ./neo4j_backup/neo4j_backup_2025-04-15_03-13-40.dump
+2025-04-15 03:13:40,078 - ERROR - Backup failed: Command 'cypher-shell -a bolt://34.135.40.119:7687 -u neo4j -p Shopari1234 --format plain '
+        MATCH (n)
+        OPTIONAL MATCH (n)-[r]->(m)
+        RETURN n, r, m
+        ' > ./neo4j_backup/neo4j_backup_2025-04-15_03-13-40.dump' returned non-zero exit status 127.
+2025-04-15 03:13:40,078 - INFO - Attempting backup using neo4j-admin dump (requires server access)
+2025-04-15 03:17:07,940 - INFO - Backing up Neo4j database to ./neo4j_backup/neo4j_backup_2025-04-15_03-17-07.dump
+2025-04-15 03:17:07,941 - ERROR - Backup failed: Command 'cypher-shell -a bolt://34.135.40.119:7687 -u neo4j -p shopari1234 --format plain '
+        MATCH (n)
+        OPTIONAL MATCH (n)-[r]->(m)
+        RETURN n, r, m
+        ' > ./neo4j_backup/neo4j_backup_2025-04-15_03-17-07.dump' returned non-zero exit status 127.
+2025-04-15 03:17:07,942 - INFO - Attempting backup using neo4j-admin dump (requires server access)
+2025-04-15 03:19:21,928 - INFO - Successfully connected to Neo4j database
+2025-04-15 03:19:24,392 - INFO - Exported 30032 nodes
+2025-04-15 03:20:00,665 - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.FeatureDeprecationWarning} {category: DEPRECATION} {title: This feature is deprecated and will be removed in future versions.} {description: The query used a deprecated function: `id`.} {position: line: 4, column: 21, offset: 86} for query: '\n                MATCH (start)-[r]->(end)\n                RETURN \n                    id(start) as start_id, \n                    labels(start) as start_labels,\n                    id(end) as end_id, \n                    labels(end) as end_labels,\n                    type(r) as rel_type,\n                    properties(r) as rel_props,\n                    start.id as start_prop_id,\n                    end.id as end_prop_id\n                '
+2025-04-15 03:20:00,665 - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.FeatureDeprecationWarning} {category: DEPRECATION} {title: This feature is deprecated and will be removed in future versions.} {description: The query used a deprecated function: `id`.} {position: line: 6, column: 21, offset: 181} for query: '\n                MATCH (start)-[r]->(end)\n                RETURN \n                    id(start) as start_id, \n                    labels(start) as start_labels,\n                    id(end) as end_id, \n                    labels(end) as end_labels,\n                    type(r) as rel_type,\n                    properties(r) as rel_props,\n                    start.id as start_prop_id,\n                    end.id as end_prop_id\n                '
+2025-04-15 03:20:00,665 - INFO - Exported 605036 relationships
+2025-04-15 03:20:10,916 - INFO - Backup successful: ./neo4j_backup/neo4j_backup_2025-04-15_03-19-21.json
+2025-04-15 03:20:11,128 - INFO - Closed Neo4j connection
