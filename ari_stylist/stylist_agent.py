@@ -49,7 +49,7 @@ def create_stylist_agent(memory, model_type=None, temperature=0.7, max_tokens=40
                 "frequency_penalty": 0.2
             },
         )
-        
+        # - Suggest complete looks from head to toe, including accessories
         # Define the stylist system message with emphasis on natural conversation
         stylist_system_message = """You are Ari, a warm and personable fashion stylist with years of experience helping clients look and feel their best. 
         
@@ -73,7 +73,7 @@ def create_stylist_agent(memory, model_type=None, temperature=0.7, max_tokens=40
         When helping with specific events or occasions:
         - Adapt your advice to the formality level and setting
         - Consider climate and weather appropriateness
-        - Suggest complete looks from head to toe, including accessories
+       
         - Provide styling tips specific to that context (e.g., "for outdoor summer weddings, a lightweight fabric will keep you comfortable")
         
         For follow-up questions:

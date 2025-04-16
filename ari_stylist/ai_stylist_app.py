@@ -1,6 +1,14 @@
+"""
+AI Stylist Application
+
+Main application entry point for the AI Stylist system.
+Initializes all components and provides a simple interface to interact with the stylist.
+Updated for CAMEL-AI 0.2.43 compatibility.
+"""
+
 import os
 import logging
-from typing import Dict, Any, Optional, Tuple
+from typing import Dict, Any, Optional, Tuple, List
 
 # Configure logging first, before any other imports
 logging.basicConfig(level=logging.INFO)
@@ -11,11 +19,11 @@ from stylist_agent import create_stylist_agent
 from neo4j_integration import ProductKnowledgeGraph
 from chat_session_manager import ChatManager
 
-# Import the appropriate ProductRetriever
+# Import the ProductRetriever
 try:
-    # Try to import the Qdrant-capable version
+    # Import the product retriever
     from product_retriever import ProductRetriever
-    logger.info("Using ProductRetriever (standard version)")
+    logger.info("Using ProductRetriever (CAMEL-AI 0.2.43 compatible)")
 except ImportError:
     logger.warning("Failed to import ProductRetriever module")
     # Define a fallback minimal ProductRetriever if needed
@@ -34,6 +42,7 @@ class AIStylistApp:
     """
     Main application entry point for the AI Stylist system.
     Initializes all components and provides a simple interface to interact with the stylist.
+    Compatible with CAMEL-AI 0.2.43.
     """
     
     def __init__(self, neo4j_url=None, neo4j_username=None, neo4j_password=None):
@@ -74,6 +83,7 @@ class AIStylistApp:
         # Use remote Qdrant if configurations are available
         if self.qdrant_url and self.qdrant_api_key:
             logger.info(f"Using remote Qdrant at {self.qdrant_url}")
+            # Initialize retriever with CAMEL-AI 0.2.43 compatible parameters
             self.product_retriever = ProductRetriever(
                 vector_storage_path="product_data/embeddings",
                 qdrant_url=self.qdrant_url,
@@ -82,7 +92,10 @@ class AIStylistApp:
             )
         else:
             logger.info("Using local vector storage (remote Qdrant configuration not provided)")
-            self.product_retriever = ProductRetriever()
+            # Initialize local retriever with CAMEL-AI 0.2.43 compatible parameters
+            self.product_retriever = ProductRetriever(
+                vector_storage_path="product_data/embeddings"
+            )
         
         # Configure product retriever with Neo4j connection
         logger.info("Setting up product indexing...")
@@ -296,7 +309,7 @@ class AIStylistApp:
             logger.error(f"Error closing resources: {e}")
 
 
-# Example usage
+# Example usage when module is run directly
 if __name__ == "__main__":
     # Initialize the application
     app = AIStylistApp(

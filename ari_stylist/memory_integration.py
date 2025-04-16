@@ -1,3 +1,11 @@
+"""
+Memory integration module for AI Stylist.
+Compatible with CAMEL-AI 0.2.43.
+
+This module provides functions to set up and manage memory for the AI Stylist,
+using CAMEL's memory system with robust fallbacks and error handling.
+"""
+
 import logging
 from typing import Tuple, List, Dict, Any, Optional
 
@@ -11,7 +19,7 @@ try:
 except Exception as e:
     logging.warning(f"Failed to import OpenAI embedding adapter: {e}")
 
-# Import required modules for memory integration from CAMEL
+# Import required modules for memory integration from CAMEL - Updated for 0.2.43
 from camel.memories import (
     ChatHistoryBlock,
     LongtermAgentMemory,
@@ -22,6 +30,8 @@ from camel.memories import (
 from camel.messages import BaseMessage
 from camel.types import ModelType, OpenAIBackendRole
 from camel.utils import OpenAITokenCounter
+from camel.embeddings import OpenAIEmbedding
+from camel.storages import QdrantStorage
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -30,6 +40,7 @@ logger = logging.getLogger("memory_integration")
 def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: int = 2048) -> LongtermAgentMemory:
     """
     Initialize the memory system for the AI stylist using CAMEL's LongtermAgentMemory.
+    Updated for CAMEL-AI 0.2.43
     
     Args:
         model_type: Type of model to use for token counting
@@ -45,10 +56,18 @@ def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: 
         token_counter = OpenAITokenCounter(model_type)
         
         # Initialize the memory with appropriate context creator and blocks
+        # Updated for CAMEL-AI 0.2.43
         try:
-            # Create VectorDBBlock
-            vector_block = VectorDBBlock()
+            # Create embedding model
+            embedding_model = OpenAIEmbedding()
             
+            # Create VectorDBBlock with explicit embedding and storage
+            vector_block = VectorDBBlock(
+                embedding=embedding_model,
+                storage=QdrantStorage(vector_dim=embedding_model.get_output_dim())
+            )
+            
+            # Create memory with all blocks
             memory = LongtermAgentMemory(
                 context_creator=ScoreBasedContextCreator(
                     token_counter=token_counter,
@@ -152,6 +171,7 @@ def add_message_to_memory(memory: LongtermAgentMemory, content: str, sender: str
 def get_memory_context(memory: LongtermAgentMemory) -> Tuple[List[Dict[str, str]], int]:
     """
     Get context from the agent's memory with robust fallback options.
+    Updated for CAMEL-AI 0.2.43.
     
     Args:
         memory: LongtermAgentMemory instance

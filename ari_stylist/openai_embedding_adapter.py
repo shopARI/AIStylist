@@ -1,5 +1,5 @@
 """
-CAMEL-AI OpenAI Embedding Adapter
+CAMEL-AI OpenAI Embedding Adapter for version 0.2.43
 
 This module creates an adapter for CAMEL-AI's OpenAIEmbedding that ensures proper
 compatibility with the current OpenAI API format. It should be imported before
@@ -19,6 +19,9 @@ def initialize_embedding_adapter():
     Initialize the adapter for CAMEL's OpenAIEmbedding to ensure compatibility
     with the current OpenAI API. This must be called before using any CAMEL memory
     components.
+    
+    Returns:
+        bool: True if successful, False otherwise
     """
     try:
         # First, make sure we're using the correct OpenAI package
@@ -33,17 +36,17 @@ def initialize_embedding_adapter():
             # Configure the OpenAI client
             openai.api_key = api_key
         
-        # Now modify the CAMEL OpenAIEmbedding class to be compatible
+        # Now modify the CAMEL OpenAIEmbedding class to be compatible with version 0.2.43
         from camel.embeddings import OpenAIEmbedding
         
         # Store the original methods
         original_embed = OpenAIEmbedding.embed
         original_embed_list = OpenAIEmbedding.embed_list
         
-        # Define new wrapper methods that ensure proper formatting
+        # Define new wrapper methods that ensure proper formatting for CAMEL-AI 0.2.43
         def new_embed(self, text: str) -> List[float]:
             try:
-                # Try to directly call OpenAI client with the correct format
+                # Try to directly call OpenAI client with the correct format for newer API
                 client = openai.OpenAI(api_key=api_key)
                 response = client.embeddings.create(
                     model="text-embedding-ada-002",
@@ -64,7 +67,7 @@ def initialize_embedding_adapter():
         
         def new_embed_list(self, texts: List[str]) -> List[List[float]]:
             try:
-                # Try to directly call OpenAI client with the correct format
+                # Try to directly call OpenAI client with the correct format for newer API
                 client = openai.OpenAI(api_key=api_key)
                 response = client.embeddings.create(
                     model="text-embedding-ada-002",
@@ -87,7 +90,7 @@ def initialize_embedding_adapter():
         OpenAIEmbedding.embed = new_embed
         OpenAIEmbedding.embed_list = new_embed_list
         
-        logger.info("Successfully initialized OpenAI embedding adapter")
+        logger.info("Successfully initialized OpenAI embedding adapter for CAMEL-AI 0.2.43")
         return True
     except Exception as e:
         logger.error(f"Failed to initialize OpenAI embedding adapter: {e}")
