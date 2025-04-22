@@ -1,20 +1,40 @@
+"""
+Asynchronous Stylist Agent for AI Stylist.
+
+This module implements the stylist agent with async support.
+Compatible with CAMEL-AI 0.2.43.
+"""
+
 import os
 import logging
+import asyncio
 from typing import Optional, List, Dict, Any
-from camel.agents import ChatAgent
-from camel.models import ModelFactory
-from camel.types import ModelType, ModelPlatformType
+import httpx
+from aiolimiter import AsyncLimiter
+
+# Try importing CAMEL components with graceful degradation
+try:
+    from camel.agents import ChatAgent
+    from camel.models import ModelFactory
+    from camel.types import ModelType, ModelPlatformType
+    CAMEL_AVAILABLE = True
+except ImportError:
+    CAMEL_AVAILABLE = False
+    logging.warning("CAMEL not installed. Please install with: pip install camel-ai")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("stylist_agent")
+logger = logging.getLogger("stylist_agent_async")
 
-def create_stylist_agent(memory, model_type=None, temperature=0.7, max_tokens=4000):
+# Rate limiter for OpenAI API calls (20 requests per minute by default)
+openai_rate_limiter = AsyncLimiter(20, 60)
+
+async def create_stylist_agent_async(memory, model_type=None, temperature=0.7, max_tokens=4000):
     """
-    Create an AI stylist agent with natural conversational abilities.
+    Create an AI stylist agent with natural conversational abilities asynchronously.
     
     Args:
-        memory: LongtermAgentMemory instance from memory_integration.py
+        memory: LongtermAgentMemory instance from memory_integration_async.py
         model_type: Type of model to use (defaults to GPT-4O if None)
         temperature: Model temperature setting (0.0-1.0)
         max_tokens: Maximum tokens in completion
@@ -22,6 +42,10 @@ def create_stylist_agent(memory, model_type=None, temperature=0.7, max_tokens=40
     Returns:
         ChatAgent: Configured stylist agent
     """
+    if not CAMEL_AVAILABLE:
+        logger.error("CAMEL is not available. Cannot create stylist agent.")
+        return None
+        
     # Determine model type, with fallbacks
     if model_type is None:
         # Try to use GPT-4O, but fall back to available models if needed
@@ -37,8 +61,12 @@ def create_stylist_agent(memory, model_type=None, temperature=0.7, max_tokens=40
     logger.info(f"Creating stylist agent with model: {model_type}")
     
     try:
+        # This is a synchronous operation in CAMEL 0.2.43, but we'll use asyncio.to_thread
+        # to make it non-blocking
+        
         # Create the model
-        model = ModelFactory.create(
+        model = await asyncio.to_thread(
+            ModelFactory.create,
             model_platform=ModelPlatformType.OPENAI,
             model_type=model_type,
             model_config_dict={
@@ -49,7 +77,7 @@ def create_stylist_agent(memory, model_type=None, temperature=0.7, max_tokens=40
                 "frequency_penalty": 0.2
             },
         )
-        # - Suggest complete looks from head to toe, including accessories
+        
         # Define the stylist system message with emphasis on natural conversation
         stylist_system_message = """You are Ari, a warm and personable fashion stylist with years of experience helping clients look and feel their best. 
         
@@ -73,7 +101,6 @@ def create_stylist_agent(memory, model_type=None, temperature=0.7, max_tokens=40
         When helping with specific events or occasions:
         - Adapt your advice to the formality level and setting
         - Consider climate and weather appropriateness
-       
         - Provide styling tips specific to that context (e.g., "for outdoor summer weddings, a lightweight fabric will keep you comfortable")
         
         For follow-up questions:
@@ -93,7 +120,8 @@ def create_stylist_agent(memory, model_type=None, temperature=0.7, max_tokens=40
         """
         
         # Create the agent with the system message
-        stylist_agent = ChatAgent(
+        stylist_agent = await asyncio.to_thread(
+            ChatAgent,
             system_message=stylist_system_message,
             model=model,
         )
@@ -109,7 +137,8 @@ def create_stylist_agent(memory, model_type=None, temperature=0.7, max_tokens=40
         # Try to create a minimal agent with fallback options
         try:
             logger.warning("Attempting to create fallback stylist agent")
-            fallback_model = ModelFactory.create(
+            fallback_model = await asyncio.to_thread(
+                ModelFactory.create,
                 model_platform=ModelPlatformType.OPENAI,
                 model_type=ModelType.GPT_3_5_TURBO,
                 model_config_dict={
@@ -118,7 +147,8 @@ def create_stylist_agent(memory, model_type=None, temperature=0.7, max_tokens=40
                 },
             )
             
-            fallback_agent = ChatAgent(
+            fallback_agent = await asyncio.to_thread(
+                ChatAgent,
                 system_message=stylist_system_message,
                 model=fallback_model,
             )
@@ -134,9 +164,9 @@ def create_stylist_agent(memory, model_type=None, temperature=0.7, max_tokens=40
             logger.error(f"Failed to create fallback agent: {e2}")
             raise RuntimeError("Unable to create stylist agent")
 
-def create_stylist_agent_with_tools(memory, tools=None, model_type=None, temperature=0.7, max_tokens=4000):
+async def create_stylist_agent_with_tools_async(memory, tools=None, model_type=None, temperature=0.7, max_tokens=4000):
     """
-    Create an AI stylist agent with tool-calling capabilities.
+    Create an AI stylist agent with tool-calling capabilities asynchronously.
     
     Args:
         memory: LongtermAgentMemory instance
@@ -149,7 +179,7 @@ def create_stylist_agent_with_tools(memory, tools=None, model_type=None, tempera
         ChatAgent: Configured stylist agent with tools
     """
     # Create the base agent
-    stylist_agent = create_stylist_agent(
+    stylist_agent = await create_stylist_agent_async(
         memory=memory,
         model_type=model_type,
         temperature=temperature,
@@ -166,9 +196,9 @@ def create_stylist_agent_with_tools(memory, tools=None, model_type=None, tempera
     
     return stylist_agent
 
-def enhance_stylist_prompt_with_products(system_message: str, products: List[Dict[str, Any]]) -> str:
+async def enhance_stylist_prompt_with_products_async(system_message: str, products: List[Dict[str, Any]]) -> str:
     """
-    Enhance the stylist's system message with specific product information.
+    Enhance the stylist's system message with specific product information asynchronously.
     
     Args:
         system_message: Base system message
@@ -220,9 +250,9 @@ def enhance_stylist_prompt_with_products(system_message: str, products: List[Dic
     # Return enhanced system message
     return system_message + product_details
 
-def create_product_recommendation_agent(memory, products, model_type=None, temperature=0.7):
+async def create_product_recommendation_agent_async(memory, products, model_type=None, temperature=0.7):
     """
-    Create a special agent optimized for product recommendations.
+    Create a special agent optimized for product recommendations asynchronously.
     
     Args:
         memory: LongtermAgentMemory instance
@@ -237,7 +267,7 @@ def create_product_recommendation_agent(memory, products, model_type=None, tempe
     
     try:
         # Start with the base stylist agent with lower max tokens
-        base_agent = create_stylist_agent(
+        base_agent = await create_stylist_agent_async(
             memory=memory,
             model_type=model_type,
             temperature=temperature,
@@ -245,14 +275,15 @@ def create_product_recommendation_agent(memory, products, model_type=None, tempe
         )
         
         # Enhance the prompt with product information
-        enhanced_system_message = enhance_stylist_prompt_with_products(
+        enhanced_system_message = await enhance_stylist_prompt_with_products_async(
             base_agent.system_message,
             products
         )
         
         # Create a new agent with the enhanced prompt
         if base_agent.model:
-            recommendation_agent = ChatAgent(
+            recommendation_agent = await asyncio.to_thread(
+                ChatAgent,
                 system_message=enhanced_system_message,
                 model=base_agent.model,
             )
@@ -269,19 +300,23 @@ def create_product_recommendation_agent(memory, products, model_type=None, tempe
     except Exception as e:
         logger.error(f"Error creating product recommendation agent: {e}")
         logger.warning("Returning base stylist agent instead")
-        return create_stylist_agent(
+        return await create_stylist_agent_async(
             memory=memory,
             model_type=model_type,
             temperature=temperature
         )
 
-def get_available_model_types():
+async def get_available_model_types_async():
     """
-    Get available model types based on the CAMEL version.
+    Get available model types based on the CAMEL version asynchronously.
     
     Returns:
         List of available ModelType options
     """
+    if not CAMEL_AVAILABLE:
+        logger.error("CAMEL is not available. Cannot get available model types.")
+        return []
+        
     available_models = []
     
     # Try to add each model type, handling AttributeError if not available

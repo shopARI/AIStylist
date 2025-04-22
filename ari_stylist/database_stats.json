@@ -1,0 +1,1821 @@
+{
+  "basic_counts": {
+    "product_count": 39423,
+    "category_count": 15,
+    "collection_count": 7,
+    "tag_count": 298
+  },
+  "category_distribution": [
+    {
+      "category": "Earrings",
+      "product_count": 9041,
+      "percentage": 24.63
+    },
+    {
+      "category": "Rings",
+      "product_count": 8407,
+      "percentage": 22.9
+    },
+    {
+      "category": "Necklaces",
+      "product_count": 7074,
+      "percentage": 19.27
+    },
+    {
+      "category": "Bracelets",
+      "product_count": 2929,
+      "percentage": 7.98
+    },
+    {
+      "category": "Tops",
+      "product_count": 2219,
+      "percentage": 6.05
+    },
+    {
+      "category": "Dresses",
+      "product_count": 1641,
+      "percentage": 4.47
+    },
+    {
+      "category": "Pants",
+      "product_count": 1141,
+      "percentage": 3.11
+    },
+    {
+      "category": "Sweaters",
+      "product_count": 1106,
+      "percentage": 3.01
+    },
+    {
+      "category": "Shirts",
+      "product_count": 1002,
+      "percentage": 2.73
+    },
+    {
+      "category": "Jackets",
+      "product_count": 822,
+      "percentage": 2.24
+    },
+    {
+      "category": "Hats",
+      "product_count": 654,
+      "percentage": 1.78
+    },
+    {
+      "category": "Skirts",
+      "product_count": 242,
+      "percentage": 0.66
+    },
+    {
+      "category": "Anklets",
+      "product_count": 192,
+      "percentage": 0.52
+    },
+    {
+      "category": "Jewelry Charms",
+      "product_count": 181,
+      "percentage": 0.49
+    },
+    {
+      "category": "Socks",
+      "product_count": 56,
+      "percentage": 0.15
+    }
+  ],
+  "collection_distribution": [
+    {
+      "collection": "All Products",
+      "product_count": 39423,
+      "percentage": 50.0
+    },
+    {
+      "collection": "Under $50",
+      "product_count": 18899,
+      "percentage": 23.97
+    },
+    {
+      "collection": "$50-$100",
+      "product_count": 7870,
+      "percentage": 9.98
+    },
+    {
+      "collection": "$100-$250",
+      "product_count": 5227,
+      "percentage": 6.63
+    },
+    {
+      "collection": "$250-$500",
+      "product_count": 3133,
+      "percentage": 3.97
+    },
+    {
+      "collection": "$500+",
+      "product_count": 2235,
+      "percentage": 2.83
+    },
+    {
+      "collection": "$500-$1000",
+      "product_count": 2059,
+      "percentage": 2.61
+    }
+  ],
+  "tag_distribution": [
+    {
+      "tag": "$50-$100",
+      "product_count": 5515,
+      "percentage": 14.32
+    },
+    {
+      "tag": "$100-$250",
+      "product_count": 3163,
+      "percentage": 8.21
+    },
+    {
+      "tag": "$500+",
+      "product_count": 1651,
+      "percentage": 4.29
+    },
+    {
+      "tag": "$250-$500",
+      "product_count": 1587,
+      "percentage": 4.12
+    },
+    {
+      "tag": "104",
+      "product_count": 1293,
+      "percentage": 3.36
+    },
+    {
+      "tag": "active",
+      "product_count": 1217,
+      "percentage": 3.16
+    },
+    {
+      "tag": "Shipping delay Jan 26 - Feb 5",
+      "product_count": 1173,
+      "percentage": 3.05
+    },
+    {
+      "tag": "consignment",
+      "product_count": 853,
+      "percentage": 2.22
+    },
+    {
+      "tag": "205",
+      "product_count": 832,
+      "percentage": 2.16
+    },
+    {
+      "tag": "-50",
+      "product_count": 832,
+      "percentage": 2.16
+    },
+    {
+      "tag": "C-Thousand",
+      "product_count": 822,
+      "percentage": 2.13
+    },
+    {
+      "tag": "206",
+      "product_count": 796,
+      "percentage": 2.07
+    },
+    {
+      "tag": "Fashion Jewelry",
+      "product_count": 739,
+      "percentage": 1.92
+    },
+    {
+      "tag": "Accessories",
+      "product_count": 659,
+      "percentage": 1.71
+    },
+    {
+      "tag": "110",
+      "product_count": 558,
+      "percentage": 1.45
+    },
+    {
+      "tag": "Basic Bae",
+      "product_count": 493,
+      "percentage": 1.28
+    },
+    {
+      "tag": "H&L&L",
+      "product_count": 470,
+      "percentage": 1.22
+    },
+    {
+      "tag": "Shipping delay Jan 20 - Feb 5",
+      "product_count": 442,
+      "percentage": 1.15
+    },
+    {
+      "tag": "RISEN",
+      "product_count": 422,
+      "percentage": 1.1
+    },
+    {
+      "tag": "Dresses",
+      "product_count": 404,
+      "percentage": 1.05
+    },
+    {
+      "tag": "Jewelry",
+      "product_count": 399,
+      "percentage": 1.04
+    },
+    {
+      "tag": "14K Gold",
+      "product_count": 384,
+      "percentage": 1.0
+    },
+    {
+      "tag": "402",
+      "product_count": 338,
+      "percentage": 0.88
+    },
+    {
+      "tag": "Tops",
+      "product_count": 334,
+      "percentage": 0.87
+    },
+    {
+      "tag": "FAM-FAM",
+      "product_count": 324,
+      "percentage": 0.84
+    },
+    {
+      "tag": "Judy Blue",
+      "product_count": 323,
+      "percentage": 0.84
+    },
+    {
+      "tag": "Fine Jewelry",
+      "product_count": 290,
+      "percentage": 0.75
+    },
+    {
+      "tag": "Bloggers",
+      "product_count": 271,
+      "percentage": 0.7
+    },
+    {
+      "tag": "202",
+      "product_count": 246,
+      "percentage": 0.64
+    },
+    {
+      "tag": "14K ONLY",
+      "product_count": 236,
+      "percentage": 0.61
+    },
+    {
+      "tag": "BiBi",
+      "product_count": 232,
+      "percentage": 0.6
+    },
+    {
+      "tag": "307",
+      "product_count": 229,
+      "percentage": 0.59
+    },
+    {
+      "tag": "Bottoms",
+      "product_count": 223,
+      "percentage": 0.58
+    },
+    {
+      "tag": "804",
+      "product_count": 214,
+      "percentage": 0.56
+    },
+    {
+      "tag": "Culture Code",
+      "product_count": 207,
+      "percentage": 0.54
+    },
+    {
+      "tag": "Swim",
+      "product_count": 200,
+      "percentage": 0.52
+    },
+    {
+      "tag": "Celeste",
+      "product_count": 196,
+      "percentage": 0.51
+    },
+    {
+      "tag": "Kids",
+      "product_count": 194,
+      "percentage": 0.5
+    },
+    {
+      "tag": "Earrings",
+      "product_count": 193,
+      "percentage": 0.5
+    },
+    {
+      "tag": "DY",
+      "product_count": 192,
+      "percentage": 0.5
+    },
+    {
+      "tag": "Zenana",
+      "product_count": 187,
+      "percentage": 0.49
+    },
+    {
+      "tag": "200",
+      "product_count": 186,
+      "percentage": 0.48
+    },
+    {
+      "tag": "Bracelets",
+      "product_count": 185,
+      "percentage": 0.48
+    },
+    {
+      "tag": "Hundredth",
+      "product_count": 183,
+      "percentage": 0.48
+    },
+    {
+      "tag": "VERY J",
+      "product_count": 177,
+      "percentage": 0.46
+    },
+    {
+      "tag": "306",
+      "product_count": 176,
+      "percentage": 0.46
+    },
+    {
+      "tag": "-75",
+      "product_count": 174,
+      "percentage": 0.45
+    },
+    {
+      "tag": "H.R.Z",
+      "product_count": 173,
+      "percentage": 0.45
+    },
+    {
+      "tag": "400",
+      "product_count": 169,
+      "percentage": 0.44
+    },
+    {
+      "tag": "Shipping delay Jan 20 - Feb 7",
+      "product_count": 161,
+      "percentage": 0.42
+    },
+    {
+      "tag": "A@X@Y",
+      "product_count": 160,
+      "percentage": 0.42
+    },
+    {
+      "tag": "CYFS",
+      "product_count": 142,
+      "percentage": 0.37
+    },
+    {
+      "tag": "#PAID",
+      "product_count": 140,
+      "percentage": 0.36
+    },
+    {
+      "tag": "Decor",
+      "product_count": 138,
+      "percentage": 0.36
+    },
+    {
+      "tag": "Shoes",
+      "product_count": 136,
+      "percentage": 0.35
+    },
+    {
+      "tag": "14K Earrings",
+      "product_count": 133,
+      "percentage": 0.35
+    },
+    {
+      "tag": "POL",
+      "product_count": 131,
+      "percentage": 0.34
+    },
+    {
+      "tag": "M@F@Y",
+      "product_count": 127,
+      "percentage": 0.33
+    },
+    {
+      "tag": "105",
+      "product_count": 122,
+      "percentage": 0.32
+    },
+    {
+      "tag": "Shipping delay Jan 22 - Feb 5",
+      "product_count": 120,
+      "percentage": 0.31
+    },
+    {
+      "tag": "-100",
+      "product_count": 120,
+      "percentage": 0.31
+    },
+    {
+      "tag": "Q&S",
+      "product_count": 109,
+      "percentage": 0.28
+    },
+    {
+      "tag": "Shipping delay Jan 18 - Feb 10",
+      "product_count": 109,
+      "percentage": 0.28
+    },
+    {
+      "tag": "Shipping delay Jan 20 - Feb 6",
+      "product_count": 108,
+      "percentage": 0.28
+    },
+    {
+      "tag": "A@X@E",
+      "product_count": 105,
+      "percentage": 0.27
+    },
+    {
+      "tag": "103",
+      "product_count": 103,
+      "percentage": 0.27
+    },
+    {
+      "tag": "Ivy Lane",
+      "product_count": 97,
+      "percentage": 0.25
+    },
+    {
+      "tag": "403",
+      "product_count": 96,
+      "percentage": 0.25
+    },
+    {
+      "tag": "badge_",
+      "product_count": 96,
+      "percentage": 0.25
+    },
+    {
+      "tag": "SYNZ",
+      "product_count": 93,
+      "percentage": 0.24
+    },
+    {
+      "tag": "Jackets + Coats",
+      "product_count": 92,
+      "percentage": 0.24
+    },
+    {
+      "tag": "260 Sample Sale August 2024",
+      "product_count": 91,
+      "percentage": 0.24
+    },
+    {
+      "tag": "LXF",
+      "product_count": 83,
+      "percentage": 0.22
+    },
+    {
+      "tag": "Fine",
+      "product_count": 83,
+      "percentage": 0.22
+    },
+    {
+      "tag": "404",
+      "product_count": 82,
+      "percentage": 0.21
+    },
+    {
+      "tag": "available",
+      "product_count": 80,
+      "percentage": 0.21
+    },
+    {
+      "tag": "Muyuan",
+      "product_count": 76,
+      "percentage": 0.2
+    },
+    {
+      "tag": "Bottoms Kids",
+      "product_count": 75,
+      "percentage": 0.19
+    },
+    {
+      "tag": "Kancan",
+      "product_count": 75,
+      "percentage": 0.19
+    },
+    {
+      "tag": "410",
+      "product_count": 71,
+      "percentage": 0.18
+    },
+    {
+      "tag": "Tasha Apparel",
+      "product_count": 69,
+      "percentage": 0.18
+    },
+    {
+      "tag": "New Arrivals",
+      "product_count": 68,
+      "percentage": 0.18
+    },
+    {
+      "tag": "H@Y@X",
+      "product_count": 68,
+      "percentage": 0.18
+    },
+    {
+      "tag": "SF Knit",
+      "product_count": 68,
+      "percentage": 0.18
+    },
+    {
+      "tag": "Shipping delay Jan 27 - Feb 4",
+      "product_count": 66,
+      "percentage": 0.17
+    },
+    {
+      "tag": "Honey",
+      "product_count": 64,
+      "percentage": 0.17
+    },
+    {
+      "tag": "14K/18K-406",
+      "product_count": 63,
+      "percentage": 0.16
+    },
+    {
+      "tag": "MGZY",
+      "product_count": 59,
+      "percentage": 0.15
+    },
+    {
+      "tag": "kids sale",
+      "product_count": 58,
+      "percentage": 0.15
+    },
+    {
+      "tag": "201",
+      "product_count": 58,
+      "percentage": 0.15
+    },
+    {
+      "tag": "600",
+      "product_count": 57,
+      "percentage": 0.15
+    },
+    {
+      "tag": "304",
+      "product_count": 57,
+      "percentage": 0.15
+    },
+    {
+      "tag": "And The Why",
+      "product_count": 56,
+      "percentage": 0.15
+    },
+    {
+      "tag": "O@B@L",
+      "product_count": 56,
+      "percentage": 0.15
+    },
+    {
+      "tag": "A.L.D.",
+      "product_count": 55,
+      "percentage": 0.14
+    },
+    {
+      "tag": "209",
+      "product_count": 53,
+      "percentage": 0.14
+    },
+    {
+      "tag": "Shipping delay Jan 25 - Feb 2",
+      "product_count": 52,
+      "percentage": 0.14
+    },
+    {
+      "tag": "assorted sale",
+      "product_count": 52,
+      "percentage": 0.14
+    },
+    {
+      "tag": "Mandy",
+      "product_count": 51,
+      "percentage": 0.13
+    },
+    {
+      "tag": "R%G",
+      "product_count": 50,
+      "percentage": 0.13
+    },
+    {
+      "tag": "S.Z.K.Y",
+      "product_count": 50,
+      "percentage": 0.13
+    },
+    {
+      "tag": "M@S@L@T",
+      "product_count": 50,
+      "percentage": 0.13
+    },
+    {
+      "tag": "409",
+      "product_count": 49,
+      "percentage": 0.13
+    },
+    {
+      "tag": "$500-$1000",
+      "product_count": 49,
+      "percentage": 0.13
+    },
+    {
+      "tag": "260",
+      "product_count": 48,
+      "percentage": 0.12
+    },
+    {
+      "tag": "Putica",
+      "product_count": 48,
+      "percentage": 0.12
+    },
+    {
+      "tag": "m@D",
+      "product_count": 48,
+      "percentage": 0.12
+    },
+    {
+      "tag": "Nicole Lee USA",
+      "product_count": 47,
+      "percentage": 0.12
+    },
+    {
+      "tag": "Fall/Winter Jackets + Coats",
+      "product_count": 46,
+      "percentage": 0.12
+    },
+    {
+      "tag": "H.Y.G@E",
+      "product_count": 45,
+      "percentage": 0.12
+    },
+    {
+      "tag": "14K",
+      "product_count": 45,
+      "percentage": 0.12
+    },
+    {
+      "tag": "Acetate",
+      "product_count": 44,
+      "percentage": 0.11
+    },
+    {
+      "tag": "Jumpsuits & Matching Sets",
+      "product_count": 43,
+      "percentage": 0.11
+    },
+    {
+      "tag": "14K Bracelets",
+      "product_count": 43,
+      "percentage": 0.11
+    },
+    {
+      "tag": "Furniture",
+      "product_count": 43,
+      "percentage": 0.11
+    },
+    {
+      "tag": "Y.C.D.Z",
+      "product_count": 43,
+      "percentage": 0.11
+    },
+    {
+      "tag": "Manny",
+      "product_count": 42,
+      "percentage": 0.11
+    },
+    {
+      "tag": "O@L@N",
+      "product_count": 40,
+      "percentage": 0.1
+    },
+    {
+      "tag": "Shipping delay Jan 24 - Feb 7",
+      "product_count": 40,
+      "percentage": 0.1
+    },
+    {
+      "tag": "C@X@Y",
+      "product_count": 40,
+      "percentage": 0.1
+    },
+    {
+      "tag": "900",
+      "product_count": 38,
+      "percentage": 0.1
+    },
+    {
+      "tag": "Rompers + Sets",
+      "product_count": 38,
+      "percentage": 0.1
+    },
+    {
+      "tag": "Millennia",
+      "product_count": 37,
+      "percentage": 0.1
+    },
+    {
+      "tag": "Home",
+      "product_count": 37,
+      "percentage": 0.1
+    },
+    {
+      "tag": "American Bazi",
+      "product_count": 37,
+      "percentage": 0.1
+    },
+    {
+      "tag": "F.H.B",
+      "product_count": 36,
+      "percentage": 0.09
+    },
+    {
+      "tag": "Decor + Toys",
+      "product_count": 36,
+      "percentage": 0.09
+    },
+    {
+      "tag": "BOMBOM",
+      "product_count": 36,
+      "percentage": 0.09
+    },
+    {
+      "tag": "J.K.T.Y",
+      "product_count": 36,
+      "percentage": 0.09
+    },
+    {
+      "tag": "HYFVE",
+      "product_count": 36,
+      "percentage": 0.09
+    },
+    {
+      "tag": "D@M",
+      "product_count": 35,
+      "percentage": 0.09
+    },
+    {
+      "tag": "Fall/Winter Tops",
+      "product_count": 35,
+      "percentage": 0.09
+    },
+    {
+      "tag": "Shipping delay Jan 20 - Feb 12",
+      "product_count": 35,
+      "percentage": 0.09
+    },
+    {
+      "tag": "YWPR",
+      "product_count": 35,
+      "percentage": 0.09
+    },
+    {
+      "tag": "CXM",
+      "product_count": 35,
+      "percentage": 0.09
+    },
+    {
+      "tag": "6",
+      "product_count": 34,
+      "percentage": 0.09
+    },
+    {
+      "tag": "14K Anklets",
+      "product_count": 32,
+      "percentage": 0.08
+    },
+    {
+      "tag": "claw hair clip",
+      "product_count": 32,
+      "percentage": 0.08
+    },
+    {
+      "tag": "218",
+      "product_count": 32,
+      "percentage": 0.08
+    },
+    {
+      "tag": "Angel Wings",
+      "product_count": 32,
+      "percentage": 0.08
+    },
+    {
+      "tag": "Double Take",
+      "product_count": 30,
+      "percentage": 0.08
+    },
+    {
+      "tag": "315",
+      "product_count": 30,
+      "percentage": 0.08
+    },
+    {
+      "tag": "LOVE TREE",
+      "product_count": 30,
+      "percentage": 0.08
+    },
+    {
+      "tag": "FNK",
+      "product_count": 30,
+      "percentage": 0.08
+    },
+    {
+      "tag": "Haptics",
+      "product_count": 30,
+      "percentage": 0.08
+    },
+    {
+      "tag": "A@Y@Y",
+      "product_count": 30,
+      "percentage": 0.08
+    },
+    {
+      "tag": "M@O",
+      "product_count": 30,
+      "percentage": 0.08
+    },
+    {
+      "tag": "Necklaces",
+      "product_count": 27,
+      "percentage": 0.07
+    },
+    {
+      "tag": "$750-$2000",
+      "product_count": 27,
+      "percentage": 0.07
+    },
+    {
+      "tag": "A&D",
+      "product_count": 27,
+      "percentage": 0.07
+    },
+    {
+      "tag": "R@Z@Y@P",
+      "product_count": 27,
+      "percentage": 0.07
+    },
+    {
+      "tag": "-125",
+      "product_count": 26,
+      "percentage": 0.07
+    },
+    {
+      "tag": "M@S@M",
+      "product_count": 25,
+      "percentage": 0.06
+    },
+    {
+      "tag": "Dining",
+      "product_count": 25,
+      "percentage": 0.06
+    },
+    {
+      "tag": "Clothing",
+      "product_count": 25,
+      "percentage": 0.06
+    },
+    {
+      "tag": "116",
+      "product_count": 25,
+      "percentage": 0.06
+    },
+    {
+      "tag": "G@H",
+      "product_count": 25,
+      "percentage": 0.06
+    },
+    {
+      "tag": "SY Fly",
+      "product_count": 24,
+      "percentage": 0.06
+    },
+    {
+      "tag": "amandastore",
+      "product_count": 24,
+      "percentage": 0.06
+    },
+    {
+      "tag": "J.H.R.C",
+      "product_count": 24,
+      "percentage": 0.06
+    },
+    {
+      "tag": "10",
+      "product_count": 24,
+      "percentage": 0.06
+    },
+    {
+      "tag": "Handbags",
+      "product_count": 23,
+      "percentage": 0.06
+    },
+    {
+      "tag": "Bags",
+      "product_count": 23,
+      "percentage": 0.06
+    },
+    {
+      "tag": "_label_Donate",
+      "product_count": 23,
+      "percentage": 0.06
+    },
+    {
+      "tag": "Shipping delay Jan 22 - Feb 4",
+      "product_count": 22,
+      "percentage": 0.06
+    },
+    {
+      "tag": "Leggings Depot",
+      "product_count": 22,
+      "percentage": 0.06
+    },
+    {
+      "tag": "Drizzle",
+      "product_count": 21,
+      "percentage": 0.05
+    },
+    {
+      "tag": "S.F.M.B",
+      "product_count": 20,
+      "percentage": 0.05
+    },
+    {
+      "tag": "108",
+      "product_count": 20,
+      "percentage": 0.05
+    },
+    {
+      "tag": "Spring/Summer Tops",
+      "product_count": 20,
+      "percentage": 0.05
+    },
+    {
+      "tag": "G@S",
+      "product_count": 20,
+      "percentage": 0.05
+    },
+    {
+      "tag": "805",
+      "product_count": 20,
+      "percentage": 0.05
+    },
+    {
+      "tag": "Adinas Jewels",
+      "product_count": 20,
+      "percentage": 0.05
+    },
+    {
+      "tag": "cool socks",
+      "product_count": 19,
+      "percentage": 0.05
+    },
+    {
+      "tag": "Jackets + Coats Kids",
+      "product_count": 19,
+      "percentage": 0.05
+    },
+    {
+      "tag": "colorful socks",
+      "product_count": 17,
+      "percentage": 0.04
+    },
+    {
+      "tag": "208",
+      "product_count": 17,
+      "percentage": 0.04
+    },
+    {
+      "tag": "Anklets",
+      "product_count": 17,
+      "percentage": 0.04
+    },
+    {
+      "tag": "allisontest",
+      "product_count": 17,
+      "percentage": 0.04
+    },
+    {
+      "tag": "_label_madewithlove",
+      "product_count": 16,
+      "percentage": 0.04
+    },
+    {
+      "tag": "Shipping delay Jan 23 - Feb 5",
+      "product_count": 16,
+      "percentage": 0.04
+    },
+    {
+      "tag": "Devine",
+      "product_count": 16,
+      "percentage": 0.04
+    },
+    {
+      "tag": "Q@B@L",
+      "product_count": 15,
+      "percentage": 0.04
+    },
+    {
+      "tag": "cool keychain",
+      "product_count": 15,
+      "percentage": 0.04
+    },
+    {
+      "tag": "Accessories Kids",
+      "product_count": 14,
+      "percentage": 0.04
+    },
+    {
+      "tag": "Dresses Kids",
+      "product_count": 13,
+      "percentage": 0.03
+    },
+    {
+      "tag": "dress",
+      "product_count": 13,
+      "percentage": 0.03
+    },
+    {
+      "tag": "$2000+",
+      "product_count": 13,
+      "percentage": 0.03
+    },
+    {
+      "tag": "411",
+      "product_count": 13,
+      "percentage": 0.03
+    },
+    {
+      "tag": "7",
+      "product_count": 13,
+      "percentage": 0.03
+    },
+    {
+      "tag": "_label_bestseller",
+      "product_count": 13,
+      "percentage": 0.03
+    },
+    {
+      "tag": "YO",
+      "product_count": 13,
+      "percentage": 0.03
+    },
+    {
+      "tag": "swim sale",
+      "product_count": 12,
+      "percentage": 0.03
+    },
+    {
+      "tag": "318",
+      "product_count": 12,
+      "percentage": 0.03
+    },
+    {
+      "tag": "Clear",
+      "product_count": 12,
+      "percentage": 0.03
+    },
+    {
+      "tag": "211",
+      "product_count": 12,
+      "percentage": 0.03
+    },
+    {
+      "tag": "Shipping delay Jan 15 - Feb 5",
+      "product_count": 12,
+      "percentage": 0.03
+    },
+    {
+      "tag": "8",
+      "product_count": 12,
+      "percentage": 0.03
+    },
+    {
+      "tag": "$25-$50",
+      "product_count": 11,
+      "percentage": 0.03
+    },
+    {
+      "tag": "Baguette (CZ)",
+      "product_count": 11,
+      "percentage": 0.03
+    },
+    {
+      "tag": "back in stock",
+      "product_count": 11,
+      "percentage": 0.03
+    },
+    {
+      "tag": "14K Rings",
+      "product_count": 11,
+      "percentage": 0.03
+    },
+    {
+      "tag": "M.Z.Y",
+      "product_count": 10,
+      "percentage": 0.03
+    },
+    {
+      "tag": "CJY",
+      "product_count": 10,
+      "percentage": 0.03
+    },
+    {
+      "tag": "3",
+      "product_count": 10,
+      "percentage": 0.03
+    },
+    {
+      "tag": "309",
+      "product_count": 10,
+      "percentage": 0.03
+    },
+    {
+      "tag": "CATHSNNA",
+      "product_count": 10,
+      "percentage": 0.03
+    },
+    {
+      "tag": "A@Y@M",
+      "product_count": 10,
+      "percentage": 0.03
+    },
+    {
+      "tag": "MeiMei",
+      "product_count": 10,
+      "percentage": 0.03
+    },
+    {
+      "tag": "GZYZ",
+      "product_count": 9,
+      "percentage": 0.02
+    },
+    {
+      "tag": "Luxury",
+      "product_count": 9,
+      "percentage": 0.02
+    },
+    {
+      "tag": "SAGE+FIG",
+      "product_count": 9,
+      "percentage": 0.02
+    },
+    {
+      "tag": "FASHION STOCK",
+      "product_count": 8,
+      "percentage": 0.02
+    },
+    {
+      "tag": "Fall/Winter Shoes",
+      "product_count": 8,
+      "percentage": 0.02
+    },
+    {
+      "tag": "Black",
+      "product_count": 8,
+      "percentage": 0.02
+    },
+    {
+      "tag": "Shipping delay Jan 20 - Feb 10",
+      "product_count": 8,
+      "percentage": 0.02
+    },
+    {
+      "tag": "CUT TO ORDER",
+      "product_count": 8,
+      "percentage": 0.02
+    },
+    {
+      "tag": "Fall/Winter Rompers + Sets",
+      "product_count": 8,
+      "percentage": 0.02
+    },
+    {
+      "tag": "sock",
+      "product_count": 8,
+      "percentage": 0.02
+    },
+    {
+      "tag": "801",
+      "product_count": 8,
+      "percentage": 0.02
+    },
+    {
+      "tag": "100-200",
+      "product_count": 8,
+      "percentage": 0.02
+    },
+    {
+      "tag": "217",
+      "product_count": 7,
+      "percentage": 0.02
+    },
+    {
+      "tag": "_label_femalefounder",
+      "product_count": 7,
+      "percentage": 0.02
+    },
+    {
+      "tag": "Bangles",
+      "product_count": 7,
+      "percentage": 0.02
+    },
+    {
+      "tag": "14K Necklaces",
+      "product_count": 7,
+      "percentage": 0.02
+    },
+    {
+      "tag": "cardigan",
+      "product_count": 6,
+      "percentage": 0.02
+    },
+    {
+      "tag": "$800-$2000",
+      "product_count": 6,
+      "percentage": 0.02
+    },
+    {
+      "tag": "Cuddley",
+      "product_count": 6,
+      "percentage": 0.02
+    },
+    {
+      "tag": "JR",
+      "product_count": 6,
+      "percentage": 0.02
+    },
+    {
+      "tag": "Sunglasses",
+      "product_count": 5,
+      "percentage": 0.01
+    },
+    {
+      "tag": "GZXK",
+      "product_count": 5,
+      "percentage": 0.01
+    },
+    {
+      "tag": "badge_limited_edition",
+      "product_count": 5,
+      "percentage": 0.01
+    },
+    {
+      "tag": "Shipping and Packing Materials",
+      "product_count": 5,
+      "percentage": 0.01
+    },
+    {
+      "tag": "adinacheckallchannels",
+      "product_count": 5,
+      "percentage": 0.01
+    },
+    {
+      "tag": "adinacheckpt2",
+      "product_count": 5,
+      "percentage": 0.01
+    },
+    {
+      "tag": "Shipping delay Jan 16 - Feb 10",
+      "product_count": 5,
+      "percentage": 0.01
+    },
+    {
+      "tag": "G.Z.K.X",
+      "product_count": 5,
+      "percentage": 0.01
+    },
+    {
+      "tag": "bead",
+      "product_count": 5,
+      "percentage": 0.01
+    },
+    {
+      "tag": "Y&X",
+      "product_count": 5,
+      "percentage": 0.01
+    },
+    {
+      "tag": "M@Y",
+      "product_count": 5,
+      "percentage": 0.01
+    },
+    {
+      "tag": "mini skirt",
+      "product_count": 4,
+      "percentage": 0.01
+    },
+    {
+      "tag": "5",
+      "product_count": 4,
+      "percentage": 0.01
+    },
+    {
+      "tag": "Aqua Blue",
+      "product_count": 4,
+      "percentage": 0.01
+    },
+    {
+      "tag": "accessories",
+      "product_count": 4,
+      "percentage": 0.01
+    },
+    {
+      "tag": "A%L",
+      "product_count": 4,
+      "percentage": 0.01
+    },
+    {
+      "tag": "Kewlstreet",
+      "product_count": 4,
+      "percentage": 0.01
+    },
+    {
+      "tag": "Y@X@N@H",
+      "product_count": 4,
+      "percentage": 0.01
+    },
+    {
+      "tag": "Shoes Kids",
+      "product_count": 4,
+      "percentage": 0.01
+    },
+    {
+      "tag": "-150",
+      "product_count": 3,
+      "percentage": 0.01
+    },
+    {
+      "tag": "athleisure",
+      "product_count": 3,
+      "percentage": 0.01
+    },
+    {
+      "tag": "Hats",
+      "product_count": 3,
+      "percentage": 0.01
+    },
+    {
+      "tag": "jewelry sale",
+      "product_count": 3,
+      "percentage": 0.01
+    },
+    {
+      "tag": "Fragrance",
+      "product_count": 3,
+      "percentage": 0.01
+    },
+    {
+      "tag": "Blazer",
+      "product_count": 3,
+      "percentage": 0.01
+    },
+    {
+      "tag": "405",
+      "product_count": 3,
+      "percentage": 0.01
+    },
+    {
+      "tag": "-300",
+      "product_count": 3,
+      "percentage": 0.01
+    },
+    {
+      "tag": "Womens",
+      "product_count": 3,
+      "percentage": 0.01
+    },
+    {
+      "tag": "212",
+      "product_count": 3,
+      "percentage": 0.01
+    },
+    {
+      "tag": "earring set",
+      "product_count": 2,
+      "percentage": 0.01
+    },
+    {
+      "tag": "-800",
+      "product_count": 2,
+      "percentage": 0.01
+    },
+    {
+      "tag": "GG21",
+      "product_count": 2,
+      "percentage": 0.01
+    },
+    {
+      "tag": "24-42",
+      "product_count": 2,
+      "percentage": 0.01
+    },
+    {
+      "tag": "Gloves",
+      "product_count": 2,
+      "percentage": 0.01
+    },
+    {
+      "tag": "215",
+      "product_count": 2,
+      "percentage": 0.01
+    },
+    {
+      "tag": "AJ Accessories",
+      "product_count": 2,
+      "percentage": 0.01
+    },
+    {
+      "tag": "4",
+      "product_count": 2,
+      "percentage": 0.01
+    },
+    {
+      "tag": "cherry",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "fall 2",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "blah blah blah",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "babes socks",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "celestial",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "best sellers",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "anklet",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "-2000",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "-200",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "bow",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "color-white",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "bag",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "earrings",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "ATTV_GLOBAL_EXCLUSION_TAG",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "Brass",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "260-1",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "bread",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "-600",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "classic guy",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "boba",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "$50-$101",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "Mens",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "423",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "Butterfly",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "california socks",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "Drop Earrings",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "Diamond",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "bezel",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "_label_donate",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "-1000",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "cat",
+      "product_count": 1,
+      "percentage": 0.0
+    },
+    {
+      "tag": "Evil Eye",
+      "product_count": 1,
+      "percentage": 0.0
+    }
+  ],
+  "price_distribution": [
+    {
+      "price_range": "Under $50",
+      "product_count": 18899,
+      "percentage": 47.94
+    },
+    {
+      "price_range": "$50-$100",
+      "product_count": 7870,
+      "percentage": 19.96
+    },
+    {
+      "price_range": "$100-$250",
+      "product_count": 5227,
+      "percentage": 13.26
+    },
+    {
+      "price_range": "$250-$500",
+      "product_count": 3133,
+      "percentage": 7.95
+    },
+    {
+      "price_range": "$500-$1000",
+      "product_count": 2059,
+      "percentage": 5.22
+    },
+    {
+      "price_range": "$1000+",
+      "product_count": 2235,
+      "percentage": 5.67
+    }
+  ],
+  "brand_distribution": [],
+  "product_type_distribution": [
+    {
+      "product_type": "Ring",
+      "product_count": 13040,
+      "percentage": 33.04
+    },
+    {
+      "product_type": "Necklace",
+      "product_count": 5739,
+      "percentage": 14.54
+    },
+    {
+      "product_type": "Bracelet",
+      "product_count": 2795,
+      "percentage": 7.08
+    },
+    {
+      "product_type": "Chain",
+      "product_count": 2601,
+      "percentage": 6.59
+    },
+    {
+      "product_type": "Dress",
+      "product_count": 1954,
+      "percentage": 4.95
+    },
+    {
+      "product_type": "Charm",
+      "product_count": 1298,
+      "percentage": 3.29
+    },
+    {
+      "product_type": "Shirt",
+      "product_count": 1194,
+      "percentage": 3.03
+    },
+    {
+      "product_type": "Pants",
+      "product_count": 1125,
+      "percentage": 2.85
+    },
+    {
+      "product_type": "Jacket",
+      "product_count": 1030,
+      "percentage": 2.61
+    },
+    {
+      "product_type": "Top",
+      "product_count": 1010,
+      "percentage": 2.56
+    },
+    {
+      "product_type": "Choker",
+      "product_count": 930,
+      "percentage": 2.36
+    },
+    {
+      "product_type": "Jeans",
+      "product_count": 889,
+      "percentage": 2.25
+    },
+    {
+      "product_type": "Shorts",
+      "product_count": 879,
+      "percentage": 2.23
+    },
+    {
+      "product_type": "T-shirt",
+      "product_count": 817,
+      "percentage": 2.07
+    },
+    {
+      "product_type": "Anklet",
+      "product_count": 680,
+      "percentage": 1.72
+    },
+    {
+      "product_type": "Pendant",
+      "product_count": 538,
+      "percentage": 1.36
+    },
+    {
+      "product_type": "Hat",
+      "product_count": 435,
+      "percentage": 1.1
+    },
+    {
+      "product_type": "Bangle",
+      "product_count": 417,
+      "percentage": 1.06
+    },
+    {
+      "product_type": "Sweater",
+      "product_count": 323,
+      "percentage": 0.82
+    },
+    {
+      "product_type": "Skirt",
+      "product_count": 318,
+      "percentage": 0.81
+    },
+    {
+      "product_type": "Suit",
+      "product_count": 306,
+      "percentage": 0.78
+    },
+    {
+      "product_type": "Earrings",
+      "product_count": 238,
+      "percentage": 0.6
+    },
+    {
+      "product_type": "Coat",
+      "product_count": 219,
+      "percentage": 0.55
+    },
+    {
+      "product_type": "Blouse",
+      "product_count": 145,
+      "percentage": 0.37
+    },
+    {
+      "product_type": "Hoodie",
+      "product_count": 136,
+      "percentage": 0.34
+    },
+    {
+      "product_type": "Sunglasses",
+      "product_count": 113,
+      "percentage": 0.29
+    },
+    {
+      "product_type": "Hoops",
+      "product_count": 108,
+      "percentage": 0.27
+    },
+    {
+      "product_type": "Blazer",
+      "product_count": 89,
+      "percentage": 0.23
+    },
+    {
+      "product_type": "Studs",
+      "product_count": 55,
+      "percentage": 0.14
+    },
+    {
+      "product_type": "Watch",
+      "product_count": 15,
+      "percentage": 0.04
+    },
+    {
+      "product_type": "Boots",
+      "product_count": 12,
+      "percentage": 0.03
+    },
+    {
+      "product_type": "Huggies",
+      "product_count": 9,
+      "percentage": 0.02
+    },
+    {
+      "product_type": "Scarf",
+      "product_count": 7,
+      "percentage": 0.02
+    },
+    {
+      "product_type": "Shoes",
+      "product_count": 5,
+      "percentage": 0.01
+    }
+  ],
+  "timestamp": "2025-04-16 18:20:55",
+  "execution_time": 1.7351527214050293
+}

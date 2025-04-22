@@ -1,12 +1,13 @@
 """
-Memory integration module for AI Stylist.
-Compatible with CAMEL-AI 0.2.43.
+Asynchronous Memory Integration for AI Stylist.
 
 This module provides functions to set up and manage memory for the AI Stylist,
-using CAMEL's memory system with robust fallbacks and error handling.
+using CAMEL's memory system with async support.
+Compatible with CAMEL-AI 0.2.43.
 """
 
 import logging
+import asyncio
 from typing import Tuple, List, Dict, Any, Optional
 
 # Import our adapter first to ensure OpenAI embedding compatibility
@@ -35,12 +36,12 @@ from camel.storages import QdrantStorage
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("memory_integration")
+logger = logging.getLogger("memory_integration_async")
 
-def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: int = 2048) -> LongtermAgentMemory:
+async def setup_stylist_memory_async(model_type: ModelType = ModelType.GPT_4O, token_limit: int = 2048) -> LongtermAgentMemory:
     """
     Initialize the memory system for the AI stylist using CAMEL's LongtermAgentMemory.
-    Updated for CAMEL-AI 0.2.43
+    Async version compatible with CAMEL-AI 0.2.43
     
     Args:
         model_type: Type of model to use for token counting
@@ -56,7 +57,8 @@ def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: 
         token_counter = OpenAITokenCounter(model_type)
         
         # Initialize the memory with appropriate context creator and blocks
-        # Updated for CAMEL-AI 0.2.43
+        # Note: Current CAMEL version doesn't have async methods for memory setup
+        # We're using to_thread to make it non-blocking
         try:
             # Create embedding model
             embedding_model = OpenAIEmbedding()
@@ -68,7 +70,8 @@ def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: 
             )
             
             # Create memory with all blocks
-            memory = LongtermAgentMemory(
+            memory = await asyncio.to_thread(
+                LongtermAgentMemory,
                 context_creator=ScoreBasedContextCreator(
                     token_counter=token_counter,
                     token_limit=token_limit,
@@ -80,7 +83,8 @@ def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: 
         except Exception as e:
             logger.error(f"Error setting up VectorDBBlock: {e}")
             # Try without vector block
-            memory = LongtermAgentMemory(
+            memory = await asyncio.to_thread(
+                LongtermAgentMemory,
                 context_creator=ScoreBasedContextCreator(
                     token_counter=token_counter,
                     token_limit=token_limit,
@@ -97,7 +101,8 @@ def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: 
         # Create a minimal fallback memory if the full setup fails
         try:
             # Simple memory without vector DB block to avoid embedding issues
-            fallback_memory = LongtermAgentMemory(
+            fallback_memory = await asyncio.to_thread(
+                LongtermAgentMemory,
                 context_creator=ScoreBasedContextCreator(
                     token_counter=OpenAITokenCounter(ModelType.GPT_3_5_TURBO),
                     token_limit=1024,
@@ -110,7 +115,8 @@ def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: 
             logger.error(f"Failed to create fallback memory: {e2}")
             # Last resort: return a very basic memory system
             try:
-                minimal_memory = LongtermAgentMemory(
+                minimal_memory = await asyncio.to_thread(
+                    LongtermAgentMemory,
                     context_creator=ScoreBasedContextCreator(
                         token_counter=OpenAITokenCounter(ModelType.GPT_3_5_TURBO),
                         token_limit=512,
@@ -122,10 +128,10 @@ def setup_stylist_memory(model_type: ModelType = ModelType.GPT_4O, token_limit: 
                 logger.error(f"Failed to create even minimal memory: {e3}")
                 raise RuntimeError("Unable to create any memory system")
 
-def add_message_to_memory(memory: LongtermAgentMemory, content: str, sender: str, 
+async def add_message_to_memory_async(memory: LongtermAgentMemory, content: str, sender: str, 
                          metadata: Optional[Dict[str, Any]] = None) -> bool:
     """
-    Add a message to the agent's memory.
+    Add a message to the agent's memory asynchronously.
     
     Args:
         memory: LongtermAgentMemory instance
@@ -160,7 +166,8 @@ def add_message_to_memory(memory: LongtermAgentMemory, content: str, sender: str
                 metadata=metadata or {},
             )
         
-        memory.write_records([record])
+        # Use asyncio.to_thread to make this non-blocking
+        await asyncio.to_thread(memory.write_records, [record])
         logger.info(f"Added {sender} message to memory: {content[:50]}...")
         return True
     
@@ -168,9 +175,9 @@ def add_message_to_memory(memory: LongtermAgentMemory, content: str, sender: str
         logger.error(f"Error adding message to memory: {e}")
         return False
 
-def get_memory_context(memory: LongtermAgentMemory) -> Tuple[List[Dict[str, str]], int]:
+async def get_memory_context_async(memory: LongtermAgentMemory) -> Tuple[List[Dict[str, str]], int]:
     """
-    Get context from the agent's memory with robust fallback options.
+    Get context from the agent's memory with robust fallback options asynchronously.
     Updated for CAMEL-AI 0.2.43.
     
     Args:
@@ -186,7 +193,8 @@ def get_memory_context(memory: LongtermAgentMemory) -> Tuple[List[Dict[str, str]
     try:
         # Try getting context - this may use embeddings which could fail with API changes
         try:
-            context, tokens = memory.get_context()
+            # Use asyncio.to_thread to make this non-blocking
+            context, tokens = await asyncio.to_thread(memory.get_context)
             logger.info(f"Retrieved memory context with {len(context)} messages and {tokens} tokens")
             return context, tokens
         except Exception as e:
@@ -196,7 +204,11 @@ def get_memory_context(memory: LongtermAgentMemory) -> Tuple[List[Dict[str, str]
             try:
                 # Access the memory records directly if available
                 if hasattr(memory, 'chat_history_block') and hasattr(memory.chat_history_block, 'memory'):
-                    history_records = list(memory.chat_history_block.memory.values())
+                    # Use to_thread to retrieve this in a non-blocking way
+                    history_records = await asyncio.to_thread(
+                        lambda: list(memory.chat_history_block.memory.values()) if memory.chat_history_block.memory else []
+                    )
+                    
                     # Format the history records into context messages
                     context = []
                     
@@ -222,9 +234,9 @@ def get_memory_context(memory: LongtermAgentMemory) -> Tuple[List[Dict[str, str]
         logger.error(f"Error getting context from memory: {e}")
         return [], 0
 
-def save_memory_to_disk(memory: LongtermAgentMemory, path: str) -> bool:
+async def save_memory_to_disk_async(memory: LongtermAgentMemory, path: str) -> bool:
     """
-    Save the memory state to disk for persistence.
+    Save the memory state to disk for persistence asynchronously.
     
     Args:
         memory: LongtermAgentMemory instance
@@ -238,16 +250,17 @@ def save_memory_to_disk(memory: LongtermAgentMemory, path: str) -> bool:
         return False
     
     try:
-        memory.save(path)
+        # Use asyncio.to_thread to make this non-blocking
+        await asyncio.to_thread(memory.save, path)
         logger.info(f"Memory saved to {path}")
         return True
     except Exception as e:
         logger.error(f"Error saving memory to {path}: {e}")
         return False
 
-def load_memory_from_disk(path: str) -> Optional[LongtermAgentMemory]:
+async def load_memory_from_disk_async(path: str) -> Optional[LongtermAgentMemory]:
     """
-    Load memory state from disk.
+    Load memory state from disk asynchronously.
     
     Args:
         path: Path to load the memory from
@@ -256,17 +269,18 @@ def load_memory_from_disk(path: str) -> Optional[LongtermAgentMemory]:
         LongtermAgentMemory if successful, None otherwise
     """
     try:
-        memory = LongtermAgentMemory.load(path)
+        # Use asyncio.to_thread to make this non-blocking
+        memory = await asyncio.to_thread(LongtermAgentMemory.load, path)
         logger.info(f"Memory loaded from {path}")
         return memory
     except Exception as e:
         logger.error(f"Error loading memory from {path}: {e}")
         return None
 
-def add_product_to_memory(memory: LongtermAgentMemory, product: Dict[str, Any], 
+async def add_product_to_memory_async(memory: LongtermAgentMemory, product: Dict[str, Any], 
                          interaction_type: str = "recommendation") -> bool:
     """
-    Add product interaction information to memory.
+    Add product interaction information to memory asynchronously.
     
     Args:
         memory: LongtermAgentMemory instance
@@ -324,7 +338,8 @@ def add_product_to_memory(memory: LongtermAgentMemory, product: Dict[str, Any],
             metadata=metadata,
         )
         
-        memory.write_records([record])
+        # Use asyncio.to_thread to make this non-blocking
+        await asyncio.to_thread(memory.write_records, [record])
         logger.info(f"Added product interaction to memory: {product_title}")
         return True
         
@@ -332,10 +347,10 @@ def add_product_to_memory(memory: LongtermAgentMemory, product: Dict[str, Any],
         logger.error(f"Error adding product to memory: {e}")
         return False
 
-def add_user_preference_to_memory(memory: LongtermAgentMemory, preference_type: str, 
+async def add_user_preference_to_memory_async(memory: LongtermAgentMemory, preference_type: str, 
                                 preference_value: Any) -> bool:
     """
-    Add user preference information to memory.
+    Add user preference information to memory asynchronously.
     
     Args:
         memory: LongtermAgentMemory instance
@@ -375,7 +390,8 @@ def add_user_preference_to_memory(memory: LongtermAgentMemory, preference_type: 
             metadata=metadata,
         )
         
-        memory.write_records([record])
+        # Use asyncio.to_thread to make this non-blocking
+        await asyncio.to_thread(memory.write_records, [record])
         logger.info(f"Added user preference to memory: {preference_type} = {value_str}")
         return True
         
@@ -383,9 +399,9 @@ def add_user_preference_to_memory(memory: LongtermAgentMemory, preference_type: 
         logger.error(f"Error adding user preference to memory: {e}")
         return False
 
-def clear_memory(memory: LongtermAgentMemory) -> bool:
+async def clear_memory_async(memory: LongtermAgentMemory) -> bool:
     """
-    Clear all memory records.
+    Clear all memory records asynchronously.
     
     Args:
         memory: LongtermAgentMemory instance
@@ -408,8 +424,8 @@ def clear_memory(memory: LongtermAgentMemory) -> bool:
         )
         
         # Clear existing records and add the reset marker
-        memory.clear()
-        memory.write_records([reset_record])
+        await asyncio.to_thread(memory.clear)
+        await asyncio.to_thread(memory.write_records, [reset_record])
         
         logger.info("Memory has been cleared")
         return True
@@ -418,9 +434,9 @@ def clear_memory(memory: LongtermAgentMemory) -> bool:
         logger.error(f"Error clearing memory: {e}")
         return False
 
-def optimize_memory(memory: LongtermAgentMemory) -> bool:
+async def optimize_memory_async(memory: LongtermAgentMemory) -> bool:
     """
-    Optimize memory by removing redundant information.
+    Optimize memory by removing redundant information asynchronously.
     
     Args:
         memory: LongtermAgentMemory instance
@@ -434,7 +450,7 @@ def optimize_memory(memory: LongtermAgentMemory) -> bool:
         
     try:
         # Get current context
-        context, _ = get_memory_context(memory)
+        context, _ = await get_memory_context_async(memory)
         
         if not context:
             logger.info("No context to optimize")

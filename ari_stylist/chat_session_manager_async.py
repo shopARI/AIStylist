@@ -1,18 +1,27 @@
+"""
+Asynchronous Chat Session Manager for AI Stylist.
+
+This module manages chat sessions and provides an interface for handling
+asynchronous conversations with the AI Stylist.
+Compatible with CAMEL-AI 0.2.43.
+"""
+
 import datetime
 import uuid
 import re
 import json
 import logging
+import asyncio
 from typing import Dict, Any, Optional, Tuple, List
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("chat_session_manager")
+logger = logging.getLogger("chat_session_manager_async")
 
-class ChatSession:
+class ChatSessionAsync:
     """
     Maintains the state and history of a continuous chat session with a user,
-    using CAMEL's memory system.
+    using CAMEL's memory system with async support.
     """
     
     def __init__(
@@ -39,9 +48,12 @@ class ChatSession:
         self.context = {}
         self.current_products_context = []
         
+        # Lock for concurrent access to messages
+        self.messages_lock = asyncio.Lock()
+        
         logger.info(f"Created new chat session: {self.session_id}")
     
-    def add_message(self, content: str, sender: str, related_products: List[str] = None) -> Dict[str, Any]:
+    async def add_message(self, content: str, sender: str, related_products: List[str] = None) -> Dict[str, Any]:
         """
         Add a message to the chat session
         
@@ -65,9 +77,10 @@ class ChatSession:
             "related_products": related_products or []
         }
         
-        # Add to local state
-        self.messages.append(message)
-        self.last_activity_time = timestamp
+        # Add to local state with lock to prevent concurrent modification
+        async with self.messages_lock:
+            self.messages.append(message)
+            self.last_activity_time = timestamp
         
         # Add to memory if available
         if self.memory:
@@ -93,15 +106,17 @@ class ChatSession:
                         role_at_backend=OpenAIBackendRole.ASSISTANT,
                     )
                 
-                self.memory.write_records([record])
+                # Note: CAMEL 0.2.43 doesn't have an async write_records method
+                # This will be a blocking call - in a real implementation, you would
+                # run this in a separate thread or use an async-compatible memory system
+                await asyncio.to_thread(self.memory.write_records, [record])
                 logger.info(f"Added {sender} message to CAMEL memory")
             except Exception as e:
                 logger.error(f"Error adding message to CAMEL memory: {e}")
         
         return message
     
-
-    def get_memory_context(self) -> Tuple[List[Dict[str, str]], int]:
+    async def get_memory_context(self) -> Tuple[List[Dict[str, str]], int]:
         """
         Get context from CAMEL memory with robust error handling for CAMEL 2.43
         
@@ -110,11 +125,11 @@ class ChatSession:
         """
         if self.memory:
             try:
-                # Import the get_memory_context function from memory_integration
-                from memory_integration import get_memory_context
+                # Import the get_memory_context function from memory_integration_async
+                from memory_integration_async import get_memory_context_async
                 
                 # Use the enhanced version with better error handling
-                return get_memory_context(self.memory)
+                return await get_memory_context_async(self.memory)
                 
             except Exception as e:
                 logger.error(f"Error getting context from CAMEL memory: {e}")
@@ -122,7 +137,7 @@ class ChatSession:
                 # Fallback: Return recent chat history directly
                 try:
                     # Format recent messages as context
-                    recent_history = self.get_conversation_history(limit=5)
+                    recent_history = await self.get_conversation_history(limit=5)
                     context = []
                     
                     for msg in recent_history:
@@ -140,7 +155,7 @@ class ChatSession:
         
         return [], 0
     
-    def get_conversation_history(self, limit: int = 10) -> List[Dict[str, Any]]:
+    async def get_conversation_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """
         Get the recent conversation history
         
@@ -150,23 +165,26 @@ class ChatSession:
         Returns:
             List of recent messages
         """
-        if not self.messages:
-            return []
-            
-        # Return the most recent messages, up to the limit
-        return self.messages[-limit:]
+        async with self.messages_lock:
+            if not self.messages:
+                return []
+                
+            # Return the most recent messages, up to the limit
+            return self.messages[-limit:]
     
-    def update_product_context(self, products: List[Dict[str, Any]]):
+    async def update_product_context(self, products: List[Dict[str, Any]]):
         """
         Update the current products in context
         
         Args:
             products: List of product dictionaries
         """
-        self.current_products_context = products
+        async with self.messages_lock:
+            self.current_products_context = products
+        
         logger.info(f"Updated product context with {len(products)} products")
         
-    def get_or_fetch_user_preferences(self) -> Dict[str, Any]:
+    async def get_or_fetch_user_preferences(self) -> Dict[str, Any]:
         """
         Get the user's preferences or fetch from knowledge graph if needed
         
@@ -179,7 +197,7 @@ class ChatSession:
         # If we have a user ID and product knowledge graph, try to fetch preferences
         if self.user_id and self.product_kg:
             try:
-                preferences = self.product_kg.get_user_preferences(self.user_id)
+                preferences = await self.product_kg.get_user_preferences(self.user_id)
                 self.context["user_preferences"] = preferences
                 return preferences
             except Exception as e:
@@ -193,7 +211,7 @@ class ChatSession:
             "budget_range": None
         }
     
-    def add_interaction_context(self, key: str, value: Any):
+    async def add_interaction_context(self, key: str, value: Any):
         """
         Add contextual information to the chat session
         
@@ -205,10 +223,10 @@ class ChatSession:
         logger.info(f"Added interaction context: {key}")
 
 
-class ChatManager:
+class ChatManagerAsync:
     """
     Manages multiple chat sessions and provides the interface for chat functionality
-    using CAMEL's memory and retrieval systems.
+    using CAMEL's memory and retrieval systems with async support.
     """
     
     def __init__(
@@ -225,10 +243,11 @@ class ChatManager:
         
         # Store active sessions
         self.active_sessions = {}
+        self.sessions_lock = asyncio.Lock()
         
-        logger.info("Chat Manager initialized")
+        logger.info("Async Chat Manager initialized")
     
-    def get_or_create_session(self, session_id: Optional[str] = None, user_id: Optional[str] = None) -> ChatSession:
+    async def get_or_create_session(self, session_id: Optional[str] = None, user_id: Optional[str] = None) -> ChatSessionAsync:
         """
         Get an existing session or create a new one
         
@@ -240,20 +259,22 @@ class ChatManager:
             Chat session object
         """
         # If session ID provided and exists, return it
-        if session_id and session_id in self.active_sessions:
-            return self.active_sessions[session_id]
+        if session_id:
+            async with self.sessions_lock:
+                if session_id in self.active_sessions:
+                    return self.active_sessions[session_id]
         
         # Create new memory for this session
         memory = None
         if self.memory_setup_func:
             try:
-                memory = self.memory_setup_func()
+                memory = await self.memory_setup_func()
                 logger.info("Created new memory for session")
             except Exception as e:
                 logger.error(f"Failed to create memory: {e}")
         
         # Create new session
-        session = ChatSession(
+        session = ChatSessionAsync(
             session_id=session_id,
             user_id=user_id,
             stylist_agent=self.stylist_agent,
@@ -263,16 +284,16 @@ class ChatManager:
         )
         
         # Store in active sessions
-        self.active_sessions[session.session_id] = session
+        async with self.sessions_lock:
+            self.active_sessions[session.session_id] = session
         
         # If user ID provided, load user preferences
         if user_id:
-            session.get_or_fetch_user_preferences()
+            await session.get_or_fetch_user_preferences()
         
         return session
     
-
-    def _handle_meta_question(self, session: ChatSession, message: str) -> Optional[Tuple[str, Dict[str, Any]]]:
+    async def _handle_meta_question(self, session: ChatSessionAsync, message: str) -> Optional[Tuple[str, Dict[str, Any]]]:
         """
         Handle follow-up responses and meta-questions using CAMEL memory
         Compatible with CAMEL 2.43
@@ -286,7 +307,7 @@ class ChatManager:
         """
         # Get CAMEL memory context with improved error handling
         try:
-            memory_context, token_count = session.get_memory_context()
+            memory_context, token_count = await session.get_memory_context()
             
             if not memory_context or len(memory_context) < 2:  # Need at least previous Q&A
                 logger.info("Insufficient context in memory for meta-question handling")
@@ -316,18 +337,21 @@ class ChatManager:
                 from camel.messages import BaseMessage
                 
                 # Add user message to session first
-                session.add_message(message, "user")
+                await session.add_message(message, "user")
                 
                 meta_message = BaseMessage.make_user_message(
                     role_name="User",
                     content=meta_question_prompt
                 )
                 
-                agent_response = session.stylist_agent.step(meta_message)
+                # Note: CAMEL 0.2.43 doesn't have an async step method
+                # This will be a blocking call - in a real implementation, you would
+                # run this in a separate thread or use an async-compatible agent
+                agent_response = await asyncio.to_thread(session.stylist_agent.step, meta_message)
                 response_text = agent_response.msg.content
                 
                 # Add agent message to session
-                session.add_message(response_text, "agent")
+                await session.add_message(response_text, "agent")
                 
                 logger.info("Handled meta-question successfully")
                 
@@ -451,45 +475,37 @@ class ChatManager:
         logger.info(f"Extracted parameters: {params}")
         return params
     
-    def _handle_product_search(self, session: ChatSession, message: str) -> Tuple[str, Dict[str, Any]]:
+    async def _handle_product_search(self, session: ChatSessionAsync, message: str) -> Tuple[str, Dict[str, Any]]:
         """
         Handle product search requests
-        
-        Args:
-            session: Chat session
-            message: User message
-            
-        Returns:
-            Tuple of (response message, additional data)
         """
         # Add user message to session
-        session.add_message(message, "user")
+        await session.add_message(message, "user")
         
         # Extract parameters from the message
         params = self._extract_parameters(message)
         
         # Get user preferences to augment the search
-        user_preferences = session.get_or_fetch_user_preferences()
+        user_preferences = await session.get_or_fetch_user_preferences()
+        
+        # Debug logging
+        logger.info(f"Search parameters extracted: {params}")
         
         # Combine explicit parameters with user preferences when appropriate
         if not params.get("collection") and user_preferences.get("preferred_collections"):
-            # Only use preferred collection if the user didn't specify one
             params["collection"] = user_preferences["preferred_collections"][0] if user_preferences["preferred_collections"] else None
         
-        # Transform materials into tags for proper database search
-        if params.get("materials") and not params.get("tag"):
-            params["tag"] = params["materials"][0]
-        
-        # Same for colors - treat them as tags
-        if params.get("colors") and not params.get("tag"):
-            params["tag"] = params["colors"][0]
+        # Make sure occasion is also used as a tag for searching
+        if params.get("occasion") and not params.get("tag"):
+            params["tag"] = params.get("occasion")
+            logger.info(f"Using occasion as tag: {params['tag']}")
         
         # Perform search using knowledge graph
         search_results = []
         if session.product_kg:
             try:
                 # Use the updated schema-compatible method
-                search_results = session.product_kg.get_product_by_filter(
+                search_results = await session.product_kg.get_product_by_filter(
                     category=params.get("category"),
                     collection=params.get("collection"),
                     tag=params.get("tag"),
@@ -497,8 +513,33 @@ class ChatManager:
                     max_price=params.get("max_price"),
                     limit=5
                 )
-                
+                # Filter out test/untitled products and zero-priced items
+                filtered_results = []
+                for product in search_results:
+                    if (product.get('price', 0) > 0 and 
+                        product.get('title') and 
+                        'test' not in product.get('title', '').lower() and
+                        'untitled' not in product.get('title', '').lower()):
+                        filtered_results.append(product)
+
+                # Replace search_results with filtered_results
+                search_results = filtered_results
                 logger.info(f"Found {len(search_results)} products from knowledge graph")
+                
+                # If no results, try a more general search
+                if not search_results and params.get("tag"):
+                    logger.info(f"No results found, trying fallback search")
+                    # Try searching with just the category
+                    if params.get("category"):
+                        search_results = await session.product_kg.get_product_by_filter(
+                            category=params.get("category"),
+                            limit=5
+                        )
+                        logger.info(f"Fallback search by category found {len(search_results)} products")
+                    else:
+                        # Get popular products as fallback
+                        search_results = await session.product_kg.get_popular_products(limit=5)
+                        logger.info(f"Fallback to popular products found {len(search_results)} products")
                 
             except Exception as e:
                 logger.error(f"Error searching products in knowledge graph: {e}")
@@ -526,7 +567,7 @@ class ChatManager:
                     nl_query += f"under ${params.get('max_price')} "
                 
                 # Use natural language search with the product retriever
-                retriever_results = session.product_retriever.search_by_natural_language(nl_query, limit=5)
+                retriever_results = await session.product_retriever.search_by_natural_language(nl_query, limit=5)
                 
                 if retriever_results:
                     logger.info(f"Found {len(retriever_results)} additional products from retriever")
@@ -548,11 +589,11 @@ class ChatManager:
         
         # Update session with current products context
         if search_results:
-            session.update_product_context(search_results)
+            await session.update_product_context(search_results)
         
         # Prepare data for the agent context
         conversation_context = ""
-        recent_history = session.get_conversation_history(limit=5)
+        recent_history = await session.get_conversation_history(limit=5)
         for msg in recent_history:
             sender = "User" if msg["sender"] == "user" else "Stylist"
             conversation_context += f"{sender}: {msg['content']}\n\n"
@@ -601,13 +642,48 @@ class ChatManager:
         - Explain why you're suggesting each piece (fabric quality, versatility, current trends, etc.)
         - Express genuine enthusiasm for pieces you think would work particularly well
         - Use phrases like "I'd recommend" or "I think you'd look great in" rather than just listing options
-
+        - Speak conversationally as their personal stylist, Ari
+        - Be specific about product details including exact names and prices
+        - Explain why each item would work well for their needs
+        - If recommending multiple items, describe each one clearly
         Here are the products I've found:
+         d"""
+
+        # Add specific product details to the context
+        for idx, product in enumerate(search_results, 1):
+            title = product.get('title', 'Stylish item')
+            price = product.get('price', 0)
+            categories = ", ".join(product.get('categories', []))
+            description = product.get('description', '')
+            
+            # Format each product with clear details
+            agent_context += f"\nProduct {idx}: {title}\n"
+            agent_context += f"- ID: {product.get('id', '')}\n"
+            agent_context += f"- Price: ${price}\n"
+            agent_context += f"- Categories: {categories}\n"
+            
+            if description and len(description) > 100:
+                description = description[:100] + "..."
+            if description:
+                agent_context += f"- Description: {description}\n"
+
+        # If no products were found, provide guidance
+        if not search_results:
+            agent_context += """
+        I couldn't find exact product matches for their request. Please:
+        - Acknowledge that we don't have the exact items they're looking for
+        - Suggest general style advice based on their query
+        - Ask follow-up questions to better understand their needs
+        """
+
+        agent_context += """
+        IMPORTANT: Always mention specific product names and prices in your response.
+        Respond as if you're having a friendly styling consultation, making the client feel understood and excited about these options.
+        """
 
         {' '.join(product_descriptions)}
 
-        Respond as if you're having a friendly styling consultation in person, making the client feel understood and excited about these options.
-        """
+    
         
         # Send context to the agent
         try:
@@ -617,14 +693,17 @@ class ChatManager:
                 content=agent_context
             )
             
-            agent_response = session.stylist_agent.step(user_message)
+            # Note: CAMEL 0.2.43 doesn't have an async step method
+            # This will be a blocking call - in a real implementation, you would
+            # run this in a separate thread or use an async-compatible agent
+            agent_response = await asyncio.to_thread(session.stylist_agent.step, user_message)
             response_text = agent_response.msg.content
             
             # Apply post-processing to ensure natural conversation
             response_text = self._naturalize_response(response_text)
             
             # Add agent message to session
-            agent_message = session.add_message(response_text, "agent", related_products=product_ids)
+            agent_message = await session.add_message(response_text, "agent", related_products=product_ids)
             
             # Return the response and result data
             result_data = {
@@ -641,7 +720,7 @@ class ChatManager:
             fallback_response = "I'm sorry, I'm having trouble finding products that match your request right now. Could you try describing what you're looking for in a different way, or perhaps be more specific about the type of item you need?"
             
             # Add fallback response to session
-            session.add_message(fallback_response, "agent")
+            await session.add_message(fallback_response, "agent")
             
             return fallback_response, {
                 "result_type": "error",
@@ -650,14 +729,8 @@ class ChatManager:
     
     def _naturalize_response(self, response_text: str) -> str:
         """
-        Post-process agent responses to remove robotic formatting elements
-        and enhance natural conversational flow.
-        
-        Args:
-            response_text: Original response from the agent
-            
-        Returns:
-            Naturalized response text
+        Post-process agent responses to enhance natural conversational flow
+        and improve product presentation.
         """
         import re
         import random
@@ -672,45 +745,54 @@ class ChatManager:
         response_text = re.sub(r'\*\*(.*?)\*\*', r'\1', response_text)
         response_text = re.sub(r'\*(.*?)\*', r'\1', response_text)
         
-        # Remove headers
-        response_text = re.sub(r'^#{1,6}\s+(.*)$', r'\1', response_text, flags=re.MULTILINE)
+        # Ensure product prices are formatted consistently
+        response_text = re.sub(r'(\$\d+)(?![\d.])', r'\1.00', response_text)
         
-        # Replace categorical headers with conversational transitions
-        transitions = {
-            "For Men:": "For a more masculine look, ",
-            "For Women:": "For a more feminine style, ",
-            "Accessories:": "To complete the look, ",
-            "Dress Shirt:": "When it comes to shirts, ",
-            "Blazer and Chinos:": "For a smart-casual option, ",
-            "Cocktail Dress:": "If you're considering a dress, "
-        }
-        
-        for header, transition in transitions.items():
-            response_text = response_text.replace(header, transition)
-        
-        # Add more personal language
-        personal_phrases = [
-            "I think ", "I'd recommend ", "In my experience, ", 
-            "You might love ", "I'm picturing ", "I could see you in "
+        # Add product highlighting phrases
+        highlight_phrases = [
+            "I'd particularly recommend the ",
+            "You'll love the ",
+            "One standout piece is the ",
+            "My favorite pick is the ",
+            "A perfect choice would be the "
         ]
         
-        # Check for short paragraphs that might be item introductions and add personal phrases
-        lines = response_text.split('\n')
-        for i in range(len(lines)):
-            # If line starts a new paragraph and is relatively short
-            if lines[i].strip() and (i == 0 or not lines[i-1].strip()):
-                if 20 < len(lines[i]) < 100 and not any(phrase in lines[i] for phrase in personal_phrases):
-                    # Add a personal phrase to the beginning
-                    random_phrase = random.choice(personal_phrases)
-                    # Make sure first character after phrase is lowercase
-                    if len(lines[i]) > 0:
-                        lines[i] = random_phrase + lines[i][0].lower() + lines[i][1:]
+        # Find product mentions without emphasis
+        # This looks for capitalized product names followed by common apparel terms
+        product_pattern = r'(?<!\w)((?:[A-Z][a-zA-Z]+\s)+(?:Dress|Top|Suit|Skirt|Blouse|Pants|Jacket|Gown))'
         
-        response_text = '\n'.join(lines)
+        # Use a counter to limit replacements (avoid over-repetition)
+        replacement_count = 0
+        max_replacements = 2
+        
+        def replace_with_highlight(match):
+            nonlocal replacement_count
+            if replacement_count < max_replacements:
+                replacement_count += 1
+                return random.choice(highlight_phrases) + match.group(1)
+            return match.group(0)
+        
+        response_text = re.sub(product_pattern, replace_with_highlight, response_text)
+        
+        # Fix common grammatical errors from the replacements
+        response_text = re.sub(r'the The ', 'the ', response_text, flags=re.IGNORECASE)
+        response_text = re.sub(r'the An ', 'an ', response_text, flags=re.IGNORECASE)
+        response_text = re.sub(r'the A ', 'a ', response_text, flags=re.IGNORECASE)
+        
+        # Replace categorical transitions with more natural ones
+        transitions = {
+            "For formal events:": "When dressing for formal events, ",
+            "For casual wear:": "If you're looking for something more casual, ",
+            "Accessories:": "To complete the look, ",
+            "Styling tips:": "Here's how I'd style it: "
+        }
+        
+        for formal, natural in transitions.items():
+            response_text = response_text.replace(formal, natural)
         
         return response_text
     
-    def process_message(self, session_id: Optional[str], user_id: Optional[str], message: str) -> Tuple[str, Dict[str, Any]]:
+    async def process_message(self, session_id: Optional[str], user_id: Optional[str], message: str) -> Tuple[str, Dict[str, Any]]:
         """
         Process a user message and generate a response
         
@@ -725,14 +807,14 @@ class ChatManager:
         logger.info(f"Processing message for session {session_id}: {message[:50]}...")
         
         # Get or create session
-        session = self.get_or_create_session(session_id, user_id)
+        session = await self.get_or_create_session(session_id, user_id)
         
         # Check if this is a follow-up or meta-question
-        meta_response = self._handle_meta_question(session, message)
+        meta_response = await self._handle_meta_question(session, message)
         if meta_response:
             logger.info("Handled as meta-question")
             return meta_response
         
         # Handle as a product search if no meta-response
         logger.info("Handling as product search")
-        return self._handle_product_search(session, message)
+        return await self._handle_product_search(session, message)

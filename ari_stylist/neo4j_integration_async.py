@@ -1,14 +1,72 @@
+"""
+Asynchronous Neo4j Integration for AI Stylist
+
+Provides integration with Neo4j for product retrieval and recommendations.
+"""
+
 import logging
-from typing import Dict, List, Any, Optional, Tuple
-from neo4j import GraphDatabase
+import json
+from typing import Dict, List, Any, Optional, Tuple, Set
+import asyncio
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("neo4j_integration")
+logger = logging.getLogger("neo4j_integration_async")
 
-class ProductKnowledgeGraph:
+try:
+    from neo4j import AsyncGraphDatabase
+except ImportError:
+    logger.warning("neo4j AsyncGraphDatabase not available. Install with: pip install neo4j>=5.0.0")
+    # Use a mock version
+    class AsyncGraphDatabase:
+        @staticmethod
+        def driver(*args, **kwargs):
+            logger.error("Cannot create AsyncGraphDatabase driver. Using mock version.")
+            # Create a mock driver with async methods
+            class MockAsyncDriver:
+                async def close(self):
+                    pass
+                    
+                async def __aenter__(self):
+                    return self
+                    
+                async def __aexit__(self, exc_type, exc_val, exc_tb):
+                    pass
+                    
+                async def execute_query(self, query, parameters=None, **kwargs):
+                    logger.warning(f"Mock driver executing query: {query}")
+                    return []
+                    
+                def session(self, **kwargs):
+                    class MockAsyncSession:
+                        async def __aenter__(self):
+                            return self
+                            
+                        async def __aexit__(self, exc_type, exc_val, exc_tb):
+                            pass
+                            
+                        async def run(self, query, parameters=None, **kwargs):
+                            logger.warning(f"Mock session running query: {query}")
+                            class MockResult:
+                                def __init__(self):
+                                    self.records = []
+                                    
+                                def single(self):
+                                    return None
+                                    
+                                def __iter__(self):
+                                    return iter([])
+                                    
+                                async def __aiter__(self):
+                                    return
+                                    yield
+                            return MockResult()
+                    return MockAsyncSession()
+            return MockAsyncDriver()
+
+class ProductKnowledgeGraphAsync:
     """
-    Provides integration with Neo4j for product retrieval and recommendations.
+    Provides asynchronous integration with Neo4j for product retrieval and recommendations.
     Adapted to work with the actual database schema containing Products connected
     to Collections, Categories, and Tags.
     """
@@ -22,7 +80,7 @@ class ProductKnowledgeGraph:
             username: Neo4j username
             password: Neo4j password
         """
-        logger.info(f"Initializing Neo4j connection to {url}")
+        logger.info(f"Initializing Async Neo4j connection to {url}")
         self.url = url
         self.username = username
         self.password = password
@@ -31,29 +89,30 @@ class ProductKnowledgeGraph:
         
         # Connect to Neo4j
         try:
-            self.driver = GraphDatabase.driver(url, auth=(username, password))
-            # Verify connection with a simple query
-            self._verify_connection()
-            logger.info("Successfully connected to Neo4j database")
+            self.driver = AsyncGraphDatabase.driver(url, auth=(username, password))
+            logger.info("Successfully initialized async Neo4j driver")
         except Exception as e:
             logger.error(f"Failed to connect to Neo4j: {e}")
             # Don't raise exception, allow initialization to continue for graceful degradation
     
-    def _verify_connection(self):
+    async def _verify_connection(self):
         """Verify the Neo4j connection with a simple query"""
-        with self.driver.session() as session:
-            result = session.run("RETURN 1 as test")
-            record = result.single()
+        if not self.driver:
+            raise ConnectionError("Neo4j driver not available")
+            
+        async with self.driver.session() as session:
+            result = await session.run("RETURN 1 as test")
+            record = await result.single()
             if not record or record.get("test") != 1:
                 raise ConnectionError("Could not verify Neo4j connection")
     
-    def close(self):
+    async def close(self):
         """Close the Neo4j connection"""
         if self.driver:
-            self.driver.close()
+            await self.driver.close()
             logger.info("Neo4j connection closed")
     
-    def query(self, query, params=None):
+    async def query(self, query, params=None):
         """
         Execute a Cypher query against Neo4j.
         
@@ -69,16 +128,19 @@ class ProductKnowledgeGraph:
             return []
         
         try:
-            with self.driver.session() as session:
-                result = session.run(query, params or {})
-                return [dict(record) for record in result]
+            async with self.driver.session() as session:
+                result = await session.run(query, params or {})
+                records = []
+                async for record in result:
+                    records.append(dict(record))
+                return records
         except Exception as e:
             logger.error(f"Neo4j query failed: {e}")
             logger.error(f"Query: {query}")
             logger.error(f"Params: {params}")
             return []
     
-    def verify_database_schema(self) -> Tuple[bool, List[str]]:
+    async def verify_database_schema(self) -> Tuple[bool, List[str]]:
         """
         Verify that the database contains the expected schema elements.
         
@@ -93,7 +155,7 @@ class ProductKnowledgeGraph:
         
         # Check for node labels
         labels_query = "CALL db.labels()"
-        labels_result = self.query(labels_query)
+        labels_result = await self.query(labels_query)
         
         if labels_result:
             existing_labels = [record.get("label") for record in labels_result]
@@ -106,7 +168,7 @@ class ProductKnowledgeGraph:
         
         # Check for relationship types
         rels_query = "CALL db.relationshipTypes()"
-        rels_result = self.query(rels_query)
+        rels_result = await self.query(rels_query)
         
         if rels_result:
             existing_rels = [record.get("relationshipType") for record in rels_result]
@@ -122,7 +184,7 @@ class ProductKnowledgeGraph:
         MATCH (p:Product) 
         RETURN p LIMIT 1
         """
-        props_result = self.query(props_query)
+        props_result = await self.query(props_query)
         
         required_properties = ["id", "title", "price", "images"]
         
@@ -170,10 +232,10 @@ class ProductKnowledgeGraph:
                 return [url.strip().strip('"\'') for url in content.split(",")]
             return [images_str]  # Return as single item if all else fails
     
-    def get_product_by_filter(self, category=None, collection=None, tag=None, 
-                           brand=None, min_price=None, max_price=None, material=None, limit=5):
+    async def get_product_by_filter(self, category=None, collection=None, tag=None, 
+                        brand=None, min_price=None, max_price=None, material=None, limit=5):
         """
-        Get products by filtering on various attributes.
+        Get products by filtering on various attributes with improved diversity.
         
         Args:
             category: Category filter (optional)
@@ -189,91 +251,258 @@ class ProductKnowledgeGraph:
             List of products
         """
         logger.info(f"Retrieving products with filters: category={category}, "
-                   f"collection={collection}, tag={tag}, price={min_price}-{max_price}")
+                f"collection={collection}, tag={tag}, price={min_price}-{max_price}")
         
-        # Build query parts
-        query_parts = ["MATCH (p:Product)"]
-        where_clauses = []
-        params = {"limit": limit}
+        # First, count total products to diagnose the database
+        count_query = "MATCH (p:Product) RETURN count(p) as total"
+        count_result = await self.query(count_query)
+        product_count = count_result[0]['total'] if count_result else 0
+        logger.info(f"Total products in database: {product_count}")
         
-        # Add category filter if provided
-        if category:
-            query_parts.append("MATCH (p)-[:IN_CATEGORY]->(c:Category)")
-            where_clauses.append("toLower(c.title) CONTAINS toLower($category)")
-            params["category"] = category
+        # Use different strategies based on the type of query
+        use_randomization = True  # Default to using randomization
         
-        # Add collection filter if provided
-        if collection:
-            query_parts.append("MATCH (p)-[:IN_COLLECTION]->(col:Collection)")
-            where_clauses.append("toLower(col.title) CONTAINS toLower($collection)")
-            params["collection"] = collection
-        
-        # Add tag filter if provided
+        # Special handling for occasions like weddings
+        is_wedding = False
         if tag:
-            query_parts.append("MATCH (p)-[:TAGGED_WITH]->(t:Tag)")
-            where_clauses.append("toLower(t.title) CONTAINS toLower($tag)")
-            params["tag"] = tag
+            wedding_terms = ["wedding", "formal", "ceremony", "gala", "cocktail", "party"]
+            is_wedding = any(term in tag.lower() for term in wedding_terms)
+            # For specific occasions, we want more targeted results
+            if is_wedding:
+                use_randomization = False
         
-        # Add brand filter if provided (try to match against tags as fallback)
-        if brand:
-            query_parts.append("MATCH (p)-[:TAGGED_WITH]->(b:Tag)")
-            where_clauses.append("toLower(b.title) CONTAINS toLower($brand)")
-            params["brand"] = brand
+        # Build the main query
+        if use_randomization:
+            # Randomized approach to get variety
+            query = """
+            MATCH (p:Product)
+            WHERE p.price > 0 AND p.title IS NOT NULL AND p.title <> ''
+            AND NOT toLower(p.title) CONTAINS 'test' AND NOT toLower(p.title) CONTAINS 'untitled'
+            """
+            
+            # Add filters as needed
+            params = {"sample_size": 2000, "limit": limit}  # Increased sample size for more variety
+            
+            if category:
+                query += """
+                WITH p
+                MATCH (p)-[:IN_CATEGORY]->(c:Category)
+                WHERE toLower(c.title) CONTAINS toLower($category)
+                """
+                params["category"] = category
+                
+            if collection:
+                query += """
+                WITH p
+                MATCH (p)-[:IN_COLLECTION]->(col:Collection)
+                WHERE toLower(col.title) CONTAINS toLower($collection)
+                """
+                params["collection"] = collection
+                
+            if tag:
+                query += """
+                WITH p
+                MATCH (p)-[:TAGGED_WITH]->(t:Tag)
+                """
+                # Split tag into words for better matching
+                tag_words = tag.lower().split()
+                tag_conditions = []
+                
+                # Add conditions for each word in the tag
+                for i, word in enumerate(tag_words):
+                    if len(word) > 3:  # Only use meaningful words
+                        tag_param = f"tag_word_{i}"
+                        tag_conditions.append(f"toLower(t.title) CONTAINS ${tag_param}")
+                        params[tag_param] = word
+                
+                # Add the OR condition for any matching word
+                if tag_conditions:
+                    query += "WHERE " + " OR ".join(tag_conditions)
+            
+            # Add price filters
+            if min_price is not None:
+                query += " WITH p WHERE p.price >= $min_price"
+                params["min_price"] = float(min_price)
+            
+            if max_price is not None:
+                query += " WITH p WHERE p.price <= $max_price"
+                params["max_price"] = float(max_price)
+            
+            # Add randomization and limit
+            query += """
+            WITH p, rand() as random
+            ORDER BY random
+            LIMIT $sample_size
+            WITH collect(p) as products
+            UNWIND products as p
+            RETURN 
+                p.id as id,
+                p.title as title,
+                p.price as price,
+                p.description as description,
+                p.images as images,
+                COALESCE(p.visited_num, 0) as visited_num,
+                COALESCE(p.size, '') as size,
+                COALESCE(p.color, '') as color
+            LIMIT $limit
+            """
+            
+        else:
+            # Traditional targeted query for specific requirements
+            # Build query parts
+            query_parts = ["MATCH (p:Product)"]
+            where_clauses = []
+            params = {"limit": limit}
+            
+            # Add category filter if provided
+            if category:
+                query_parts.append("MATCH (p)-[:IN_CATEGORY]->(c:Category)")
+                where_clauses.append("toLower(c.title) CONTAINS toLower($category)")
+                params["category"] = category
+            
+            # Add collection filter if provided
+            if collection:
+                query_parts.append("MATCH (p)-[:IN_COLLECTION]->(col:Collection)")
+                where_clauses.append("toLower(col.title) CONTAINS toLower($collection)")
+                params["collection"] = collection
+            
+            # For weddings, add formal dress categories if no category specified
+            if is_wedding and not category:
+                query_parts.append("MATCH (p)-[:IN_CATEGORY]->(c:Category)")
+                where_clauses.append("(toLower(c.title) CONTAINS 'dress' OR toLower(c.title) CONTAINS 'suit' OR toLower(c.title) CONTAINS 'formal' OR toLower(c.title) CONTAINS 'gown')")
+            
+            # Improved tag filter with word-based matching
+            if tag:
+                query_parts.append("MATCH (p)-[:TAGGED_WITH]->(t:Tag)")
+                # Split tag into words for better matching
+                tag_words = tag.lower().split()
+                tag_conditions = []
+                
+                # Add conditions for each word in the tag
+                for i, word in enumerate(tag_words):
+                    if len(word) > 3:  # Only use meaningful words
+                        tag_param = f"tag_word_{i}"
+                        tag_conditions.append(f"toLower(t.title) CONTAINS ${tag_param}")
+                        params[tag_param] = word
+                
+                # Add the OR condition for any matching word
+                if tag_conditions:
+                    where_clauses.append("(" + " OR ".join(tag_conditions) + ")")
+            
+            # Add price filters
+            if min_price is not None:
+                where_clauses.append("p.price >= $min_price")
+                params["min_price"] = float(min_price)
+            
+            if max_price is not None:
+                where_clauses.append("p.price <= $max_price")
+                params["max_price"] = float(max_price)
+            
+            # Filter out low-quality items
+            where_clauses.append("p.price > 0")  # Skip zero-priced items
+            where_clauses.append("p.title IS NOT NULL AND p.title <> ''")  # Require title
+            where_clauses.append("NOT toLower(p.title) CONTAINS 'test'")  # Skip test items
+            where_clauses.append("NOT toLower(p.title) CONTAINS 'untitled'")  # Skip untitled
+            
+            # Add WHERE clause if needed
+            if where_clauses:
+                query_parts.append("WHERE " + " AND ".join(where_clauses))
+            
+            # Add ordering based on occasion
+            if is_wedding:
+                # Add to the ORDER BY clause to prioritize dresses
+                query_parts.append("""
+                ORDER BY 
+                    CASE 
+                        WHEN toLower(p.title) CONTAINS 'dress' THEN 1
+                        WHEN toLower(p.title) CONTAINS 'gown' THEN 2
+                        WHEN toLower(p.title) CONTAINS 'suit' THEN 3
+                        ELSE 4
+                    END,
+                    COALESCE(p.visited_num, 0) DESC
+                """)
+            else:
+                # Mix popularity with some randomness
+                query_parts.append("ORDER BY COALESCE(p.visited_num, 0) DESC, rand()")
+            
+            # Complete the query
+            query = "\n".join(query_parts)
+            query += """
+            LIMIT $limit
+            """
+            
+            # Add return statement
+            query += """
+            RETURN 
+                p.id as id,
+                p.title as title,
+                p.price as price,
+                p.description as description,
+                p.images as images,
+                COALESCE(p.visited_num, 0) as visited_num,
+                COALESCE(p.size, '') as size,
+                COALESCE(p.color, '') as color
+            """
         
-        # Add price filters
-        if min_price is not None:
-            where_clauses.append("p.price >= $min_price")
-            params["min_price"] = float(min_price)
-        
-        if max_price is not None:
-            where_clauses.append("p.price <= $max_price")
-            params["max_price"] = float(max_price)
-        
-        # Add WHERE clause if needed
-        if where_clauses:
-            query_parts.append("WHERE " + " AND ".join(where_clauses))
-        
-        # Complete the query with return statements
-        query = "\n".join(query_parts)
-        query += """
-        RETURN 
-            p.id as id,
-            p.title as title,
-            p.price as price,
-            p.description as description,
-            p.images as images,
-            p.visited_num as visited_num
-        ORDER BY p.visited_num DESC
-        LIMIT $limit
-        """
+        # Log the query for debugging
+        logger.info(f"Neo4j query: {query}")
+        logger.info(f"Query parameters: {params}")
         
         # Execute the query
-        result = self.query(query, params)
+        result = await self.query(query, params)
         
-        if not result:
+        filtered_result = []
+        for record in result:
+            # Only keep items with price > 0 and proper titles
+            if (record.get("price", 0) > 0 and 
+                record.get("title") and 
+                "test" not in record.get("title", "").lower() and 
+                "untitled" not in record.get("title", "").lower()):
+                filtered_result.append(record)
+        
+        if not filtered_result:
             logger.warning(f"No products found matching filters")
             return []
         
-        # Process results into a standardized format
+        # Process results into product objects
         products = []
-        for record in result:
+        seen_titles = set()
+        product_types = set()
+        
+        for record in filtered_result:
+            # Skip if we've seen this title already
+            title = record.get("title", "").strip()
+            if title in seen_titles:
+                continue
+                
+            product_id = record.get("id", "")
+            
+            # Add to seen titles
+            seen_titles.add(title)
+            
             # Create standardized product object
             product_obj = {
-                "id": record.get("id", ""),
-                "title": record.get("title", "Untitled Product"),
+                "id": product_id,
+                "title": title,
                 "price": record.get("price", 0.0),
                 "description": record.get("description", ""),
                 "images": self._parse_images(record.get("images", "[]")),
-                "categories": self._get_product_categories(record.get("id")),
+                "categories": await self._get_product_categories(product_id),
+                "size": record.get("size", ""),
+                "color": record.get("color", ""),
                 "visited_num": record.get("visited_num", 0)
             }
             
             products.append(product_obj)
+            
+            # Stop if we have enough products
+            if len(products) >= limit:
+                break
         
         logger.info(f"Retrieved {len(products)} products matching filters")
         return products
     
-    def _get_product_categories(self, product_id):
+    async def _get_product_categories(self, product_id):
         """
         Get categories for a specific product.
         
@@ -291,14 +520,14 @@ class ProductKnowledgeGraph:
         RETURN c.title as category
         """
         
-        result = self.query(query, {"product_id": product_id})
+        result = await self.query(query, {"product_id": product_id})
         
         if not result:
             return []
             
         return [record.get("category") for record in result if record.get("category")]
     
-    def get_product_details(self, product_id):
+    async def get_product_details(self, product_id):
         """
         Get detailed information about a specific product.
         
@@ -326,7 +555,7 @@ class ProductKnowledgeGraph:
             p.visited_num as visited_num
         """
         
-        result = self.query(query, {"product_id": product_id})
+        result = await self.query(query, {"product_id": product_id})
         
         if not result or len(result) == 0:
             logger.warning(f"Product not found: {product_id}")
@@ -335,7 +564,7 @@ class ProductKnowledgeGraph:
         product = result[0]
         
         # Get categories
-        categories = self._get_product_categories(product_id)
+        categories = await self._get_product_categories(product_id)
         
         # Get tags
         tags_query = """
@@ -343,7 +572,7 @@ class ProductKnowledgeGraph:
         RETURN t.title as tag
         """
         
-        tags_result = self.query(tags_query, {"product_id": product_id})
+        tags_result = await self.query(tags_query, {"product_id": product_id})
         tags = [record.get("tag") for record in tags_result if record.get("tag")]
         
         # Get collections
@@ -352,7 +581,7 @@ class ProductKnowledgeGraph:
         RETURN c.title as collection
         """
         
-        collections_result = self.query(collections_query, {"product_id": product_id})
+        collections_result = await self.query(collections_query, {"product_id": product_id})
         collections = [record.get("collection") for record in collections_result if record.get("collection")]
         
         # Create detailed product object
@@ -372,11 +601,11 @@ class ProductKnowledgeGraph:
         }
         
         # Increment the visit counter for this product
-        self._increment_product_visit(product_id)
+        await self._increment_product_visit(product_id)
         
         return product_details
     
-    def _increment_product_visit(self, product_id):
+    async def _increment_product_visit(self, product_id):
         """
         Increment the visit counter for a product.
         
@@ -389,7 +618,7 @@ class ProductKnowledgeGraph:
             SET p.visited_num = COALESCE(p.visited_num, 0) + 1
             """
             
-            self.query(query, {"product_id": product_id})
+            await self.query(query, {"product_id": product_id})
         except Exception as e:
             logger.error(f"Failed to increment visit counter: {e}")
     
@@ -423,7 +652,7 @@ class ProductKnowledgeGraph:
         
         return None
     
-    def get_similar_products(self, product_id, limit=5):
+    async def get_similar_products(self, product_id, limit=5):
         """
         Get products similar to a given product.
         
@@ -441,7 +670,7 @@ class ProductKnowledgeGraph:
             return []
             
         # Get the categories and tags of the reference product
-        product_details = self.get_product_details(product_id)
+        product_details = await self.get_product_details(product_id)
         
         if not product_details:
             logger.warning(f"Reference product not found: {product_id}")
@@ -490,7 +719,7 @@ class ProductKnowledgeGraph:
         """
         
         # Execute the query
-        result = self.query(query, params)
+        result = await self.query(query, params)
         
         if not result:
             logger.warning(f"No similar products found")
@@ -499,13 +728,15 @@ class ProductKnowledgeGraph:
         # Process results
         products = []
         for record in result:
+            product_id = record.get("id", "")
+            
             product_obj = {
-                "id": record.get("id", ""),
+                "id": product_id,
                 "title": record.get("title", "Untitled Product"),
                 "price": record.get("price", 0.0),
                 "description": record.get("description", ""),
                 "images": self._parse_images(record.get("images", "[]")),
-                "categories": self._get_product_categories(record.get("id")),
+                "categories": await self._get_product_categories(product_id),
                 "visited_num": record.get("visited_num", 0),
                 "similarity_score": record.get("similarity_score", 0)
             }
@@ -515,7 +746,7 @@ class ProductKnowledgeGraph:
         logger.info(f"Found {len(products)} similar products")
         return products
     
-    def get_popular_products(self, limit=5):
+    async def get_popular_products(self, limit=5):
         """
         Get the most popular products based on visit count.
         
@@ -540,7 +771,7 @@ class ProductKnowledgeGraph:
         LIMIT $limit
         """
         
-        result = self.query(query, {"limit": limit})
+        result = await self.query(query, {"limit": limit})
         
         if not result:
             logger.warning("No popular products found")
@@ -549,13 +780,15 @@ class ProductKnowledgeGraph:
         # Process results
         products = []
         for record in result:
+            product_id = record.get("id", "")
+            
             product_obj = {
-                "id": record.get("id", ""),
+                "id": product_id,
                 "title": record.get("title", "Untitled Product"),
                 "price": record.get("price", 0.0),
                 "description": record.get("description", ""),
                 "images": self._parse_images(record.get("images", "[]")),
-                "categories": self._get_product_categories(record.get("id")),
+                "categories": await self._get_product_categories(product_id),
                 "visited_num": record.get("visited_num", 0)
             }
             
@@ -564,7 +797,7 @@ class ProductKnowledgeGraph:
         logger.info(f"Retrieved {len(products)} popular products")
         return products
     
-    def get_products_by_category(self, category, limit=5):
+    async def get_products_by_category(self, category, limit=5):
         """
         Get products in a specific category.
         
@@ -595,7 +828,7 @@ class ProductKnowledgeGraph:
         LIMIT $limit
         """
         
-        result = self.query(query, {"category": category, "limit": limit})
+        result = await self.query(query, {"category": category, "limit": limit})
         
         if not result:
             logger.warning(f"No products found in category: {category}")
@@ -604,13 +837,15 @@ class ProductKnowledgeGraph:
         # Process results
         products = []
         for record in result:
+            product_id = record.get("id", "")
+            
             product_obj = {
-                "id": record.get("id", ""),
+                "id": product_id,
                 "title": record.get("title", "Untitled Product"),
                 "price": record.get("price", 0.0),
                 "description": record.get("description", ""),
                 "images": self._parse_images(record.get("images", "[]")),
-                "categories": self._get_product_categories(record.get("id")),
+                "categories": await self._get_product_categories(product_id),
                 "visited_num": record.get("visited_num", 0)
             }
             
@@ -619,7 +854,7 @@ class ProductKnowledgeGraph:
         logger.info(f"Retrieved {len(products)} products in category: {category}")
         return products
     
-    def get_products_by_collection(self, collection, limit=5):
+    async def get_products_by_collection(self, collection, limit=5):
         """
         Get products in a specific collection.
         
@@ -650,7 +885,7 @@ class ProductKnowledgeGraph:
         LIMIT $limit
         """
         
-        result = self.query(query, {"collection": collection, "limit": limit})
+        result = await self.query(query, {"collection": collection, "limit": limit})
         
         if not result:
             logger.warning(f"No products found in collection: {collection}")
@@ -659,13 +894,15 @@ class ProductKnowledgeGraph:
         # Process results
         products = []
         for record in result:
+            product_id = record.get("id", "")
+            
             product_obj = {
-                "id": record.get("id", ""),
+                "id": product_id,
                 "title": record.get("title", "Untitled Product"),
                 "price": record.get("price", 0.0),
                 "description": record.get("description", ""),
                 "images": self._parse_images(record.get("images", "[]")),
-                "categories": self._get_product_categories(record.get("id")),
+                "categories": await self._get_product_categories(product_id),
                 "visited_num": record.get("visited_num", 0)
             }
             
@@ -674,7 +911,7 @@ class ProductKnowledgeGraph:
         logger.info(f"Retrieved {len(products)} products in collection: {collection}")
         return products
     
-    def get_products_by_tag(self, tag, limit=5):
+    async def get_products_by_tag(self, tag, limit=5):
         """
         Get products with a specific tag.
         
@@ -705,7 +942,7 @@ class ProductKnowledgeGraph:
         LIMIT $limit
         """
         
-        result = self.query(query, {"tag": tag, "limit": limit})
+        result = await self.query(query, {"tag": tag, "limit": limit})
         
         if not result:
             logger.warning(f"No products found with tag: {tag}")
@@ -714,13 +951,15 @@ class ProductKnowledgeGraph:
         # Process results
         products = []
         for record in result:
+            product_id = record.get("id", "")
+            
             product_obj = {
-                "id": record.get("id", ""),
+                "id": product_id,
                 "title": record.get("title", "Untitled Product"),
                 "price": record.get("price", 0.0),
                 "description": record.get("description", ""),
                 "images": self._parse_images(record.get("images", "[]")),
-                "categories": self._get_product_categories(record.get("id")),
+                "categories": await self._get_product_categories(product_id),
                 "visited_num": record.get("visited_num", 0)
             }
             
@@ -729,7 +968,7 @@ class ProductKnowledgeGraph:
         logger.info(f"Retrieved {len(products)} products with tag: {tag}")
         return products
     
-    def get_user_preferences(self, user_id):
+    async def get_user_preferences(self, user_id):
         """
         Get user preferences. Included for interface compatibility.
         In a real system, this would retrieve user preferences from the database.
@@ -750,16 +989,3 @@ class ProductKnowledgeGraph:
             "preferred_tags": [],
             "budget_range": None
         }
-    
-    def add_interaction_context(self, key, value):
-        """
-        Placeholder for adding interaction context.
-        Included for compatibility with the existing code.
-        
-        Args:
-            key: Context key
-            value: Context value
-        """
-        logger.info(f"Adding interaction context: {key}")
-        # This is a placeholder for future implementation
-        pass

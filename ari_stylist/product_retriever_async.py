@@ -1,7 +1,8 @@
 """
-Product Retriever module for AI Stylist
-Focused on remote Qdrant integration for vector search
-Compatible with CAMEL-AI 0.2.43
+Asynchronous Product Retriever for AI Stylist.
+
+This module implements an asynchronous product retriever using Qdrant vector search.
+Compatible with CAMEL-AI 0.2.43.
 """
 
 import os
@@ -9,6 +10,7 @@ import logging
 import json
 import uuid
 import datetime
+import asyncio
 from typing import Dict, List, Any, Optional, Union, Tuple
 
 # Updated imports for CAMEL-AI 0.2.43
@@ -17,16 +19,25 @@ from camel.types import EmbeddingModelType
 from camel.toolkits import RetrievalToolkit
 
 # For Qdrant integration
-import qdrant_client
-from qdrant_client.http import models
+try:
+    import qdrant_client
+    from qdrant_client.http import models
+    from qdrant_client.http.exceptions import UnexpectedResponse
+    QDRANT_AVAILABLE = True
+except ImportError:
+    QDRANT_AVAILABLE = False
+    logging.warning("Qdrant not installed. Install with: pip install qdrant-client")
+
+# For async HTTP calls
+import httpx
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("product_retriever")
+logger = logging.getLogger("product_retriever_async")
 
-class ProductRetriever:
+class ProductRetrieverAsync:
     """
-    Product retriever using Qdrant for vector-based search.
+    Asynchronous product retriever using Qdrant for vector-based search.
     Optimized for remote Qdrant collections.
     Compatible with CAMEL-AI 0.2.43.
     """
@@ -59,7 +70,7 @@ class ProductRetriever:
             self.initialized = False
             return
             
-        logger.info(f"Initializing ProductRetriever with Qdrant at: {self.qdrant_url}")
+        logger.info(f"Initializing ProductRetrieverAsync with Qdrant at: {self.qdrant_url}")
         
         try:
             # Initialize embedding model - consistent with CAMEL-AI 0.2.43
@@ -67,40 +78,54 @@ class ProductRetriever:
                 model_type=EmbeddingModelType.TEXT_EMBEDDING_ADA_2
             )
             
-            # Initialize Qdrant client
-            self.qdrant_client = qdrant_client.QdrantClient(
-                url=self.qdrant_url,
-                api_key=self.qdrant_api_key
-            )
-            logger.info(f"Connected to Qdrant instance: {self.qdrant_url}")
-            
-            # Check if collection exists, create if it doesn't
-            self._ensure_collection_exists()
+            # Initialize Qdrant client (synchronous client for now)
+            if QDRANT_AVAILABLE:
+                self.qdrant_client = qdrant_client.QdrantClient(
+                    url=self.qdrant_url,
+                    api_key=self.qdrant_api_key
+                )
+                logger.info(f"Connected to Qdrant instance: {self.qdrant_url}")
+                
+                # Check if collection exists, create if it doesn't
+                self._ensure_collection_exists_sync()
+                
+                # HTTP client for async operations with Qdrant REST API
+                self.http_client = httpx.AsyncClient(
+                    base_url=self.qdrant_url,
+                    headers={"api-key": self.qdrant_api_key} if self.qdrant_api_key else None,
+                    timeout=60.0
+                )
+            else:
+                self.qdrant_client = None
+                self.http_client = None
+                logger.warning("Qdrant client not available")
             
             # Set up retrieval toolkit for function calling
             self.retrieval_toolkit = RetrievalToolkit()
             self.retrieval_tools = self.retrieval_toolkit.get_tools()
             
-            logger.info("ProductRetriever initialized successfully")
+            logger.info("ProductRetrieverAsync initialized successfully")
             self.initialized = True
             
         except Exception as e:
-            logger.error(f"Error initializing ProductRetriever: {e}")
+            logger.error(f"Error initializing ProductRetrieverAsync: {e}")
             # Create empty placeholders for graceful degradation
             self.embedding_model = None
             self.qdrant_client = None
+            self.http_client = None
             self.retrieval_toolkit = None
             self.retrieval_tools = []
             self.initialized = False
     
-    def _ensure_collection_exists(self) -> bool:
+    def _ensure_collection_exists_sync(self) -> bool:
         """
         Ensure that the Qdrant collection exists, creating it if necessary.
+        This is a synchronous method used during initialization.
         
         Returns:
             bool: True if successful, False otherwise
         """
-        if not self.qdrant_client:
+        if not self.qdrant_client or not QDRANT_AVAILABLE:
             return False
             
         try:
@@ -125,7 +150,53 @@ class ProductRetriever:
             logger.error(f"Error ensuring collection exists: {e}")
             return False
     
-    def setup_product_indexing(self, product_kg) -> bool:
+    async def ensure_collection_exists(self) -> bool:
+        """
+        Asynchronous version to ensure that the Qdrant collection exists.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not self.http_client:
+            return self._ensure_collection_exists_sync()
+            
+        try:
+            # Check if collection exists using REST API
+            response = await self.http_client.get("/collections")
+            if response.status_code != 200:
+                logger.error(f"Failed to get collections: {response.text}")
+                return False
+                
+            collections = response.json()
+            collection_names = [c["name"] for c in collections["collections"]]
+            collection_exists = self.qdrant_collection_name in collection_names
+            
+            if not collection_exists:
+                logger.info(f"Creating collection '{self.qdrant_collection_name}'...")
+                # Create the collection using REST API
+                create_payload = {
+                    "vectors": {
+                        "size": 1536,
+                        "distance": "Cosine"
+                    }
+                }
+                response = await self.http_client.put(
+                    f"/collections/{self.qdrant_collection_name}",
+                    json=create_payload
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"Failed to create collection: {response.text}")
+                    return False
+                    
+                logger.info(f"Collection '{self.qdrant_collection_name}' created successfully")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error ensuring collection exists: {e}")
+            return False
+    
+    async def setup_product_indexing(self, product_kg) -> bool:
         """
         Set up product indexing for vector search.
         
@@ -140,10 +211,14 @@ class ProductRetriever:
             return False
             
         self.product_kg = product_kg
+        
+        # Ensure collection exists
+        await self.ensure_collection_exists()
+        
         logger.info("Product indexing setup successful")
         return True
     
-    def search_products(
+    async def search_products(
         self, 
         query: str, 
         limit: int = 5, 
@@ -166,8 +241,8 @@ class ProductRetriever:
             logger.warning("Empty query provided")
             return []
         
-        if not self.initialized or not self.qdrant_client:
-            logger.error("ProductRetriever not properly initialized")
+        if not self.initialized:
+            logger.error("ProductRetrieverAsync not properly initialized")
             return []
         
         try:
@@ -175,24 +250,59 @@ class ProductRetriever:
             query_embedding = self.embedding_model.embed(query)
             
             # Search the Qdrant collection
-            search_results = self.qdrant_client.search(
-                collection_name=self.qdrant_collection_name,
-                query_vector=query_embedding,
-                limit=limit,
-                score_threshold=similarity_threshold
-            )
+            search_results = []
+            
+            if self.http_client:
+                # Use async REST API
+                search_payload = {
+                    "vector": query_embedding,
+                    "limit": limit,
+                    "with_payload": True,
+                    "score_threshold": similarity_threshold
+                }
+                
+                response = await self.http_client.post(
+                    f"/collections/{self.qdrant_collection_name}/points/search",
+                    json=search_payload
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"Search failed: {response.text}")
+                    return []
+                
+                search_results = response.json()["result"]
+            elif self.qdrant_client:
+                # Fall back to synchronous client if async fails
+                sync_results = self.qdrant_client.search(
+                    collection_name=self.qdrant_collection_name,
+                    query_vector=query_embedding,
+                    limit=limit,
+                    score_threshold=similarity_threshold
+                )
+                
+                search_results = [
+                    {"id": hit.id, "score": hit.score, "payload": hit.payload}
+                    for hit in sync_results
+                ]
+            else:
+                logger.warning("No Qdrant client available for search")
+                return []
             
             logger.info(f"Found {len(search_results)} results from Qdrant")
             
             # Extract product IDs from search results
-            product_ids = [hit.payload.get("product_id") for hit in search_results if hit.payload.get("product_id")]
+            product_ids = [
+                hit["payload"].get("product_id") 
+                for hit in search_results 
+                if "payload" in hit and "product_id" in hit["payload"]
+            ]
             
             # If we have a product knowledge graph, fetch product details
             products = []
             if self.product_kg and product_ids:
                 for product_id in product_ids:
                     try:
-                        product = self.product_kg.get_product_details(product_id)
+                        product = await self.product_kg.get_product_details(product_id)
                         if product:
                             products.append(product)
                     except Exception as e:
@@ -204,7 +314,7 @@ class ProductRetriever:
             logger.error(f"Error searching products: {e}")
             return []
     
-    def search_by_natural_language(
+    async def search_by_natural_language(
         self, 
         query: str, 
         limit: int = 5
@@ -220,9 +330,9 @@ class ProductRetriever:
             List[Dict[str, Any]]: List of product dictionaries
         """
         logger.info(f"Searching by natural language: '{query}'")
-        return self.search_products(query, limit, similarity_threshold=0.6)
+        return await self.search_products(query, limit, similarity_threshold=0.6)
     
-    def search_similar_products(
+    async def search_similar_products(
         self, 
         product_id: str, 
         limit: int = 5
@@ -245,7 +355,7 @@ class ProductRetriever:
             
         try:
             # Get product details
-            product = self.product_kg.get_product_details(product_id)
+            product = await self.product_kg.get_product_details(product_id)
             
             if not product:
                 logger.warning(f"Product not found: {product_id}")
@@ -255,7 +365,7 @@ class ProductRetriever:
             query = f"{product.get('title', '')} {product.get('description', '')}"
             
             # Search for similar products
-            similar_products = self.search_products(
+            similar_products = await self.search_products(
                 query=query,
                 limit=limit + 1,  # Add 1 to account for the product itself
                 similarity_threshold=0.6
@@ -270,7 +380,7 @@ class ProductRetriever:
             logger.error(f"Error finding similar products: {e}")
             return []
     
-    def index_product(self, product: Dict[str, Any]) -> bool:
+    async def index_product(self, product: Dict[str, Any]) -> bool:
         """
         Index a product for vector search.
         
@@ -301,7 +411,36 @@ class ProductRetriever:
             embedding = self.embedding_model.embed(doc_text)
             
             # Store in Qdrant
-            if self.qdrant_client:
+            if self.http_client:
+                # Use async REST API
+                point_id = str(uuid.uuid4())
+                point_payload = {
+                    "points": [
+                        {
+                            "id": point_id,
+                            "vector": embedding,
+                            "payload": {
+                                "product_id": product_id,
+                                "text": doc_text,
+                                "title": product.get('title', ''),
+                                "timestamp": str(datetime.datetime.now())
+                            }
+                        }
+                    ]
+                }
+                
+                response = await self.http_client.put(
+                    f"/collections/{self.qdrant_collection_name}/points",
+                    json=point_payload
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"Failed to index product: {response.text}")
+                    return False
+                    
+                return True
+            elif self.qdrant_client:
+                # Fall back to synchronous client
                 self.qdrant_client.upsert(
                     collection_name=self.qdrant_collection_name,
                     points=[
@@ -319,7 +458,7 @@ class ProductRetriever:
                 )
                 return True
             else:
-                logger.error("Qdrant client not initialized")
+                logger.error("No Qdrant client available for indexing")
                 return False
                 
         except Exception as e:
@@ -334,3 +473,8 @@ class ProductRetriever:
             List: List of retrieval tools
         """
         return self.retrieval_tools
+    
+    async def close(self):
+        """Close all resources"""
+        if self.http_client:
+            await self.http_client.aclose()
