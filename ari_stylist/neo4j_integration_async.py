@@ -833,7 +833,7 @@ class ProductKnowledgeGraphAsync:
             return await self.get_popular_products(limit)
     
     async def get_product_by_filter(self, category=None, collection=None, tag=None, 
-                        brand=None, min_price=None, max_price=None, material=None, limit=5):
+                brand=None, min_price=None, max_price=None, material=None, limit=5):
         """
         Get products by filtering on various attributes.
         
@@ -951,9 +951,10 @@ class ProductKnowledgeGraphAsync:
             WITH p, 0 as score
             """
         
-        # Order by score then popularity, with some randomness
+        # Modify the ORDER BY clause to include randomness while preserving score priority
         query += """
-        ORDER BY score DESC, p.visited_num DESC, rand()
+        WITH p, score
+        ORDER BY score DESC, rand() * 0.5 + p.visited_num * 0.5 DESC
         LIMIT $limit
         RETURN 
             p.id as id,

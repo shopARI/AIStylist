@@ -594,6 +594,58 @@ class EnhancedChatManagerAsync:
         
         return session
     
+    async def _detect_message_intent(self, message: str) -> str:
+        """
+        Detect the intent of a user message
+        
+        Args:
+            message: User message
+            
+        Returns:
+            Intent string: "memory_question", "product_request", "greeting", or "conversation"
+        """
+        message_lower = message.lower()
+        
+        # Check for memory-related intent
+        memory_keywords = ["remember", "recall", "mentioned", "earlier", "previous", 
+                        "before", "last time", "you said", "I said", "we discussed"]
+        if any(keyword in message_lower for keyword in memory_keywords):
+            return "memory_question"
+        
+        # Check for product request intent - EXPANDED PATTERNS
+        product_keywords = ["recommend", "suggestion", "suggest", "looking for", "find me", "search for", 
+                        "show me", "need a", "want a", "buy", "purchase", "advice on",
+                        "recommendation", "i need", "what should i", "specific", "particular",
+                        "product", "options", "prices", "cost", "how much", "where can i get"]
+        product_types = ["dress", "shirt", "pants", "jeans", "shoes", "jacket", "coat", 
+                        "skirt", "jewelry", "accessories", "hat", "outfit", "gown",
+                        "attire", "wear", "clothing", "put on", "put", "ensemble"]
+        
+        # Check for explicit product requests
+        if any(keyword in message_lower for keyword in product_keywords):
+            return "product_request"
+        
+        # Check if a product type is mentioned with possessive terms
+        possessive_terms = ["want", "need", "looking for", "searching for", "particular", "specific"]
+        for term in possessive_terms:
+            for prod_type in product_types:
+                if f"{term} {prod_type}" in message_lower:
+                    return "product_request"
+                
+        # Special case for "how much are these" or similar price questions
+        price_keywords = ["how much", "price", "cost", "expensive"]
+        if any(keyword in message_lower for keyword in price_keywords):
+            return "product_request"
+        
+        # Check for greeting intent
+        greeting_keywords = ["hello", "hi", "hey", "greetings", "good morning", 
+                            "good afternoon", "good evening"]
+        if any(keyword in message_lower for keyword in greeting_keywords):
+            return "greeting"
+        
+        # Default to conversation
+        return "conversation"
+
     async def _handle_meta_question(self, session: EnhancedChatSessionAsync, message: str) -> Optional[Tuple[str, Dict[str, Any]]]:
         """
         Handle follow-up responses and meta-questions using CAMEL memory
@@ -630,7 +682,6 @@ class EnhancedChatManagerAsync:
                     if is_memory_question:
                         # If explicitly asking about memory but no context available
                         # Return an honest response about limited context
-                        await session.add_message(message, "user")
                         
                         response_text = ("I can see you're asking about our previous conversation, "
                                         "but I don't have enough context from our earlier interaction. "
@@ -679,7 +730,7 @@ class EnhancedChatManagerAsync:
                 I'll now respond with full awareness of our conversation history.
                 """
                 
-                # Add user message to session first
+                # Add user message to session
                 await session.add_message(message, "user")
                 
                 # Send to stylist agent
@@ -781,6 +832,106 @@ class EnhancedChatManagerAsync:
         
         # Not a memory-related question
         return None
+
+    async def _handle_conversation(self, session: EnhancedChatSessionAsync, message: str) -> Tuple[str, Dict[str, Any]]:
+        """
+        Handle general conversation without product search
+        
+        Args:
+            session: Chat session
+            message: User message
+            
+        Returns:
+            Tuple of (response message, additional data)
+        """
+        try:
+            # Get memory context
+            memory_context, token_count = await session.get_memory_context()
+            
+            # Format context for agent
+            context_text = ""
+            for msg in memory_context:
+                role = msg.get("role", "unknown")
+                content = msg.get("content", "")
+                context_text += f"{role.upper()}: {content}\n\n"
+            
+            # Get user preferences for enhanced context
+            user_preferences = await session.get_or_fetch_user_preferences()
+            
+            # Create a natural conversation prompt
+            conversation_prompt = f"""
+            I'll have a natural stylist conversation without immediately suggesting products.
+            
+            CONVERSATION HISTORY:
+            {context_text}
+            
+            USER PREFERENCES:
+            {json.dumps(user_preferences, indent=2)}
+            
+            LATEST MESSAGE: {message}
+            
+            As Ari the stylist, I should:
+            1. Respond conversationally without immediately suggesting specific products
+            2. Focus on understanding the client's needs, preferences, and context
+            3. Only suggest specific products if explicitly asked to do so
+            4. Build rapport through my fashion expertise and personalized advice
+            
+            I should NOT:
+            - Push products when not requested
+            - Jump straight to specific product recommendations
+            - Use formulaic responses that sound like a catalog
+            
+            My response:
+            """
+            
+            # Add user message to session
+            await session.add_message(message, "user")
+            
+            # Send to stylist agent
+            try:
+                from camel.messages import BaseMessage
+                
+                user_message = BaseMessage.make_user_message(
+                    role_name="User",
+                    content=conversation_prompt
+                )
+                
+                # Use asyncio.to_thread for CAMEL's synchronous step method
+                agent_response = await asyncio.to_thread(session.stylist_agent.step, user_message)
+                response_text = agent_response.msg.content
+                
+                # Add agent message to session
+                await session.add_message(response_text, "agent")
+                
+                logger.info("Conversation handled successfully")
+                
+                return response_text, {
+                    "result_type": "conversation",
+                    "is_product_search": False
+                }
+            except Exception as e:
+                logger.error(f"Error getting response from agent: {e}")
+                fallback_response = "I'm here to help with your fashion needs. What specific style advice are you looking for today?"
+                
+                # Add fallback response to session
+                await session.add_message(fallback_response, "agent")
+                
+                return fallback_response, {
+                    "result_type": "error",
+                    "error": str(e)
+                }
+                
+        except Exception as e:
+            logger.error(f"Error handling conversation: {e}")
+            fallback_response = "I'd be happy to chat about fashion. Is there something specific you'd like advice on?"
+            
+            # Add fallback response to session
+            await session.add_message(fallback_response, "agent")
+            
+            return fallback_response, {
+                "result_type": "error",
+                "error": str(e)
+            }
     
     def _extract_parameters(self, message: str) -> Dict[str, Any]:
         """
@@ -815,7 +966,9 @@ class EnhancedChatManagerAsync:
             r'to\s+(?:a|an)\s+([a-zA-Z\s]+wedding)',
             r'for\s+(?:a|an)\s+([a-zA-Z\s]+event)',
             r'to\s+(?:a|an)\s+([a-zA-Z\s]+event)',
-            r'for\s+(?:a|an)\s+([a-zA-Z\s]+occasion)'
+            r'for\s+(?:a|an)\s+([a-zA-Z\s]+occasion)',
+            r'going\s+to\s+(?:a|an)\s+([a-zA-Z\s]+)',
+            r'attending\s+(?:a|an)\s+([a-zA-Z\s]+)'
         ]
         
         for pattern in occasion_patterns:
@@ -857,8 +1010,8 @@ class EnhancedChatManagerAsync:
         
         # Extract color mentions
         color_list = ["red", "blue", "green", "black", "white", "yellow", "purple", 
-                      "orange", "pink", "brown", "gray", "grey", "navy", "teal", 
-                      "maroon", "beige", "turquoise", "gold", "silver"]
+                    "orange", "pink", "brown", "gray", "grey", "navy", "teal", 
+                    "maroon", "beige", "turquoise", "gold", "silver"]
         
         for color in color_list:
             if re.search(r'\b' + color + r'\b', message, re.IGNORECASE):
@@ -881,16 +1034,27 @@ class EnhancedChatManagerAsync:
                         "sweater", "jacket", "coat", "suit", "blazer", "t-shirt", 
                         "hoodie", "shorts", "swimwear", "activewear", "shoes", 
                         "boots", "sneakers", "accessories", "jewelry", "necklace",
-                        "bracelet", "earrings", "ring", "watch", "scarf", "hat"]
+                        "bracelet", "earrings", "ring", "watch", "scarf", "hat",
+                        "gown", "outfit"]
         
         for category in category_list:
             if re.search(r'\b' + category + r'\b', message, re.IGNORECASE):
                 params["category"] = category
                 break
         
+        # Special case for "wedding" or other events - set as both occasion and potentially category
+        if "wedding" in message.lower() and not params["category"]:
+            params["category"] = "dress"  # Default to dress for weddings if no other category mentioned
+        
+        # Special case for "formal" or "casual" - set as collection
+        if "formal" in message.lower() and not params["collection"]:
+            params["collection"] = "Formal"
+        elif "casual" in message.lower() and not params["collection"]:
+            params["collection"] = "Casual"
+        
         logger.info(f"Extracted parameters: {params}")
         return params
-    
+
     async def _handle_product_search(self, session: EnhancedChatSessionAsync, message: str) -> Tuple[str, Dict[str, Any]]:
         """
         Handle product search requests with enhanced personalization and memory
@@ -911,31 +1075,101 @@ class EnhancedChatManagerAsync:
         # Get user preferences to augment the search
         user_preferences = await session.get_or_fetch_user_preferences()
         
+        # Get conversation history to extract context
+        conversation_history = await session.get_conversation_history(limit=10)
+        
+        # Analyze conversation history to extract additional context
+        event_type = None
+        formality = None
+        color_preference = None
+        
+        for msg in reversed(conversation_history):
+            if msg["sender"] == "user":
+                content = msg["content"].lower()
+                
+                # Check for event types
+                if "wedding" in content:
+                    event_type = "wedding"
+                elif "party" in content:
+                    event_type = "party"
+                elif "interview" in content:
+                    event_type = "interview"
+                elif "date" in content:
+                    event_type = "date"
+                    
+                # Check for formality
+                if "formal" in content:
+                    formality = "formal"
+                elif "casual" in content:
+                    formality = "casual"
+                
+                # Check for color preferences
+                if "i like" in content and ("color" in content or "colours" in content):
+                    if "all colors" in content:
+                        color_preference = "all"
+                    elif any(color in content for color in ["red", "blue", "green", "black", "white"]):
+                        # Extract specific colors
+                        for color in ["red", "blue", "green", "black", "white", "pink", "purple"]:
+                            if color in content:
+                                if not params.get("colors"):
+                                    params["colors"] = []
+                                params["colors"].append(color)
+        
+        # Use extracted context to enhance search parameters
+        if event_type == "wedding" and not params.get("tag"):
+            params["tag"] = "wedding"
+        
+        if formality == "formal" and not params.get("collection"):
+            params["collection"] = "Formal"
+        
         # Debug logging
         logger.info(f"Search parameters extracted: {params}")
+        logger.info(f"Context from conversation: event_type={event_type}, formality={formality}")
         
         # Combine explicit parameters with user preferences when appropriate
         if not params.get("collection") and user_preferences.get("preferred_collections"):
             params["collection"] = user_preferences["preferred_collections"][0] if user_preferences["preferred_collections"] else None
         
         # Make sure occasion is also used as a tag for searching
-        if params.get("occasion") and not params.get("tag"):
-            params["tag"] = params.get("occasion")
-            logger.info(f"Using occasion as tag: {params['tag']}")
+        if event_type and not params.get("tag"):
+            params["tag"] = event_type
+            logger.info(f"Using event type as tag: {params['tag']}")
         
         # Perform search using knowledge graph - DIRECT SEARCH FIRST
         search_results = []
         if session.product_kg:
             try:
-                # Use the updated schema-compatible method - DIRECT SEARCH LIKE ORIGINAL
-                search_results = await session.product_kg.get_product_by_filter(
-                    category=params.get("category"),
-                    collection=params.get("collection"),
-                    tag=params.get("tag"),
-                    min_price=params.get("min_price"),
-                    max_price=params.get("max_price"),
-                    limit=5
-                )
+                # Make sure to prioritize formal attire if that's the context
+                if formality == "formal":
+                    # Try to search by formal tag first
+                    search_results = await session.product_kg.get_product_by_filter(
+                        tag="formal",
+                        category=params.get("category") or "dress", # Default to dresses for formal events
+                        limit=5
+                    )
+                    
+                    # If no formal tag results, try elegant/dressy/cocktail
+                    if not search_results:
+                        for formal_tag in ["elegant", "dressy", "cocktail", "gown"]:
+                            search_results = await session.product_kg.get_product_by_filter(
+                                tag=formal_tag,
+                                category=params.get("category") or "dress",
+                                limit=5
+                            )
+                            if search_results:
+                                break
+                
+                # If no results from formality search or formality not specified
+                if not search_results:
+                    # Use the regular filtered search
+                    search_results = await session.product_kg.get_product_by_filter(
+                        category=params.get("category"),
+                        collection=params.get("collection"),
+                        tag=params.get("tag"),
+                        min_price=params.get("min_price"),
+                        max_price=params.get("max_price"),
+                        limit=5
+                    )
                 
                 # Filter out test/untitled products and zero-priced items
                 filtered_results = []
@@ -951,17 +1185,25 @@ class EnhancedChatManagerAsync:
                 logger.info(f"Found {len(search_results)} products from knowledge graph")
                 
                 # If no results, try a more general search
-                if not search_results and params.get("tag"):
+                if not search_results:
                     logger.info(f"No results found, trying fallback search")
-                    # Try searching with just the category
-                    if params.get("category"):
+                    
+                    # Try searching just for dresses for a wedding
+                    if event_type == "wedding":
+                        search_results = await session.product_kg.get_product_by_filter(
+                            category="dress",
+                            limit=5
+                        )
+                        logger.info(f"Fallback search for dresses found {len(search_results)} products")
+                    # Fall back to category
+                    elif params.get("category"):
                         search_results = await session.product_kg.get_product_by_filter(
                             category=params.get("category"),
                             limit=5
                         )
                         logger.info(f"Fallback search by category found {len(search_results)} products")
                     else:
-                        # Get popular products as fallback
+                        # Get popular products as final fallback
                         search_results = await session.product_kg.get_popular_products(limit=5)
                         logger.info(f"Fallback to popular products found {len(search_results)} products")
                 
@@ -975,14 +1217,19 @@ class EnhancedChatManagerAsync:
                 nl_query = f"Find products that are "
                 if params.get("category"):
                     nl_query += f"{params.get('category')} "
+                elif formality == "formal" and event_type == "wedding":
+                    nl_query += "formal dresses for weddings "
+                
                 if params.get("collection"):
                     nl_query += f"from {params.get('collection')} collection "
                 if params.get("colors"):
                     nl_query += f"in {', '.join(params.get('colors'))} color "
                 if params.get("tag"):
                     nl_query += f"tagged with {params.get('tag')} "
-                if params.get("occasion"):
-                    nl_query += f"suitable for {params.get('occasion')} "
+                if event_type:
+                    nl_query += f"suitable for {event_type} "
+                if formality:
+                    nl_query += f"that are {formality} "
                 
                 # Add price constraints if available
                 if params.get("min_price") and params.get("max_price"):
@@ -1035,7 +1282,6 @@ class EnhancedChatManagerAsync:
         - Explain why you're suggesting each piece (fabric quality, versatility, current trends, etc.)
         - Express genuine enthusiasm for pieces you think would work particularly well
         - Use phrases like "I'd recommend" or "I think you'd look great in" rather than just listing options
-        - Speak conversationally as their personal stylist, Ari
         - Be specific about product details including exact names and prices
         - Explain why each item would work well for their needs
         - If recommending multiple items, describe each one clearly
@@ -1182,10 +1428,10 @@ class EnhancedChatManagerAsync:
             response_text = response_text.replace(formal, natural)
         
         return response_text
-    
+
     async def process_message(self, session_id: Optional[str], user_id: Optional[str], message: str) -> Tuple[str, Dict[str, Any]]:
         """
-        Process a user message with enhanced memory and personalization
+        Process a user message with enhanced intent detection
         
         Args:
             session_id: Optional session ID
@@ -1225,12 +1471,28 @@ class EnhancedChatManagerAsync:
                             # Update user registry
                             self.registered_users[user_id] = session_id
         
-        # Check if this is a follow-up or meta-question
-        meta_response = await self._handle_meta_question(session, message)
-        if meta_response:
-            logger.info("Handled as meta-question")
-            return meta_response
+        # Detect intent first
+        intent = await self._detect_message_intent(message)
+        logger.info(f"Detected message intent: {intent}")
         
-        # Handle as a product search if no meta-response
-        logger.info("Handling as product search")
-        return await self._handle_product_search(session, message)
+        # Process based on intent
+        if intent == "memory_question":
+            # Check if this is a follow-up or meta-question
+            meta_response = await self._handle_meta_question(session, message)
+            if meta_response:
+                logger.info("Handled as memory-related question")
+                return meta_response
+                
+        if intent == "product_request":
+            # Handle as a product search
+            logger.info("Handling as product search")
+            return await self._handle_product_search(session, message)
+            
+        if intent == "greeting":
+            # Greetings should be handled as conversation
+            logger.info("Handling greeting as conversation")
+            return await self._handle_conversation(session, message)
+            
+        # Default to conversation for all other intents
+        logger.info("Handling as general conversation")
+        return await self._handle_conversation(session, message)
