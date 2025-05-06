@@ -1,12 +1,15 @@
 """
-Asynchronous Neo4j Integration for AI Stylist
+Enhanced Asynchronous Neo4j Integration for AI Stylist
 
-Provides integration with Neo4j for product retrieval and recommendations.
+Provides advanced integration with Neo4j for product retrieval, user management,
+and memory persistence.
 """
 
 import logging
 import json
+import datetime
 from typing import Dict, List, Any, Optional, Tuple, Set
+import uuid
 import asyncio
 
 # Configure logging
@@ -17,7 +20,7 @@ try:
     from neo4j import AsyncGraphDatabase
 except ImportError:
     logger.warning("neo4j AsyncGraphDatabase not available. Install with: pip install neo4j>=5.0.0")
-    # Use a mock version
+    # Use a mock version (same as original)
     class AsyncGraphDatabase:
         @staticmethod
         def driver(*args, **kwargs):
@@ -66,9 +69,8 @@ except ImportError:
 
 class ProductKnowledgeGraphAsync:
     """
-    Provides asynchronous integration with Neo4j for product retrieval and recommendations.
-    Adapted to work with the actual database schema containing Products connected
-    to Collections, Categories, and Tags.
+    Enhanced asynchronous integration with Neo4j for product retrieval, user management,
+    and memory persistence.
     """
     
     def __init__(self, url, username, password):
@@ -80,12 +82,15 @@ class ProductKnowledgeGraphAsync:
             username: Neo4j username
             password: Neo4j password
         """
-        logger.info(f"Initializing Async Neo4j connection to {url}")
+        logger.info(f"Initializing Enhanced Async Neo4j connection to {url}")
         self.url = url
         self.username = username
         self.password = password
         self.driver = None
         self.neo4j = self  # For compatibility with existing code
+        
+        # Track known schema problems
+        self.known_schema_issues = set()
         
         # Connect to Neo4j
         try:
@@ -139,17 +144,161 @@ class ProductKnowledgeGraphAsync:
             logger.error(f"Query: {query}")
             logger.error(f"Params: {params}")
             return []
+
+    async def ensure_schema(self) -> bool:
+        """Ensure schema with retry mechanism for deadlocks"""
+        if not self.driver:
+            logger.error("No active Neo4j connection")
+            return False
+            
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                # Create constraints for product nodes - using more compatible syntax
+                product_constraints = [
+                    "CREATE CONSTRAINT IF NOT EXISTS FOR (p:Product) REQUIRE p.id IS UNIQUE",
+                    "CREATE CONSTRAINT IF NOT EXISTS FOR (c:Category) REQUIRE c.title IS UNIQUE",
+                    "CREATE CONSTRAINT IF NOT EXISTS FOR (c:Collection) REQUIRE c.title IS UNIQUE",
+                    "CREATE CONSTRAINT IF NOT EXISTS FOR (t:Tag) REQUIRE t.title IS UNIQUE" # Fixed: t.title instead of c.title
+                ]
+                
+                for constraint in product_constraints:
+                    try:
+                        await self.query(constraint)
+                    except Exception as e:
+                        if "already exists" in str(e):
+                            logger.info(f"Constraint already exists: {constraint}")
+                        elif "There already exists an index" in str(e):
+                            # If there's a conflicting index, log it but continue
+                            logger.warning(f"Conflicting index exists for constraint: {constraint}")
+                        else:
+                            logger.error(f"Error creating constraint: {constraint} - {e}")
+                
+                # Create constraints for user nodes with same compatible syntax
+                user_constraints = [
+                    "CREATE CONSTRAINT IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE",
+                    "CREATE CONSTRAINT IF NOT EXISTS FOR (m:MemoryState) REQUIRE m.id IS UNIQUE",
+                    "CREATE CONSTRAINT IF NOT EXISTS FOR (p:UserPreference) REQUIRE p.id IS UNIQUE",
+                    "CREATE CONSTRAINT IF NOT EXISTS FOR (i:ProductInteraction) REQUIRE i.id IS UNIQUE"
+                ]
+                
+                for constraint in user_constraints:
+                    try:
+                        await self.query(constraint)
+                    except Exception as e:
+                        if "already exists" in str(e):
+                            logger.info(f"Constraint already exists: {constraint}")
+                        else:
+                            logger.error(f"Error creating constraint: {constraint} - {e}")
+                
+                # Create basic relationship types if they don't exist
+                await self._ensure_relationship_types()
+                
+                logger.info("Enhanced Neo4j schema created successfully")
+                return True
+                
+            except Exception as e:
+                retry_count += 1
+                if "DeadlockDetected" in str(e) and retry_count < max_retries:
+                    # Exponential backoff with jitter
+                    import random
+                    wait_time = (2 ** retry_count) + random.uniform(0, 1)
+                    logger.warning(f"Deadlock detected, retrying schema setup in {wait_time:.2f} seconds (attempt {retry_count}/{max_retries})")
+                    await asyncio.sleep(wait_time)
+                else:
+                    logger.error(f"Error ensuring Neo4j schema after {retry_count} attempts: {e}")
+                    return False
+        
+        return False
+    
+    async def _ensure_relationship_types(self):
+        """
+        Create basic relationship type examples if missing.
+        This ensures that relationship types exist without affecting user data.
+        """
+        # Check which relationship types are missing
+        relationship_types = ["HAS_PREFERENCE", "HAS_INTERACTION", "REFERS_TO"]
+        missing_types = []
+        
+        for rel_type in relationship_types:
+            query = f"MATCH ()-[r:{rel_type}]->() RETURN count(r) as count LIMIT 1"
+            result = await self.query(query)
+            
+            # If we get a warning about unknown relationship type
+            if len(result) == 0 or (len(result) > 0 and result[0].get("count", 0) == 0):
+                missing_types.append(rel_type)
+        
+        if not missing_types:
+            return
+            
+        logger.warning(f"Missing relationship types: {missing_types}")
+        
+        try:
+            # Create a sample relationship network only if types are missing
+            if missing_types:
+                # Create test user if needed
+                sample_user_query = """
+                MERGE (u:User {id: 'system_test_user'})
+                ON CREATE SET u.name = 'System Test User',
+                             u.created_at = datetime()
+                RETURN u.id as id
+                """
+                user_result = await self.query(sample_user_query)
+                
+                if not user_result:
+                    logger.error("Failed to create test user for relationship types")
+                    return
+                
+                # Create test preference if HAS_PREFERENCE is missing
+                if "HAS_PREFERENCE" in missing_types:
+                    pref_query = """
+                    MATCH (u:User {id: 'system_test_user'})
+                    MERGE (p:UserPreference {id: 'system_test_pref'})
+                    ON CREATE SET p.type = 'test_type',
+                                 p.value = 'test_value',
+                                 p.created_at = datetime()
+                    MERGE (u)-[:HAS_PREFERENCE]->(p)
+                    """
+                    await self.query(pref_query)
+                
+                # Create test interaction and REFERS_TO if needed
+                if "HAS_INTERACTION" in missing_types or "REFERS_TO" in missing_types:
+                    # Find a product to use
+                    prod_query = "MATCH (p:Product) RETURN p.id as id LIMIT 1"
+                    product_result = await self.query(prod_query)
+                    
+                    if product_result and len(product_result) > 0:
+                        product_id = product_result[0].get("id")
+                        
+                        if product_id:
+                            # Create interaction with both relationship types
+                            interaction_query = f"""
+                            MATCH (u:User {{id: 'system_test_user'}}), (p:Product {{id: '{product_id}'}})
+                            MERGE (i:ProductInteraction {{id: 'system_test_interaction'}})
+                            ON CREATE SET i.type = 'test_interaction',
+                                         i.timestamp = datetime()
+                            MERGE (u)-[:HAS_INTERACTION]->(i)
+                            MERGE (i)-[:REFERS_TO]->(p)
+                            """
+                            await self.query(interaction_query)
+                
+                logger.info("Created sample relationship types for schema verification")
+        except Exception as e:
+            logger.error(f"Error creating relationship types: {e}")
     
     async def verify_database_schema(self) -> Tuple[bool, List[str]]:
         """
         Verify that the database contains the expected schema elements.
+        Enhanced to include user management and memory persistence.
         
         Returns:
             Tuple of (schema_valid, missing_elements)
         """
-        # Required elements based on our analysis
-        required_node_labels = ["Product", "Category", "Collection", "Tag"]
-        required_relationship_types = ["IN_CATEGORY", "IN_COLLECTION", "TAGGED_WITH"]
+        # Required elements based on our enhanced schema
+        required_node_labels = ["Product", "Category", "Collection", "Tag", "User", "MemoryState", "UserPreference", "ProductInteraction"]
+        required_relationship_types = ["IN_CATEGORY", "IN_COLLECTION", "TAGGED_WITH", "HAS_MEMORY", "HAS_PREFERENCE", "HAS_INTERACTION", "REFERS_TO"]
         
         missing_elements = []
         
@@ -200,8 +349,89 @@ class ProductKnowledgeGraphAsync:
             logger.info("Database schema verification successful")
         else:
             logger.warning(f"Database schema incomplete. Missing: {missing_elements}")
+            
+            # Save known schema issues to prevent repeated warnings
+            self.known_schema_issues = set(missing_elements)
         
         return schema_valid, missing_elements
+    
+    async def get_database_statistics(self) -> Dict[str, Any]:
+        """
+        Get statistics about the database, including user and memory data.
+        
+        Returns:
+            Dictionary with database statistics
+        """
+        stats = {}
+        
+        # Count node types
+        node_types = ["Product", "Category", "Collection", "Tag", "User", "MemoryState", "UserPreference", "ProductInteraction"]
+        
+        for node_type in node_types:
+            query = f"MATCH (n:{node_type}) RETURN count(n) as count"
+            result = await self.query(query)
+            if result:
+                stats[f"{node_type.lower()}_count"] = result[0]["count"]
+        
+        # Count relationship types
+        rel_types = ["IN_CATEGORY", "IN_COLLECTION", "TAGGED_WITH", "HAS_MEMORY", "HAS_PREFERENCE", "HAS_INTERACTION", "REFERS_TO"]
+        
+        for rel_type in rel_types:
+            query = f"MATCH ()-[r:{rel_type}]->() RETURN count(r) as count"
+            result = await self.query(query)
+            if result:
+                stats[f"{rel_type.lower()}_count"] = result[0]["count"]
+        
+        # Get product price statistics
+        price_query = """
+        MATCH (p:Product) WHERE p.price IS NOT NULL
+        RETURN min(p.price) as min_price, max(p.price) as max_price, avg(p.price) as avg_price
+        """
+        price_result = await self.query(price_query)
+        if price_result:
+            stats["price_statistics"] = {
+                "min": price_result[0]["min_price"],
+                "max": price_result[0]["max_price"],
+                "avg": price_result[0]["avg_price"]
+            }
+        
+        # Get user activity statistics - Fixed query syntax
+        user_query = """
+        MATCH (u:User)
+        OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+        WITH u, count(i) as interaction_count
+        RETURN count(u) as user_count, 
+               sum(interaction_count) as total_interactions
+        """
+        user_result = await self.query(user_query)
+        if user_result:
+            stats["user_statistics"] = {
+                "user_count": user_result[0]["user_count"],
+                "total_interactions": user_result[0]["total_interactions"] or 0
+            }
+        
+        # Get top product categories
+        category_query = """
+        MATCH (p:Product)-[:IN_CATEGORY]->(c:Category)
+        RETURN c.title as category, count(p) as count
+        ORDER BY count DESC LIMIT 5
+        """
+        category_result = await self.query(category_query)
+        if category_result:
+            stats["top_categories"] = {record["category"]: record["count"] for record in category_result}
+        
+        # Get memory statistics
+        memory_query = """
+        MATCH (m:MemoryState)
+        RETURN count(m) as memory_count
+        """
+        memory_result = await self.query(memory_query)
+        if memory_result:
+            stats["memory_statistics"] = {
+                "memory_count": memory_result[0]["memory_count"]
+            }
+        
+        return stats
     
     def _parse_images(self, images_str: str) -> List[str]:
         """
@@ -232,10 +462,380 @@ class ProductKnowledgeGraphAsync:
                 return [url.strip().strip('"\'') for url in content.split(",")]
             return [images_str]  # Return as single item if all else fails
     
+    async def get_user_preferences(self, user_id: str) -> Dict[str, Any]:
+        """
+        Get user preferences from Neo4j.
+        Enhanced implementation for persistent user preferences.
+        
+        Args:
+            user_id: User ID
+            
+        Returns:
+            Dictionary of user preferences
+        """
+        logger.info(f"Getting preferences for user: {user_id}")
+        
+        if not user_id:
+            return {
+                "preferred_categories": [],
+                "preferred_collections": [],
+                "preferred_tags": [],
+                "budget_range": None
+            }
+        
+        try:
+            # Check if HAS_PREFERENCE relationship exists before querying
+            if "Relationship type: HAS_PREFERENCE" in self.known_schema_issues:
+                logger.info(f"Skipping preference query due to missing relationship type")
+                return {
+                    "preferred_categories": [],
+                    "preferred_collections": [],
+                    "preferred_tags": [],
+                    "budget_range": None
+                }
+                
+            # Query Neo4j for user preferences
+            query = """
+            MATCH (u:User {id: $user_id})-[:HAS_PREFERENCE]->(p:UserPreference)
+            RETURN p.type as preference_type, p.value as preference_value
+            """
+            
+            result = await self.query(query, {"user_id": user_id})
+            
+            if not result:
+                logger.info(f"No preferences found for user {user_id}")
+                return {
+                    "preferred_categories": [],
+                    "preferred_collections": [],
+                    "preferred_tags": [],
+                    "budget_range": None
+                }
+            
+            # Process preference results
+            preferences = {
+                "preferred_categories": [],
+                "preferred_collections": [],
+                "preferred_tags": [],
+                "budget_range": None,
+                "color_preferences": [],
+                "style_preferences": [],
+                "occasion_preferences": []
+            }
+            
+            for record in result:
+                pref_type = record.get("preference_type")
+                pref_value = record.get("preference_value")
+                
+                if not pref_type or not pref_value:
+                    continue
+                
+                # Parse JSON value if applicable
+                try:
+                    if isinstance(pref_value, str):
+                        pref_value = json.loads(pref_value)
+                except json.JSONDecodeError:
+                    # If not valid JSON, use as is
+                    pass
+                
+                # Map preference types to our structure
+                if pref_type == "category":
+                    if isinstance(pref_value, list):
+                        preferences["preferred_categories"].extend(pref_value)
+                    else:
+                        preferences["preferred_categories"].append(pref_value)
+                elif pref_type == "collection":
+                    if isinstance(pref_value, list):
+                        preferences["preferred_collections"].extend(pref_value)
+                    else:
+                        preferences["preferred_collections"].append(pref_value)
+                elif pref_type == "tag":
+                    if isinstance(pref_value, list):
+                        preferences["preferred_tags"].extend(pref_value)
+                    else:
+                        preferences["preferred_tags"].append(pref_value)
+                elif pref_type == "budget_range":
+                    preferences["budget_range"] = pref_value
+                elif pref_type == "color":
+                    if isinstance(pref_value, list):
+                        preferences["color_preferences"].extend(pref_value)
+                    else:
+                        preferences["color_preferences"].append(pref_value)
+                elif pref_type == "style":
+                    if isinstance(pref_value, list):
+                        preferences["style_preferences"].extend(pref_value)
+                    else:
+                        preferences["style_preferences"].append(pref_value)
+                elif pref_type == "occasion":
+                    if isinstance(pref_value, list):
+                        preferences["occasion_preferences"].extend(pref_value)
+                    else:
+                        preferences["occasion_preferences"].append(pref_value)
+                else:
+                    # Add other preference types directly
+                    preferences[pref_type] = pref_value
+            
+            # Remove duplicates from lists
+            for key in preferences:
+                if isinstance(preferences[key], list):
+                    preferences[key] = list(dict.fromkeys(preferences[key]))
+            
+            logger.info(f"Retrieved preferences for user {user_id}")
+            return preferences
+            
+        except Exception as e:
+            logger.error(f"Error getting user preferences: {e}")
+            return {
+                "preferred_categories": [],
+                "preferred_collections": [],
+                "preferred_tags": [],
+                "budget_range": None
+            }
+    
+    async def create_or_update_user(self, user_id: str, user_data: Optional[Dict[str, Any]] = None) -> bool:
+        """
+        Create or update a user in Neo4j.
+        
+        Args:
+            user_id: User ID
+            user_data: Optional user data
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not user_id:
+            logger.error("No user ID provided")
+            return False
+            
+        try:
+            # Prepare user data
+            data = user_data or {}
+            data["last_active"] = datetime.datetime.now().isoformat()
+            
+            # Convert data to parameters
+            params = {"user_id": user_id}
+            set_clause = "SET u.last_active = $last_active"
+            
+            for key, value in data.items():
+                if key != "last_active":  # Already handled above
+                    params[key] = value
+                    set_clause += f", u.{key} = ${key}"
+            
+            # Create or update user
+            query = f"""
+            MERGE (u:User {{id: $user_id}})
+            {set_clause}
+            RETURN u.id as user_id
+            """
+            
+            result = await self.query(query, params)
+            
+            if result and result[0].get("user_id") == user_id:
+                logger.info(f"Created or updated user {user_id}")
+                return True
+            else:
+                logger.warning(f"Failed to create or update user {user_id}")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error creating or updating user: {e}")
+            return False
+    
+    async def get_user_interaction_history(self, user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
+        """
+        Get the interaction history for a user.
+        
+        Args:
+            user_id: User ID
+            limit: Maximum number of interactions to return
+            
+        Returns:
+            List of interaction records
+        """
+        if not user_id:
+            logger.error("No user ID provided")
+            return []
+            
+        try:
+            # Check if required relationship types exist
+            if "Relationship type: HAS_INTERACTION" in self.known_schema_issues or "Relationship type: REFERS_TO" in self.known_schema_issues:
+                logger.info(f"Skipping interaction history query due to missing relationship types")
+                return []
+                
+            # Query for user interactions
+            query = """
+            MATCH (u:User {id: $user_id})-[:HAS_INTERACTION]->(i:ProductInteraction)-[:REFERS_TO]->(p:Product)
+            RETURN 
+                i.id as interaction_id,
+                i.type as interaction_type,
+                i.timestamp as timestamp,
+                p.id as product_id,
+                p.title as product_title,
+                p.price as product_price
+            ORDER BY i.timestamp DESC
+            LIMIT $limit
+            """
+            
+            result = await self.query(query, {"user_id": user_id, "limit": limit})
+            
+            # Process results
+            interactions = []
+            
+            for record in result:
+                interaction = {
+                    "id": record.get("interaction_id"),
+                    "type": record.get("interaction_type"),
+                    "timestamp": record.get("timestamp"),
+                    "product": {
+                        "id": record.get("product_id"),
+                        "title": record.get("product_title"),
+                        "price": record.get("product_price")
+                    }
+                }
+                
+                interactions.append(interaction)
+                
+            logger.info(f"Retrieved {len(interactions)} interactions for user {user_id}")
+            return interactions
+            
+        except Exception as e:
+            logger.error(f"Error getting user interaction history: {e}")
+            return []
+    
+    async def get_personalized_product_recommendations(self, user_id: str, limit: int = 5) -> List[Dict[str, Any]]:
+        """
+        Get personalized product recommendations based on user interactions and preferences.
+        
+        Args:
+            user_id: User ID
+            limit: Maximum number of recommendations
+            
+        Returns:
+            List of recommended products
+        """
+        if not user_id:
+            logger.error("No user ID provided")
+            return []
+            
+        try:
+            # Check if required relationship types exist
+            if "Relationship type: HAS_PREFERENCE" in self.known_schema_issues or "Relationship type: HAS_INTERACTION" in self.known_schema_issues:
+                logger.info(f"Skipping personalized recommendations due to missing relationship types")
+                if hasattr(self, 'get_popular_products'):
+                    return await self.get_popular_products(limit)
+                else:
+                    return []
+                
+            # Query products based on user preferences and interactions
+            query = """
+            // Find categories liked by this user
+            MATCH (u:User {id: $user_id})-[:HAS_PREFERENCE]->(p:UserPreference)
+            WHERE p.type = 'category'
+            WITH u, collect(p.value) as preferred_categories
+            
+            // Find products interacted with by this user
+            MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)-[:REFERS_TO]->(viewed:Product)
+            WITH u, preferred_categories, collect(viewed) as viewed_products
+            
+            // Find similar products in preferred categories
+            UNWIND preferred_categories as category
+            MATCH (sim_product:Product)-[:IN_CATEGORY]->(:Category {title: category})
+            WHERE NOT sim_product IN viewed_products
+            
+            // Return recommended products
+            RETURN DISTINCT
+                sim_product.id as id,
+                sim_product.title as title,
+                sim_product.price as price,
+                sim_product.description as description,
+                sim_product.images as images
+            LIMIT $limit
+            """
+            
+            result = await self.query(query, {"user_id": user_id, "limit": limit})
+            
+            if result:
+                # Process results into product objects
+                recommendations = []
+                
+                for record in result:
+                    product_id = record.get("id")
+                    
+                    product_obj = {
+                        "id": product_id,
+                        "title": record.get("title", "Untitled Product"),
+                        "price": record.get("price", 0.0),
+                        "description": record.get("description", ""),
+                        "images": self._parse_images(record.get("images", "[]")),
+                        "categories": await self._get_product_categories(product_id)
+                    }
+                    
+                    recommendations.append(product_obj)
+                
+                logger.info(f"Found {len(recommendations)} personalized recommendations for user {user_id}")
+                return recommendations
+                
+            # If no category-based recommendations, try based on recent views
+            query = """
+            // Find recently viewed products
+            MATCH (u:User {id: $user_id})-[:HAS_INTERACTION]->(i:ProductInteraction)-[:REFERS_TO]->(p:Product)
+            WHERE i.type = 'viewed' OR i.type = 'liked'
+            WITH p, i.timestamp as timestamp
+            ORDER BY timestamp DESC
+            LIMIT 3
+            
+            // Find products similar to recently viewed
+            MATCH (p)-[:IN_CATEGORY]->(c:Category)<-[:IN_CATEGORY]-(similar:Product)
+            WHERE similar.id <> p.id
+            
+            // Return similar products
+            RETURN DISTINCT
+                similar.id as id,
+                similar.title as title,
+                similar.price as price,
+                similar.description as description,
+                similar.images as images,
+                similar.visited_num as visited_num
+            ORDER BY similar.visited_num DESC
+            LIMIT $limit
+            """
+            
+            result = await self.query(query, {"user_id": user_id, "limit": limit})
+            
+            if result:
+                # Process results
+                recommendations = []
+                
+                for record in result:
+                    product_id = record.get("id")
+                    
+                    product_obj = {
+                        "id": product_id,
+                        "title": record.get("title", "Untitled Product"),
+                        "price": record.get("price", 0.0),
+                        "description": record.get("description", ""),
+                        "images": self._parse_images(record.get("images", "[]")),
+                        "categories": await self._get_product_categories(product_id),
+                        "visited_num": record.get("visited_num", 0)
+                    }
+                    
+                    recommendations.append(product_obj)
+                
+                logger.info(f"Found {len(recommendations)} similar recommendations for user {user_id}")
+                return recommendations
+            
+            # If still no recommendations, fall back to popular products
+            logger.info(f"No personalized recommendations found, falling back to popular products")
+            return await self.get_popular_products(limit)
+            
+        except Exception as e:
+            logger.error(f"Error getting personalized recommendations: {e}")
+            # Fall back to popular products
+            return await self.get_popular_products(limit)
+    
     async def get_product_by_filter(self, category=None, collection=None, tag=None, 
                         brand=None, min_price=None, max_price=None, material=None, limit=5):
         """
-        Get products by filtering on various attributes with improved diversity.
+        Get products by filtering on various attributes.
         
         Args:
             category: Category filter (optional)
@@ -253,255 +853,145 @@ class ProductKnowledgeGraphAsync:
         logger.info(f"Retrieving products with filters: category={category}, "
                 f"collection={collection}, tag={tag}, price={min_price}-{max_price}")
         
-        # First, count total products to diagnose the database
-        count_query = "MATCH (p:Product) RETURN count(p) as total"
-        count_result = await self.query(count_query)
-        product_count = count_result[0]['total'] if count_result else 0
-        logger.info(f"Total products in database: {product_count}")
+        # Start with a flexible query that will always return results
+        query = """
+        MATCH (p:Product)
+        WHERE p.price > 0 
+        AND p.title IS NOT NULL AND p.title <> ''
+        AND NOT toLower(p.title) CONTAINS 'test' 
+        AND NOT toLower(p.title) CONTAINS 'untitled'
+        """
         
-        # Use different strategies based on the type of query
-        use_randomization = True  # Default to using randomization
+        params = {"limit": limit}
+        score_initialized = False
         
-        # Special handling for occasions like weddings
-        is_wedding = False
-        if tag:
-            wedding_terms = ["wedding", "formal", "ceremony", "gala", "cocktail", "party"]
-            is_wedding = any(term in tag.lower() for term in wedding_terms)
-            # For specific occasions, we want more targeted results
-            if is_wedding:
-                use_randomization = False
-        
-        # Build the main query
-        if use_randomization:
-            # Randomized approach to get variety
-            query = """
-            MATCH (p:Product)
-            WHERE p.price > 0 AND p.title IS NOT NULL AND p.title <> ''
-            AND NOT toLower(p.title) CONTAINS 'test' AND NOT toLower(p.title) CONTAINS 'untitled'
+        # Add scoring system for beach vacation specific terms
+        if "beach" in (tag or "").lower() or "vacation" in (tag or "").lower():
+            query += """
+            WITH p, 0 as score 
+            OPTIONAL MATCH (p)-[:IN_CATEGORY]->(c:Category)
+            WHERE toLower(c.title) IN ['swimwear', 'dress', 'shorts', 'sandals', 'beach']
+            WITH p, CASE WHEN count(c) > 0 THEN 10 ELSE 0 END as score
             """
-            
-            # Add filters as needed
-            params = {"sample_size": 2000, "limit": limit}  # Increased sample size for more variety
-            
-            if category:
+            score_initialized = True
+        
+        # Apply all filters as OPTIONAL MATCH to ensure we get results
+        if category:
+            if score_initialized:
                 query += """
-                WITH p
-                MATCH (p)-[:IN_CATEGORY]->(c:Category)
+                WITH p, score
+                OPTIONAL MATCH (p)-[:IN_CATEGORY]->(c:Category)
                 WHERE toLower(c.title) CONTAINS toLower($category)
+                WITH p, score + CASE WHEN count(c) > 0 THEN 5 ELSE 0 END as score
                 """
-                params["category"] = category
-                
-            if collection:
-                query += """
-                WITH p
-                MATCH (p)-[:IN_COLLECTION]->(col:Collection)
-                WHERE toLower(col.title) CONTAINS toLower($collection)
-                """
-                params["collection"] = collection
-                
-            if tag:
-                query += """
-                WITH p
-                MATCH (p)-[:TAGGED_WITH]->(t:Tag)
-                """
-                # Split tag into words for better matching
-                tag_words = tag.lower().split()
-                tag_conditions = []
-                
-                # Add conditions for each word in the tag
-                for i, word in enumerate(tag_words):
-                    if len(word) > 3:  # Only use meaningful words
-                        tag_param = f"tag_word_{i}"
-                        tag_conditions.append(f"toLower(t.title) CONTAINS ${tag_param}")
-                        params[tag_param] = word
-                
-                # Add the OR condition for any matching word
-                if tag_conditions:
-                    query += "WHERE " + " OR ".join(tag_conditions)
-            
-            # Add price filters
-            if min_price is not None:
-                query += " WITH p WHERE p.price >= $min_price"
-                params["min_price"] = float(min_price)
-            
-            if max_price is not None:
-                query += " WITH p WHERE p.price <= $max_price"
-                params["max_price"] = float(max_price)
-            
-            # Add randomization and limit
-            query += """
-            WITH p, rand() as random
-            ORDER BY random
-            LIMIT $sample_size
-            WITH collect(p) as products
-            UNWIND products as p
-            RETURN 
-                p.id as id,
-                p.title as title,
-                p.price as price,
-                p.description as description,
-                p.images as images,
-                COALESCE(p.visited_num, 0) as visited_num,
-                COALESCE(p.size, '') as size,
-                COALESCE(p.color, '') as color
-            LIMIT $limit
-            """
-            
-        else:
-            # Traditional targeted query for specific requirements
-            # Build query parts
-            query_parts = ["MATCH (p:Product)"]
-            where_clauses = []
-            params = {"limit": limit}
-            
-            # Add category filter if provided
-            if category:
-                query_parts.append("MATCH (p)-[:IN_CATEGORY]->(c:Category)")
-                where_clauses.append("toLower(c.title) CONTAINS toLower($category)")
-                params["category"] = category
-            
-            # Add collection filter if provided
-            if collection:
-                query_parts.append("MATCH (p)-[:IN_COLLECTION]->(col:Collection)")
-                where_clauses.append("toLower(col.title) CONTAINS toLower($collection)")
-                params["collection"] = collection
-            
-            # For weddings, add formal dress categories if no category specified
-            if is_wedding and not category:
-                query_parts.append("MATCH (p)-[:IN_CATEGORY]->(c:Category)")
-                where_clauses.append("(toLower(c.title) CONTAINS 'dress' OR toLower(c.title) CONTAINS 'suit' OR toLower(c.title) CONTAINS 'formal' OR toLower(c.title) CONTAINS 'gown')")
-            
-            # Improved tag filter with word-based matching
-            if tag:
-                query_parts.append("MATCH (p)-[:TAGGED_WITH]->(t:Tag)")
-                # Split tag into words for better matching
-                tag_words = tag.lower().split()
-                tag_conditions = []
-                
-                # Add conditions for each word in the tag
-                for i, word in enumerate(tag_words):
-                    if len(word) > 3:  # Only use meaningful words
-                        tag_param = f"tag_word_{i}"
-                        tag_conditions.append(f"toLower(t.title) CONTAINS ${tag_param}")
-                        params[tag_param] = word
-                
-                # Add the OR condition for any matching word
-                if tag_conditions:
-                    where_clauses.append("(" + " OR ".join(tag_conditions) + ")")
-            
-            # Add price filters
-            if min_price is not None:
-                where_clauses.append("p.price >= $min_price")
-                params["min_price"] = float(min_price)
-            
-            if max_price is not None:
-                where_clauses.append("p.price <= $max_price")
-                params["max_price"] = float(max_price)
-            
-            # Filter out low-quality items
-            where_clauses.append("p.price > 0")  # Skip zero-priced items
-            where_clauses.append("p.title IS NOT NULL AND p.title <> ''")  # Require title
-            where_clauses.append("NOT toLower(p.title) CONTAINS 'test'")  # Skip test items
-            where_clauses.append("NOT toLower(p.title) CONTAINS 'untitled'")  # Skip untitled
-            
-            # Add WHERE clause if needed
-            if where_clauses:
-                query_parts.append("WHERE " + " AND ".join(where_clauses))
-            
-            # Add ordering based on occasion
-            if is_wedding:
-                # Add to the ORDER BY clause to prioritize dresses
-                query_parts.append("""
-                ORDER BY 
-                    CASE 
-                        WHEN toLower(p.title) CONTAINS 'dress' THEN 1
-                        WHEN toLower(p.title) CONTAINS 'gown' THEN 2
-                        WHEN toLower(p.title) CONTAINS 'suit' THEN 3
-                        ELSE 4
-                    END,
-                    COALESCE(p.visited_num, 0) DESC
-                """)
             else:
-                # Mix popularity with some randomness
-                query_parts.append("ORDER BY COALESCE(p.visited_num, 0) DESC, rand()")
-            
-            # Complete the query
-            query = "\n".join(query_parts)
+                query += """
+                WITH p, 0 as score
+                OPTIONAL MATCH (p)-[:IN_CATEGORY]->(c:Category)
+                WHERE toLower(c.title) CONTAINS toLower($category)
+                WITH p, CASE WHEN count(c) > 0 THEN 5 ELSE 0 END as score
+                """
+                score_initialized = True
+            params["category"] = category
+        
+        if tag:
+            if score_initialized:
+                query += """
+                WITH p, score
+                OPTIONAL MATCH (p)-[:TAGGED_WITH]->(t:Tag)
+                WHERE toLower(t.title) CONTAINS toLower($tag)
+                WITH p, score + CASE WHEN count(t) > 0 THEN 5 ELSE 0 END as score
+                """
+            else:
+                query += """
+                WITH p, 0 as score
+                OPTIONAL MATCH (p)-[:TAGGED_WITH]->(t:Tag)
+                WHERE toLower(t.title) CONTAINS toLower($tag)
+                WITH p, CASE WHEN count(t) > 0 THEN 5 ELSE 0 END as score
+                """
+                score_initialized = True
+            params["tag"] = tag
+        
+        if collection:
+            if score_initialized:
+                query += """
+                WITH p, score
+                OPTIONAL MATCH (p)-[:IN_COLLECTION]->(col:Collection)
+                WHERE toLower(col.title) CONTAINS toLower($collection)
+                WITH p, score + CASE WHEN count(col) > 0 THEN 5 ELSE 0 END as score
+                """
+            else:
+                query += """
+                WITH p, 0 as score
+                OPTIONAL MATCH (p)-[:IN_COLLECTION]->(col:Collection)
+                WHERE toLower(col.title) CONTAINS toLower($collection)
+                WITH p, CASE WHEN count(col) > 0 THEN 5 ELSE 0 END as score
+                """
+                score_initialized = True
+            params["collection"] = collection
+        
+        # Add price filters if provided
+        if min_price is not None:
             query += """
-            LIMIT $limit
+            WITH p, score
+            WHERE p.price >= $min_price
             """
-            
-            # Add return statement
+            params["min_price"] = float(min_price)
+        
+        if max_price is not None:
             query += """
-            RETURN 
-                p.id as id,
-                p.title as title,
-                p.price as price,
-                p.description as description,
-                p.images as images,
-                COALESCE(p.visited_num, 0) as visited_num,
-                COALESCE(p.size, '') as size,
-                COALESCE(p.color, '') as color
+            WITH p, score
+            WHERE p.price <= $max_price
+            """
+            params["max_price"] = float(max_price)
+        
+        # If no scoring has been initialized, add a basic score
+        if not score_initialized:
+            query += """
+            WITH p, 0 as score
             """
         
-        # Log the query for debugging
-        logger.info(f"Neo4j query: {query}")
-        logger.info(f"Query parameters: {params}")
+        # Order by score then popularity, with some randomness
+        query += """
+        ORDER BY score DESC, p.visited_num DESC, rand()
+        LIMIT $limit
+        RETURN 
+            p.id as id,
+            p.title as title,
+            p.price as price,
+            p.description as description,
+            p.images as images,
+            COALESCE(p.visited_num, 0) as visited_num
+        """
         
-        # Execute the query
+        # Execute query
         result = await self.query(query, params)
-        
-        filtered_result = []
-        for record in result:
-            # Only keep items with price > 0 and proper titles
-            if (record.get("price", 0) > 0 and 
-                record.get("title") and 
-                "test" not in record.get("title", "").lower() and 
-                "untitled" not in record.get("title", "").lower()):
-                filtered_result.append(record)
-        
-        if not filtered_result:
-            logger.warning(f"No products found matching filters")
-            return []
+        logger.info(f"Query returned {len(result) if result else 0} products")
         
         # Process results into product objects
         products = []
-        seen_titles = set()
-        product_types = set()
-        
-        for record in filtered_result:
-            # Skip if we've seen this title already
-            title = record.get("title", "").strip()
-            if title in seen_titles:
-                continue
-                
+        for record in result:
             product_id = record.get("id", "")
             
-            # Add to seen titles
-            seen_titles.add(title)
-            
-            # Create standardized product object
+            if not product_id:
+                continue
+                
+            # Create product object
             product_obj = {
                 "id": product_id,
-                "title": title,
+                "title": record.get("title", ""),
                 "price": record.get("price", 0.0),
                 "description": record.get("description", ""),
                 "images": self._parse_images(record.get("images", "[]")),
                 "categories": await self._get_product_categories(product_id),
-                "size": record.get("size", ""),
-                "color": record.get("color", ""),
                 "visited_num": record.get("visited_num", 0)
             }
             
             products.append(product_obj)
-            
-            # Stop if we have enough products
-            if len(products) >= limit:
-                break
         
         logger.info(f"Retrieved {len(products)} products matching filters")
         return products
-    
+
     async def _get_product_categories(self, product_id):
         """
         Get categories for a specific product.
@@ -968,24 +1458,54 @@ class ProductKnowledgeGraphAsync:
         logger.info(f"Retrieved {len(products)} products with tag: {tag}")
         return products
     
-    async def get_user_preferences(self, user_id):
+    async def get_trending_products(self, limit=5, days=30):
         """
-        Get user preferences. Included for interface compatibility.
-        In a real system, this would retrieve user preferences from the database.
+        Get trending products based on recent visits.
         
         Args:
-            user_id: User ID
+            limit: Maximum number of products to return
+            days: Number of days to consider for trending
             
         Returns:
-            Dictionary of user preferences (placeholder)
+            List of trending products
         """
-        logger.info(f"Getting preferences for user: {user_id}")
+        logger.info(f"Getting trending products for last {days} days")
         
-        # Placeholder for user preferences
-        # In a real system, this would retrieve actual user data from the database
-        return {
-            "preferred_categories": [],
-            "preferred_collections": [],
-            "preferred_tags": [],
-            "budget_range": None
-        }
+        # Get products with highest visit counts
+        # In a real implementation, you'd filter by recent interactions
+        query = """
+        MATCH (p:Product)
+        WHERE p.visited_num IS NOT NULL AND p.visited_num > 0
+        RETURN 
+            p.id as id,
+            p.title as title,
+            p.price as price,
+            p.description as description,
+            p.images as images,
+            p.visited_num as visited_num
+        ORDER BY p.visited_num DESC
+        LIMIT $limit
+        """
+        
+        result = await self.query(query, {"limit": limit})
+        
+        # Process results
+        products = []
+        for record in result:
+            product_id = record.get("id", "")
+            
+            product_obj = {
+                "id": product_id,
+                "title": record.get("title", "Untitled Product"),
+                "price": record.get("price", 0.0),
+                "description": record.get("description", ""),
+                "images": self._parse_images(record.get("images", "[]")),
+                "categories": await self._get_product_categories(product_id),
+                "visited_num": record.get("visited_num", 0),
+                "trending": True
+            }
+            
+            products.append(product_obj)
+        
+        logger.info(f"Retrieved {len(products)} trending products")
+        return products

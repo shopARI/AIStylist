@@ -1,16 +1,21 @@
 """
-Asynchronous Memory Integration for AI Stylist.
+Enhanced Asynchronous Memory Integration for AI Stylist.
 
-This module provides functions to set up and manage memory for the AI Stylist,
-using CAMEL's memory system with async support.
+This module provides advanced functions to set up and manage persistent memory 
+for the AI Stylist, using CAMEL's memory system with Neo4j persistence.
 Compatible with CAMEL-AI 0.2.43.
 """
 
 import logging
 import asyncio
-from typing import Tuple, List, Dict, Any, Optional
+import json
+import uuid
+import datetime
+import base64
+import pickle
+from typing import Tuple, List, Dict, Any, Optional, Union
 
-# Import our adapter first to ensure OpenAI embedding compatibility
+# Import adapter first to ensure OpenAI embedding compatibility
 try:
     from openai_embedding_adapter import initialization_result
     if initialization_result:
@@ -38,19 +43,166 @@ from camel.storages import QdrantStorage
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("memory_integration_async")
 
-async def setup_stylist_memory_async(model_type: ModelType = ModelType.GPT_4O, token_limit: int = 2048) -> LongtermAgentMemory:
+class MemoryState:
+    """Class for serializing and deserializing memory states"""
+    
+    @staticmethod
+    async def serialize_memory(memory: LongtermAgentMemory) -> Dict[str, Any]:
+        """
+        Serialize a CAMEL memory instance for storage.
+        
+        Args:
+            memory: LongtermAgentMemory instance
+            
+        Returns:
+            Dictionary with serialized memory data
+        """
+        if not memory:
+            return {}
+            
+        try:
+            # Extract chat history records
+            chat_history = {}
+            
+            if hasattr(memory, 'chat_history_block') and hasattr(memory.chat_history_block, 'memory'):
+                for record_id, record in memory.chat_history_block.memory.items():
+                    if hasattr(record, 'message') and hasattr(record.message, 'content'):
+                        role = "user" if record.role_at_backend == OpenAIBackendRole.USER else "assistant"
+                        chat_history[record_id] = {
+                            "role": role,
+                            "content": record.message.content,
+                            "timestamp": datetime.datetime.now().isoformat(),
+                            "metadata": record.metadata if hasattr(record, 'metadata') else {}
+                        }
+            
+            # Extract vector records if available
+            vector_records = []
+            
+            if hasattr(memory, 'vector_db_block') and hasattr(memory.vector_db_block, 'storage'):
+                try:
+                    # Note: This is a simplification as direct access to records might not be available
+                    # In a production system, we would implement a more robust extraction method
+                    pass
+                except Exception as e:
+                    logger.error(f"Error extracting vector records: {e}")
+            
+            # Create the serialized memory structure
+            serialized = {
+                "chat_history": chat_history,
+                "vector_records": vector_records,
+                "serialized_at": datetime.datetime.now().isoformat(),
+                "version": "1.0"
+            }
+            
+            return serialized
+        
+        except Exception as e:
+            logger.error(f"Error serializing memory: {e}")
+            return {}
+    
+    @staticmethod
+    async def deserialize_memory(serialized_data: Dict[str, Any], model_type: ModelType = ModelType.GPT_4O) -> Optional[LongtermAgentMemory]:
+        """
+        Deserialize memory data into a CAMEL memory instance.
+        
+        Args:
+            serialized_data: Dictionary with serialized memory data
+            model_type: Type of model to use for token counting
+            
+        Returns:
+            LongtermAgentMemory instance or None if deserialization fails
+        """
+        if not serialized_data:
+            return None
+            
+        try:
+            # Create a new memory instance
+            memory = await setup_stylist_memory_async(model_type)
+            
+            if not memory:
+                logger.error("Failed to create new memory instance for deserialization")
+                return None
+                
+            # Restore chat history records
+            chat_history = serialized_data.get("chat_history", {})
+            
+            for record_id, record_data in chat_history.items():
+                role = record_data.get("role")
+                content = record_data.get("content")
+                metadata = record_data.get("metadata", {})
+                
+                if role and content:
+                    # Create the appropriate message based on role
+                    if role == "user":
+                        message = BaseMessage.make_user_message(
+                            role_name="User",
+                            content=content
+                        )
+                        role_at_backend = OpenAIBackendRole.USER
+                    else:
+                        message = BaseMessage.make_assistant_message(
+                            role_name="Stylist",
+                            content=content
+                        )
+                        role_at_backend = OpenAIBackendRole.ASSISTANT
+                    
+                    # Create and add the memory record
+                    record = MemoryRecord(
+                        message=message,
+                        role_at_backend=role_at_backend,
+                        metadata=metadata
+                    )
+                    
+                    # Add to memory - use to_thread for non-blocking operation
+                    await asyncio.to_thread(memory.write_records, [record])
+            
+            # Restore vector records if available
+            # This would be implemented based on the specific vectorization approach
+            
+            logger.info(f"Successfully deserialized memory with {len(chat_history)} chat records")
+            return memory
+            
+        except Exception as e:
+            logger.error(f"Error deserializing memory: {e}")
+            return None
+
+async def setup_stylist_memory_async(
+    model_type: ModelType = ModelType.GPT_4O, 
+    token_limit: int = 2048,
+    user_id: Optional[str] = None,
+    neo4j_client = None
+) -> LongtermAgentMemory:
     """
     Initialize the memory system for the AI stylist using CAMEL's LongtermAgentMemory.
-    Async version compatible with CAMEL-AI 0.2.43
+    Enhanced with persistence capabilities and user-specific loading.
     
     Args:
         model_type: Type of model to use for token counting
         token_limit: Maximum token limit for context window
-    
+        user_id: Optional user ID for loading persistent memory
+        neo4j_client: Neo4j client for persistence operations
+        
     Returns:
         LongtermAgentMemory: Configured memory system for the stylist agent
     """
     logger.info(f"Setting up stylist memory with model type {model_type} and token limit {token_limit}")
+    
+    memory = None
+    
+    # Try to load existing memory if user_id is provided
+    if user_id and neo4j_client:
+        try:
+            logger.info(f"Attempting to load memory for user {user_id}")
+            memory = await load_memory_for_user_async(user_id, neo4j_client, model_type)
+            
+            if memory:
+                logger.info(f"Successfully loaded memory for user {user_id}")
+                return memory
+            else:
+                logger.info(f"No existing memory found for user {user_id}, creating new memory")
+        except Exception as e:
+            logger.error(f"Error loading memory for user {user_id}: {e}")
+            # Continue to create new memory
     
     try:
         # Set up token counter for the appropriate model
@@ -79,6 +231,11 @@ async def setup_stylist_memory_async(model_type: ModelType = ModelType.GPT_4O, t
                 chat_history_block=ChatHistoryBlock(),
                 vector_db_block=vector_block,
             )
+            
+            # Add user_id to memory metadata if provided
+            if user_id:
+                memory.metadata = {"user_id": user_id, "created_at": datetime.datetime.now().isoformat()}
+                
             logger.info("Stylist memory setup with vector capabilities")
         except Exception as e:
             logger.error(f"Error setting up VectorDBBlock: {e}")
@@ -91,6 +248,11 @@ async def setup_stylist_memory_async(model_type: ModelType = ModelType.GPT_4O, t
                 ),
                 chat_history_block=ChatHistoryBlock(),
             )
+            
+            # Add user_id to memory metadata if provided
+            if user_id:
+                memory.metadata = {"user_id": user_id, "created_at": datetime.datetime.now().isoformat()}
+                
             logger.info("Stylist memory setup with chat history only (no vector capabilities)")
         
         logger.info("Stylist memory setup successful")
@@ -109,6 +271,11 @@ async def setup_stylist_memory_async(model_type: ModelType = ModelType.GPT_4O, t
                 ),
                 chat_history_block=ChatHistoryBlock(),
             )
+            
+            # Add user_id to memory metadata if provided
+            if user_id:
+                fallback_memory.metadata = {"user_id": user_id, "created_at": datetime.datetime.now().isoformat()}
+                
             logger.info("Created fallback memory due to error (chat history only)")
             return fallback_memory
         except Exception as e2:
@@ -122,14 +289,207 @@ async def setup_stylist_memory_async(model_type: ModelType = ModelType.GPT_4O, t
                         token_limit=512,
                     )
                 )
+                
+                # Add user_id to memory metadata if provided
+                if user_id:
+                    minimal_memory.metadata = {"user_id": user_id, "created_at": datetime.datetime.now().isoformat()}
+                    
                 logger.info("Created minimal memory system")
                 return minimal_memory
             except Exception as e3:
                 logger.error(f"Failed to create even minimal memory: {e3}")
                 raise RuntimeError("Unable to create any memory system")
 
-async def add_message_to_memory_async(memory: LongtermAgentMemory, content: str, sender: str, 
-                         metadata: Optional[Dict[str, Any]] = None) -> bool:
+async def load_memory_for_user_async(
+    user_id: str,
+    neo4j_client,
+    model_type: ModelType = ModelType.GPT_4O
+) -> Optional[LongtermAgentMemory]:
+    """
+    Load memory for a specific user from Neo4j.
+    
+    Args:
+        user_id: User ID
+        neo4j_client: Neo4j client for persistence operations
+        model_type: Type of model to use for token counting
+        
+    Returns:
+        LongtermAgentMemory instance or None if not found
+    """
+    if not user_id or not neo4j_client:
+        logger.warning("Cannot load memory: invalid user ID or Neo4j client")
+        return None
+        
+    try:
+        # Query Neo4j for the latest memory state for this user
+        query = """
+        MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryState)
+        WHERE m.type = 'camel'
+        RETURN m.memory_data as memory_data, m.created_at as created_at
+        ORDER BY m.created_at DESC
+        LIMIT 1
+        """
+        
+        result = await neo4j_client.query(query, {"user_id": user_id})
+        
+        if not result:
+            logger.info(f"No memory found for user {user_id}")
+            return None
+            
+        # Extract memory data
+        memory_data = result[0].get("memory_data")
+        created_at = result[0].get("created_at")
+        
+        if not memory_data:
+            logger.warning(f"Empty memory data for user {user_id}")
+            return None
+            
+        # Deserialize the memory data
+        try:
+            memory_dict = json.loads(memory_data)
+            memory = await MemoryState.deserialize_memory(memory_dict, model_type)
+            
+            if memory:
+                logger.info(f"Loaded memory for user {user_id} created at {created_at}")
+                
+                # Add user_id to memory metadata
+                memory.metadata = {"user_id": user_id, "loaded_at": datetime.datetime.now().isoformat()}
+                
+                return memory
+            else:
+                logger.warning(f"Failed to deserialize memory for user {user_id}")
+                return None
+        except json.JSONDecodeError as e:
+            logger.error(f"Error decoding memory JSON for user {user_id}: {e}")
+            return None
+            
+    except Exception as e:
+        logger.error(f"Error loading memory for user {user_id}: {e}")
+        return None
+
+async def save_memory_for_user_async(
+    memory: LongtermAgentMemory,
+    user_id: str,
+    neo4j_client
+) -> bool:
+    """
+    Save memory for a specific user to Neo4j.
+    
+    Args:
+        memory: LongtermAgentMemory instance
+        user_id: User ID
+        neo4j_client: Neo4j client for persistence operations
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    if not memory or not user_id or not neo4j_client:
+        logger.warning("Cannot save memory: invalid memory, user ID, or Neo4j client")
+        return False
+        
+    try:
+        # Serialize the memory
+        memory_dict = await MemoryState.serialize_memory(memory)
+        
+        if not memory_dict:
+            logger.warning(f"Empty serialized memory for user {user_id}")
+            return False
+            
+        # Convert to JSON
+        memory_json = json.dumps(memory_dict)
+        
+        # Generate a unique ID for this memory state
+        memory_id = str(uuid.uuid4())
+        created_at = datetime.datetime.now().isoformat()
+        
+        # Save to Neo4j
+        query = """
+        // Ensure the user exists
+        MERGE (u:User {id: $user_id})
+        
+        // Create the memory state
+        CREATE (m:MemoryState {
+            id: $memory_id,
+            type: 'camel',
+            memory_data: $memory_data,
+            created_at: $created_at
+        })
+        
+        // Connect the memory to the user
+        CREATE (u)-[:HAS_MEMORY]->(m)
+        
+        RETURN m.id as memory_id
+        """
+        
+        result = await neo4j_client.query(
+            query, 
+            {
+                "user_id": user_id,
+                "memory_id": memory_id,
+                "memory_data": memory_json,
+                "created_at": created_at
+            }
+        )
+        
+        if result and result[0].get("memory_id") == memory_id:
+            logger.info(f"Saved memory state {memory_id} for user {user_id}")
+            
+            # Cleanup old memory states to avoid excessive storage
+            await cleanup_old_memory_states_async(user_id, neo4j_client)
+            
+            return True
+        else:
+            logger.warning(f"Failed to save memory for user {user_id}")
+            return False
+            
+    except Exception as e:
+        logger.error(f"Error saving memory for user {user_id}: {e}")
+        return False
+
+async def cleanup_old_memory_states_async(
+    user_id: str,
+    neo4j_client,
+    keep_latest: int = 3
+) -> bool:
+    """
+    Clean up old memory states for a user to avoid excessive storage.
+    
+    Args:
+        user_id: User ID
+        neo4j_client: Neo4j client for persistence operations
+        keep_latest: Number of latest memory states to keep
+        
+    Returns:
+        bool: True if successful, False otherwise
+    """
+    if not user_id or not neo4j_client:
+        return False
+        
+    try:
+        # Query to delete old memory states
+        query = """
+        MATCH (u:User {id: $user_id})-[:HAS_MEMORY]->(m:MemoryState)
+        WITH m, u
+        ORDER BY m.created_at DESC
+        SKIP $keep_latest
+        DETACH DELETE m
+        """
+        
+        await neo4j_client.query(query, {"user_id": user_id, "keep_latest": keep_latest})
+        
+        logger.info(f"Cleaned up old memory states for user {user_id}, keeping {keep_latest} latest")
+        return True
+        
+    except Exception as e:
+        logger.error(f"Error cleaning up old memory states for user {user_id}: {e}")
+        return False
+
+async def add_message_to_memory_async(
+    memory: LongtermAgentMemory, 
+    content: str, 
+    sender: str, 
+    metadata: Optional[Dict[str, Any]] = None
+) -> bool:
     """
     Add a message to the agent's memory asynchronously.
     
@@ -178,7 +538,7 @@ async def add_message_to_memory_async(memory: LongtermAgentMemory, content: str,
 async def get_memory_context_async(memory: LongtermAgentMemory) -> Tuple[List[Dict[str, str]], int]:
     """
     Get context from the agent's memory with robust fallback options asynchronously.
-    Updated for CAMEL-AI 0.2.43.
+    Enhanced for CAMEL-AI 0.2.43.
     
     Args:
         memory: LongtermAgentMemory instance
@@ -212,7 +572,7 @@ async def get_memory_context_async(memory: LongtermAgentMemory) -> Tuple[List[Di
                     # Format the history records into context messages
                     context = []
                     
-                    for record in history_records[-5:]:  # Get last 5 messages
+                    for record in history_records[-10:]:  # Get last 10 messages - increased from 5
                         if hasattr(record, 'role_at_backend') and hasattr(record, 'message'):
                             role = "user" if record.role_at_backend == OpenAIBackendRole.USER else "assistant"
                             content = record.message.content if hasattr(record.message, 'content') else ""
@@ -234,121 +594,126 @@ async def get_memory_context_async(memory: LongtermAgentMemory) -> Tuple[List[Di
         logger.error(f"Error getting context from memory: {e}")
         return [], 0
 
-async def save_memory_to_disk_async(memory: LongtermAgentMemory, path: str) -> bool:
+async def extract_preferences_from_memory_async(
+    memory: LongtermAgentMemory
+) -> Dict[str, Any]:
     """
-    Save the memory state to disk for persistence asynchronously.
+    Extract user preferences from memory content.
     
     Args:
         memory: LongtermAgentMemory instance
-        path: Path to save the memory
         
     Returns:
-        bool: True if successful, False otherwise
+        Dictionary of extracted preferences
     """
     if not memory:
-        logger.warning("Cannot save memory: memory is None")
-        return False
-    
-    try:
-        # Use asyncio.to_thread to make this non-blocking
-        await asyncio.to_thread(memory.save, path)
-        logger.info(f"Memory saved to {path}")
-        return True
-    except Exception as e:
-        logger.error(f"Error saving memory to {path}: {e}")
-        return False
-
-async def load_memory_from_disk_async(path: str) -> Optional[LongtermAgentMemory]:
-    """
-    Load memory state from disk asynchronously.
-    
-    Args:
-        path: Path to load the memory from
-        
-    Returns:
-        LongtermAgentMemory if successful, None otherwise
-    """
-    try:
-        # Use asyncio.to_thread to make this non-blocking
-        memory = await asyncio.to_thread(LongtermAgentMemory.load, path)
-        logger.info(f"Memory loaded from {path}")
-        return memory
-    except Exception as e:
-        logger.error(f"Error loading memory from {path}: {e}")
-        return None
-
-async def add_product_to_memory_async(memory: LongtermAgentMemory, product: Dict[str, Any], 
-                         interaction_type: str = "recommendation") -> bool:
-    """
-    Add product interaction information to memory asynchronously.
-    
-    Args:
-        memory: LongtermAgentMemory instance
-        product: Product information dictionary
-        interaction_type: Type of interaction with the product
-        
-    Returns:
-        bool: True if successful, False otherwise
-    """
-    if not memory or not product:
-        logger.warning("Cannot add product to memory: invalid input")
-        return False
+        return {}
         
     try:
-        # Create a product reference message
-        product_id = product.get("id", "unknown")
-        product_title = product.get("title", "Untitled Product")
-        
-        # Build message content based on interaction type
-        if interaction_type == "recommendation":
-            content = f"I recommended {product_title} (ID: {product_id})."
-        elif interaction_type == "viewed":
-            content = f"User viewed {product_title} (ID: {product_id})."
-        elif interaction_type == "liked":
-            content = f"User liked {product_title} (ID: {product_id})."
-        else:
-            content = f"Product interaction: {product_title} (ID: {product_id})."
+        # Get all memory records
+        if not hasattr(memory, 'chat_history_block') or not hasattr(memory.chat_history_block, 'memory'):
+            return {}
             
-        # Add product categories if available
-        if product.get("categories"):
-            categories = ", ".join(product.get("categories"))
-            content += f" Categories: {categories}."
-            
-        # Add product collections if available
-        if product.get("collections"):
-            collections = ", ".join(product.get("collections"))
-            content += f" Collections: {collections}."
-            
-        # Create a memory record with product metadata
-        metadata = {
-            "type": "product_interaction",
-            "interaction_type": interaction_type,
-            "product_id": product_id,
-            "product_title": product_title,
-            "product_price": product.get("price", 0),
-        }
-        
-        # Add to memory as system message
-        record = MemoryRecord(
-            message=BaseMessage.make_system_message(
-                role_name="System",
-                content=content,
-            ),
-            role_at_backend=OpenAIBackendRole.SYSTEM,
-            metadata=metadata,
+        # Use to_thread to retrieve this in a non-blocking way
+        history_records = await asyncio.to_thread(
+            lambda: list(memory.chat_history_block.memory.values()) if memory.chat_history_block.memory else []
         )
         
-        # Use asyncio.to_thread to make this non-blocking
-        await asyncio.to_thread(memory.write_records, [record])
-        logger.info(f"Added product interaction to memory: {product_title}")
-        return True
+        # Look for preference records with specific metadata
+        preferences = {}
+        
+        for record in history_records:
+            if hasattr(record, 'metadata'):
+                metadata = record.metadata
+                
+                if metadata.get('type') == 'user_preference':
+                    pref_type = metadata.get('preference_type')
+                    pref_value = metadata.get('preference_value')
+                    
+                    if pref_type:
+                        preferences[pref_type] = pref_value
+        
+        # If preferences were found in metadata, return them
+        if preferences:
+            return preferences
+            
+        # Otherwise, try to extract preferences from message content
+        extracted_prefs = {
+            "preferred_categories": [],
+            "preferred_collections": [],
+            "preferred_tags": [],
+            "budget_range": None,
+            "style_preferences": [],
+            "color_preferences": [],
+            "occasion_preferences": []
+        }
+        
+        # Create a simplified string representation of the memory for preference extraction
+        memory_content = ""
+        
+        for record in history_records:
+            if hasattr(record, 'message') and hasattr(record.message, 'content'):
+                # Only use user messages to extract preferences
+                if hasattr(record, 'role_at_backend') and record.role_at_backend == OpenAIBackendRole.USER:
+                    memory_content += record.message.content + " "
+        
+        # Simple extraction based on keywords - in a real system, this would be more sophisticated
+        
+        # Extract color preferences
+        color_keywords = ["red", "blue", "green", "black", "white", "pink", "purple", 
+                        "orange", "yellow", "gray", "brown", "teal", "navy"]
+                        
+        for color in color_keywords:
+            if f"like {color}" in memory_content.lower() or f"prefer {color}" in memory_content.lower():
+                extracted_prefs["color_preferences"].append(color)
+        
+        # Extract style preferences
+        style_keywords = ["casual", "formal", "elegant", "vintage", "modern", "classic",
+                        "bohemian", "minimalist", "sporty", "preppy", "romantic"]
+                        
+        for style in style_keywords:
+            if f"like {style}" in memory_content.lower() or f"prefer {style}" in memory_content.lower():
+                extracted_prefs["style_preferences"].append(style)
+        
+        # Extract category preferences
+        category_keywords = ["dress", "dresses", "pants", "jeans", "shirts", "t-shirts",
+                           "skirts", "sweaters", "jackets", "coats", "shoes", "accessories"]
+                           
+        for category in category_keywords:
+            if f"like {category}" in memory_content.lower() or f"prefer {category}" in memory_content.lower():
+                extracted_prefs["preferred_categories"].append(category)
+        
+        # Extract occasion preferences
+        occasion_keywords = ["wedding", "party", "work", "office", "casual", "formal",
+                           "date", "evening", "outdoor", "vacation", "beach"]
+                           
+        for occasion in occasion_keywords:
+            if f"for {occasion}" in memory_content.lower():
+                extracted_prefs["occasion_preferences"].append(occasion)
+        
+        # Extract budget information - simplified
+        if "budget" in memory_content.lower():
+            if "low" in memory_content.lower():
+                extracted_prefs["budget_range"] = {"min": 0, "max": 50}
+            elif "high" in memory_content.lower():
+                extracted_prefs["budget_range"] = {"min": 100, "max": 500}
+            else:
+                extracted_prefs["budget_range"] = {"min": 50, "max": 100}
+        
+        return extracted_prefs
         
     except Exception as e:
-        logger.error(f"Error adding product to memory: {e}")
-        return False
+        logger.error(f"Error extracting preferences from memory: {e}")
+        return {}
 
-async def add_user_preference_to_memory_async(memory: LongtermAgentMemory, preference_type: str, 
-                                preference_value: Any) -> bool:
+async def add_user_preference_to_memory_async(
+    memory: LongtermAgentMemory, 
+    preference_type: str, 
+    preference_value: Any,
+    persist_to_neo4j: bool = True,
+    user_id: Optional[str] = None,
+    neo4j_client = None
+) -> bool:
     """
     Add user preference information to memory asynchronously.
     
@@ -356,6 +721,9 @@ async def add_user_preference_to_memory_async(memory: LongtermAgentMemory, prefe
         memory: LongtermAgentMemory instance
         preference_type: Type of preference (e.g., "color", "style", "budget")
         preference_value: Value of the preference
+        persist_to_neo4j: Whether to persist preference to Neo4j
+        user_id: User ID (required if persist_to_neo4j is True)
+        neo4j_client: Neo4j client (required if persist_to_neo4j is True)
         
     Returns:
         bool: True if successful, False otherwise
@@ -378,6 +746,7 @@ async def add_user_preference_to_memory_async(memory: LongtermAgentMemory, prefe
             "type": "user_preference",
             "preference_type": preference_type,
             "preference_value": preference_value,
+            "timestamp": datetime.datetime.now().isoformat()
         }
         
         # Add to memory as system message
@@ -393,53 +762,192 @@ async def add_user_preference_to_memory_async(memory: LongtermAgentMemory, prefe
         # Use asyncio.to_thread to make this non-blocking
         await asyncio.to_thread(memory.write_records, [record])
         logger.info(f"Added user preference to memory: {preference_type} = {value_str}")
+        
+        # Persist to Neo4j if requested
+        if persist_to_neo4j and user_id and neo4j_client:
+            # Convert preference value to JSON string for storage
+            if isinstance(preference_value, (list, dict)):
+                value_json = json.dumps(preference_value)
+            else:
+                value_json = json.dumps(str(preference_value))
+                
+            # Create unique ID for preference
+            preference_id = str(uuid.uuid4())
+            
+            # Save to Neo4j
+            query = """
+            // Ensure the user exists
+            MERGE (u:User {id: $user_id})
+            
+            // Create preference
+            CREATE (p:UserPreference {
+                id: $preference_id,
+                type: $preference_type,
+                value: $value,
+                created_at: $created_at
+            })
+            
+            // Connect the preference to the user
+            CREATE (u)-[:HAS_PREFERENCE]->(p)
+            
+            // Delete old preferences of the same type for this user
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(old:UserPreference)
+            WHERE old.type = $preference_type AND old.id <> $preference_id
+            DETACH DELETE old
+            
+            RETURN p.id as preference_id
+            """
+            
+            await neo4j_client.query(
+                query, 
+                {
+                    "user_id": user_id,
+                    "preference_id": preference_id,
+                    "preference_type": preference_type,
+                    "value": value_json,
+                    "created_at": datetime.datetime.now().isoformat()
+                }
+            )
+            
+            logger.info(f"Persisted user preference to Neo4j: {preference_type}")
+        
         return True
         
     except Exception as e:
         logger.error(f"Error adding user preference to memory: {e}")
         return False
 
-async def clear_memory_async(memory: LongtermAgentMemory) -> bool:
+async def add_product_interaction_to_memory_async(
+    memory: LongtermAgentMemory,
+    product: Dict[str, Any],
+    interaction_type: str = "viewed",
+    persist_to_neo4j: bool = True,
+    user_id: Optional[str] = None,
+    neo4j_client = None
+) -> bool:
     """
-    Clear all memory records asynchronously.
+    Add product interaction to memory and optionally persist to Neo4j.
     
     Args:
         memory: LongtermAgentMemory instance
+        product: Product dictionary
+        interaction_type: Type of interaction (e.g., "viewed", "liked", "purchased")
+        persist_to_neo4j: Whether to persist interaction to Neo4j
+        user_id: User ID (required if persist_to_neo4j is True)
+        neo4j_client: Neo4j client (required if persist_to_neo4j is True)
         
     Returns:
         bool: True if successful, False otherwise
     """
-    if not memory:
-        logger.warning("Cannot clear memory: memory is None")
+    if not memory or not product:
+        logger.warning("Cannot add product interaction to memory: invalid input")
         return False
         
     try:
-        # Add a memory reset marker
-        reset_record = MemoryRecord(
+        # Extract product details
+        product_id = product.get("id", "unknown")
+        product_title = product.get("title", "Unknown Product")
+        product_price = product.get("price", 0)
+        
+        # Create interaction message content
+        content = f"User {interaction_type} product: {product_title} (ID: {product_id})"
+        
+        # Create metadata
+        metadata = {
+            "type": "product_interaction",
+            "interaction_type": interaction_type,
+            "product_id": product_id,
+            "product_title": product_title,
+            "product_price": product_price,
+            "timestamp": datetime.datetime.now().isoformat(),
+            "categories": product.get("categories", []),
+            "tags": product.get("tags", [])
+        }
+        
+        # Add to memory as system message
+        record = MemoryRecord(
             message=BaseMessage.make_system_message(
                 role_name="System",
-                content="Memory has been reset.",
+                content=content,
             ),
             role_at_backend=OpenAIBackendRole.SYSTEM,
+            metadata=metadata,
         )
         
-        # Clear existing records and add the reset marker
-        await asyncio.to_thread(memory.clear)
-        await asyncio.to_thread(memory.write_records, [reset_record])
+        # Use asyncio.to_thread to make this non-blocking
+        await asyncio.to_thread(memory.write_records, [record])
+        logger.info(f"Added product interaction to memory: {interaction_type} {product_id}")
         
-        logger.info("Memory has been cleared")
+        # Persist to Neo4j if requested
+        if persist_to_neo4j and user_id and neo4j_client:
+            # Create unique ID for interaction
+            interaction_id = str(uuid.uuid4())
+            timestamp = datetime.datetime.now().isoformat()
+            
+            # Save to Neo4j
+            query = """
+            // Ensure the user exists
+            MERGE (u:User {id: $user_id})
+            
+            // Find the product
+            MATCH (p:Product {id: $product_id})
+            
+            // Create interaction
+            CREATE (i:ProductInteraction {
+                id: $interaction_id,
+                type: $interaction_type,
+                timestamp: $timestamp
+            })
+            
+            // Connect the interaction to the user and product
+            CREATE (u)-[:HAS_INTERACTION]->(i)-[:REFERS_TO]->(p)
+            
+            RETURN i.id as interaction_id
+            """
+            
+            result = await neo4j_client.query(
+                query, 
+                {
+                    "user_id": user_id,
+                    "product_id": product_id,
+                    "interaction_id": interaction_id,
+                    "interaction_type": interaction_type,
+                    "timestamp": timestamp
+                }
+            )
+            
+            # If successful, increment product visit counter
+            if result and result[0].get("interaction_id") == interaction_id:
+                # Query to increment visit counter
+                visit_query = """
+                MATCH (p:Product {id: $product_id})
+                SET p.visited_num = COALESCE(p.visited_num, 0) + 1
+                """
+                
+                await neo4j_client.query(visit_query, {"product_id": product_id})
+                
+                logger.info(f"Persisted product interaction to Neo4j: {interaction_type} {product_id}")
+            else:
+                logger.warning(f"Failed to persist product interaction to Neo4j: {interaction_type} {product_id}")
+        
         return True
         
     except Exception as e:
-        logger.error(f"Error clearing memory: {e}")
+        logger.error(f"Error adding product interaction to memory: {e}")
         return False
 
-async def optimize_memory_async(memory: LongtermAgentMemory) -> bool:
+async def optimize_memory_async(
+    memory: LongtermAgentMemory, 
+    user_id: Optional[str] = None,
+    neo4j_client = None
+) -> bool:
     """
-    Optimize memory by removing redundant information asynchronously.
+    Optimize memory by summarizing and compressing memory records.
     
     Args:
         memory: LongtermAgentMemory instance
+        user_id: Optional user ID for persistence
+        neo4j_client: Neo4j client for persistence operations
         
     Returns:
         bool: True if successful, False otherwise
@@ -449,17 +957,23 @@ async def optimize_memory_async(memory: LongtermAgentMemory) -> bool:
         return False
         
     try:
-        # Get current context
-        context, _ = await get_memory_context_async(memory)
+        # Get current memory state
+        old_memory_size = 0
         
-        if not context:
-            logger.info("No context to optimize")
-            return True
+        if hasattr(memory, 'chat_history_block') and hasattr(memory.chat_history_block, 'memory'):
+            old_memory_size = len(memory.chat_history_block.memory)
             
-        logger.info(f"Optimizing memory with {len(context)} context items")
+        # For a real implementation, we would:
+        # 1. Identify important vs. unimportant memory records
+        # 2. Summarize or compress less important records
+        # 3. Keep important records (preferences, key interactions)
         
-        # Currently a placeholder for future optimization implementations
-        # CAMEL does not yet provide direct memory optimization functions
+        # Since this is a placeholder, we'll just log the operation
+        logger.info(f"Memory optimization performed (placeholder). Memory size: {old_memory_size}")
+        
+        # Save optimized memory if requested
+        if user_id and neo4j_client:
+            await save_memory_for_user_async(memory, user_id, neo4j_client)
         
         return True
         

@@ -21,7 +21,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from aiolimiter import AsyncLimiter
 
-from ai_stylist_app_async import AIStylistApp
+from ai_stylist_app_async import EnhancedAIStylistApp
 from memory_integration_async import setup_stylist_memory_async
 
 # Configure logging
@@ -94,7 +94,7 @@ class StylistServiceAsync:
         
         # Create AI Stylist app with all components
         try:
-            self.app = AIStylistApp(
+            self.app = EnhancedAIStylistApp(
                 neo4j_url=self.neo4j_url,
                 neo4j_username=self.neo4j_username,
                 neo4j_password=self.neo4j_password

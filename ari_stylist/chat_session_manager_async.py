@@ -1,8 +1,8 @@
 """
-Asynchronous Chat Session Manager for AI Stylist.
+Enhanced Asynchronous Chat Session Manager for AI Stylist.
 
-This module manages chat sessions and provides an interface for handling
-asynchronous conversations with the AI Stylist.
+This module provides an improved session manager with persistent memory
+across sessions and enhanced conversation capabilities.
 Compatible with CAMEL-AI 0.2.43.
 """
 
@@ -16,12 +16,24 @@ from typing import Dict, Any, Optional, Tuple, List
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("chat_session_manager_async")
+logger = logging.getLogger("enhanced_chat_session_manager_async")
 
-class ChatSessionAsync:
+# Import memory integration functions
+from memory_integration_async import (
+    setup_stylist_memory_async,
+    save_memory_for_user_async,
+    add_message_to_memory_async,
+    get_memory_context_async,
+    add_product_interaction_to_memory_async,
+    add_user_preference_to_memory_async,
+    extract_preferences_from_memory_async,
+    optimize_memory_async
+)
+
+class EnhancedChatSessionAsync:
     """
-    Maintains the state and history of a continuous chat session with a user,
-    using CAMEL's memory system with async support.
+    Enhanced chat session with persistent memory and cross-session capabilities.
+    Uses CAMEL's memory system with Neo4j persistence.
     """
     
     def __init__(
@@ -31,7 +43,8 @@ class ChatSessionAsync:
         stylist_agent = None,
         product_kg = None,
         product_retriever = None,
-        memory = None
+        memory = None,
+        auto_persistence: bool = True
     ):
         # Generate session ID if not provided
         self.session_id = session_id or str(uuid.uuid4())
@@ -40,6 +53,12 @@ class ChatSessionAsync:
         self.product_kg = product_kg
         self.product_retriever = product_retriever
         self.memory = memory
+        
+        # Auto-persistence settings
+        self.auto_persistence = auto_persistence
+        self.persistence_interval = 600  # 10 minutes
+        self.last_persistence_time = datetime.datetime.now()
+        self.persistence_task = None
         
         # Track session state
         self.session_start_time = datetime.datetime.now()
@@ -51,11 +70,19 @@ class ChatSessionAsync:
         # Lock for concurrent access to messages
         self.messages_lock = asyncio.Lock()
         
-        logger.info(f"Created new chat session: {self.session_id}")
+        # User preferences extracted from memory
+        self.user_preferences = {}
+        self.preferences_up_to_date = False
+        
+        # Start persistence task if enabled
+        if self.auto_persistence and user_id and product_kg:
+            self.persistence_task = asyncio.create_task(self._persistence_worker())
+        
+        logger.info(f"Created enhanced chat session: {self.session_id} for user: {self.user_id}")
     
     async def add_message(self, content: str, sender: str, related_products: List[str] = None) -> Dict[str, Any]:
         """
-        Add a message to the chat session
+        Add a message to the chat session with enhanced memory integration
         
         Args:
             content: Message content
@@ -85,59 +112,108 @@ class ChatSessionAsync:
         # Add to memory if available
         if self.memory:
             try:
-                from camel.messages import BaseMessage
-                from camel.memories import MemoryRecord
-                from camel.types import OpenAIBackendRole
+                # Enhanced metadata for better memory retrieval
+                metadata = {
+                    "message_id": message_id,
+                    "session_id": self.session_id,
+                    "user_id": self.user_id,
+                    "related_products": related_products or [],
+                    "timestamp": timestamp.isoformat()
+                }
                 
-                if sender == "user":
-                    record = MemoryRecord(
-                        message=BaseMessage.make_user_message(
-                            role_name="User",
-                            content=content,
-                        ),
-                        role_at_backend=OpenAIBackendRole.USER,
-                    )
-                else:
-                    record = MemoryRecord(
-                        message=BaseMessage.make_assistant_message(
-                            role_name="Stylist",
-                            content=content,
-                        ),
-                        role_at_backend=OpenAIBackendRole.ASSISTANT,
-                    )
+                # Add to memory using enhanced memory integration
+                await add_message_to_memory_async(
+                    memory=self.memory, 
+                    content=content, 
+                    sender=sender, 
+                    metadata=metadata
+                )
                 
-                # Note: CAMEL 0.2.43 doesn't have an async write_records method
-                # This will be a blocking call - in a real implementation, you would
-                # run this in a separate thread or use an async-compatible memory system
-                await asyncio.to_thread(self.memory.write_records, [record])
-                logger.info(f"Added {sender} message to CAMEL memory")
+                logger.info(f"Added {sender} message to enhanced memory")
+                
+                # Extract and update preferences from user messages
+                if sender == "user" and not self.preferences_up_to_date:
+                    await self._update_preferences_from_memory()
+                
             except Exception as e:
-                logger.error(f"Error adding message to CAMEL memory: {e}")
+                logger.error(f"Error adding message to memory: {e}")
+        
+        # Schedule memory persistence if enabled
+        if self.auto_persistence and self.user_id and self.product_kg and self.memory:
+            current_time = datetime.datetime.now()
+            if (current_time - self.last_persistence_time).total_seconds() > self.persistence_interval:
+                try:
+                    logger.info(f"Persisting memory for user {self.user_id}")
+                    await save_memory_for_user_async(self.memory, self.user_id, self.product_kg)
+                    self.last_persistence_time = current_time
+                except Exception as e:
+                    logger.error(f"Error persisting memory: {e}")
         
         return message
     
+    async def _persistence_worker(self):
+        """Background task to periodically persist memory for this session"""
+        try:
+            while True:
+                # Sleep for the persistence interval
+                await asyncio.sleep(self.persistence_interval)
+                
+                # Check if persistence is still needed
+                current_time = datetime.datetime.now()
+                time_since_activity = (current_time - self.last_activity_time).total_seconds()
+                
+                if time_since_activity > 300:  # 5 minutes of inactivity
+                    # Final persistence before ending task
+                    if self.memory and self.user_id and self.product_kg:
+                        try:
+                            logger.info(f"Final memory persistence for inactive session {self.session_id}")
+                            await save_memory_for_user_async(self.memory, self.user_id, self.product_kg)
+                            # Optimize memory before ending
+                            await optimize_memory_async(self.memory, self.user_id, self.product_kg)
+                        except Exception as e:
+                            logger.error(f"Error in final memory persistence: {e}")
+                    break
+                
+                # Periodic persistence
+                if self.memory and self.user_id and self.product_kg:
+                    try:
+                        logger.info(f"Periodic memory persistence for session {self.session_id}")
+                        await save_memory_for_user_async(self.memory, self.user_id, self.product_kg)
+                        self.last_persistence_time = current_time
+                    except Exception as e:
+                        logger.error(f"Error in periodic memory persistence: {e}")
+        
+        except asyncio.CancelledError:
+            # Task was cancelled - perform final persistence
+            if self.memory and self.user_id and self.product_kg:
+                try:
+                    logger.info(f"Final memory persistence on cancellation for session {self.session_id}")
+                    await save_memory_for_user_async(self.memory, self.user_id, self.product_kg)
+                except Exception as e:
+                    logger.error(f"Error in final memory persistence on cancellation: {e}")
+        
+        except Exception as e:
+            logger.error(f"Error in persistence worker: {e}")
+    
     async def get_memory_context(self) -> Tuple[List[Dict[str, str]], int]:
         """
-        Get context from CAMEL memory with robust error handling for CAMEL 2.43
+        Get context from CAMEL memory with enhanced error handling
         
         Returns:
             Tuple of (context messages, token count)
         """
         if self.memory:
             try:
-                # Import the get_memory_context function from memory_integration_async
-                from memory_integration_async import get_memory_context_async
-                
-                # Use the enhanced version with better error handling
+                # Use enhanced memory integration
                 return await get_memory_context_async(self.memory)
                 
             except Exception as e:
-                logger.error(f"Error getting context from CAMEL memory: {e}")
+                logger.error(f"Error getting context from memory: {e}")
                 
                 # Fallback: Return recent chat history directly
                 try:
                     # Format recent messages as context
-                    recent_history = await self.get_conversation_history(limit=5)
+                    recent_history = await self.get_conversation_history(limit=10)  # Increased from 5
                     context = []
                     
                     for msg in recent_history:
@@ -154,6 +230,41 @@ class ChatSessionAsync:
                     logger.error(f"Error creating fallback context: {e2}")
         
         return [], 0
+    
+    async def _update_preferences_from_memory(self):
+        """Extract and update user preferences from memory content"""
+        if not self.memory:
+            return
+            
+        try:
+            # Extract preferences from memory
+            memory_preferences = await extract_preferences_from_memory_async(self.memory)
+            
+            # Merge with existing preferences
+            for key, value in memory_preferences.items():
+                if isinstance(value, list):
+                    # For list values, combine and deduplicate
+                    existing = self.user_preferences.get(key, [])
+                    if isinstance(existing, list):
+                        combined = existing + value
+                        # Remove duplicates while preserving order
+                        self.user_preferences[key] = list(dict.fromkeys(combined))
+                    else:
+                        self.user_preferences[key] = value
+                else:
+                    # For scalar values, prefer newer values
+                    self.user_preferences[key] = value
+            
+            # Mark preferences as up to date
+            self.preferences_up_to_date = True
+            
+            # Also store in context for backward compatibility
+            self.context["user_preferences"] = self.user_preferences
+            
+            logger.info(f"Updated user preferences from memory: {len(self.user_preferences)} preference types")
+            
+        except Exception as e:
+            logger.error(f"Error updating preferences from memory: {e}")
     
     async def get_conversation_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """
@@ -184,32 +295,118 @@ class ChatSessionAsync:
         
         logger.info(f"Updated product context with {len(products)} products")
         
+        # Record product interactions if a user ID is available
+        if self.user_id and self.memory and self.product_kg:
+            for product in products:
+                try:
+                    await add_product_interaction_to_memory_async(
+                        memory=self.memory,
+                        product=product,
+                        interaction_type="recommended",
+                        persist_to_neo4j=True,
+                        user_id=self.user_id,
+                        neo4j_client=self.product_kg
+                    )
+                except Exception as e:
+                    logger.error(f"Error recording product interaction: {e}")
+    
     async def get_or_fetch_user_preferences(self) -> Dict[str, Any]:
         """
-        Get the user's preferences or fetch from knowledge graph if needed
+        Get the user's preferences from memory or fetch from knowledge graph if needed
         
         Returns:
             Dictionary of user preferences
         """
+        # If we already have preferences and they're up to date, return them
+        if self.preferences_up_to_date and self.user_preferences:
+            return self.user_preferences
+            
+        # If we have preferences in context (backward compatibility), use them
         if "user_preferences" in self.context:
-            return self.context["user_preferences"]
+            self.user_preferences = self.context["user_preferences"]
+            return self.user_preferences
             
         # If we have a user ID and product knowledge graph, try to fetch preferences
         if self.user_id and self.product_kg:
             try:
+                # Get preferences from Neo4j
                 preferences = await self.product_kg.get_user_preferences(self.user_id)
-                self.context["user_preferences"] = preferences
-                return preferences
+                
+                if preferences:
+                    self.user_preferences = preferences
+                    self.context["user_preferences"] = preferences
+                    self.preferences_up_to_date = True
+                    return preferences
+                    
+                # If no preferences in Neo4j, try to extract from memory
+                if self.memory:
+                    await self._update_preferences_from_memory()
+                    return self.user_preferences
+                    
             except Exception as e:
                 logger.error(f"Error fetching user preferences: {e}")
         
-        # Return empty preferences if nothing found
+        # If memory extraction failed or no user ID, return empty preferences
         return {
             "preferred_categories": [], 
             "preferred_collections": [],
             "preferred_tags": [], 
             "budget_range": None
         }
+    
+    async def add_preference(self, preference_type: str, preference_value: Any) -> bool:
+        """
+        Add a user preference to memory and Neo4j
+        
+        Args:
+            preference_type: Type of preference (e.g., "color", "style", "budget")
+            preference_value: Value of the preference
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        # Update local preferences
+        if isinstance(preference_value, list):
+            # For list values, ensure we have a list in preferences
+            if preference_type not in self.user_preferences:
+                self.user_preferences[preference_type] = []
+            
+            # Add new values to the list
+            if not isinstance(self.user_preferences[preference_type], list):
+                self.user_preferences[preference_type] = [self.user_preferences[preference_type]]
+                
+            # Add new values and deduplicate
+            self.user_preferences[preference_type].extend(preference_value)
+            self.user_preferences[preference_type] = list(dict.fromkeys(self.user_preferences[preference_type]))
+        else:
+            # For scalar values, simply replace
+            self.user_preferences[preference_type] = preference_value
+        
+        # Update context for backward compatibility
+        self.context["user_preferences"] = self.user_preferences
+        
+        # Add to memory if available
+        if self.memory:
+            try:
+                # Enhanced with persistence
+                await add_user_preference_to_memory_async(
+                    memory=self.memory,
+                    preference_type=preference_type,
+                    preference_value=preference_value,
+                    persist_to_neo4j=True if self.user_id and self.product_kg else False,
+                    user_id=self.user_id,
+                    neo4j_client=self.product_kg
+                )
+                
+                logger.info(f"Added preference to memory: {preference_type}")
+                return True
+                
+            except Exception as e:
+                logger.error(f"Error adding preference to memory: {e}")
+                return False
+        
+        # If no memory available, just use local state
+        return True
     
     async def add_interaction_context(self, key: str, value: Any):
         """
@@ -221,12 +418,79 @@ class ChatSessionAsync:
         """
         self.context[key] = value
         logger.info(f"Added interaction context: {key}")
+    
+    async def record_product_interaction(self, product_id: str, interaction_type: str = "viewed") -> bool:
+        """
+        Record a product interaction to memory and Neo4j
+        
+        Args:
+            product_id: Product ID
+            interaction_type: Type of interaction (e.g., "viewed", "liked", "purchased")
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not product_id:
+            return False
+            
+        try:
+            # Get product details
+            product = await self.product_kg.get_product_details(product_id)
+            
+            if not product:
+                logger.warning(f"Product not found: {product_id}")
+                return False
+                
+            # Add to memory with persistence
+            if self.memory:
+                await add_product_interaction_to_memory_async(
+                    memory=self.memory,
+                    product=product,
+                    interaction_type=interaction_type,
+                    persist_to_neo4j=True if self.user_id and self.product_kg else False,
+                    user_id=self.user_id,
+                    neo4j_client=self.product_kg
+                )
+                
+                logger.info(f"Recorded product interaction: {interaction_type} {product_id}")
+                return True
+            else:
+                logger.warning(f"Cannot record interaction: memory not available")
+                return False
+                
+        except Exception as e:
+            logger.error(f"Error recording product interaction: {e}")
+            return False
+    
+    async def close(self):
+        """
+        Close the session and perform final persistence
+        """
+        # Cancel persistence task if running
+        if self.persistence_task:
+            self.persistence_task.cancel()
+            try:
+                await self.persistence_task
+            except asyncio.CancelledError:
+                pass
+            
+        # Perform final persistence
+        if self.memory and self.user_id and self.product_kg:
+            try:
+                logger.info(f"Final memory persistence for session {self.session_id}")
+                await save_memory_for_user_async(self.memory, self.user_id, self.product_kg)
+                # Optimize memory before closing
+                await optimize_memory_async(self.memory, self.user_id, self.product_kg)
+            except Exception as e:
+                logger.error(f"Error in final memory persistence: {e}")
+        
+        logger.info(f"Closed session {self.session_id}")
 
 
-class ChatManagerAsync:
+class EnhancedChatManagerAsync:
     """
-    Manages multiple chat sessions and provides the interface for chat functionality
-    using CAMEL's memory and retrieval systems with async support.
+    Enhanced chat manager with persistent memory and cross-session capabilities.
+    Uses CAMEL's memory system with Neo4j persistence.
     """
     
     def __init__(
@@ -245,18 +509,34 @@ class ChatManagerAsync:
         self.active_sessions = {}
         self.sessions_lock = asyncio.Lock()
         
-        logger.info("Async Chat Manager initialized")
+        # Create user registry for returning users
+        self.registered_users = {}
+        
+        # Make sure schema is set up
+        if product_kg:
+            asyncio.create_task(self._ensure_schema())
+        
+        logger.info("Enhanced Chat Manager initialized")
     
-    async def get_or_create_session(self, session_id: Optional[str] = None, user_id: Optional[str] = None) -> ChatSessionAsync:
+    async def _ensure_schema(self):
+        """Ensure the Neo4j schema is set up correctly"""
+        if hasattr(self.product_kg, 'ensure_schema'):
+            try:
+                await self.product_kg.ensure_schema()
+                logger.info("Neo4j schema verified")
+            except Exception as e:
+                logger.error(f"Error ensuring Neo4j schema: {e}")
+    
+    async def get_or_create_session(self, session_id: Optional[str] = None, user_id: Optional[str] = None) -> EnhancedChatSessionAsync:
         """
-        Get an existing session or create a new one
+        Get an existing session or create a new one with persistent memory
         
         Args:
             session_id: Optional session ID
             user_id: Optional user ID
             
         Returns:
-            Chat session object
+            Enhanced chat session object
         """
         # If session ID provided and exists, return it
         if session_id:
@@ -264,39 +544,60 @@ class ChatManagerAsync:
                 if session_id in self.active_sessions:
                     return self.active_sessions[session_id]
         
-        # Create new memory for this session
+        # If user ID provided, check if a returning user
         memory = None
-        if self.memory_setup_func:
+        if user_id and self.product_kg:
             try:
-                memory = await self.memory_setup_func()
+                # Create or update user in Neo4j
+                await self.product_kg.create_or_update_user(user_id)
+                
+                # Try to load memory for returning user
+                if self.memory_setup_func:
+                    memory = await self.memory_setup_func(user_id=user_id, neo4j_client=self.product_kg)
+                    
+                    if memory:
+                        logger.info(f"Loaded persistent memory for returning user {user_id}")
+                    else:
+                        logger.info(f"No existing memory found for user {user_id}, creating new memory")
+            except Exception as e:
+                logger.error(f"Error loading memory for user {user_id}: {e}")
+        
+        # If no memory loaded, create new memory
+        if memory is None and self.memory_setup_func:
+            try:
+                memory = await self.memory_setup_func(user_id=user_id, neo4j_client=self.product_kg)
                 logger.info("Created new memory for session")
             except Exception as e:
                 logger.error(f"Failed to create memory: {e}")
         
         # Create new session
-        session = ChatSessionAsync(
+        session = EnhancedChatSessionAsync(
             session_id=session_id,
             user_id=user_id,
             stylist_agent=self.stylist_agent,
             product_kg=self.product_kg,
             product_retriever=self.product_retriever,
-            memory=memory
+            memory=memory,
+            auto_persistence=True if user_id and self.product_kg else False
         )
         
         # Store in active sessions
         async with self.sessions_lock:
             self.active_sessions[session.session_id] = session
         
-        # If user ID provided, load user preferences
+        # If user ID provided, associate with this user
         if user_id:
+            self.registered_users[user_id] = session.session_id
+            
+            # Load user preferences
             await session.get_or_fetch_user_preferences()
         
         return session
     
-    async def _handle_meta_question(self, session: ChatSessionAsync, message: str) -> Optional[Tuple[str, Dict[str, Any]]]:
+    async def _handle_meta_question(self, session: EnhancedChatSessionAsync, message: str) -> Optional[Tuple[str, Dict[str, Any]]]:
         """
         Handle follow-up responses and meta-questions using CAMEL memory
-        Compatible with CAMEL 2.43
+        Enhanced with improved detection of memory-related questions
         
         Args:
             session: Chat session
@@ -305,71 +606,186 @@ class ChatManagerAsync:
         Returns:
             Tuple of (response message, additional data) or None if not a meta-question
         """
-        # Get CAMEL memory context with improved error handling
-        try:
-            memory_context, token_count = await session.get_memory_context()
+        # First identify if this is a memory-related question
+        memory_keywords = ["remember", "recall", "mentioned", "earlier", "previous", "before", 
+                            "last time", "said", "asked", "told", "history", "conversation"]
+        is_memory_question = any(keyword in message.lower() for keyword in memory_keywords)
+        
+        # If it's not a memory-related question, check if it's a follow-up question
+        # that doesn't explicitly mention memory but requires context
+        pronouns = ["it", "that", "this", "they", "them", "those", "these"]
+        has_pronouns = any(f" {pronoun} " in f" {message.lower()} " for pronoun in pronouns)
+        
+        # Proceed if we have a memory question or a potential follow-up
+        if is_memory_question or has_pronouns:
+            logger.info(f"Detected potential memory-related question: '{message}'")
             
-            if not memory_context or len(memory_context) < 2:  # Need at least previous Q&A
-                logger.info("Insufficient context in memory for meta-question handling")
-                return None
-                
-            # Format memory context for agent
-            context_text = ""
-            for msg in memory_context:
-                role = msg.get("role", "unknown")
-                content = msg.get("content", "")
-                context_text += f"{role.upper()}: {content}\n\n"
-            
-            # Create a meta-question detection prompt
-            meta_question_prompt = f"""
-            Based on our conversation history, I need to address your follow-up question:
-            
-            CONVERSATION HISTORY:
-            {context_text}
-            
-            LATEST QUESTION: {message}
-            
-            I'll think about how this question relates to our previous discussion about style and fashion.
-            """
-            
-            # Send to stylist agent
             try:
-                from camel.messages import BaseMessage
+                # Get memory context with improved error handling
+                memory_context, token_count = await session.get_memory_context()
+                
+                if not memory_context or len(memory_context) < 2:  # Need at least previous Q&A
+                    logger.info("Insufficient context in memory for meta-question handling")
+                    
+                    if is_memory_question:
+                        # If explicitly asking about memory but no context available
+                        # Return an honest response about limited context
+                        await session.add_message(message, "user")
+                        
+                        response_text = ("I can see you're asking about our previous conversation, "
+                                        "but I don't have enough context from our earlier interaction. "
+                                        "Could you help remind me what specifically you're referring to?")
+                        
+                        await session.add_message(response_text, "agent")
+                        
+                        return response_text, {
+                            "result_type": "meta_response",
+                            "is_follow_up": True,
+                            "has_memory_context": False
+                        }
+                    return None
+                
+                # Format memory context for agent
+                context_messages = []
+                for idx, msg in enumerate(memory_context):
+                    role = msg.get("role", "unknown")
+                    content = msg.get("content", "")
+                    # Format nicely with clear separation
+                    context_messages.append(f"[Message {idx+1}] {role.upper()}: {content}")
+                
+                context_text = "\n\n".join(context_messages)
+                
+                # Get user preferences for enhanced context
+                user_preferences = await session.get_or_fetch_user_preferences()
+                
+                # Create a meta-question detection prompt with clear instructions to use memory
+                meta_question_prompt = f"""
+                I need to respond to a question about our conversation history. I HAVE MEMORY and should use it to answer accurately.
+                
+                CONVERSATION HISTORY:
+                {context_text}
+                
+                USER PREFERENCES:
+                {json.dumps(user_preferences, indent=2)}
+                
+                LATEST QUESTION: {message}
+                
+                When responding, I should:
+                1. Directly acknowledge what I remember from our previous conversation
+                2. Reference specific details from our conversation history
+                3. Use a natural, conversational tone as the stylist Ari
+                4. Connect my response to any fashion advice or products I've previously mentioned
+                
+                I'll now respond with full awareness of our conversation history.
+                """
                 
                 # Add user message to session first
                 await session.add_message(message, "user")
                 
-                meta_message = BaseMessage.make_user_message(
-                    role_name="User",
-                    content=meta_question_prompt
-                )
-                
-                # Note: CAMEL 0.2.43 doesn't have an async step method
-                # This will be a blocking call - in a real implementation, you would
-                # run this in a separate thread or use an async-compatible agent
-                agent_response = await asyncio.to_thread(session.stylist_agent.step, meta_message)
-                response_text = agent_response.msg.content
-                
-                # Add agent message to session
-                await session.add_message(response_text, "agent")
-                
-                logger.info("Handled meta-question successfully")
-                
-                return response_text, {
-                    "result_type": "meta_response",
-                    "is_follow_up": True
-                }
+                # Send to stylist agent
+                try:
+                    from camel.messages import BaseMessage
+                    
+                    meta_message = BaseMessage.make_user_message(
+                        role_name="User",
+                        content=meta_question_prompt
+                    )
+                    
+                    # Note: CAMEL 0.2.43 doesn't have an async step method
+                    # This will be a blocking call - in a real implementation, you would
+                    # run this in a separate thread or use an async-compatible agent
+                    agent_response = await asyncio.to_thread(session.stylist_agent.step, meta_message)
+                    response_text = agent_response.msg.content
+                    
+                    # Process the response to ensure it actually uses memory
+                    # If the response suggests it doesn't have memory, fix it
+                    no_memory_phrases = [
+                        "i don't have the ability to remember", 
+                        "i cannot recall", 
+                        "i don't have access to",
+                        "i don't have memory",
+                        "i can't remember"
+                    ]
+                    
+                    if any(phrase in response_text.lower() for phrase in no_memory_phrases):
+                        # Response incorrectly claims no memory - override it
+                        logger.warning("Agent response incorrectly claims no memory capability - fixing")
+                        
+                        # Extract a relevant detail from the conversation history
+                        relevant_detail = "our previous conversation"
+                        for msg in reversed(memory_context):
+                            if msg.get("role") == "user" and len(msg.get("content", "")) > 10:
+                                # Found a substantive user message
+                                content = msg.get("content", "")
+                                if len(content) > 50:
+                                    content = content[:50] + "..."
+                                relevant_detail = f"when you asked about '{content}'"
+                                break
+                        
+                        # Create fixed response that acknowledges memory
+                        response_text = (
+                            f"Yes, I remember {relevant_detail}. Looking at our conversation history, "
+                            f"I can see we've been discussing fashion advice. Is there something specific "
+                            f"from our previous conversation you'd like me to elaborate on?"
+                        )
+                    
+                    # Add agent message to session
+                    await session.add_message(response_text, "agent")
+                    
+                    logger.info("Handled meta-question successfully")
+                    
+                    return response_text, {
+                        "result_type": "meta_response",
+                        "is_follow_up": True,
+                        "has_memory_context": True,
+                        "memory_context_size": len(memory_context)
+                    }
+                except Exception as e:
+                    logger.error(f"Error handling meta-question with agent: {e}")
+                    
+                    # Fallback response if agent fails
+                    fallback_response = (
+                        "I remember our conversation, but I'm having trouble processing your question. "
+                        "Could you please rephrase it or provide more details about what you'd like me to recall?"
+                    )
+                    
+                    await session.add_message(fallback_response, "agent")
+                    
+                    return fallback_response, {
+                        "result_type": "meta_response",
+                        "is_follow_up": True,
+                        "has_memory_context": True,
+                        "error": str(e)
+                    }
+                    
             except Exception as e:
-                logger.error(f"Error handling meta-question with agent: {e}")
-                return None
+                logger.warning(f"Error in meta-question handling: {e}")
                 
-        except Exception as e:
-            logger.warning(f"Error in meta-question handling: {e}")
-            return None
+                if is_memory_question:
+                    # If explicitly asking about memory but handling failed
+                    # Return a graceful response
+                    await session.add_message(message, "user")
+                    
+                    response_text = ("I'm having trouble accessing our conversation history right now. "
+                                    "Could you help remind me what you're referring to?")
+                    
+                    await session.add_message(response_text, "agent")
+                    
+                    return response_text, {
+                        "result_type": "meta_response",
+                        "is_follow_up": True,
+                        "error": str(e)
+                    }
+                
+                return None
+        
+        # Not a memory-related question
+        return None
     
     def _extract_parameters(self, message: str) -> Dict[str, Any]:
         """
         Extract query parameters from a user message
+        Enhanced with more robust extraction
         
         Args:
             message: User message
@@ -382,8 +798,8 @@ class ChatManagerAsync:
         # Initialize params with default values
         params = {
             "category": None,
-            "collection": None,  # Changed from 'brand' to match actual schema
-            "tag": None,         # Added for tag search
+            "collection": None,
+            "tag": None,
             "min_price": None,
             "max_price": None,
             "occasion": None,
@@ -475,9 +891,16 @@ class ChatManagerAsync:
         logger.info(f"Extracted parameters: {params}")
         return params
     
-    async def _handle_product_search(self, session: ChatSessionAsync, message: str) -> Tuple[str, Dict[str, Any]]:
+    async def _handle_product_search(self, session: EnhancedChatSessionAsync, message: str) -> Tuple[str, Dict[str, Any]]:
         """
-        Handle product search requests
+        Handle product search requests with enhanced personalization and memory
+        
+        Args:
+            session: Enhanced chat session
+            message: User message
+            
+        Returns:
+            Tuple of (response text, result data)
         """
         # Add user message to session
         await session.add_message(message, "user")
@@ -500,11 +923,11 @@ class ChatManagerAsync:
             params["tag"] = params.get("occasion")
             logger.info(f"Using occasion as tag: {params['tag']}")
         
-        # Perform search using knowledge graph
+        # Perform search using knowledge graph - DIRECT SEARCH FIRST
         search_results = []
         if session.product_kg:
             try:
-                # Use the updated schema-compatible method
+                # Use the updated schema-compatible method - DIRECT SEARCH LIKE ORIGINAL
                 search_results = await session.product_kg.get_product_by_filter(
                     category=params.get("category"),
                     collection=params.get("collection"),
@@ -513,6 +936,7 @@ class ChatManagerAsync:
                     max_price=params.get("max_price"),
                     limit=5
                 )
+                
                 # Filter out test/untitled products and zero-priced items
                 filtered_results = []
                 for product in search_results:
@@ -571,18 +995,16 @@ class ChatManagerAsync:
                 
                 if retriever_results:
                     logger.info(f"Found {len(retriever_results)} additional products from retriever")
-                    search_results.extend(retriever_results)
                     
-                    # Deduplicate results by ID
-                    seen_ids = set()
-                    unique_results = []
+                    # Add products not already in search_results
+                    existing_ids = {p.get('id') for p in search_results}
+                    for product in retriever_results:
+                        if product.get('id') and product.get('id') not in existing_ids:
+                            search_results.append(product)
+                            existing_ids.add(product.get('id'))
                     
-                    for product in search_results:
-                        if product.get("id") not in seen_ids:
-                            seen_ids.add(product.get("id"))
-                            unique_results.append(product)
-                    
-                    search_results = unique_results[:5]  # Limit to 5 products
+                    # Limit to 5 products
+                    search_results = search_results[:5]
                 
             except Exception as e:
                 logger.error(f"Error augmenting search with retriever: {e}")
@@ -601,35 +1023,6 @@ class ChatManagerAsync:
         # Prepare product IDs for tracking
         product_ids = [product.get("id", "") for product in search_results if product.get("id")]
         
-        # Create product descriptions in a more natural, conversational format
-        product_descriptions = []
-        for product in search_results:
-            # Extract key information
-            title = product.get("title", "Stylish item")
-            price = product.get("price", 0)
-            categories = ", ".join(product.get("categories", []))
-            features = ", ".join(product.get("features", []) or product.get("tags", []))
-            description = product.get("description", "")
-            
-            # Create a natural description
-            desc = (f"A {title} that would be perfect for you. "
-                   f"It's priced at ${price} ")
-            
-            if categories:
-                desc += f"and is great for {categories}. "
-            else:
-                desc += "and is very versatile. "
-                
-            if features:
-                desc += f"What makes it special is {features}. "
-                
-            if description and len(description) > 10:  # Only add if meaningful description exists
-                # Truncate long descriptions
-                short_desc = description[:100] + "..." if len(description) > 100 else description
-                desc += f"The product details mention: {short_desc}"
-                
-            product_descriptions.append(desc)
-        
         # Create agent context with an emphasis on natural conversation
         agent_context = f"""
         {conversation_context}
@@ -647,7 +1040,7 @@ class ChatManagerAsync:
         - Explain why each item would work well for their needs
         - If recommending multiple items, describe each one clearly
         Here are the products I've found:
-         d"""
+        """
 
         # Add specific product details to the context
         for idx, product in enumerate(search_results, 1):
@@ -674,16 +1067,13 @@ class ChatManagerAsync:
         - Acknowledge that we don't have the exact items they're looking for
         - Suggest general style advice based on their query
         - Ask follow-up questions to better understand their needs
+        - Mention that we're constantly updating our inventory
         """
 
         agent_context += """
         IMPORTANT: Always mention specific product names and prices in your response.
         Respond as if you're having a friendly styling consultation, making the client feel understood and excited about these options.
         """
-
-        {' '.join(product_descriptions)}
-
-    
         
         # Send context to the agent
         try:
@@ -709,7 +1099,8 @@ class ChatManagerAsync:
             result_data = {
                 "result_type": "product_search",
                 "products": search_results,
-                "parameters": params
+                "parameters": params,
+                "user_preferences": user_preferences
             }
             
             logger.info("Product search handled successfully")
@@ -794,7 +1185,7 @@ class ChatManagerAsync:
     
     async def process_message(self, session_id: Optional[str], user_id: Optional[str], message: str) -> Tuple[str, Dict[str, Any]]:
         """
-        Process a user message and generate a response
+        Process a user message with enhanced memory and personalization
         
         Args:
             session_id: Optional session ID
@@ -808,6 +1199,31 @@ class ChatManagerAsync:
         
         # Get or create session
         session = await self.get_or_create_session(session_id, user_id)
+        
+        # Check if user has a different active session
+        if user_id and user_id in self.registered_users:
+            registered_session_id = self.registered_users[user_id]
+            if registered_session_id != session.session_id:
+                logger.info(f"User {user_id} has a different active session, switching to {registered_session_id}")
+                
+                # Try to get the registered session
+                async with self.sessions_lock:
+                    if registered_session_id in self.active_sessions:
+                        session = self.active_sessions[registered_session_id]
+                        
+                        # Update the session ID if it was provided
+                        if session_id:
+                            # Remove old mapping
+                            del self.active_sessions[registered_session_id]
+                            
+                            # Update session ID
+                            session.session_id = session_id
+                            
+                            # Add new mapping
+                            self.active_sessions[session_id] = session
+                            
+                            # Update user registry
+                            self.registered_users[user_id] = session_id
         
         # Check if this is a follow-up or meta-question
         meta_response = await self._handle_meta_question(session, message)
