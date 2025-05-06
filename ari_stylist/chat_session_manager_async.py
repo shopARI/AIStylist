@@ -12,6 +12,7 @@ import re
 import json
 import logging
 import asyncio
+import traceback
 from typing import Dict, Any, Optional, Tuple, List
 
 # Configure logging
@@ -29,6 +30,9 @@ from memory_integration_async import (
     extract_preferences_from_memory_async,
     optimize_memory_async
 )
+
+# Import AsyncCAMELService
+from async_camel_service import AsyncCAMELService
 
 class EnhancedChatSessionAsync:
     """
@@ -73,6 +77,9 @@ class EnhancedChatSessionAsync:
         # User preferences extracted from memory
         self.user_preferences = {}
         self.preferences_up_to_date = False
+        
+        # Create CAMEL service
+        self.camel_service = AsyncCAMELService()
         
         # Start persistence task if enabled
         if self.auto_persistence and user_id and product_kg:
@@ -122,21 +129,24 @@ class EnhancedChatSessionAsync:
                 }
                 
                 # Add to memory using enhanced memory integration
-                await add_message_to_memory_async(
+                success = await add_message_to_memory_async(
                     memory=self.memory, 
                     content=content, 
                     sender=sender, 
                     metadata=metadata
                 )
                 
-                logger.info(f"Added {sender} message to enhanced memory")
+                if success:
+                    logger.info(f"Added {sender} message to enhanced memory")
+                else:
+                    logger.warning(f"Failed to add {sender} message to memory")
                 
                 # Extract and update preferences from user messages
                 if sender == "user" and not self.preferences_up_to_date:
                     await self._update_preferences_from_memory()
                 
             except Exception as e:
-                logger.error(f"Error adding message to memory: {e}")
+                logger.error(f"Error adding message to memory: {e}", exc_info=True)
         
         # Schedule memory persistence if enabled
         if self.auto_persistence and self.user_id and self.product_kg and self.memory:
@@ -147,7 +157,7 @@ class EnhancedChatSessionAsync:
                     await save_memory_for_user_async(self.memory, self.user_id, self.product_kg)
                     self.last_persistence_time = current_time
                 except Exception as e:
-                    logger.error(f"Error persisting memory: {e}")
+                    logger.error(f"Error persisting memory: {e}", exc_info=True)
         
         return message
     
@@ -171,7 +181,7 @@ class EnhancedChatSessionAsync:
                             # Optimize memory before ending
                             await optimize_memory_async(self.memory, self.user_id, self.product_kg)
                         except Exception as e:
-                            logger.error(f"Error in final memory persistence: {e}")
+                            logger.error(f"Error in final memory persistence: {e}", exc_info=True)
                     break
                 
                 # Periodic persistence
@@ -181,7 +191,7 @@ class EnhancedChatSessionAsync:
                         await save_memory_for_user_async(self.memory, self.user_id, self.product_kg)
                         self.last_persistence_time = current_time
                     except Exception as e:
-                        logger.error(f"Error in periodic memory persistence: {e}")
+                        logger.error(f"Error in periodic memory persistence: {e}", exc_info=True)
         
         except asyncio.CancelledError:
             # Task was cancelled - perform final persistence
@@ -190,10 +200,10 @@ class EnhancedChatSessionAsync:
                     logger.info(f"Final memory persistence on cancellation for session {self.session_id}")
                     await save_memory_for_user_async(self.memory, self.user_id, self.product_kg)
                 except Exception as e:
-                    logger.error(f"Error in final memory persistence on cancellation: {e}")
+                    logger.error(f"Error in final memory persistence on cancellation: {e}", exc_info=True)
         
         except Exception as e:
-            logger.error(f"Error in persistence worker: {e}")
+            logger.error(f"Error in persistence worker: {e}", exc_info=True)
     
     async def get_memory_context(self) -> Tuple[List[Dict[str, str]], int]:
         """
@@ -205,14 +215,20 @@ class EnhancedChatSessionAsync:
         if self.memory:
             try:
                 # Use enhanced memory integration
-                return await get_memory_context_async(self.memory)
+                context, token_count = await get_memory_context_async(self.memory)
+                
+                # Log context details for debugging
+                logger.debug(f"Got memory context: {len(context)} messages, {token_count} tokens")
+                
+                return context, token_count
                 
             except Exception as e:
-                logger.error(f"Error getting context from memory: {e}")
+                logger.error(f"Error getting context from memory: {e}", exc_info=True)
                 
                 # Fallback: Return recent chat history directly
                 try:
                     # Format recent messages as context
+                    logger.debug("Attempting fallback to direct message history")
                     recent_history = await self.get_conversation_history(limit=10)  # Increased from 5
                     context = []
                     
@@ -227,8 +243,9 @@ class EnhancedChatSessionAsync:
                     return context, 0
                     
                 except Exception as e2:
-                    logger.error(f"Error creating fallback context: {e2}")
+                    logger.error(f"Error creating fallback context: {e2}", exc_info=True)
         
+        logger.warning("No memory available for context retrieval")
         return [], 0
     
     async def _update_preferences_from_memory(self):
@@ -264,7 +281,7 @@ class EnhancedChatSessionAsync:
             logger.info(f"Updated user preferences from memory: {len(self.user_preferences)} preference types")
             
         except Exception as e:
-            logger.error(f"Error updating preferences from memory: {e}")
+            logger.error(f"Error updating preferences from memory: {e}", exc_info=True)
     
     async def get_conversation_history(self, limit: int = 10) -> List[Dict[str, Any]]:
         """
@@ -308,7 +325,7 @@ class EnhancedChatSessionAsync:
                         neo4j_client=self.product_kg
                     )
                 except Exception as e:
-                    logger.error(f"Error recording product interaction: {e}")
+                    logger.error(f"Error recording product interaction: {e}", exc_info=True)
     
     async def get_or_fetch_user_preferences(self) -> Dict[str, Any]:
         """
@@ -344,13 +361,13 @@ class EnhancedChatSessionAsync:
                     return self.user_preferences
                     
             except Exception as e:
-                logger.error(f"Error fetching user preferences: {e}")
+                logger.error(f"Error fetching user preferences: {e}", exc_info=True)
         
         # If memory extraction failed or no user ID, return empty preferences
         return {
-            "preferred_categories": [], 
+            "preferred_categories": [],
             "preferred_collections": [],
-            "preferred_tags": [], 
+            "preferred_tags": [],
             "budget_range": None
         }
     
@@ -402,7 +419,7 @@ class EnhancedChatSessionAsync:
                 return True
                 
             except Exception as e:
-                logger.error(f"Error adding preference to memory: {e}")
+                logger.error(f"Error adding preference to memory: {e}", exc_info=True)
                 return False
         
         # If no memory available, just use local state
@@ -459,7 +476,7 @@ class EnhancedChatSessionAsync:
                 return False
                 
         except Exception as e:
-            logger.error(f"Error recording product interaction: {e}")
+            logger.error(f"Error recording product interaction: {e}", exc_info=True)
             return False
     
     async def close(self):
@@ -482,7 +499,11 @@ class EnhancedChatSessionAsync:
                 # Optimize memory before closing
                 await optimize_memory_async(self.memory, self.user_id, self.product_kg)
             except Exception as e:
-                logger.error(f"Error in final memory persistence: {e}")
+                logger.error(f"Error in final memory persistence: {e}", exc_info=True)
+        
+        # Close CAMEL service
+        if hasattr(self, 'camel_service'):
+            await self.camel_service.close()
         
         logger.info(f"Closed session {self.session_id}")
 
@@ -512,6 +533,9 @@ class EnhancedChatManagerAsync:
         # Create user registry for returning users
         self.registered_users = {}
         
+        # Initialize CAMEL service
+        self.camel_service = AsyncCAMELService()
+        
         # Make sure schema is set up
         if product_kg:
             asyncio.create_task(self._ensure_schema())
@@ -525,7 +549,7 @@ class EnhancedChatManagerAsync:
                 await self.product_kg.ensure_schema()
                 logger.info("Neo4j schema verified")
             except Exception as e:
-                logger.error(f"Error ensuring Neo4j schema: {e}")
+                logger.error(f"Error ensuring Neo4j schema: {e}", exc_info=True)
     
     async def get_or_create_session(self, session_id: Optional[str] = None, user_id: Optional[str] = None) -> EnhancedChatSessionAsync:
         """
@@ -542,6 +566,7 @@ class EnhancedChatManagerAsync:
         if session_id:
             async with self.sessions_lock:
                 if session_id in self.active_sessions:
+                    logger.info(f"Returning existing session {session_id}")
                     return self.active_sessions[session_id]
         
         # If user ID provided, check if a returning user
@@ -560,7 +585,7 @@ class EnhancedChatManagerAsync:
                     else:
                         logger.info(f"No existing memory found for user {user_id}, creating new memory")
             except Exception as e:
-                logger.error(f"Error loading memory for user {user_id}: {e}")
+                logger.error(f"Error loading memory for user {user_id}: {e}", exc_info=True)
         
         # If no memory loaded, create new memory
         if memory is None and self.memory_setup_func:
@@ -568,7 +593,12 @@ class EnhancedChatManagerAsync:
                 memory = await self.memory_setup_func(user_id=user_id, neo4j_client=self.product_kg)
                 logger.info("Created new memory for session")
             except Exception as e:
-                logger.error(f"Failed to create memory: {e}")
+                logger.error(f"Failed to create memory: {e}", exc_info=True)
+        
+        # Generate session ID if not provided
+        if not session_id:
+            session_id = str(uuid.uuid4())
+            logger.info(f"Generated new session ID: {session_id}")
         
         # Create new session
         session = EnhancedChatSessionAsync(
@@ -733,19 +763,14 @@ class EnhancedChatManagerAsync:
                 # Add user message to session
                 await session.add_message(message, "user")
                 
-                # Send to stylist agent
                 try:
-                    from camel.messages import BaseMessage
-                    
-                    meta_message = BaseMessage.make_user_message(
-                        role_name="User",
-                        content=meta_question_prompt
+                    # Process message with context using the CAMEL service
+                    agent_response = await session.camel_service.process_message(
+                        agent=session.stylist_agent,
+                        message=meta_question_prompt,
+                        context=None  # Context is already included in the prompt
                     )
                     
-                    # Note: CAMEL 0.2.43 doesn't have an async step method
-                    # This will be a blocking call - in a real implementation, you would
-                    # run this in a separate thread or use an async-compatible agent
-                    agent_response = await asyncio.to_thread(session.stylist_agent.step, meta_message)
                     response_text = agent_response.msg.content
                     
                     # Process the response to ensure it actually uses memory
@@ -792,7 +817,7 @@ class EnhancedChatManagerAsync:
                         "memory_context_size": len(memory_context)
                     }
                 except Exception as e:
-                    logger.error(f"Error handling meta-question with agent: {e}")
+                    logger.error(f"Error handling meta-question with agent: {e}", exc_info=True)
                     
                     # Fallback response if agent fails
                     fallback_response = (
@@ -810,7 +835,7 @@ class EnhancedChatManagerAsync:
                     }
                     
             except Exception as e:
-                logger.warning(f"Error in meta-question handling: {e}")
+                logger.warning(f"Error in meta-question handling: {e}", exc_info=True)
                 
                 if is_memory_question:
                     # If explicitly asking about memory but handling failed
@@ -845,88 +870,92 @@ class EnhancedChatManagerAsync:
             Tuple of (response message, additional data)
         """
         try:
-            # Get memory context
+            # Get memory context with detailed logging
+            logger.debug(f"Getting memory context for conversation handling")
             memory_context, token_count = await session.get_memory_context()
-            
-            # Format context for agent
-            context_text = ""
-            for msg in memory_context:
-                role = msg.get("role", "unknown")
-                content = msg.get("content", "")
-                context_text += f"{role.upper()}: {content}\n\n"
-            
-            # Get user preferences for enhanced context
-            user_preferences = await session.get_or_fetch_user_preferences()
-            
-            # Create a natural conversation prompt
-            conversation_prompt = f"""
-            I'll have a natural stylist conversation without immediately suggesting products.
-            
-            CONVERSATION HISTORY:
-            {context_text}
-            
-            USER PREFERENCES:
-            {json.dumps(user_preferences, indent=2)}
-            
-            LATEST MESSAGE: {message}
-            
-            As Ari the stylist, I should:
-            1. Respond conversationally without immediately suggesting specific products
-            2. Focus on understanding the client's needs, preferences, and context
-            3. Only suggest specific products if explicitly asked to do so
-            4. Build rapport through my fashion expertise and personalized advice
-            
-            I should NOT:
-            - Push products when not requested
-            - Jump straight to specific product recommendations
-            - Use formulaic responses that sound like a catalog
-            
-            My response:
-            """
+            logger.debug(f"Received memory context: {len(memory_context)} messages, {token_count} tokens")
             
             # Add user message to session
+            logger.debug(f"Adding user message to session: {message[:50]}...")
             await session.add_message(message, "user")
             
-            # Send to stylist agent
+            # Get user preferences for enhanced context
+            logger.debug("Fetching user preferences")
+            user_preferences = await session.get_or_fetch_user_preferences()
+            
+            # Create full context for the message
+            context = {
+                "conversation_history": memory_context,
+                "user_preferences": user_preferences
+            }
+            
+            logger.info(f"Processing conversation message with context: {len(memory_context)} messages")
+            
+            # Try processing with full context first
             try:
-                from camel.messages import BaseMessage
-                
-                user_message = BaseMessage.make_user_message(
-                    role_name="User",
-                    content=conversation_prompt
+                # Process message with context using the CAMEL service
+                response = await session.camel_service.process_message(
+                    agent=session.stylist_agent,
+                    message=message,
+                    context=context
                 )
                 
-                # Use asyncio.to_thread for CAMEL's synchronous step method
-                agent_response = await asyncio.to_thread(session.stylist_agent.step, user_message)
-                response_text = agent_response.msg.content
+                response_text = response.msg.content
+                logger.debug(f"Got agent response: {response_text[:50]}...")
                 
-                # Add agent message to session
-                await session.add_message(response_text, "agent")
-                
-                logger.info("Conversation handled successfully")
-                
-                return response_text, {
-                    "result_type": "conversation",
-                    "is_product_search": False
-                }
             except Exception as e:
-                logger.error(f"Error getting response from agent: {e}")
-                fallback_response = "I'm here to help with your fashion needs. What specific style advice are you looking for today?"
+                logger.error(f"Error processing message with full context: {e}", exc_info=True)
+                logger.info("Trying simplified context...")
                 
-                # Add fallback response to session
-                await session.add_message(fallback_response, "agent")
+                # Try with a simplified prompt if full context fails
+                simplified_prompt = f"""
+                User message: {message}
                 
-                return fallback_response, {
-                    "result_type": "error",
-                    "error": str(e)
-                }
+                Respond naturally as a helpful fashion stylist named Ari. Be friendly and conversational.
+                """
                 
+                # Process with simplified prompt
+                try:
+                    response = await session.camel_service.process_message(
+                        agent=session.stylist_agent,
+                        message=simplified_prompt,
+                        context=None
+                    )
+                    
+                    response_text = response.msg.content
+                    logger.debug(f"Got agent response with simplified prompt: {response_text[:50]}...")
+                    
+                except Exception as e2:
+                    logger.error(f"Error with simplified prompt too: {e2}", exc_info=True)
+                    
+                    # Final fallback to a preset response
+                    response_text = (
+                        "I'd be happy to help with fashion advice. "
+                        "What kind of outfit or style are you looking for today?"
+                    )
+                    
+                    logger.info("Using preset fallback response")
+            
+            # Add agent message to session
+            await session.add_message(response_text, "agent")
+            
+            logger.info("Conversation handled successfully")
+            
+            return response_text, {
+                "result_type": "conversation",
+                "is_product_search": False
+            }
         except Exception as e:
-            logger.error(f"Error handling conversation: {e}")
+            logger.error(f"Error in _handle_conversation: {e}", exc_info=True)
+            
+            # Prepare fallback response
             fallback_response = "I'd be happy to chat about fashion. Is there something specific you'd like advice on?"
             
             # Add fallback response to session
-            await session.add_message(fallback_response, "agent")
+            try:
+                await session.add_message(fallback_response, "agent")
+            except Exception as add_error:
+                logger.error(f"Error adding fallback message: {add_error}", exc_info=True)
             
             return fallback_response, {
                 "result_type": "error",
@@ -1208,7 +1237,7 @@ class EnhancedChatManagerAsync:
                         logger.info(f"Fallback to popular products found {len(search_results)} products")
                 
             except Exception as e:
-                logger.error(f"Error searching products in knowledge graph: {e}")
+                logger.error(f"Error searching products in knowledge graph: {e}", exc_info=True)
         
         # If few results from knowledge graph, augment with retriever
         if session.product_retriever and len(search_results) < 3:
@@ -1254,7 +1283,7 @@ class EnhancedChatManagerAsync:
                     search_results = search_results[:5]
                 
             except Exception as e:
-                logger.error(f"Error augmenting search with retriever: {e}")
+                logger.error(f"Error augmenting search with retriever: {e}", exc_info=True)
         
         # Update session with current products context
         if search_results:
@@ -1321,19 +1350,68 @@ class EnhancedChatManagerAsync:
         Respond as if you're having a friendly styling consultation, making the client feel understood and excited about these options.
         """
         
-        # Send context to the agent
+        # Process message with context
         try:
-            from camel.messages import BaseMessage
-            user_message = BaseMessage.make_user_message(
-                role_name="User",
-                content=agent_context
-            )
+            logger.info("Processing product search message with agent")
             
-            # Note: CAMEL 0.2.43 doesn't have an async step method
-            # This will be a blocking call - in a real implementation, you would
-            # run this in a separate thread or use an async-compatible agent
-            agent_response = await asyncio.to_thread(session.stylist_agent.step, user_message)
-            response_text = agent_response.msg.content
+            # Process with error handling and retry logic
+            try:
+                # Process using session's CAMEL service
+                agent_response = await session.camel_service.process_message(
+                    agent=session.stylist_agent,
+                    message=agent_context,
+                    context=None  # Context is already included in the prompt
+                )
+                
+                response_text = agent_response.msg.content
+                logger.debug(f"Got product search response: {response_text[:50]}...")
+                
+            except Exception as e:
+                logger.error(f"Error in primary product search response: {e}", exc_info=True)
+                
+                # Simplified retry with a more basic prompt
+                try:
+                    simplified_prompt = f"""
+                    The user is looking for: {message}
+                    
+                    I found these products that might work:
+                    """
+                    
+                    # Add product information in a simplified format
+                    for idx, product in enumerate(search_results, 1):
+                        title = product.get('title', 'Stylish item')
+                        price = product.get('price', 0)
+                        simplified_prompt += f"\n{idx}. {title} - ${price}\n"
+                    
+                    simplified_prompt += "\nPlease recommend these products in a friendly, conversational way as a stylist."
+                    
+                    # Try with simplified prompt
+                    agent_response = await session.camel_service.process_message(
+                        agent=session.stylist_agent,
+                        message=simplified_prompt,
+                        context=None
+                    )
+                    
+                    response_text = agent_response.msg.content
+                    logger.debug(f"Got simplified product search response: {response_text[:50]}...")
+                    
+                except Exception as e2:
+                    logger.error(f"Error with simplified prompt too: {e2}", exc_info=True)
+                    
+                    # Use a static fallback response
+                    if search_results:
+                        # Directly construct a response mentioning the products
+                        response_text = "Based on what you're looking for, I'd recommend these options:\n\n"
+                        
+                        for idx, product in enumerate(search_results, 1):
+                            title = product.get('title', 'Stylish item')
+                            price = product.get('price', 0)
+                            response_text += f"{title} (${price})\n"
+                            
+                        response_text += "\nWould any of these work for you?"
+                    else:
+                        response_text = ("I don't have specific products that match exactly what you're looking for at the moment. "
+                                       "Could you tell me more about what style or occasion you're shopping for?")
             
             # Apply post-processing to ensure natural conversation
             response_text = self._naturalize_response(response_text)
@@ -1353,7 +1431,7 @@ class EnhancedChatManagerAsync:
             return response_text, result_data
             
         except Exception as e:
-            logger.error(f"Error getting response from agent: {e}")
+            logger.error(f"Error in overall product search handling: {e}", exc_info=True)
             fallback_response = "I'm sorry, I'm having trouble finding products that match your request right now. Could you try describing what you're looking for in a different way, or perhaps be more specific about the type of item you need?"
             
             # Add fallback response to session
@@ -1444,55 +1522,123 @@ class EnhancedChatManagerAsync:
         logger.info(f"Processing message for session {session_id}: {message[:50]}...")
         
         # Get or create session
-        session = await self.get_or_create_session(session_id, user_id)
-        
-        # Check if user has a different active session
-        if user_id and user_id in self.registered_users:
-            registered_session_id = self.registered_users[user_id]
-            if registered_session_id != session.session_id:
-                logger.info(f"User {user_id} has a different active session, switching to {registered_session_id}")
-                
-                # Try to get the registered session
-                async with self.sessions_lock:
-                    if registered_session_id in self.active_sessions:
-                        session = self.active_sessions[registered_session_id]
-                        
-                        # Update the session ID if it was provided
-                        if session_id:
-                            # Remove old mapping
-                            del self.active_sessions[registered_session_id]
-                            
-                            # Update session ID
-                            session.session_id = session_id
-                            
-                            # Add new mapping
-                            self.active_sessions[session_id] = session
-                            
-                            # Update user registry
-                            self.registered_users[user_id] = session_id
-        
-        # Detect intent first
-        intent = await self._detect_message_intent(message)
-        logger.info(f"Detected message intent: {intent}")
-        
-        # Process based on intent
-        if intent == "memory_question":
-            # Check if this is a follow-up or meta-question
-            meta_response = await self._handle_meta_question(session, message)
-            if meta_response:
-                logger.info("Handled as memory-related question")
-                return meta_response
-                
-        if intent == "product_request":
-            # Handle as a product search
-            logger.info("Handling as product search")
-            return await self._handle_product_search(session, message)
+        try:
+            session = await self.get_or_create_session(session_id, user_id)
+            logger.info(f"Using session: {session.session_id}")
             
-        if intent == "greeting":
-            # Greetings should be handled as conversation
-            logger.info("Handling greeting as conversation")
+            # Check if user has a different active session
+            if user_id and user_id in self.registered_users:
+                registered_session_id = self.registered_users[user_id]
+                if registered_session_id != session.session_id:
+                    logger.info(f"User {user_id} has a different active session, switching to {registered_session_id}")
+                    
+                    # Try to get the registered session
+                    async with self.sessions_lock:
+                        if registered_session_id in self.active_sessions:
+                            session = self.active_sessions[registered_session_id]
+                            
+                            # Update the session ID if it was provided
+                            if session_id:
+                                # Remove old mapping
+                                del self.active_sessions[registered_session_id]
+                                
+                                # Update session ID
+                                session.session_id = session_id
+                                
+                                # Add new mapping
+                                self.active_sessions[session_id] = session
+                                
+                                # Update user registry
+                                self.registered_users[user_id] = session_id
+            
+            # Verify stylist agent exists
+            if not hasattr(session, 'stylist_agent') or not session.stylist_agent:
+                logger.warning(f"Session {session.session_id} has no stylist agent, creating one")
+                
+                # Create a new memory if needed
+                if not hasattr(session, 'memory') or not session.memory:
+                    logger.info("Creating new memory for session")
+                    memory = await self.memory_setup_func(user_id=user_id, neo4j_client=self.product_kg)
+                    session.memory = memory
+                
+                # Create a new agent
+                from stylist_agent_async import create_stylist_agent_async
+                stylist_agent = await create_stylist_agent_async(
+                    memory=session.memory
+                )
+                session.stylist_agent = stylist_agent
+                logger.info("Created new stylist agent for session")
+        
+        except Exception as e:
+            logger.error(f"Error getting or creating session: {e}", exc_info=True)
+            
+            # Create a minimal session as fallback
+            fallback_response = "I'm sorry, I encountered an issue with your session. Let's have a fresh conversation. How can I help with your fashion needs?"
+            
+            # Return error with fallback
+            return fallback_response, {
+                "result_type": "error",
+                "error": f"Session creation error: {str(e)}"
+            }
+        
+        try:
+            # Detect intent first
+            intent = await self._detect_message_intent(message)
+            logger.info(f"Detected message intent: {intent}")
+            
+            # Process based on intent
+            if intent == "memory_question":
+                # Check if this is a follow-up or meta-question
+                meta_response = await self._handle_meta_question(session, message)
+                if meta_response:
+                    logger.info("Handled as memory-related question")
+                    return meta_response
+                    
+            if intent == "product_request":
+                # Handle as a product search
+                logger.info("Handling as product search")
+                return await self._handle_product_search(session, message)
+                
+            if intent == "greeting":
+                # Greetings should be handled as conversation
+                logger.info("Handling greeting as conversation")
+                return await self._handle_conversation(session, message)
+                
+            # Default to conversation for all other intents
+            logger.info("Handling as general conversation")
             return await self._handle_conversation(session, message)
             
-        # Default to conversation for all other intents
-        logger.info("Handling as general conversation")
-        return await self._handle_conversation(session, message)
+        except Exception as e:
+            logger.error(f"Error in message processing pipeline: {e}", exc_info=True)
+            
+            # Get stack trace for detailed debugging
+            stack_trace = traceback.format_exc()
+            logger.error(f"Stack trace: {stack_trace}")
+            
+            # Provide a friendly fallback response
+            fallback_response = "I'd be happy to help with fashion advice. What kind of style are you looking for today?"
+            
+            # Try to record the message and response
+            try:
+                await session.add_message(message, "user")
+                await session.add_message(fallback_response, "agent")
+            except Exception as add_error:
+                logger.error(f"Error adding fallback messages: {add_error}")
+            
+            return fallback_response, {
+                "result_type": "error",
+                "error": str(e)
+            }
+    
+    async def close(self):
+        """Close all resources"""
+        # Close active sessions
+        for session_id, session in self.active_sessions.items():
+            if hasattr(session, 'close'):
+                try:
+                    await session.close()
+                except Exception as e:
+                    logger.error(f"Error closing session {session_id}: {e}")
+        
+        # Close CAMEL service
+        await self.camel_service.close()

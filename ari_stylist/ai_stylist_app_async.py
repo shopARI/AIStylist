@@ -18,6 +18,9 @@ import uuid
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("enhanced_ai_stylist_app_async")
 
+# Import AsyncCAMELService
+from async_camel_service import AsyncCAMELService
+
 # Import the enhanced memory integration
 from memory_integration_async import (
     setup_stylist_memory_async,
@@ -112,6 +115,9 @@ class EnhancedAIStylistApp:
             self.product_retriever = ProductRetrieverAsync(
                 vector_storage_path="product_data/embeddings"
             )
+        
+        # Initialize the CAMEL service
+        self.camel_service = AsyncCAMELService()
         
         # Initialize the enhanced memory system
         logger.info("Setting up enhanced memory system...")
@@ -249,9 +255,18 @@ class EnhancedAIStylistApp:
             
             # Update stylist agent if needed
             if not hasattr(session, 'stylist_agent') or not session.stylist_agent:
+                # Create a new agent using the CAMEL service
+                memory = await self.camel_service.setup_memory(
+                    memory_setup_func=self.memory_setup_func,
+                    user_id=user_id,
+                    neo4j_client=self.product_kg
+                )
+                
+                session.memory = memory
+                
                 # Create a new agent
                 stylist_agent = await create_stylist_agent_async(
-                    memory=session.memory
+                    memory=memory
                 )
                 session.stylist_agent = stylist_agent
                 logger.info("Created stylist agent for new session")
@@ -304,11 +319,13 @@ class EnhancedAIStylistApp:
                 session = await self.chat_manager.get_or_create_session(session_id=session_id)
                 
                 if not hasattr(session, 'stylist_agent') or not session.stylist_agent:
-                    # Create a new agent if needed
-                    memory = await setup_stylist_memory_async(
+                    # Create a new agent if needed using AsyncCAMELService
+                    memory = await self.camel_service.setup_memory(
+                        memory_setup_func=self.memory_setup_func,
                         user_id=session.user_id if hasattr(session, 'user_id') else None,
                         neo4j_client=self.product_kg
                     )
+                    
                     stylist_agent = await create_stylist_agent_async(memory)
                     session.stylist_agent = stylist_agent
                     session.memory = memory
@@ -793,6 +810,9 @@ class EnhancedAIStylistApp:
             # Close Neo4j connection
             if hasattr(self.product_kg, 'close'):
                 await self.product_kg.close()
+            
+            # Close CAMEL service
+            await self.camel_service.close()
             
             # Clean up enhanced recommender resources
             if hasattr(self, 'enhanced_recommender_manager'):
