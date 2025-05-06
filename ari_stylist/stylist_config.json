@@ -1,0 +1,30 @@
+{
+  "known_users": {
+    "0d675dbe-e409-417e-ade4-17a6cb347ff5": {
+      "name": "leo",
+      "created_at": "2025-05-06T06:03:57.697010",
+      "last_used": "2025-05-06T06:15:01.883104",
+      "sessions": [
+        {
+          "id": "cbbe5c51-8c72-49ae-bd7a-564a02bb7487",
+          "created_at": "2025-05-06T06:04:14.947872",
+          "last_active": "2025-05-06T06:16:47.463083"
+        }
+      ]
+    },
+    "4d3451d3-a12f-40f7-8c53-5b15bb4136a1": {
+      "name": "User-4d3451",
+      "created_at": "2025-05-06T06:13:27.299265",
+      "last_used": "2025-05-06T06:13:27.299277",
+      "sessions": [
+        {
+          "id": "0767843d-a795-49a0-8650-8490ecfabc0c",
+          "created_at": "2025-05-06T06:13:40.181218",
+          "last_active": "2025-05-06T06:14:25.304050"
+        }
+      ]
+    }
+  },
+  "default_user_id": "0d675dbe-e409-417e-ade4-17a6cb347ff5",
+  "last_session": null
+}
