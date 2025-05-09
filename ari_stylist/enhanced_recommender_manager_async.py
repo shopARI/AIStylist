@@ -13,7 +13,7 @@ from typing import Dict, List, Any, Optional, Tuple
 # Import the recommender systems
 from multi_cluster_recommender import MultiClusterRecommender
 from hybrid_visual_recommender import HybridVisualRecommender
-from rfm_apriori_recommender import RFMAprioriRecommender
+from rfm_apriori_recommender_async import RFMAprioriRecommenderAsync
 from memory_rag_recommender import MemoryRAGRecommender
 from ensemble_recommender import EnsembleRecommender
 
@@ -142,24 +142,23 @@ class EnhancedRecommenderManagerAsync:
             logger.error(f"Error creating HybridVisualRecommender: {e}")
             return None
     
-    def create_rfm_apriori_recommender(self) -> Optional[RFMAprioriRecommender]:
-        """
-        Create a RFMAprioriRecommender.
+    def create_rfm_apriori_recommender(self) -> Optional[RFMAprioriRecommenderAsync]:
+        """Create a RFMAprioriRecommenderAsync.
         
         Returns:
             RFMAprioriRecommender instance or None
         """
         try:
-            recommender = RFMAprioriRecommender(
+            recommender = RFMAprioriRecommenderAsync(
                 product_kg=self.product_kg,
                 memory_setup_func=self.memory_setup_func
             )
             
-            logger.info("Created RFMAprioriRecommender")
+            logger.info("Created RFMAprioriRecommenderAsync")
             return recommender
             
         except Exception as e:
-            logger.error(f"Error creating RFMAprioriRecommender: {e}")
+            logger.error(f"Error creating RFMAprioriRecommenderAsync: {e}")
             return None
     
     def create_memory_rag_recommender(self) -> Optional[MemoryRAGRecommender]:
