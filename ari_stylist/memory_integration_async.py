@@ -751,9 +751,13 @@ async def add_user_preference_to_memory_async(
         }
         
         # Add to memory as system message - FIXED for CAMEL-AI 0.2.43
+        # Create an assistant message but override the role to system
         record = MemoryRecord(
-            content=content,  # Use content directly instead of creating a message
-            role_at_backend=OpenAIBackendRole.SYSTEM,
+            message=BaseMessage.make_assistant_message(
+                role_name="System",  # Use "System" as role name
+                content=content,
+            ),
+            role_at_backend=OpenAIBackendRole.SYSTEM,  # This ensures it's treated as a system message
             metadata=metadata,
         )
         
@@ -883,9 +887,13 @@ async def add_product_interaction_to_memory_async(
         }
         
         # Add to memory as system message - FIXED for CAMEL-AI 0.2.43
+        # Create an assistant message but override the role to system
         record = MemoryRecord(
-            content=content,  # Use content directly instead of creating a message
-            role_at_backend=OpenAIBackendRole.SYSTEM,
+            message=BaseMessage.make_assistant_message(
+                role_name="System",  # Use "System" as role name
+                content=content,
+            ),
+            role_at_backend=OpenAIBackendRole.SYSTEM,  # This ensures it's treated as a system message
             metadata=metadata,
         )
         
@@ -1012,4 +1020,3 @@ async def optimize_memory_async(
     except Exception as e:
         logger.error(f"Error optimizing memory: {e}", exc_info=True)
         return False
-    
