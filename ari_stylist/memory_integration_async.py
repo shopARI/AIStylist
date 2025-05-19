@@ -927,6 +927,9 @@ async def add_product_interaction_to_memory_async(
                 // Ensure the user exists
                 MERGE (u:User {id: $user_id})
                 
+                // Pass the user node to the next clause
+                WITH u
+                
                 // Find the product
                 MATCH (p:Product {id: $product_id})
                 
