@@ -750,12 +750,9 @@ async def add_user_preference_to_memory_async(
             "timestamp": datetime.datetime.now().isoformat()
         }
         
-        # Add to memory as system message
+        # Add to memory as system message - FIXED for CAMEL-AI 0.2.43
         record = MemoryRecord(
-            message=BaseMessage.make_system_message(
-                role_name="System",
-                content=content,
-            ),
+            content=content,  # Use content directly instead of creating a message
             role_at_backend=OpenAIBackendRole.SYSTEM,
             metadata=metadata,
         )
@@ -885,12 +882,9 @@ async def add_product_interaction_to_memory_async(
             "tags": product.get("tags", [])
         }
         
-        # Add to memory as system message
+        # Add to memory as system message - FIXED for CAMEL-AI 0.2.43
         record = MemoryRecord(
-            message=BaseMessage.make_system_message(
-                role_name="System",
-                content=content,
-            ),
+            content=content,  # Use content directly instead of creating a message
             role_at_backend=OpenAIBackendRole.SYSTEM,
             metadata=metadata,
         )
@@ -1018,3 +1012,4 @@ async def optimize_memory_async(
     except Exception as e:
         logger.error(f"Error optimizing memory: {e}", exc_info=True)
         return False
+    
