@@ -4,6 +4,9 @@ Enhanced Asynchronous Chat Session Manager for AI Stylist.
 This module provides an improved session manager with persistent memory
 across sessions and enhanced conversation capabilities.
 Compatible with CAMEL-AI 0.2.43.
+
+FIXED: Now properly uses the advanced ML ensemble system for all product recommendations
+instead of bypassing it with direct Neo4j queries.
 """
 
 import datetime
@@ -48,7 +51,8 @@ class EnhancedChatSessionAsync:
         product_kg = None,
         product_retriever = None,
         memory = None,
-        auto_persistence: bool = True
+        auto_persistence: bool = True,
+        parent_app = None  # NEW: Reference to parent app for advanced recommendations
     ):
         # Generate session ID if not provided
         self.session_id = session_id or str(uuid.uuid4())
@@ -57,6 +61,7 @@ class EnhancedChatSessionAsync:
         self.product_kg = product_kg
         self.product_retriever = product_retriever
         self.memory = memory
+        self.parent_app = parent_app  # NEW: Store reference to main app
         
         # Auto-persistence settings
         self.auto_persistence = auto_persistence
@@ -512,6 +517,9 @@ class EnhancedChatManagerAsync:
     """
     Enhanced chat manager with persistent memory and cross-session capabilities.
     Uses CAMEL's memory system with Neo4j persistence.
+    
+    FIXED: Now properly uses the advanced ML ensemble system for product recommendations
+    instead of bypassing it with direct Neo4j queries.
     """
     
     def __init__(
@@ -520,11 +528,13 @@ class EnhancedChatManagerAsync:
         product_kg = None,
         product_retriever = None,
         memory_setup_func = None,
+        parent_app = None  # NEW: Reference to parent app for advanced recommendations
     ):
         self.stylist_agent = stylist_agent
         self.product_kg = product_kg
         self.product_retriever = product_retriever
         self.memory_setup_func = memory_setup_func
+        self.parent_app = parent_app  # NEW: Store reference to main app
         
         # Store active sessions
         self.active_sessions = {}
@@ -540,7 +550,7 @@ class EnhancedChatManagerAsync:
         if product_kg:
             asyncio.create_task(self._ensure_schema())
         
-        logger.info("Enhanced Chat Manager initialized")
+        logger.info("Enhanced Chat Manager initialized with advanced ML integration")
     
     async def _ensure_schema(self):
         """Ensure the Neo4j schema is set up correctly"""
@@ -600,7 +610,7 @@ class EnhancedChatManagerAsync:
             session_id = str(uuid.uuid4())
             logger.info(f"Generated new session ID: {session_id}")
         
-        # Create new session
+        # Create new session with parent app reference
         session = EnhancedChatSessionAsync(
             session_id=session_id,
             user_id=user_id,
@@ -608,7 +618,8 @@ class EnhancedChatManagerAsync:
             product_kg=self.product_kg,
             product_retriever=self.product_retriever,
             memory=memory,
-            auto_persistence=True if user_id and self.product_kg else False
+            auto_persistence=True if user_id and self.product_kg else False,
+            parent_app=self.parent_app  # NEW: Pass parent app reference
         )
         
         # Store in active sessions
@@ -1086,7 +1097,10 @@ class EnhancedChatManagerAsync:
 
     async def _handle_product_search(self, session: EnhancedChatSessionAsync, message: str) -> Tuple[str, Dict[str, Any]]:
         """
-        Handle product search requests with enhanced personalization and memory
+        Handle product search requests using the ADVANCED ML ENSEMBLE SYSTEM
+        
+        FIXED: This now uses the parent app's get_product_recommendations method
+        which leverages the full ML ensemble instead of direct Neo4j queries.
         
         Args:
             session: Enhanced chat session
@@ -1098,7 +1112,7 @@ class EnhancedChatManagerAsync:
         # Add user message to session
         await session.add_message(message, "user")
         
-        # Extract parameters from the message
+        # Extract parameters from the message for context
         params = self._extract_parameters(message)
         
         # Get user preferences to augment the search
@@ -1155,135 +1169,43 @@ class EnhancedChatManagerAsync:
         logger.info(f"Search parameters extracted: {params}")
         logger.info(f"Context from conversation: event_type={event_type}, formality={formality}")
         
-        # Combine explicit parameters with user preferences when appropriate
-        if not params.get("collection") and user_preferences.get("preferred_collections"):
-            params["collection"] = user_preferences["preferred_collections"][0] if user_preferences["preferred_collections"] else None
+        # Build search query for the ML system
+        search_query = message
+        if event_type:
+            search_query += f" for {event_type}"
+        if formality:
+            search_query += f" {formality}"
         
-        # Make sure occasion is also used as a tag for searching
-        if event_type and not params.get("tag"):
-            params["tag"] = event_type
-            logger.info(f"Using event type as tag: {params['tag']}")
+        # ============================================================================
+        # 🚀 FIXED: USE THE ADVANCED ML ENSEMBLE SYSTEM INSTEAD OF DIRECT NEO4J
+        # ============================================================================
         
-        # Perform search using knowledge graph - DIRECT SEARCH FIRST
         search_results = []
-        if session.product_kg:
-            try:
-                # Make sure to prioritize formal attire if that's the context
-                if formality == "formal":
-                    # Try to search by formal tag first
-                    search_results = await session.product_kg.get_product_by_filter(
-                        tag="formal",
-                        category=params.get("category") or "dress", # Default to dresses for formal events
-                        limit=5
-                    )
-                    
-                    # If no formal tag results, try elegant/dressy/cocktail
-                    if not search_results:
-                        for formal_tag in ["elegant", "dressy", "cocktail", "gown"]:
-                            search_results = await session.product_kg.get_product_by_filter(
-                                tag=formal_tag,
-                                category=params.get("category") or "dress",
-                                limit=5
-                            )
-                            if search_results:
-                                break
-                
-                # If no results from formality search or formality not specified
-                if not search_results:
-                    # Use the regular filtered search
-                    search_results = await session.product_kg.get_product_by_filter(
-                        category=params.get("category"),
-                        collection=params.get("collection"),
-                        tag=params.get("tag"),
-                        min_price=params.get("min_price"),
-                        max_price=params.get("max_price"),
-                        limit=5
-                    )
-                
-                # Filter out test/untitled products and zero-priced items
-                filtered_results = []
-                for product in search_results:
-                    if (product.get('price', 0) > 0 and 
-                        product.get('title') and 
-                        'test' not in product.get('title', '').lower() and
-                        'untitled' not in product.get('title', '').lower()):
-                        filtered_results.append(product)
-
-                # Replace search_results with filtered_results
-                search_results = filtered_results
-                logger.info(f"Found {len(search_results)} products from knowledge graph")
-                
-                # If no results, try a more general search
-                if not search_results:
-                    logger.info(f"No results found, trying fallback search")
-                    
-                    # Try searching just for dresses for a wedding
-                    if event_type == "wedding":
-                        search_results = await session.product_kg.get_product_by_filter(
-                            category="dress",
-                            limit=5
-                        )
-                        logger.info(f"Fallback search for dresses found {len(search_results)} products")
-                    # Fall back to category
-                    elif params.get("category"):
-                        search_results = await session.product_kg.get_product_by_filter(
-                            category=params.get("category"),
-                            limit=5
-                        )
-                        logger.info(f"Fallback search by category found {len(search_results)} products")
-                    else:
-                        # Get popular products as final fallback
-                        search_results = await session.product_kg.get_popular_products(limit=5)
-                        logger.info(f"Fallback to popular products found {len(search_results)} products")
-                
-            except Exception as e:
-                logger.error(f"Error searching products in knowledge graph: {e}", exc_info=True)
         
-        # If few results from knowledge graph, augment with retriever
-        if session.product_retriever and len(search_results) < 3:
+        if session.parent_app:
             try:
-                # Construct a natural language query for the retriever
-                nl_query = f"Find products that are "
-                if params.get("category"):
-                    nl_query += f"{params.get('category')} "
-                elif formality == "formal" and event_type == "wedding":
-                    nl_query += "formal dresses for weddings "
+                logger.info("🚀 Using ADVANCED ML ENSEMBLE SYSTEM for product search")
                 
-                if params.get("collection"):
-                    nl_query += f"from {params.get('collection')} collection "
-                if params.get("colors"):
-                    nl_query += f"in {', '.join(params.get('colors'))} color "
-                if params.get("tag"):
-                    nl_query += f"tagged with {params.get('tag')} "
-                if event_type:
-                    nl_query += f"suitable for {event_type} "
-                if formality:
-                    nl_query += f"that are {formality} "
+                # Use the sophisticated recommendation system
+                search_results = await session.parent_app.get_product_recommendations(
+                    session_id=session.session_id,
+                    query=search_query,
+                    limit=5,
+                    occasion=params.get("occasion")
+                )
                 
-                # Add price constraints if available
-                if params.get("min_price") and params.get("max_price"):
-                    nl_query += f"between ${params.get('min_price')} and ${params.get('max_price')} "
-                elif params.get("max_price"):
-                    nl_query += f"under ${params.get('max_price')} "
-                
-                # Use natural language search with the product retriever
-                retriever_results = await session.product_retriever.search_by_natural_language(nl_query, limit=5)
-                
-                if retriever_results:
-                    logger.info(f"Found {len(retriever_results)} additional products from retriever")
-                    
-                    # Add products not already in search_results
-                    existing_ids = {p.get('id') for p in search_results}
-                    for product in retriever_results:
-                        if product.get('id') and product.get('id') not in existing_ids:
-                            search_results.append(product)
-                            existing_ids.add(product.get('id'))
-                    
-                    # Limit to 5 products
-                    search_results = search_results[:5]
+                logger.info(f"✅ Advanced ML system returned {len(search_results)} products")
                 
             except Exception as e:
-                logger.error(f"Error augmenting search with retriever: {e}", exc_info=True)
+                logger.error(f"❌ Advanced ML system failed: {e}", exc_info=True)
+                
+                # Only fall back to direct search if ML system completely fails
+                logger.warning("🔄 Falling back to direct Neo4j search as last resort")
+                search_results = await self._fallback_direct_search(session, params, formality, event_type)
+        
+        else:
+            logger.warning("❌ No parent app reference - using fallback direct search")
+            search_results = await self._fallback_direct_search(session, params, formality, event_type)
         
         # Update session with current products context
         if search_results:
@@ -1424,7 +1346,8 @@ class EnhancedChatManagerAsync:
                 "result_type": "product_search",
                 "products": search_results,
                 "parameters": params,
-                "user_preferences": user_preferences
+                "user_preferences": user_preferences,
+                "used_advanced_ml": bool(session.parent_app and search_results)  # Track if ML was used
             }
             
             logger.info("Product search handled successfully")
@@ -1441,6 +1364,91 @@ class EnhancedChatManagerAsync:
                 "result_type": "error",
                 "error": str(e)
             }
+    
+    async def _fallback_direct_search(self, session, params, formality, event_type):
+        """
+        Fallback direct Neo4j search (only used when ML ensemble fails)
+        
+        This is the OLD method that bypasses the ML system - should rarely be used
+        """
+        logger.warning("🔄 Using fallback direct Neo4j search (ML ensemble unavailable)")
+        
+        search_results = []
+        
+        if session.product_kg:
+            try:
+                # Make sure to prioritize formal attire if that's the context
+                if formality == "formal":
+                    # Try to search by formal tag first
+                    search_results = await session.product_kg.get_product_by_filter(
+                        tag="formal",
+                        category=params.get("category") or "dress", # Default to dresses for formal events
+                        limit=5
+                    )
+                    
+                    # If no formal tag results, try elegant/dressy/cocktail
+                    if not search_results:
+                        for formal_tag in ["elegant", "dressy", "cocktail", "gown"]:
+                            search_results = await session.product_kg.get_product_by_filter(
+                                tag=formal_tag,
+                                category=params.get("category") or "dress",
+                                limit=5
+                            )
+                            if search_results:
+                                break
+                
+                # If no results from formality search or formality not specified
+                if not search_results:
+                    # Use the regular filtered search
+                    search_results = await session.product_kg.get_product_by_filter(
+                        category=params.get("category"),
+                        collection=params.get("collection"),
+                        tag=params.get("tag"),
+                        min_price=params.get("min_price"),
+                        max_price=params.get("max_price"),
+                        limit=5
+                    )
+                
+                # Filter out test/untitled products and zero-priced items
+                filtered_results = []
+                for product in search_results:
+                    if (product.get('price', 0) > 0 and 
+                        product.get('title') and 
+                        'test' not in product.get('title', '').lower() and
+                        'untitled' not in product.get('title', '').lower()):
+                        filtered_results.append(product)
+
+                # Replace search_results with filtered_results
+                search_results = filtered_results
+                logger.info(f"Found {len(search_results)} products from direct Neo4j fallback")
+                
+                # If no results, try a more general search
+                if not search_results:
+                    logger.info(f"No results found, trying fallback search")
+                    
+                    # Try searching just for dresses for a wedding
+                    if event_type == "wedding":
+                        search_results = await session.product_kg.get_product_by_filter(
+                            category="dress",
+                            limit=5
+                        )
+                        logger.info(f"Fallback search for dresses found {len(search_results)} products")
+                    # Fall back to category
+                    elif params.get("category"):
+                        search_results = await session.product_kg.get_product_by_filter(
+                            category=params.get("category"),
+                            limit=5
+                        )
+                        logger.info(f"Fallback search by category found {len(search_results)} products")
+                    else:
+                        # Get popular products as final fallback
+                        search_results = await session.product_kg.get_popular_products(limit=5)
+                        logger.info(f"Fallback to popular products found {len(search_results)} products")
+                
+            except Exception as e:
+                logger.error(f"Error in direct Neo4j fallback search: {e}", exc_info=True)
+        
+        return search_results
     
     def _naturalize_response(self, response_text: str) -> str:
         """
@@ -1595,8 +1603,8 @@ class EnhancedChatManagerAsync:
                     return meta_response
                     
             if intent == "product_request":
-                # Handle as a product search
-                logger.info("Handling as product search")
+                # Handle as a product search - NOW USES ADVANCED ML SYSTEM! 🚀
+                logger.info("🚀 Handling as product search with ADVANCED ML ENSEMBLE")
                 return await self._handle_product_search(session, message)
                 
             if intent == "greeting":

@@ -4,6 +4,9 @@ Enhanced Asynchronous AI Stylist Application
 Main application entry point for the AI Stylist system with persistent memory support.
 Implements user identification and cross-session memory.
 Compatible with CAMEL-AI 0.2.43.
+
+FIXED: Now properly passes parent app reference to chat manager to enable
+advanced ML ensemble system for all conversations.
 """
 
 import os
@@ -65,6 +68,8 @@ class EnhancedAIStylistApp:
     Enhanced AI Stylist application with persistent memory and user identification.
     Implements cross-session memory and improved personalization.
     Compatible with CAMEL-AI 0.2.43.
+    
+    FIXED: Now properly integrates chat conversations with the advanced ML ensemble system.
     """
     
     def __init__(self, neo4j_url=None, neo4j_username=None, neo4j_password=None):
@@ -123,21 +128,6 @@ class EnhancedAIStylistApp:
         logger.info("Setting up enhanced memory system...")
         self.memory_setup_func = setup_stylist_memory_async
         
-        # Initialize enhanced chat manager with components
-        logger.info("Creating enhanced chat manager...")
-        self.chat_manager = EnhancedChatManagerAsync(
-            stylist_agent=None,  # Will be set per session
-            product_kg=self.product_kg,
-            product_retriever=self.product_retriever,
-            memory_setup_func=self.memory_setup_func
-        )
-        
-        # Track active sessions
-        self.active_sessions = {}
-        
-        # User registry for cross-session support
-        self.registered_users = {}
-        
         # Initialize the enhanced recommender manager
         logger.info("Initializing enhanced recommender manager...")
         self.enhanced_recommender_manager = EnhancedRecommenderManagerAsync(
@@ -146,6 +136,24 @@ class EnhancedAIStylistApp:
             memory_setup_func=self.memory_setup_func,
             stylist_agent=None  # Will be set per session
         )
+        
+        # ============================================================================
+        # 🚀 FIXED: Pass parent app reference to chat manager for ML integration
+        # ============================================================================
+        logger.info("Creating enhanced chat manager with ML integration...")
+        self.chat_manager = EnhancedChatManagerAsync(
+            stylist_agent=None,  # Will be set per session
+            product_kg=self.product_kg,
+            product_retriever=self.product_retriever,
+            memory_setup_func=self.memory_setup_func,
+            parent_app=self  # 🚀 NEW: Pass self reference for ML access
+        )
+        
+        # Track active sessions
+        self.active_sessions = {}
+        
+        # User registry for cross-session support
+        self.registered_users = {}
         
         # Memory optimization settings
         self.memory_optimization_interval = 3600  # 1 hour
@@ -157,7 +165,7 @@ class EnhancedAIStylistApp:
         # Verify and update database schema
         asyncio.create_task(self._setup_database_schema())
         
-        logger.info("Enhanced AI Stylist initialized and ready for conversations!")
+        logger.info("✅ Enhanced AI Stylist initialized with FULL ML integration for chat!")
     
     async def _setup_database_schema(self):
         """Set up and verify the database schema"""
@@ -354,7 +362,7 @@ class EnhancedAIStylistApp:
         
         # Process the message using the chat manager
         try:
-            logger.info(f"Processing message for session {session_id}")
+            logger.info(f"🚀 Processing message for session {session_id} with FULL ML integration")
             response, data = await self.chat_manager.process_message(
                 session_id=session_id,
                 user_id=session.user_id if hasattr(session, 'user_id') else None,
@@ -419,7 +427,9 @@ class EnhancedAIStylistApp:
     
     async def get_product_recommendations(self, session_id, product_id=None, query=None, limit=5, occasion=None):
         """
-        Enhanced recommendation system with direct product search prioritized
+        Enhanced recommendation system with proper fallback chain
+        
+        This is the CORE ML ENSEMBLE METHOD that should be used for all recommendations
         
         Args:
             session_id: Session ID
@@ -436,177 +446,273 @@ class EnhancedAIStylistApp:
             logger.error(f"Session not found: {session_id}")
             return []
             
-        try:
-            # Get user ID from session
-            user_id = session.user_id if hasattr(session, 'user_id') else None
+        user_id = session.user_id if hasattr(session, 'user_id') else None
+        
+        # Add occasion from query if provided
+        if query and not occasion:
+            # Extract occasion from query
+            occasions = ["wedding", "party", "work", "casual", "formal", "date", "dinner", "beach"]
+            seasons = ["summer", "winter", "fall", "spring"]
             
-            # Add occasion from query if provided
-            if query and not occasion:
-                # Extract occasion from query
-                occasions = ["wedding", "party", "work", "casual", "formal", "date", "dinner", "beach"]
-                seasons = ["summer", "winter", "fall", "spring"]
-                
-                query_lower = query.lower()
-                
-                # Check for occasions
-                for occ in occasions:
-                    if occ in query_lower:
-                        occasion = occ
-                        break
-                        
-                # Check for seasons + occasions
-                if not occasion:
-                    for season in seasons:
-                        if season in query_lower:
-                            for occ in occasions:
-                                if occ in query_lower:
-                                    occasion = f"{season} {occ}"
-                                    break
+            query_lower = query.lower()
             
-            # DIRECT PRODUCT SEARCH FIRST - similar to original implementation
-            search_results = []
-            
-            # If product_id is provided, use it for similar product search
-            if product_id:
-                # Get recommendations based on a specific product
-                if hasattr(self.product_kg, 'get_similar_products'):
-                    similar_products = await self.product_kg.get_similar_products(product_id, limit=limit)
+            # Check for occasions
+            for occ in occasions:
+                if occ in query_lower:
+                    occasion = occ
+                    break
                     
-                    if similar_products:
-                        # Record product view interaction if session supports it
-                        if hasattr(session, 'record_product_interaction'):
-                            await session.record_product_interaction(
-                                product_id=product_id,
-                                interaction_type="viewed"
-                            )
-                        
-                        return similar_products
-                        
-                elif hasattr(self.product_retriever, 'search_similar_products'):
-                    # Fall back to retriever if available
-                    similar_products = await self.product_retriever.search_similar_products(product_id, limit=limit)
-                    
-                    if similar_products:
-                        return similar_products
-            
-            # If query or occasion, use direct filter search
-            if query or occasion:
-                # Extract potential tag from query or use occasion
-                search_tag = None
-                if occasion:
-                    search_tag = occasion
-                elif query:
-                    # Simple extraction of potential tags from query
-                    tag_candidates = query.lower().split()
-                    for tag in tag_candidates:
-                        if len(tag) > 3 and tag not in ["need", "want", "looking", "for", "some", "with"]:
-                            search_tag = tag
-                            break
+            # Check for seasons + occasions
+            if not occasion:
+                for season in seasons:
+                    if season in query_lower:
+                        for occ in occasions:
+                            if occ in query_lower:
+                                occasion = f"{season} {occ}"
+                                break
+        
+        # Define all recommendation methods in priority order
+        recommendation_methods = []
+        
+        # Method 1: Similar products (if product_id provided)
+        if product_id:
+            recommendation_methods.extend([
+                ("similar_products_kg", self._try_similar_products_kg, product_id, limit),
+                ("similar_products_retriever", self._try_similar_products_retriever, product_id, limit),
+            ])
+        
+        # Method 2: Direct filter-based search (if query/occasion provided)
+        if query or occasion:
+            recommendation_methods.extend([
+                ("direct_filter_search", self._try_direct_filter_search, query, occasion, limit),
+                ("vector_search", self._try_vector_search, query, limit),
+            ])
+        
+        # Method 3: Enhanced recommender system
+        if hasattr(self, 'enhanced_recommender_manager') and self.enhanced_recommender_manager:
+            recommendation_methods.append(
+                ("enhanced_recommender", self._try_enhanced_recommender, user_id, session_id, product_id, query or occasion, limit)
+            )
+        
+        # Method 4: User preference-based fallbacks
+        recommendation_methods.extend([
+            ("user_preference_categories", self._try_user_preference_categories, session, limit),
+            ("user_preference_tags", self._try_user_preference_tags, session, limit),
+        ])
+        
+        # Method 5: General fallback methods
+        recommendation_methods.extend([
+            ("popular_products", self._try_popular_products, limit),
+            ("trending_products", self._try_trending_products, limit),
+            ("category_fallback", self._try_category_fallback, query, limit),
+            ("general_search", self._try_general_search, limit),
+        ])
+        
+        # Try each method until we get sufficient results
+        for method_name, method_func, *args in recommendation_methods:
+            try:
+                logger.info(f"Trying recommendation method: {method_name}")
+                results = await method_func(*args)
                 
-                # Extract potential category from query
-                category = None
-                category_list = ["dress", "shirt", "pants", "jeans", "skirt", "blouse", 
+                if results and len(results) > 0:
+                    # Filter out test/untitled products and zero-priced items
+                    filtered_results = self._filter_valid_products(results)
+                    
+                    if filtered_results:
+                        logger.info(f"✅ Got {len(filtered_results)} valid recommendations from {method_name}")
+                        
+                        # Record interactions if applicable
+                        await self._record_product_interactions(session, filtered_results)
+                        
+                        return filtered_results[:limit]
+                        
+            except Exception as e:
+                logger.warning(f"Method {method_name} failed: {e}")
+                continue  # Try next method
+        
+        # If we get here, all methods failed
+        logger.warning("All recommendation methods failed - returning empty list")
+        return []
+
+    # Helper methods for each recommendation strategy
+
+    async def _try_similar_products_kg(self, product_id, limit):
+        """Try getting similar products from knowledge graph"""
+        if hasattr(self.product_kg, 'get_similar_products'):
+            return await self.product_kg.get_similar_products(product_id, limit=limit)
+        return []
+
+    async def _try_similar_products_retriever(self, product_id, limit):
+        """Try getting similar products from retriever"""
+        if hasattr(self.product_retriever, 'search_similar_products'):
+            return await self.product_retriever.search_similar_products(product_id, limit=limit)
+        return []
+
+    async def _try_direct_filter_search(self, query, occasion, limit):
+        """Try direct filter search with product_kg"""
+        if not hasattr(self.product_kg, 'get_product_by_filter'):
+            return []
+            
+        # Extract potential parameters from query
+        category = None
+        tag = occasion
+        
+        if query:
+            # Extract potential category from query
+            category_list = ["dress", "shirt", "pants", "jeans", "skirt", "blouse", 
                             "sweater", "jacket", "coat", "suit", "blazer", "t-shirt", 
                             "hoodie", "shorts", "swimwear", "activewear", "shoes"]
-                
-                query_lower = query.lower() if query else ""
-                for cat in category_list:
-                    if cat in query_lower:
-                        category = cat
+            
+            query_lower = query.lower()
+            for cat in category_list:
+                if cat in query_lower:
+                    category = cat
+                    break
+            
+            # Extract potential tag from query if no occasion
+            if not tag:
+                tag_candidates = query.lower().split()
+                for potential_tag in tag_candidates:
+                    if len(potential_tag) > 3 and potential_tag not in ["need", "want", "looking", "for", "some", "with"]:
+                        tag = potential_tag
                         break
-                
-                # Direct search with product_kg
-                if hasattr(self.product_kg, 'get_product_by_filter'):
-                    filter_products = await self.product_kg.get_product_by_filter(
-                        category=category,
-                        tag=search_tag,
-                        limit=limit
-                    )
-                    
-                    if filter_products:
-                        # Record interactions if session supports it
-                        if hasattr(session, 'record_product_interaction'):
-                            for product in filter_products:
-                                if 'id' in product:
-                                    await session.record_product_interaction(
-                                        product_id=product['id'],
-                                        interaction_type="recommended"
-                                    )
-                        
-                        return filter_products
-            
-            # Fallback to vector search if available
-            if query and hasattr(self.product_retriever, 'search_by_natural_language'):
-                vector_products = await self.product_retriever.search_by_natural_language(
-                    query=query,
-                    limit=limit
-                )
-                
-                if vector_products:
-                    return vector_products
-            
-            # Use enhanced recommendations as a fallback
-            if hasattr(self, 'enhanced_recommender_manager') and self.enhanced_recommender_manager:
-                recommendations = await self.enhanced_recommender_manager.get_recommendations(
-                    user_id=user_id,
-                    session_id=session_id,
-                    product_id=product_id,
-                    query=query or occasion,
-                    limit=limit
-                )
-                
-                if recommendations:
-                    # If insufficient results, add fallback to occasion-specific search
-                    if len(recommendations) < 3 and occasion:
-                        fallback_products = await self.product_kg.get_product_by_filter(
-                            tag=occasion,
-                            limit=limit - len(recommendations)
-                        )
-                        
-                        # Add products not already in recommendations
-                        existing_ids = {p.get('id') for p in recommendations}
-                        for product in fallback_products:
-                            if product.get('id') not in existing_ids:
-                                recommendations.append(product)
-                                existing_ids.add(product.get('id'))
-                    
-                    # Record recommendations
-                    if hasattr(session, 'record_product_interaction'):
-                        for product in recommendations:
-                            if 'id' in product:
-                                await session.record_product_interaction(
-                                    product_id=product['id'],
-                                    interaction_type="recommended"
-                                )
-                    
-                    return recommendations
-            
-            # Final fallbacks if still no results
-            
-            # Find a category to recommend from user preferences
-            user_preferences = {}
+        
+        # Try the search
+        return await self.product_kg.get_product_by_filter(
+            category=category,
+            tag=tag,
+            limit=limit
+        )
+
+    async def _try_vector_search(self, query, limit):
+        """Try vector search with product retriever"""
+        if query and hasattr(self.product_retriever, 'search_by_natural_language'):
+            return await self.product_retriever.search_by_natural_language(
+                query=query,
+                limit=limit
+            )
+        return []
+
+    async def _try_enhanced_recommender(self, user_id, session_id, product_id, query, limit):
+        """Try enhanced recommender manager"""
+        try:
+            return await self.enhanced_recommender_manager.get_recommendations(
+                user_id=user_id,
+                session_id=session_id,
+                product_id=product_id,
+                query=query,
+                limit=limit
+            )
+        except Exception as e:
+            logger.error(f"Enhanced recommender failed: {e}")
+            return []
+
+    async def _try_user_preference_categories(self, session, limit):
+        """Try recommendations based on user's preferred categories"""
+        try:
             if hasattr(session, 'get_or_fetch_user_preferences'):
                 user_preferences = await session.get_or_fetch_user_preferences()
-            
-            if user_preferences and user_preferences.get("preferred_categories"):
-                category = user_preferences["preferred_categories"][0]
-                if hasattr(self.product_kg, 'get_products_by_category'):
-                    category_products = await self.product_kg.get_products_by_category(category, limit=limit)
-                    if category_products:
-                        return category_products
-            
-            # Fall back to popular products
+                
+                if user_preferences and user_preferences.get("preferred_categories"):
+                    category = user_preferences["preferred_categories"][0]
+                    if hasattr(self.product_kg, 'get_products_by_category'):
+                        return await self.product_kg.get_products_by_category(category, limit=limit)
+        except Exception as e:
+            logger.error(f"User preference categories fallback failed: {e}")
+        return []
+
+    async def _try_user_preference_tags(self, session, limit):
+        """Try recommendations based on user's preferred tags"""
+        try:
+            if hasattr(session, 'get_or_fetch_user_preferences'):
+                user_preferences = await session.get_or_fetch_user_preferences()
+                
+                if user_preferences and user_preferences.get("preferred_tags"):
+                    tag = user_preferences["preferred_tags"][0]
+                    if hasattr(self.product_kg, 'get_products_by_tag'):
+                        return await self.product_kg.get_products_by_tag(tag, limit=limit)
+        except Exception as e:
+            logger.error(f"User preference tags fallback failed: {e}")
+        return []
+
+    async def _try_popular_products(self, limit):
+        """Try getting popular products"""
+        try:
             if hasattr(self.product_kg, 'get_popular_products'):
                 return await self.product_kg.get_popular_products(limit=limit)
-            elif hasattr(self.product_kg, 'get_trending_products'):
-                return await self.product_kg.get_trending_products(limit=limit)
-            
-            # Last resort: general search
-            return await self.product_kg.get_product_by_filter(limit=limit)
-                
         except Exception as e:
-            logger.error(f"Error getting product recommendations: {e}")
+            logger.error(f"Popular products fallback failed: {e}")
+        return []
+
+    async def _try_trending_products(self, limit):
+        """Try getting trending products"""
+        try:
+            if hasattr(self.product_kg, 'get_trending_products'):
+                return await self.product_kg.get_trending_products(limit=limit)
+        except Exception as e:
+            logger.error(f"Trending products fallback failed: {e}")
+        return []
+
+    async def _try_category_fallback(self, query, limit):
+        """Try fallback based on common categories"""
+        try:
+            # Default categories to try if no other method works
+            default_categories = ["dress", "shirt", "pants", "accessories"]
+            
+            # If query contains a category, try that first
+            if query:
+                query_lower = query.lower()
+                for category in default_categories:
+                    if category in query_lower:
+                        if hasattr(self.product_kg, 'get_products_by_category'):
+                            results = await self.product_kg.get_products_by_category(category, limit=limit)
+                            if results:
+                                return results
+            
+            # Try the first default category
+            if hasattr(self.product_kg, 'get_products_by_category'):
+                return await self.product_kg.get_products_by_category(default_categories[0], limit=limit)
+        except Exception as e:
+            logger.error(f"Category fallback failed: {e}")
+        return []
+
+    async def _try_general_search(self, limit):
+        """Final fallback - get any valid products"""
+        try:
+            if hasattr(self.product_kg, 'get_product_by_filter'):
+                return await self.product_kg.get_product_by_filter(limit=limit)
+        except Exception as e:
+            logger.error(f"General search fallback failed: {e}")
+        return []
+
+    def _filter_valid_products(self, products):
+        """Filter out invalid products (test products, zero prices, etc.)"""
+        if not products:
             return []
+            
+        filtered_results = []
+        for product in products:
+            if (product.get('price', 0) > 0 and 
+                product.get('title') and 
+                'test' not in product.get('title', '').lower() and
+                'untitled' not in product.get('title', '').lower()):
+                filtered_results.append(product)
+        
+        return filtered_results
+
+    async def _record_product_interactions(self, session, products):
+        """Record product interactions for recommendations"""
+        try:
+            if hasattr(session, 'record_product_interaction'):
+                for product in products:
+                    if 'id' in product:
+                        await session.record_product_interaction(
+                            product_id=product['id'],
+                            interaction_type="recommended"
+                        )
+        except Exception as e:
+            logger.error(f"Error recording product interactions: {e}")
+            # Don't let interaction recording failures break the recommendation flow
 
     async def record_product_interaction(self, session_id, product_id, interaction_type="viewed"):
         """

@@ -561,6 +561,10 @@ async def get_stats(service: StylistServiceAsync = Depends(get_service)):
     """Get service statistics"""
     return await service.get_service_stats()
 
+# ============================================================================
+# FIXED RECOMMENDATIONS ENDPOINT WITH PROPER FALLBACK CHAIN
+# ============================================================================
+
 @app.post("/recommendations", response_model=Dict[str, Any])
 async def get_recommendations(
     session_id: str,
@@ -569,8 +573,15 @@ async def get_recommendations(
     limit: int = Query(5, ge=1, le=20),
     service: StylistServiceAsync = Depends(get_service)
 ):
-    """Get product recommendations"""
+    """Get product recommendations with comprehensive fallback chain"""
+    
+    # Track which method succeeded for logging/analytics
+    successful_method = None
+    recommendations = []
+    
+    # Method 1: Try full personalized recommendations
     try:
+        logger.info(f"Attempting personalized recommendations for session {session_id}")
         recommendations = await service.app.get_product_recommendations(
             session_id=session_id,
             product_id=product_id,
@@ -578,14 +589,211 @@ async def get_recommendations(
             limit=limit
         )
         
-        return {
-            "session_id": session_id,
-            "recommendations": recommendations,
-            "count": len(recommendations)
-        }
+        if recommendations:
+            successful_method = "personalized"
+            logger.info(f"Got {len(recommendations)} personalized recommendations")
+        
     except Exception as e:
-        logger.error(f"Error getting recommendations: {e}", exc_info=True)
-        raise HTTPException(status_code=500, detail=f"Server error: {str(e)}")
+        logger.warning(f"Personalized recommendations failed: {e}")
+        recommendations = []
+    
+    # Method 2: Try recommendations without session (if session was the problem)
+    if not recommendations and session_id:
+        try:
+            logger.info("Attempting non-personalized recommendations")
+            # Try to get recommendations without session-specific data
+            recommendations = await _get_non_personalized_recommendations(
+                service, product_id, query, limit
+            )
+            
+            if recommendations:
+                successful_method = "non_personalized"
+                logger.info(f"Got {len(recommendations)} non-personalized recommendations")
+                
+        except Exception as e:
+            logger.warning(f"Non-personalized recommendations failed: {e}")
+            recommendations = []
+    
+    # Method 3: Try direct database fallback (bypass app layer)
+    if not recommendations:
+        try:
+            logger.info("Attempting direct database recommendations")
+            recommendations = await _get_direct_database_recommendations(
+                service, product_id, query, limit
+            )
+            
+            if recommendations:
+                successful_method = "direct_database"
+                logger.info(f"Got {len(recommendations)} direct database recommendations")
+                
+        except Exception as e:
+            logger.warning(f"Direct database recommendations failed: {e}")
+            recommendations = []
+    
+    # Method 4: Try cached/static recommendations
+    if not recommendations:
+        try:
+            logger.info("Attempting cached/static recommendations")
+            recommendations = await _get_cached_recommendations(query, limit)
+            
+            if recommendations:
+                successful_method = "cached"
+                logger.info(f"Got {len(recommendations)} cached recommendations")
+                
+        except Exception as e:
+            logger.warning(f"Cached recommendations failed: {e}")
+            recommendations = []
+    
+    # Method 5: Final fallback - return minimal static data
+    if not recommendations:
+        logger.warning("All recommendation methods failed, using minimal fallback")
+        recommendations = _get_minimal_fallback_recommendations(limit)
+        successful_method = "minimal_fallback"
+    
+    # Return response with metadata about which method worked
+    return {
+        "session_id": session_id,
+        "recommendations": recommendations,
+        "count": len(recommendations),
+        "method": successful_method,
+        "personalized": successful_method == "personalized",
+        "fallback_used": successful_method != "personalized"
+    }
+
+# ============================================================================
+# HELPER FUNCTIONS FOR SERVICE-LEVEL FALLBACKS
+# ============================================================================
+
+async def _get_non_personalized_recommendations(service, product_id, query, limit):
+    """Get recommendations without session-specific personalization"""
+    try:
+        # Create a temporary session or use generic logic
+        if product_id and hasattr(service.app.product_kg, 'get_similar_products'):
+            return await service.app.product_kg.get_similar_products(product_id, limit)
+        
+        elif query and hasattr(service.app.product_retriever, 'search_by_natural_language'):
+            return await service.app.product_retriever.search_by_natural_language(query, limit)
+        
+        elif hasattr(service.app.product_kg, 'get_popular_products'):
+            return await service.app.product_kg.get_popular_products(limit)
+            
+    except Exception as e:
+        logger.error(f"Error in non-personalized recommendations: {e}")
+        raise
+
+async def _get_direct_database_recommendations(service, product_id, query, limit):
+    """Get recommendations by directly querying the database"""
+    try:
+        # Try direct Neo4j queries bypassing the app layer
+        if product_id:
+            # Direct similar products query
+            neo4j_query = """
+            MATCH (p:Product {id: $product_id})-[:IN_CATEGORY]->(c:Category)<-[:IN_CATEGORY]-(similar:Product)
+            WHERE similar.id <> $product_id
+            RETURN 
+                similar.id as id,
+                similar.title as title,
+                similar.price as price,
+                similar.description as description,
+                similar.images as images
+            ORDER BY similar.visited_num DESC
+            LIMIT $limit
+            """
+            
+            result = await service.app.product_kg.query(neo4j_query, {
+                "product_id": product_id,
+                "limit": limit
+            })
+            
+            if result:
+                return [_format_product_from_db_record(record) for record in result]
+        
+        # Direct popular products query
+        popular_query = """
+        MATCH (p:Product)
+        WHERE p.price > 0 AND p.title IS NOT NULL
+        RETURN 
+            p.id as id,
+            p.title as title,
+            p.price as price,
+            p.description as description,
+            p.images as images,
+            p.visited_num as visited_num
+        ORDER BY p.visited_num DESC
+        LIMIT $limit
+        """
+        
+        result = await service.app.product_kg.query(popular_query, {"limit": limit})
+        
+        if result:
+            return [_format_product_from_db_record(record) for record in result]
+            
+    except Exception as e:
+        logger.error(f"Error in direct database recommendations: {e}")
+        raise
+
+async def _get_cached_recommendations(query, limit):
+    """Get cached or pre-computed recommendations"""
+    try:
+        # This could be implemented with Redis, file cache, or static data
+        # For now, return empty - let other fallbacks handle it
+        # In a real implementation, you might have:
+        # - Recently popular items cached in Redis
+        # - Pre-computed recommendation lists
+        # - Static "featured" products
+        
+        # Return empty for now - the minimal fallback will handle this
+        return []
+        
+    except Exception as e:
+        logger.error(f"Error in cached recommendations: {e}")
+        raise
+
+def _get_minimal_fallback_recommendations(limit):
+    """Final fallback - return minimal generic data"""
+    # This is the absolute last resort - return generic placeholder
+    # In a real system, you might return:
+    # - Most popular items from a static list
+    # - Default "featured" products
+    # - Empty list with appropriate messaging
+    return [
+        {
+            "id": f"fallback_{i}",
+            "title": f"Featured Item {i+1}",
+            "price": 50.00,
+            "description": "Popular choice",
+            "images": [],
+            "categories": [],
+            "source": "minimal_fallback"
+        }
+        for i in range(min(limit, 3))  # Return up to 3 generic items
+    ]
+
+def _format_product_from_db_record(record):
+    """Format a database record into a product dictionary"""
+    return {
+        "id": record.get("id", ""),
+        "title": record.get("title", "Unknown Product"),
+        "price": record.get("price", 0.0),
+        "description": record.get("description", ""),
+        "images": _parse_images_string(record.get("images", "[]")),
+        "visited_num": record.get("visited_num", 0),
+        "source": "direct_database"
+    }
+
+def _parse_images_string(images_str):
+    """Parse images string from database"""
+    if not images_str:
+        return []
+    try:
+        import json
+        return json.loads(images_str.replace("'", '"'))
+    except:
+        return []
+
+# ============================================================================
+# OTHER ENDPOINTS (UNCHANGED)
+# ============================================================================
 
 @app.post("/interaction", response_model=Dict[str, Any])
 async def record_interaction(

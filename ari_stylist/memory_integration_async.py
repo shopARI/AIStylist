@@ -4,6 +4,8 @@ Enhanced Asynchronous Memory Integration for AI Stylist.
 This module provides advanced functions to set up and manage persistent memory 
 for the AI Stylist, using CAMEL's memory system with Neo4j persistence.
 Compatible with CAMEL-AI 0.2.43.
+
+FIXED: All coroutine/async issues resolved for proper memory operation.
 """
 
 import logging
@@ -47,20 +49,9 @@ async def setup_stylist_memory_async(
 ) -> LongtermAgentMemory:
     """
     Initialize the memory system for the AI stylist using CAMEL's LongtermAgentMemory.
-    Enhanced with persistence capabilities and user-specific loading.
-    
-    Args:
-        model_type: Type of model to use for token counting
-        token_limit: Maximum token limit for context window
-        user_id: Optional user ID for loading persistent memory
-        neo4j_client: Neo4j client for persistence operations
-        
-    Returns:
-        LongtermAgentMemory: Configured memory system for the stylist agent
+    FIXED: Properly handle async memory creation without coroutine issues.
     """
     logger.info(f"Setting up stylist memory with model type {model_type} and token limit {token_limit}")
-    
-    memory = None
     
     # Try to load existing memory if user_id is provided
     if user_id and neo4j_client:
@@ -75,10 +66,10 @@ async def setup_stylist_memory_async(
                 logger.info(f"No existing memory found for user {user_id}, creating new memory")
         except Exception as e:
             logger.error(f"Error loading memory for user {user_id}: {e}", exc_info=True)
-            # Continue to create new memory
     
-    # Define memory setup function
-    async def _setup_memory():
+    # FIXED: Create memory synchronously, not as coroutine
+    def _setup_memory_sync():
+        """Synchronous memory setup function for asyncio.to_thread"""
         try:
             # Set up token counter for the appropriate model
             token_counter = OpenAITokenCounter(model_type)
@@ -98,12 +89,12 @@ async def setup_stylist_memory_async(
                 
             return memory
         except Exception as e:
-            logger.error(f"Error in _setup_memory: {e}", exc_info=True)
+            logger.error(f"Error in _setup_memory_sync: {e}", exc_info=True)
             return None
     
-    # Run memory setup in thread pool
+    # Run memory setup in thread pool with SYNC function
     try:
-        memory = await asyncio.to_thread(_setup_memory)
+        memory = await asyncio.to_thread(_setup_memory_sync)
         
         if not memory:
             logger.error("Failed to create memory")
@@ -117,15 +108,16 @@ async def setup_stylist_memory_async(
         try:
             logger.info("Attempting to create minimal fallback memory")
             
-            # Run in thread pool to avoid blocking
-            minimal_memory = await asyncio.to_thread(
-                lambda: LongtermAgentMemory(
+            # FIXED: Use sync function for fallback too
+            def _minimal_memory_sync():
+                return LongtermAgentMemory(
                     context_creator=ScoreBasedContextCreator(
                         token_counter=OpenAITokenCounter(ModelType.GPT_3_5_TURBO),
                         token_limit=512,
                     )
                 )
-            )
+            
+            minimal_memory = await asyncio.to_thread(_minimal_memory_sync)
             
             # Add user_id to metadata if provided
             if user_id and minimal_memory:
@@ -144,52 +136,67 @@ class MemoryState:
     async def serialize_memory(memory: LongtermAgentMemory) -> Dict[str, Any]:
         """
         Serialize a CAMEL memory instance for storage.
-        
-        Args:
-            memory: LongtermAgentMemory instance
-            
-        Returns:
-            Dictionary with serialized memory data
+        FIXED: Handle memory object properly without coroutine issues.
         """
         if not memory:
             logger.warning("Cannot serialize memory: memory is None")
             return {}
+        
+        # FIXED: Check if memory is a coroutine (it shouldn't be)
+        if asyncio.iscoroutine(memory):
+            logger.error("Memory is still a coroutine - this should not happen")
+            return {}
             
         try:
-            # Extract chat history records
-            chat_history = {}
-            
-            if hasattr(memory, 'chat_history_block') and hasattr(memory.chat_history_block, 'memory'):
-                for record_id, record in memory.chat_history_block.memory.items():
-                    if hasattr(record, 'message') and hasattr(record.message, 'content'):
-                        role = "user" if record.role_at_backend == OpenAIBackendRole.USER else "assistant"
-                        chat_history[record_id] = {
-                            "role": role,
-                            "content": record.message.content,
-                            "timestamp": datetime.datetime.now().isoformat(),
-                            "metadata": record.metadata if hasattr(record, 'metadata') else {}
-                        }
-            
-            # Extract vector records if available
-            vector_records = []
-            
-            if hasattr(memory, 'vector_db_block') and hasattr(memory.vector_db_block, 'storage'):
+            # FIXED: Use sync function for thread pool
+            def _serialize_memory_sync(mem):
                 try:
-                    # Note: This is a simplification as direct access to records might not be available
-                    # In a production system, we would implement a more robust extraction method
-                    pass
+                    # Extract chat history records
+                    chat_history = {}
+                    
+                    if hasattr(mem, 'chat_history_block') and hasattr(mem.chat_history_block, 'memory'):
+                        for record_id, record in mem.chat_history_block.memory.items():
+                            if hasattr(record, 'message') and hasattr(record.message, 'content'):
+                                role = "user" if record.role_at_backend == OpenAIBackendRole.USER else "assistant"
+                                chat_history[record_id] = {
+                                    "role": role,
+                                    "content": record.message.content,
+                                    "timestamp": datetime.datetime.now().isoformat(),
+                                    "metadata": record.metadata if hasattr(record, 'metadata') else {}
+                                }
+                    
+                    # Extract vector records if available
+                    vector_records = []
+                    
+                    if hasattr(mem, 'vector_db_block') and hasattr(mem.vector_db_block, 'storage'):
+                        try:
+                            # Note: This is a simplification as direct access to records might not be available
+                            # In a production system, we would implement a more robust extraction method
+                            pass
+                        except Exception as e:
+                            logger.error(f"Error extracting vector records: {e}", exc_info=True)
+                    
+                    # Create the serialized memory structure
+                    serialized = {
+                        "chat_history": chat_history,
+                        "vector_records": vector_records,
+                        "serialized_at": datetime.datetime.now().isoformat(),
+                        "version": "1.0"
+                    }
+                    
+                    return serialized
                 except Exception as e:
-                    logger.error(f"Error extracting vector records: {e}", exc_info=True)
+                    logger.error(f"Error in _serialize_memory_sync: {e}", exc_info=True)
+                    return {}
             
-            # Create the serialized memory structure
-            serialized = {
-                "chat_history": chat_history,
-                "vector_records": vector_records,
-                "serialized_at": datetime.datetime.now().isoformat(),
-                "version": "1.0"
-            }
+            # Use asyncio.to_thread for serialization
+            serialized = await asyncio.to_thread(_serialize_memory_sync, memory)
             
-            logger.info(f"Serialized memory with {len(chat_history)} chat history records")
+            if serialized and serialized.get("chat_history"):
+                logger.info(f"Serialized memory with {len(serialized['chat_history'])} chat history records")
+            else:
+                logger.info("Serialized empty memory")
+                
             return serialized
         
         except Exception as e:
@@ -200,13 +207,7 @@ class MemoryState:
     async def deserialize_memory(serialized_data: Dict[str, Any], model_type: ModelType = ModelType.GPT_4O) -> Optional[LongtermAgentMemory]:
         """
         Deserialize memory data into a CAMEL memory instance.
-        
-        Args:
-            serialized_data: Dictionary with serialized memory data
-            model_type: Type of model to use for token counting
-            
-        Returns:
-            LongtermAgentMemory instance or None if deserialization fails
+        FIXED: Properly handle memory creation without coroutine issues.
         """
         if not serialized_data:
             logger.warning("Cannot deserialize memory: no data provided")
@@ -220,38 +221,49 @@ class MemoryState:
                 logger.error("Failed to create new memory instance for deserialization")
                 return None
                 
+            # FIXED: Use sync function for deserialization
+            def _restore_chat_history_sync(mem, chat_history):
+                try:
+                    for record_id, record_data in chat_history.items():
+                        role = record_data.get("role")
+                        content = record_data.get("content")
+                        metadata = record_data.get("metadata", {})
+                        
+                        if role and content:
+                            # Create the appropriate message based on role
+                            if role == "user":
+                                message = BaseMessage.make_user_message(
+                                    role_name="User",
+                                    content=content
+                                )
+                                role_at_backend = OpenAIBackendRole.USER
+                            else:
+                                message = BaseMessage.make_assistant_message(
+                                    role_name="Stylist",
+                                    content=content
+                                )
+                                role_at_backend = OpenAIBackendRole.ASSISTANT
+                            
+                            # Create and add the memory record
+                            record = MemoryRecord(
+                                message=message,
+                                role_at_backend=role_at_backend,
+                                metadata=metadata
+                            )
+                            
+                            # Add to memory
+                            mem.write_records([record])
+                    return True
+                except Exception as e:
+                    logger.error(f"Error in _restore_chat_history_sync: {e}", exc_info=True)
+                    return False
+            
             # Restore chat history records
             chat_history = serialized_data.get("chat_history", {})
-            
-            for record_id, record_data in chat_history.items():
-                role = record_data.get("role")
-                content = record_data.get("content")
-                metadata = record_data.get("metadata", {})
-                
-                if role and content:
-                    # Create the appropriate message based on role
-                    if role == "user":
-                        message = BaseMessage.make_user_message(
-                            role_name="User",
-                            content=content
-                        )
-                        role_at_backend = OpenAIBackendRole.USER
-                    else:
-                        message = BaseMessage.make_assistant_message(
-                            role_name="Stylist",
-                            content=content
-                        )
-                        role_at_backend = OpenAIBackendRole.ASSISTANT
-                    
-                    # Create and add the memory record
-                    record = MemoryRecord(
-                        message=message,
-                        role_at_backend=role_at_backend,
-                        metadata=metadata
-                    )
-                    
-                    # Add to memory - use to_thread for non-blocking operation
-                    await asyncio.to_thread(memory.write_records, [record])
+            if chat_history:
+                success = await asyncio.to_thread(_restore_chat_history_sync, memory, chat_history)
+                if not success:
+                    logger.warning("Failed to restore chat history")
             
             # Restore vector records if available
             # This would be implemented based on the specific vectorization approach
@@ -270,14 +282,7 @@ async def load_memory_for_user_async(
 ) -> Optional[LongtermAgentMemory]:
     """
     Load memory for a specific user from Neo4j.
-    
-    Args:
-        user_id: User ID
-        neo4j_client: Neo4j client for persistence operations
-        model_type: Type of model to use for token counting
-        
-    Returns:
-        LongtermAgentMemory instance or None if not found
+    FIXED: Properly handle memory loading without coroutine issues.
     """
     if not user_id or not neo4j_client:
         logger.warning("Cannot load memory: invalid user ID or Neo4j client")
@@ -316,7 +321,8 @@ async def load_memory_for_user_async(
                 logger.info(f"Loaded memory for user {user_id} created at {created_at}")
                 
                 # Add user_id to memory metadata
-                memory.metadata = {"user_id": user_id, "loaded_at": datetime.datetime.now().isoformat()}
+                if not asyncio.iscoroutine(memory):
+                    memory.metadata = {"user_id": user_id, "loaded_at": datetime.datetime.now().isoformat()}
                 
                 return memory
             else:
@@ -337,17 +343,15 @@ async def save_memory_for_user_async(
 ) -> bool:
     """
     Save memory for a specific user to Neo4j.
-    
-    Args:
-        memory: LongtermAgentMemory instance
-        user_id: User ID
-        neo4j_client: Neo4j client for persistence operations
-        
-    Returns:
-        bool: True if successful, False otherwise
+    FIXED: Properly handle memory saving without coroutine issues.
     """
     if not memory or not user_id or not neo4j_client:
         logger.warning("Cannot save memory: invalid memory, user ID, or Neo4j client")
+        return False
+    
+    # FIXED: Check if memory is a coroutine (it shouldn't be)
+    if asyncio.iscoroutine(memory):
+        logger.error("Memory is still a coroutine - this should not happen")
         return False
         
     try:
@@ -416,14 +420,6 @@ async def cleanup_old_memory_states_async(
 ) -> bool:
     """
     Clean up old memory states for a user to avoid excessive storage.
-    
-    Args:
-        user_id: User ID
-        neo4j_client: Neo4j client for persistence operations
-        keep_latest: Number of latest memory states to keep
-        
-    Returns:
-        bool: True if successful, False otherwise
     """
     if not user_id or not neo4j_client:
         return False
@@ -453,16 +449,16 @@ async def add_message_to_memory_async(
     sender: str, 
     metadata: Optional[Dict[str, Any]] = None
 ) -> bool:
-    """Add a message to the agent's memory asynchronously."""
+    """Add a message to the agent's memory asynchronously. FIXED: Handle memory properly."""
     if not memory:
         logger.warning("Cannot add message to memory: memory is None")
         return False
     
     try:
-        # Ensure memory is not a coroutine by awaiting it if needed
+        # FIXED: Don't await memory if it's already resolved
         if asyncio.iscoroutine(memory):
-            logger.info("Memory is a coroutine, awaiting it before adding message")
-            memory = await memory
+            logger.error("Memory is still a coroutine - this should not happen")
+            return False
             
         # Create the memory record based on sender
         if sender == "user":
@@ -484,16 +480,16 @@ async def add_message_to_memory_async(
                 metadata=metadata or {},
             )
         
-        # Explicit function for thread pool to avoid capturing complex state
-        def _write_to_memory(mem, rec):
+        # FIXED: Use sync function for thread pool
+        def _write_to_memory_sync(mem, rec):
             try:
                 mem.write_records([rec])
                 return True
             except Exception as e:
-                logger.error(f"Error in _write_to_memory: {e}", exc_info=True)
+                logger.error(f"Error in _write_to_memory_sync: {e}", exc_info=True)
                 return False
                 
-        result = await asyncio.to_thread(_write_to_memory, memory, record)
+        result = await asyncio.to_thread(_write_to_memory_sync, memory, record)
         
         if result:
             logger.info(f"Added {sender} message to memory: {content[:50]}...")
@@ -503,31 +499,29 @@ async def add_message_to_memory_async(
         return result
     
     except Exception as e:
-        stack_trace = traceback.format_exc()
-        logger.error(f"Error adding message to memory: {e}\n{stack_trace}")
+        logger.error(f"Error adding message to memory: {e}", exc_info=True)
         return False
 
 async def get_memory_context_async(memory: LongtermAgentMemory) -> Tuple[List[Dict[str, str]], int]:
     """
     Get context from the agent's memory with robust fallback options asynchronously.
-    Enhanced for CAMEL-AI 0.2.43.
-    
-    Args:
-        memory: LongtermAgentMemory instance
-        
-    Returns:
-        Tuple of (context messages, token count)
+    FIXED: Properly handle memory object without coroutine issues.
     """
     if not memory:
         logger.warning("Cannot get context from memory: memory is None")
+        return [], 0
+    
+    # FIXED: Check if memory is a coroutine (it shouldn't be)
+    if asyncio.iscoroutine(memory):
+        logger.error("Memory is still a coroutine - this should not happen")
         return [], 0
     
     try:
         # Log the memory retrieval attempt
         logger.debug("Retrieving memory context...")
         
-        # Try getting context using a separate function to avoid capturing complex state
-        def _get_memory_context(mem):
+        # FIXED: Use sync function for thread pool
+        def _get_memory_context_sync(mem):
             try:
                 context, tokens = mem.get_context()
                 return context, tokens, None
@@ -535,25 +529,25 @@ async def get_memory_context_async(memory: LongtermAgentMemory) -> Tuple[List[Di
                 return None, 0, e
                 
         # Use asyncio.to_thread to make this non-blocking
-        context, tokens, error = await asyncio.to_thread(_get_memory_context, memory)
+        context, tokens, error = await asyncio.to_thread(_get_memory_context_sync, memory)
         
         if error:
             logger.warning(f"Error getting context from memory: {error}")
             
             # Access the memory records directly if available
             try:
-                # Define explicit function for thread pool
-                def _get_history_records(mem):
+                # FIXED: Use sync function for thread pool
+                def _get_history_records_sync(mem):
                     try:
                         if hasattr(mem, 'chat_history_block') and hasattr(mem.chat_history_block, 'memory'):
                             return list(mem.chat_history_block.memory.values())
                         return []
                     except Exception as e:
-                        logger.error(f"Error in _get_history_records: {e}", exc_info=True)
+                        logger.error(f"Error in _get_history_records_sync: {e}", exc_info=True)
                         return []
                         
                 # Use to_thread to retrieve this in a non-blocking way
-                history_records = await asyncio.to_thread(_get_history_records, memory)
+                history_records = await asyncio.to_thread(_get_history_records_sync, memory)
                 
                 # Format the history records into context messages
                 context = []
@@ -588,35 +582,30 @@ async def extract_preferences_from_memory_async(
 ) -> Dict[str, Any]:
     """
     Extract user preferences from memory content.
-    
-    Args:
-        memory: LongtermAgentMemory instance
-        
-    Returns:
-        Dictionary of extracted preferences
+    FIXED: Properly handle memory object without coroutine issues.
     """
     if not memory:
         logger.warning("Cannot extract preferences: memory is None")
         return {}
+    
+    # FIXED: Check if memory is a coroutine (it shouldn't be)
+    if asyncio.iscoroutine(memory):
+        logger.error("Memory is still a coroutine - this should not happen")
+        return {}
         
     try:
-        # Get all memory records
-        if not hasattr(memory, 'chat_history_block') or not hasattr(memory.chat_history_block, 'memory'):
-            logger.warning("Memory does not have chat_history_block or memory attribute")
-            return {}
-            
-        # Define explicit function for thread pool
-        def _get_memory_records(mem):
+        # FIXED: Use sync function for thread pool
+        def _get_memory_records_sync(mem):
             try:
                 if hasattr(mem, 'chat_history_block') and hasattr(mem.chat_history_block, 'memory'):
                     return list(mem.chat_history_block.memory.values())
                 return []
             except Exception as e:
-                logger.error(f"Error in _get_memory_records: {e}", exc_info=True)
+                logger.error(f"Error in _get_memory_records_sync: {e}", exc_info=True)
                 return []
                 
         # Use to_thread to retrieve this in a non-blocking way
-        history_records = await asyncio.to_thread(_get_memory_records, memory)
+        history_records = await asyncio.to_thread(_get_memory_records_sync, memory)
         
         # Look for preference records with specific metadata
         preferences = {}
@@ -717,20 +706,15 @@ async def add_user_preference_to_memory_async(
 ) -> bool:
     """
     Add user preference information to memory asynchronously.
-    
-    Args:
-        memory: LongtermAgentMemory instance
-        preference_type: Type of preference (e.g., "color", "style", "budget")
-        preference_value: Value of the preference
-        persist_to_neo4j: Whether to persist preference to Neo4j
-        user_id: User ID (required if persist_to_neo4j is True)
-        neo4j_client: Neo4j client (required if persist_to_neo4j is True)
-        
-    Returns:
-        bool: True if successful, False otherwise
+    FIXED: Properly handle memory object without coroutine issues.
     """
     if not memory:
         logger.warning("Cannot add preference to memory: memory is None")
+        return False
+    
+    # FIXED: Check if memory is a coroutine (it shouldn't be)
+    if asyncio.iscoroutine(memory):
+        logger.error("Memory is still a coroutine - this should not happen")
         return False
         
     try:
@@ -750,28 +734,27 @@ async def add_user_preference_to_memory_async(
             "timestamp": datetime.datetime.now().isoformat()
         }
         
-        # Add to memory as system message - FIXED for CAMEL-AI 0.2.43
-        # Create an assistant message but override the role to system
+        # Add to memory as system message
         record = MemoryRecord(
             message=BaseMessage.make_assistant_message(
-                role_name="System",  # Use "System" as role name
+                role_name="System",
                 content=content,
             ),
-            role_at_backend=OpenAIBackendRole.SYSTEM,  # This ensures it's treated as a system message
+            role_at_backend=OpenAIBackendRole.ASSISTANT,
             metadata=metadata,
         )
         
-        # Define explicit function for thread pool
-        def _write_preference_to_memory(mem, rec):
+        # FIXED: Use sync function for thread pool
+        def _write_preference_to_memory_sync(mem, rec):
             try:
                 mem.write_records([rec])
                 return True
             except Exception as e:
-                logger.error(f"Error in _write_preference_to_memory: {e}", exc_info=True)
+                logger.error(f"Error in _write_preference_to_memory_sync: {e}", exc_info=True)
                 return False
         
         # Use asyncio.to_thread to make this non-blocking
-        result = await asyncio.to_thread(_write_preference_to_memory, memory, record)
+        result = await asyncio.to_thread(_write_preference_to_memory_sync, memory, record)
         
         if result:
             logger.info(f"Added user preference to memory: {preference_type} = {value_str}")
@@ -849,20 +832,15 @@ async def add_product_interaction_to_memory_async(
 ) -> bool:
     """
     Add product interaction to memory and optionally persist to Neo4j.
-    
-    Args:
-        memory: LongtermAgentMemory instance
-        product: Product dictionary
-        interaction_type: Type of interaction (e.g., "viewed", "liked", "purchased")
-        persist_to_neo4j: Whether to persist interaction to Neo4j
-        user_id: User ID (required if persist_to_neo4j is True)
-        neo4j_client: Neo4j client (required if persist_to_neo4j is True)
-        
-    Returns:
-        bool: True if successful, False otherwise
+    FIXED: Properly handle memory object without coroutine issues.
     """
     if not memory or not product:
         logger.warning("Cannot add product interaction to memory: invalid input")
+        return False
+    
+    # FIXED: Check if memory is a coroutine (it shouldn't be)
+    if asyncio.iscoroutine(memory):
+        logger.error("Memory is still a coroutine - this should not happen")
         return False
         
     try:
@@ -886,28 +864,27 @@ async def add_product_interaction_to_memory_async(
             "tags": product.get("tags", [])
         }
         
-        # Add to memory as system message - FIXED for CAMEL-AI 0.2.43
-        # Create an assistant message but override the role to system
+        # Add to memory as assistant message (system messages not available in this CAMEL version)
         record = MemoryRecord(
             message=BaseMessage.make_assistant_message(
-                role_name="System",  # Use "System" as role name
+                role_name="System",
                 content=content,
             ),
-            role_at_backend=OpenAIBackendRole.SYSTEM,  # This ensures it's treated as a system message
+            role_at_backend=OpenAIBackendRole.ASSISTANT,
             metadata=metadata,
         )
         
-        # Define explicit function for thread pool
-        def _write_interaction_to_memory(mem, rec):
+        # FIXED: Use sync function for thread pool
+        def _write_interaction_to_memory_sync(mem, rec):
             try:
                 mem.write_records([rec])
                 return True
             except Exception as e:
-                logger.error(f"Error in _write_interaction_to_memory: {e}", exc_info=True)
+                logger.error(f"Error in _write_interaction_to_memory_sync: {e}", exc_info=True)
                 return False
         
         # Use asyncio.to_thread to make this non-blocking
-        result = await asyncio.to_thread(_write_interaction_to_memory, memory, record)
+        result = await asyncio.to_thread(_write_interaction_to_memory_sync, memory, record)
         
         if result:
             logger.info(f"Added product interaction to memory: {interaction_type} {product_id}")
@@ -926,8 +903,6 @@ async def add_product_interaction_to_memory_async(
                 query = """
                 // Ensure the user exists
                 MERGE (u:User {id: $user_id})
-                
-                // Pass the user node to the next clause
                 WITH u
                 
                 // Find the product
@@ -986,26 +961,33 @@ async def optimize_memory_async(
 ) -> bool:
     """
     Optimize memory by summarizing and compressing memory records.
-    
-    Args:
-        memory: LongtermAgentMemory instance
-        user_id: Optional user ID for persistence
-        neo4j_client: Neo4j client for persistence operations
-        
-    Returns:
-        bool: True if successful, False otherwise
+    FIXED: Properly handle memory object without coroutine issues.
     """
     if not memory:
         logger.warning("Cannot optimize memory: memory is None")
+        return False
+    
+    # FIXED: Check if memory is a coroutine (it shouldn't be)
+    if asyncio.iscoroutine(memory):
+        logger.error("Memory is still a coroutine - this should not happen")
         return False
         
     try:
         # Get current memory state
         old_memory_size = 0
         
-        if hasattr(memory, 'chat_history_block') and hasattr(memory.chat_history_block, 'memory'):
-            old_memory_size = len(memory.chat_history_block.memory)
-            
+        # FIXED: Use sync function for thread pool
+        def _get_memory_size_sync(mem):
+            try:
+                if hasattr(mem, 'chat_history_block') and hasattr(mem.chat_history_block, 'memory'):
+                    return len(mem.chat_history_block.memory)
+                return 0
+            except Exception as e:
+                logger.error(f"Error getting memory size: {e}")
+                return 0
+        
+        old_memory_size = await asyncio.to_thread(_get_memory_size_sync, memory)
+        
         # For a real implementation, we would:
         # 1. Identify important vs. unimportant memory records
         # 2. Summarize or compress less important records

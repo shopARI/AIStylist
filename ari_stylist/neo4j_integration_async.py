@@ -594,13 +594,7 @@ class ProductKnowledgeGraphAsync:
     async def create_or_update_user(self, user_id: str, user_data: Optional[Dict[str, Any]] = None) -> bool:
         """
         Create or update a user in Neo4j.
-        
-        Args:
-            user_id: User ID
-            user_data: Optional user data
-            
-        Returns:
-            bool: True if successful, False otherwise
+        FIXED: Properly handle parameters.
         """
         if not user_id:
             logger.error("No user ID provided")
@@ -609,21 +603,27 @@ class ProductKnowledgeGraphAsync:
         try:
             # Prepare user data
             data = user_data or {}
-            data["last_active"] = datetime.datetime.now().isoformat()
+            current_time = datetime.datetime.now().isoformat()
             
-            # Convert data to parameters
-            params = {"user_id": user_id}
-            set_clause = "SET u.last_active = $last_active"
+            # FIXED: Properly build parameters dictionary
+            params = {
+                "user_id": user_id,
+                "last_active": current_time
+            }
             
+            set_clauses = ["u.last_active = $last_active"]
+            
+            # Add other data parameters
             for key, value in data.items():
                 if key != "last_active":  # Already handled above
-                    params[key] = value
-                    set_clause += f", u.{key} = ${key}"
+                    param_key = f"data_{key}"
+                    params[param_key] = value
+                    set_clauses.append(f"u.{key} = ${param_key}")
             
             # Create or update user
             query = f"""
             MERGE (u:User {{id: $user_id}})
-            {set_clause}
+            SET {', '.join(set_clauses)}
             RETURN u.id as user_id
             """
             
@@ -639,7 +639,10 @@ class ProductKnowledgeGraphAsync:
         except Exception as e:
             logger.error(f"Error creating or updating user: {e}")
             return False
-    
+
+
+
+
     async def get_user_interaction_history(self, user_id: str, limit: int = 20) -> List[Dict[str, Any]]:
         """
         Get the interaction history for a user.
@@ -836,19 +839,7 @@ class ProductKnowledgeGraphAsync:
                 brand=None, min_price=None, max_price=None, material=None, limit=5):
         """
         Get products by filtering on various attributes.
-        
-        Args:
-            category: Category filter (optional)
-            collection: Collection filter (optional)
-            tag: Tag filter (optional)
-            brand: Brand filter (optional) - kept for interface compatibility
-            min_price: Minimum price filter (optional)
-            max_price: Maximum price filter (optional)
-            material: Material filter (optional) - kept for interface compatibility
-            limit: Maximum number of products to return
-            
-        Returns:
-            List of products
+        FIXED: Resolve Neo4j aggregation syntax errors.
         """
         logger.info(f"Retrieving products with filters: category={category}, "
                 f"collection={collection}, tag={tag}, price={min_price}-{max_price}")
@@ -863,98 +854,86 @@ class ProductKnowledgeGraphAsync:
         """
         
         params = {"limit": limit}
-        score_initialized = False
         
-        # Add scoring system for beach vacation specific terms
-        if "beach" in (tag or "").lower() or "vacation" in (tag or "").lower():
-            query += """
-            WITH p, 0 as score 
-            OPTIONAL MATCH (p)-[:IN_CATEGORY]->(c:Category)
-            WHERE toLower(c.title) IN ['swimwear', 'dress', 'shorts', 'sandals', 'beach']
-            WITH p, CASE WHEN count(c) > 0 THEN 10 ELSE 0 END as score
-            """
-            score_initialized = True
+        # FIXED: Build scoring logic without aggregation syntax errors
+        scoring_parts = []
         
-        # Apply all filters as OPTIONAL MATCH to ensure we get results
+        # Apply category filter
         if category:
-            if score_initialized:
-                query += """
-                WITH p, score
-                OPTIONAL MATCH (p)-[:IN_CATEGORY]->(c:Category)
-                WHERE toLower(c.title) CONTAINS toLower($category)
-                WITH p, score + CASE WHEN count(c) > 0 THEN 5 ELSE 0 END as score
-                """
-            else:
-                query += """
-                WITH p, 0 as score
-                OPTIONAL MATCH (p)-[:IN_CATEGORY]->(c:Category)
-                WHERE toLower(c.title) CONTAINS toLower($category)
-                WITH p, CASE WHEN count(c) > 0 THEN 5 ELSE 0 END as score
-                """
-                score_initialized = True
+            query += """
+            WITH p
+            OPTIONAL MATCH (p)-[:IN_CATEGORY]->(c:Category)
+            WHERE toLower(c.title) CONTAINS toLower($category)
+            """
             params["category"] = category
+            scoring_parts.append("CASE WHEN count(c) > 0 THEN 5 ELSE 0 END")
         
+        # Apply tag filter
         if tag:
-            if score_initialized:
+            if category:  # Continue the WITH chain
                 query += """
-                WITH p, score
+                WITH p, c
                 OPTIONAL MATCH (p)-[:TAGGED_WITH]->(t:Tag)
                 WHERE toLower(t.title) CONTAINS toLower($tag)
-                WITH p, score + CASE WHEN count(t) > 0 THEN 5 ELSE 0 END as score
                 """
-            else:
+            else:  # Start the WITH chain
                 query += """
-                WITH p, 0 as score
+                WITH p
                 OPTIONAL MATCH (p)-[:TAGGED_WITH]->(t:Tag)
                 WHERE toLower(t.title) CONTAINS toLower($tag)
-                WITH p, CASE WHEN count(t) > 0 THEN 5 ELSE 0 END as score
                 """
-                score_initialized = True
             params["tag"] = tag
+            scoring_parts.append("CASE WHEN count(t) > 0 THEN 5 ELSE 0 END")
         
+        # Apply collection filter
         if collection:
-            if score_initialized:
+            if category or tag:  # Continue the WITH chain
                 query += """
-                WITH p, score
+                WITH p, c, t
                 OPTIONAL MATCH (p)-[:IN_COLLECTION]->(col:Collection)
                 WHERE toLower(col.title) CONTAINS toLower($collection)
-                WITH p, score + CASE WHEN count(col) > 0 THEN 5 ELSE 0 END as score
                 """
-            else:
+            else:  # Start the WITH chain
                 query += """
-                WITH p, 0 as score
+                WITH p
                 OPTIONAL MATCH (p)-[:IN_COLLECTION]->(col:Collection)
                 WHERE toLower(col.title) CONTAINS toLower($collection)
-                WITH p, CASE WHEN count(col) > 0 THEN 5 ELSE 0 END as score
                 """
-                score_initialized = True
             params["collection"] = collection
+            scoring_parts.append("CASE WHEN count(col) > 0 THEN 5 ELSE 0 END")
+        
+        # FIXED: Calculate score in a single WITH clause
+        if scoring_parts:
+            score_expression = " + ".join(scoring_parts)
+            query += f"""
+            WITH p, ({score_expression}) as score
+            """
+        else:
+            query += """
+            WITH p, 0 as score
+            """
         
         # Add price filters if provided
         if min_price is not None:
             query += """
-            WITH p, score
             WHERE p.price >= $min_price
             """
             params["min_price"] = float(min_price)
         
         if max_price is not None:
-            query += """
-            WITH p, score
-            WHERE p.price <= $max_price
-            """
+            if min_price is not None:
+                query += """
+                AND p.price <= $max_price
+                """
+            else:
+                query += """
+                WHERE p.price <= $max_price
+                """
             params["max_price"] = float(max_price)
         
-        # If no scoring has been initialized, add a basic score
-        if not score_initialized:
-            query += """
-            WITH p, 0 as score
-            """
-        
-        # Modify the ORDER BY clause to include randomness while preserving score priority
+        # Order by score (relevance) first, then add some randomness and popularity
         query += """
-        WITH p, score
-        ORDER BY score DESC, rand() * 0.5 + p.visited_num * 0.5 DESC
+        ORDER BY score DESC, rand() * 0.5 + COALESCE(p.visited_num, 0) * 0.5 DESC
         LIMIT $limit
         RETURN 
             p.id as id,
@@ -962,7 +941,8 @@ class ProductKnowledgeGraphAsync:
             p.price as price,
             p.description as description,
             p.images as images,
-            COALESCE(p.visited_num, 0) as visited_num
+            COALESCE(p.visited_num, 0) as visited_num,
+            score
         """
         
         # Execute query
@@ -985,13 +965,17 @@ class ProductKnowledgeGraphAsync:
                 "description": record.get("description", ""),
                 "images": self._parse_images(record.get("images", "[]")),
                 "categories": await self._get_product_categories(product_id),
-                "visited_num": record.get("visited_num", 0)
+                "visited_num": record.get("visited_num", 0),
+                "score": record.get("score", 0)
             }
             
             products.append(product_obj)
         
         logger.info(f"Retrieved {len(products)} products matching filters")
         return products
+
+
+
 
     async def _get_product_categories(self, product_id):
         """
