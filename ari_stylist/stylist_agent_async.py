@@ -2,7 +2,9 @@
 Refactored Asynchronous Stylist Agent for AI Stylist.
 
 This module implements the stylist agent with true async support.
-Compatible with CAMEL-AI 0.2.43.
+Compatible with CAMEL-AI 0.2.59+.
+
+MIGRATED: Now uses AgentFactory instead of AsyncCAMELService for CAMEL 0.2.59+ compatibility.
 """
 
 import logging
@@ -13,25 +15,17 @@ from typing import Optional, List, Dict, Any
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("stylist_agent_async")
 
-# Import AsyncCAMELService
-from async_camel_service import AsyncCAMELService
-
-# Global service instance
-_service = None
-
-def get_service(max_workers=10):
-    """Get or create the global service instance"""
-    global _service
-    if _service is None:
-        _service = AsyncCAMELService(max_workers=max_workers)
-    return _service
+# MIGRATED: Import AgentFactory instead of AsyncCAMELService
+from agent_factory import get_agent_factory
 
 async def create_stylist_agent_async(memory, model_type=None, temperature=0.7, max_tokens=4000):
     """
     Create an AI stylist agent with natural conversational abilities asynchronously.
     
+    MIGRATED: Now uses AgentFactory for CAMEL 0.2.59+ compatibility.
+    
     Args:
-        memory: LongtermAgentMemory instance 
+        memory: AgentMemory instance (CAMEL 0.2.59+ format)
         model_type: Type of model to use (defaults to GPT-4O if None)
         temperature: Model temperature setting (0.0-1.0)
         max_tokens: Maximum tokens in completion
@@ -41,8 +35,67 @@ async def create_stylist_agent_async(memory, model_type=None, temperature=0.7, m
     """
     logger.info(f"Creating stylist agent with model: {model_type}")
     
-    # Define the stylist system message with emphasis on natural conversation
-    stylist_system_message = """You are Ari, a warm and personable fashion stylist with years of experience helping clients look and feel their best. 
+    # MIGRATED: Use AgentFactory instead of AsyncCAMELService
+    factory = get_agent_factory()
+    
+    # Create stylist agent using the factory
+    agent = await factory.create_stylist_agent(
+        memory=memory,
+        model_type=model_type,
+        temperature=temperature,
+        max_tokens=max_tokens,
+        enable_mcp=True  # Enable MCP for CAMEL 0.2.59+
+    )
+    
+    logger.info("Successfully created stylist agent using AgentFactory")
+    return agent
+
+async def create_stylist_agent_with_tools_async(memory, tools=None, model_type=None, temperature=0.7, max_tokens=4000):
+    """
+    Create an AI stylist agent with tool-calling capabilities asynchronously.
+    
+    MIGRATED: Now uses AgentFactory for CAMEL 0.2.59+ compatibility.
+    
+    Args:
+        memory: AgentMemory instance (CAMEL 0.2.59+ format)
+        tools: List of tools to provide to the agent
+        model_type: Type of model to use
+        temperature: Model temperature setting (0.0-1.0)
+        max_tokens: Maximum tokens in completion
+        
+    Returns:
+        ChatAgent: Configured stylist agent with tools
+    """
+    logger.info(f"Creating stylist agent with {len(tools) if tools else 0} tools")
+    
+    # MIGRATED: Use AgentFactory for creating agents with tools
+    factory = get_agent_factory()
+    
+    # Create agent with tools using the factory
+    agent = await factory.create_agent(
+        system_message=_get_stylist_system_message(),
+        model_type=model_type,
+        model_config={
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        },
+        tools=tools or [],
+        memory=memory,
+        use_mcp=True  # Enable MCP for CAMEL 0.2.59+
+    )
+    
+    logger.info(f"Successfully created stylist agent with tools using AgentFactory")
+    return agent
+
+def _get_stylist_system_message() -> str:
+    """
+    Get the stylist system message.
+    Centralized for consistency across agent creation methods.
+    
+    Returns:
+        str: The stylist system message
+    """
+    return """You are Ari, a warm and personable fashion stylist with years of experience helping clients look and feel their best. 
 
 IMPORTANT INSTRUCTION: Do not recommend specific products unless explicitly asked. Focus on building rapport and understanding client needs first.
 
@@ -66,55 +119,7 @@ For follow-up questions:
 - Reference specific items you mentioned before when relevant
 - Maintain a continuous conversation flow like a real styling consultation
 
-Always maintain a friendly, encouraging tone that boosts the client's confidence. Your goal is to make them feel like they're getting personalized advice from a trusted friend with fashion expertise.
-"""
-    
-    # Use the AsyncCAMELService to create the agent
-    service = get_service()
-    
-    # Create a session ID for this agent
-    session_id = f"stylist_{os.urandom(4).hex()}"
-    
-    agent = await service.get_or_create_agent(
-        session_id=session_id,
-        system_message=stylist_system_message,
-        model_type=model_type,
-        memory=memory
-    )
-    
-    return agent
-
-async def create_stylist_agent_with_tools_async(memory, tools=None, model_type=None, temperature=0.7, max_tokens=4000):
-    """
-    Create an AI stylist agent with tool-calling capabilities asynchronously.
-    
-    Args:
-        memory: LongtermAgentMemory instance
-        tools: List of tools to provide to the agent
-        model_type: Type of model to use
-        temperature: Model temperature setting (0.0-1.0)
-        max_tokens: Maximum tokens in completion
-        
-    Returns:
-        ChatAgent: Configured stylist agent with tools
-    """
-    # Create the base agent
-    stylist_agent = await create_stylist_agent_async(
-        memory=memory,
-        model_type=model_type,
-        temperature=temperature,
-        max_tokens=max_tokens
-    )
-    
-    # Add tools if provided - this operation is quick and can be done directly
-    if tools and len(tools) > 0:
-        try:
-            stylist_agent.tools = tools
-            logger.info(f"Added {len(tools)} tools to stylist agent")
-        except Exception as e:
-            logger.error(f"Error adding tools to stylist agent: {e}")
-    
-    return stylist_agent
+Always maintain a friendly, encouraging tone that boosts the client's confidence. Your goal is to make them feel like they're getting personalized advice from a trusted friend with fashion expertise."""
 
 async def enhance_stylist_prompt_with_products_async(system_message: str, products: List[Dict[str, Any]]) -> str:
     """
@@ -132,7 +137,7 @@ async def enhance_stylist_prompt_with_products_async(system_message: str, produc
         
     logger.info(f"Enhancing stylist prompt with {len(products)} products")
     
-    # Create product details section - this is a fast string operation that can run directly
+    # Create product details section - this is a fast string operation
     product_details = "\n\nAvailable products to recommend:\n"
     
     for i, product in enumerate(products[:5]):  # Limit to 5 products to avoid overloading context
@@ -174,8 +179,10 @@ async def create_product_recommendation_agent_async(memory, products, model_type
     """
     Create a special agent optimized for product recommendations asynchronously.
     
+    MIGRATED: Now uses AgentFactory for CAMEL 0.2.59+ compatibility.
+    
     Args:
-        memory: LongtermAgentMemory instance
+        memory: AgentMemory instance (CAMEL 0.2.59+ format)
         products: List of products to recommend
         model_type: Type of model to use
         temperature: Model temperature setting
@@ -183,31 +190,128 @@ async def create_product_recommendation_agent_async(memory, products, model_type
     Returns:
         ChatAgent: Configured recommendation agent
     """
-    logger.info("Creating product recommendation agent")
+    logger.info("Creating product recommendation agent using AgentFactory")
     
-    # Start with the base stylist agent with lower max tokens
-    base_agent = await create_stylist_agent_async(
-        memory=memory,
-        model_type=model_type,
-        temperature=temperature,
-        max_tokens=2000
-    )
+    # Get the base system message
+    base_system_message = _get_stylist_system_message()
     
     # Enhance the prompt with product information
     enhanced_system_message = await enhance_stylist_prompt_with_products_async(
-        base_agent.system_message,
+        base_system_message,
         products
     )
     
-    # Use the enhanced prompt to create a new agent
-    service = get_service()
-    session_id = f"product_rec_{os.urandom(4).hex()}"
+    # MIGRATED: Use AgentFactory to create the agent
+    factory = get_agent_factory()
     
-    recommendation_agent = await service.get_or_create_agent(
-        session_id=session_id,
+    recommendation_agent = await factory.create_agent(
         system_message=enhanced_system_message,
         model_type=model_type,
-        memory=memory
+        model_config={
+            "temperature": temperature,
+            "max_tokens": 2000  # Slightly lower for focused product recommendations
+        },
+        memory=memory,
+        use_mcp=True  # Enable MCP for CAMEL 0.2.59+
     )
     
+    logger.info("Successfully created product recommendation agent using AgentFactory")
     return recommendation_agent
+
+async def create_agent_with_custom_prompt_async(
+    custom_prompt: str,
+    memory,
+    model_type=None,
+    temperature=0.7,
+    max_tokens=4000,
+    tools=None
+):
+    """
+    Create an agent with a custom prompt for specialized use cases.
+    
+    MIGRATED: Uses AgentFactory for CAMEL 0.2.59+ compatibility.
+    
+    Args:
+        custom_prompt: Custom system message
+        memory: AgentMemory instance
+        model_type: Type of model to use
+        temperature: Model temperature setting
+        max_tokens: Maximum tokens in completion
+        tools: Optional list of tools
+        
+    Returns:
+        ChatAgent: Configured agent
+    """
+    logger.info("Creating agent with custom prompt using AgentFactory")
+    
+    # MIGRATED: Use AgentFactory
+    factory = get_agent_factory()
+    
+    agent = await factory.create_agent(
+        system_message=custom_prompt,
+        model_type=model_type,
+        model_config={
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        },
+        tools=tools or [],
+        memory=memory,
+        use_mcp=True  # Enable MCP for CAMEL 0.2.59+
+    )
+    
+    logger.info("Successfully created custom agent using AgentFactory")
+    return agent
+
+# Backward compatibility functions for existing code
+async def get_stylist_agent_async(memory, **kwargs):
+    """
+    Backward compatibility function for getting a stylist agent.
+    
+    Args:
+        memory: AgentMemory instance
+        **kwargs: Additional arguments passed to create_stylist_agent_async
+        
+    Returns:
+        ChatAgent: Stylist agent
+    """
+    logger.info("Using backward compatibility function for stylist agent creation")
+    return await create_stylist_agent_async(memory, **kwargs)
+
+async def create_enhanced_stylist_async(memory, enable_tools=True, **kwargs):
+    """
+    Create an enhanced stylist agent with optional tool support.
+    
+    Args:
+        memory: AgentMemory instance
+        enable_tools: Whether to enable tools
+        **kwargs: Additional arguments
+        
+    Returns:
+        ChatAgent: Enhanced stylist agent
+    """
+    if enable_tools:
+        # Try to import and add basic tools
+        tools = []
+        try:
+            from camel_imports import SearchToolkit
+            if SearchToolkit:
+                tools.append(SearchToolkit())
+        except Exception as e:
+            logger.warning(f"Could not add tools: {e}")
+        
+        return await create_stylist_agent_with_tools_async(memory, tools=tools, **kwargs)
+    else:
+        return await create_stylist_agent_async(memory, **kwargs)
+
+# Cleanup function for proper resource management
+async def cleanup_agent_resources():
+    """
+    Clean up any global agent resources.
+    Should be called during application shutdown.
+    """
+    try:
+        factory = get_agent_factory()
+        await factory.cleanup()
+        logger.info("Cleaned up agent factory resources")
+    except Exception as e:
+        logger.error(f"Error cleaning up agent resources: {e}")

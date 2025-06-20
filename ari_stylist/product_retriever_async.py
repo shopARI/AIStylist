@@ -2,7 +2,9 @@
 Asynchronous Product Retriever for AI Stylist.
 
 This module implements an asynchronous product retriever using Qdrant vector search.
-Compatible with CAMEL-AI 0.2.43.
+Compatible with CAMEL-AI 0.2.64.
+
+FIXED: Uses centralized imports and proper error handling.
 """
 
 import os
@@ -13,10 +15,13 @@ import datetime
 import asyncio
 from typing import Dict, List, Any, Optional, Union, Tuple
 
-# Updated imports for CAMEL-AI 0.2.43
-from camel.embeddings import OpenAIEmbedding
-from camel.types import EmbeddingModelType
-from camel.toolkits import RetrievalToolkit
+# FIXED: Use centralized imports with error handling
+from camel_imports import (
+    CAMEL_AVAILABLE,
+    OpenAIEmbedding,
+    EmbeddingModelType,
+    RetrievalToolkit
+)
 
 # For Qdrant integration
 try:
@@ -29,7 +34,12 @@ except ImportError:
     logging.warning("Qdrant not installed. Install with: pip install qdrant-client")
 
 # For async HTTP calls
-import httpx
+try:
+    import httpx
+    HTTPX_AVAILABLE = True
+except ImportError:
+    HTTPX_AVAILABLE = False
+    logging.warning("httpx not installed. Install with: pip install httpx")
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +49,9 @@ class ProductRetrieverAsync:
     """
     Asynchronous product retriever using Qdrant for vector-based search.
     Optimized for remote Qdrant collections.
-    Compatible with CAMEL-AI 0.2.43.
+    Compatible with CAMEL-AI 0.2.64.
+    
+    FIXED: Uses proper error handling for all CAMEL components.
     """
     
     def __init__(
@@ -51,6 +63,8 @@ class ProductRetrieverAsync:
     ):
         """
         Initialize the product retriever with Qdrant vector search.
+        
+        FIXED: Added proper error handling for CAMEL components.
         
         Args:
             qdrant_url: URL of Qdrant instance
@@ -72,37 +86,71 @@ class ProductRetrieverAsync:
             
         logger.info(f"Initializing ProductRetrieverAsync with Qdrant at: {self.qdrant_url}")
         
+        # Check CAMEL availability
+        if not CAMEL_AVAILABLE:
+            logger.warning("CAMEL-AI not fully available, using fallback implementations")
+        
         try:
-            # Initialize embedding model - consistent with CAMEL-AI 0.2.43
-            self.embedding_model = OpenAIEmbedding(
-                model_type=EmbeddingModelType.TEXT_EMBEDDING_ADA_2
-            )
+            # FIXED: Initialize embedding model with error handling
+            if CAMEL_AVAILABLE and OpenAIEmbedding and EmbeddingModelType:
+                self.embedding_model = OpenAIEmbedding(
+                    model_type=EmbeddingModelType.TEXT_EMBEDDING_ADA_2
+                )
+                logger.info("Embedding model initialized successfully")
+            else:
+                logger.error("CAMEL embedding components not available")
+                self.embedding_model = None
+                self.initialized = False
+                return
             
             # Initialize Qdrant client (synchronous client for now)
             if QDRANT_AVAILABLE:
-                self.qdrant_client = qdrant_client.QdrantClient(
-                    url=self.qdrant_url,
-                    api_key=self.qdrant_api_key
-                )
-                logger.info(f"Connected to Qdrant instance: {self.qdrant_url}")
-                
-                # Check if collection exists, create if it doesn't
-                self._ensure_collection_exists_sync()
+                try:
+                    self.qdrant_client = qdrant_client.QdrantClient(
+                        url=self.qdrant_url,
+                        api_key=self.qdrant_api_key
+                    )
+                    logger.info(f"Connected to Qdrant instance: {self.qdrant_url}")
+                    
+                    # Check if collection exists, create if it doesn't
+                    self._ensure_collection_exists_sync()
+                except Exception as e:
+                    logger.error(f"Error connecting to Qdrant: {e}")
+                    self.qdrant_client = None
                 
                 # HTTP client for async operations with Qdrant REST API
-                self.http_client = httpx.AsyncClient(
-                    base_url=self.qdrant_url,
-                    headers={"api-key": self.qdrant_api_key} if self.qdrant_api_key else None,
-                    timeout=60.0
-                )
+                if HTTPX_AVAILABLE:
+                    try:
+                        self.http_client = httpx.AsyncClient(
+                            base_url=self.qdrant_url,
+                            headers={"api-key": self.qdrant_api_key} if self.qdrant_api_key else None,
+                            timeout=60.0
+                        )
+                    except Exception as e:
+                        logger.error(f"Error creating HTTP client: {e}")
+                        self.http_client = None
+                else:
+                    logger.warning("httpx not available for async operations")
+                    self.http_client = None
             else:
                 self.qdrant_client = None
                 self.http_client = None
                 logger.warning("Qdrant client not available")
             
-            # Set up retrieval toolkit for function calling
-            self.retrieval_toolkit = RetrievalToolkit()
-            self.retrieval_tools = self.retrieval_toolkit.get_tools()
+            # FIXED: Set up retrieval toolkit with error handling
+            if CAMEL_AVAILABLE and RetrievalToolkit:
+                try:
+                    self.retrieval_toolkit = RetrievalToolkit()
+                    self.retrieval_tools = self.retrieval_toolkit.get_tools()
+                    logger.info("Retrieval toolkit initialized successfully")
+                except Exception as e:
+                    logger.warning(f"Error initializing retrieval toolkit: {e}")
+                    self.retrieval_toolkit = None
+                    self.retrieval_tools = []
+            else:
+                logger.warning("CAMEL RetrievalToolkit not available")
+                self.retrieval_toolkit = None
+                self.retrieval_tools = []
             
             logger.info("ProductRetrieverAsync initialized successfully")
             self.initialized = True
@@ -157,7 +205,7 @@ class ProductRetrieverAsync:
         Returns:
             bool: True if successful, False otherwise
         """
-        if not self.http_client:
+        if not self.http_client or not HTTPX_AVAILABLE:
             return self._ensure_collection_exists_sync()
             
         try:
@@ -245,6 +293,10 @@ class ProductRetrieverAsync:
             logger.error("ProductRetrieverAsync not properly initialized")
             return []
         
+        if not self.embedding_model:
+            logger.error("Embedding model not available")
+            return []
+        
         try:
             # Generate embedding for the query
             query_embedding = self.embedding_model.embed(query)
@@ -252,7 +304,7 @@ class ProductRetrieverAsync:
             # Search the Qdrant collection
             search_results = []
             
-            if self.http_client:
+            if self.http_client and HTTPX_AVAILABLE:
                 # Use async REST API
                 search_payload = {
                     "vector": query_embedding,
@@ -261,29 +313,37 @@ class ProductRetrieverAsync:
                     "score_threshold": similarity_threshold
                 }
                 
-                response = await self.http_client.post(
-                    f"/collections/{self.qdrant_collection_name}/points/search",
-                    json=search_payload
-                )
-                
-                if response.status_code != 200:
-                    logger.error(f"Search failed: {response.text}")
-                    return []
-                
-                search_results = response.json()["result"]
-            elif self.qdrant_client:
+                try:
+                    response = await self.http_client.post(
+                        f"/collections/{self.qdrant_collection_name}/points/search",
+                        json=search_payload
+                    )
+                    
+                    if response.status_code != 200:
+                        logger.error(f"Search failed: {response.text}")
+                        return []
+                    
+                    search_results = response.json()["result"]
+                except Exception as e:
+                    logger.error(f"Error in async search: {e}")
+                    search_results = []
+            elif self.qdrant_client and QDRANT_AVAILABLE:
                 # Fall back to synchronous client if async fails
-                sync_results = self.qdrant_client.search(
-                    collection_name=self.qdrant_collection_name,
-                    query_vector=query_embedding,
-                    limit=limit,
-                    score_threshold=similarity_threshold
-                )
-                
-                search_results = [
-                    {"id": hit.id, "score": hit.score, "payload": hit.payload}
-                    for hit in sync_results
-                ]
+                try:
+                    sync_results = self.qdrant_client.search(
+                        collection_name=self.qdrant_collection_name,
+                        query_vector=query_embedding,
+                        limit=limit,
+                        score_threshold=similarity_threshold
+                    )
+                    
+                    search_results = [
+                        {"id": hit.id, "score": hit.score, "payload": hit.payload}
+                        for hit in sync_results
+                    ]
+                except Exception as e:
+                    logger.error(f"Error in sync search: {e}")
+                    search_results = []
             else:
                 logger.warning("No Qdrant client available for search")
                 return []
@@ -302,9 +362,12 @@ class ProductRetrieverAsync:
             if self.product_kg and product_ids:
                 for product_id in product_ids:
                     try:
-                        product = await self.product_kg.get_product_details(product_id)
-                        if product:
-                            products.append(product)
+                        if hasattr(self.product_kg, 'get_product_details'):
+                            product = await self.product_kg.get_product_details(product_id)
+                            if product:
+                                products.append(product)
+                        else:
+                            logger.warning("Product KG does not support get_product_details")
                     except Exception as e:
                         logger.error(f"Error fetching product {product_id}: {e}")
             
@@ -355,7 +418,11 @@ class ProductRetrieverAsync:
             
         try:
             # Get product details
-            product = await self.product_kg.get_product_details(product_id)
+            if hasattr(self.product_kg, 'get_product_details'):
+                product = await self.product_kg.get_product_details(product_id)
+            else:
+                logger.error("Product KG does not support get_product_details")
+                return []
             
             if not product:
                 logger.warning(f"Product not found: {product_id}")
@@ -396,6 +463,10 @@ class ProductRetrieverAsync:
             logger.error("Invalid product data")
             return False
             
+        if not self.embedding_model:
+            logger.error("Embedding model not available")
+            return False
+            
         product_id = product.get('id')
         
         try:
@@ -411,7 +482,7 @@ class ProductRetrieverAsync:
             embedding = self.embedding_model.embed(doc_text)
             
             # Store in Qdrant
-            if self.http_client:
+            if self.http_client and HTTPX_AVAILABLE:
                 # Use async REST API
                 point_id = str(uuid.uuid4())
                 point_payload = {
@@ -429,34 +500,42 @@ class ProductRetrieverAsync:
                     ]
                 }
                 
-                response = await self.http_client.put(
-                    f"/collections/{self.qdrant_collection_name}/points",
-                    json=point_payload
-                )
-                
-                if response.status_code != 200:
-                    logger.error(f"Failed to index product: {response.text}")
-                    return False
+                try:
+                    response = await self.http_client.put(
+                        f"/collections/{self.qdrant_collection_name}/points",
+                        json=point_payload
+                    )
                     
-                return True
-            elif self.qdrant_client:
+                    if response.status_code != 200:
+                        logger.error(f"Failed to index product: {response.text}")
+                        return False
+                        
+                    return True
+                except Exception as e:
+                    logger.error(f"Error in async indexing: {e}")
+                    return False
+            elif self.qdrant_client and QDRANT_AVAILABLE:
                 # Fall back to synchronous client
-                self.qdrant_client.upsert(
-                    collection_name=self.qdrant_collection_name,
-                    points=[
-                        models.PointStruct(
-                            id=str(uuid.uuid4()),
-                            vector=embedding,
-                            payload={
-                                "product_id": product_id,
-                                "text": doc_text,
-                                "title": product.get('title', ''),
-                                "timestamp": str(datetime.datetime.now())
-                            }
-                        )
-                    ]
-                )
-                return True
+                try:
+                    self.qdrant_client.upsert(
+                        collection_name=self.qdrant_collection_name,
+                        points=[
+                            models.PointStruct(
+                                id=str(uuid.uuid4()),
+                                vector=embedding,
+                                payload={
+                                    "product_id": product_id,
+                                    "text": doc_text,
+                                    "title": product.get('title', ''),
+                                    "timestamp": str(datetime.datetime.now())
+                                }
+                            )
+                        ]
+                    )
+                    return True
+                except Exception as e:
+                    logger.error(f"Error in sync indexing: {e}")
+                    return False
             else:
                 logger.error("No Qdrant client available for indexing")
                 return False
@@ -472,9 +551,12 @@ class ProductRetrieverAsync:
         Returns:
             List: List of retrieval tools
         """
-        return self.retrieval_tools
+        return self.retrieval_tools if self.retrieval_tools else []
     
     async def close(self):
         """Close all resources"""
-        if self.http_client:
-            await self.http_client.aclose()
+        if self.http_client and HTTPX_AVAILABLE:
+            try:
+                await self.http_client.aclose()
+            except Exception as e:
+                logger.error(f"Error closing HTTP client: {e}")

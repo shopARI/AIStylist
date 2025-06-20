@@ -13,7 +13,9 @@ from typing import Dict, List, Any, Optional, Tuple
 # Import the recommender systems
 from multi_cluster_recommender import MultiClusterRecommender
 from hybrid_visual_recommender import HybridVisualRecommender
+
 from rfm_apriori_recommender_async import RFMAprioriRecommenderAsync
+
 from memory_rag_recommender import MemoryRAGRecommender
 from ensemble_recommender import EnsembleRecommender
 

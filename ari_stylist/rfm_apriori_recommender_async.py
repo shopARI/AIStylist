@@ -4,7 +4,9 @@ Asynchronous RFM-Apriori Recommendation System for AI Stylist.
 This module implements a recommendation system that combines RFM (Recency,
 Frequency, Monetary) analysis with association rule mining using the Apriori
 algorithm for personalized fashion recommendations.
-Compatible with CAMEL-AI 0.2.43.
+Compatible with CAMEL-AI 0.2.59+.
+
+MIGRATED: Now uses AgentFactory instead of AsyncCAMELService for CAMEL 0.2.59+ compatibility.
 """
 
 import logging
@@ -14,8 +16,8 @@ import asyncio
 from typing import List, Dict, Any, Optional, Tuple, Set
 from collections import defaultdict
 
-# Import AsyncCAMELService
-from async_camel_service import AsyncCAMELService
+# MIGRATED: Import AgentFactory instead of AsyncCAMELService
+from agent_factory import get_agent_factory
 
 try:
     import pandas as pd
@@ -27,8 +29,12 @@ except ImportError:
     MLXTEND_AVAILABLE = False
     logging.warning("mlxtend not installed. Please install with: pip install mlxtend pandas")
 
-from camel.agents import ChatAgent
-from camel.memories import LongtermAgentMemory
+# MIGRATED: Updated imports for CAMEL 0.2.59+
+from camel_imports import (
+    ChatAgent,
+    AgentMemory,
+    CAMEL_AVAILABLE
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -38,6 +44,8 @@ class RFMAprioriRecommenderAsync:
     """
     Implements an asynchronous recommendation system that combines RFM (Recency, Frequency,
     Monetary) analysis with association rule mining using the Apriori algorithm.
+    
+    MIGRATED: Now uses AgentFactory for CAMEL 0.2.59+ compatibility.
     """
     
     def __init__(
@@ -58,7 +66,7 @@ class RFMAprioriRecommenderAsync:
             min_confidence: Minimum confidence for association rules
             min_lift: Minimum lift for association rules
         """
-        logger.info("Initializing RFMAprioriRecommenderAsync")
+        logger.info("Initializing RFMAprioriRecommenderAsync with CAMEL 0.2.59+ support")
         self.product_kg = product_kg
         self.memory_setup_func = memory_setup_func
         
@@ -79,8 +87,8 @@ class RFMAprioriRecommenderAsync:
         # Memory for tracking user preferences
         self.memory = None
         
-        # CAMEL service
-        self.camel_service = AsyncCAMELService()
+        # MIGRATED: Use AgentFactory instead of AsyncCAMELService
+        self.agent_factory = get_agent_factory()
         
         # Lock for transaction access
         self.transaction_lock = asyncio.Lock()
@@ -752,4 +760,5 @@ class RFMAprioriRecommenderAsync:
     
     async def close(self):
         """Clean up resources"""
-        await self.camel_service.close()
+        # MIGRATED: Clean up AgentFactory resources
+        await self.agent_factory.cleanup()

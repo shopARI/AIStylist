@@ -3,7 +3,9 @@ Multi-Clustering Recommendation System for AI Stylist.
 
 This module implements a recommendation system that uses clustering
 to group similar products and users for better recommendations.
-Compatible with CAMEL-AI 0.2.43.
+Compatible with CAMEL-AI 0.2.64.
+
+FIXED: Uses centralized imports and proper error handling.
 """
 
 import logging
@@ -12,13 +14,19 @@ from typing import List, Dict, Any, Optional, Tuple
 
 try:
     from sklearn.cluster import KMeans
+    SKLEARN_AVAILABLE = True
 except ImportError:
+    SKLEARN_AVAILABLE = False
     logging.warning("scikit-learn not installed. Please install with: pip install scikit-learn")
 
-from camel.embeddings import OpenAIEmbedding
-from camel.storages import QdrantStorage
-from camel.retrievers import VectorRetriever
-from camel.types import EmbeddingModelType
+# FIXED: Use centralized imports with error handling
+from camel_imports import (
+    CAMEL_AVAILABLE,
+    OpenAIEmbedding,
+    QdrantStorage, 
+    VectorRetriever,
+    EmbeddingModelType
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -28,6 +36,8 @@ class MultiClusterRecommender:
     """
     Implements a recommendation system that uses clustering to group
     similar products and users for better recommendations.
+    
+    FIXED: Uses proper error handling for all CAMEL components.
     """
     
     def __init__(
@@ -40,44 +50,73 @@ class MultiClusterRecommender:
         """
         Initialize the multi-cluster recommender.
         
+        FIXED: Added proper error handling for CAMEL components.
+        
         Args:
             product_kg: Neo4j product knowledge graph instance
             embedding_model: CAMEL embedding model (optional)
             n_clusters: Number of clusters to create
             storage_path: Path to store vector embeddings
         """
-        logger.info("Initializing MultiClusterRecommender")
+        logger.info("Initializing MultiClusterRecommender with CAMEL 0.2.64 compatibility")
         self.product_kg = product_kg
         self.n_clusters = n_clusters
         
-        # Initialize embedding model
+        # Check availability of required components
+        if not CAMEL_AVAILABLE:
+            logger.warning("CAMEL-AI not fully available, using fallback implementations")
+        
+        if not SKLEARN_AVAILABLE:
+            logger.error("scikit-learn not available, clustering will not work")
+            self.embedding_model = None
+            self.storage = None
+            self.retriever = None
+            self.product_cluster_model = None
+            self.user_cluster_model = None
+            self.is_clustered = False
+            return
+        
+        # FIXED: Initialize embedding model with error handling
         try:
-            self.embedding_model = embedding_model or OpenAIEmbedding(
-                model_type=EmbeddingModelType.TEXT_EMBEDDING_3_SMALL
-            )
-            logger.info("Embedding model initialized successfully")
+            if CAMEL_AVAILABLE and OpenAIEmbedding and EmbeddingModelType:
+                self.embedding_model = embedding_model or OpenAIEmbedding(
+                    model_type=EmbeddingModelType.TEXT_EMBEDDING_3_SMALL
+                )
+                logger.info("Embedding model initialized successfully")
+            else:
+                logger.warning("CAMEL embeddings not available")
+                self.embedding_model = None
         except Exception as e:
             logger.error(f"Error initializing embedding model: {e}")
-            # Fallback to a simpler approach if embeddings aren't available
             self.embedding_model = None
             logger.warning("Using fallback without embeddings")
         
-        # Initialize storage and retriever if embedding model is available
-        if self.embedding_model:
+        # FIXED: Initialize storage and retriever with error handling
+        if self.embedding_model and CAMEL_AVAILABLE:
             try:
-                # Create vector storage with CAMEL
-                self.storage = QdrantStorage(
-                    vector_dim=self.embedding_model.get_output_dim(),
-                    path=storage_path,
-                    collection_name="fashion_clusters"
-                )
+                if QdrantStorage:
+                    # Create vector storage with CAMEL
+                    self.storage = QdrantStorage(
+                        vector_dim=self.embedding_model.get_output_dim(),
+                        path=storage_path,
+                        collection_name="fashion_clusters"
+                    )
+                    logger.info("Vector storage initialized")
+                else:
+                    logger.warning("QdrantStorage not available")
+                    self.storage = None
                 
-                # Initialize retriever
-                self.retriever = VectorRetriever(
-                    embedding_model=self.embedding_model,
-                    storage=self.storage
-                )
-                logger.info("Vector storage and retriever initialized")
+                if VectorRetriever and self.storage:
+                    # Initialize retriever
+                    self.retriever = VectorRetriever(
+                        embedding_model=self.embedding_model,
+                        storage=self.storage
+                    )
+                    logger.info("Vector retriever initialized")
+                else:
+                    logger.warning("VectorRetriever not available")
+                    self.retriever = None
+                    
             except Exception as e:
                 logger.error(f"Error initializing vector storage: {e}")
                 self.storage = None
@@ -153,6 +192,10 @@ class MultiClusterRecommender:
         if not products:
             logger.warning("No products provided for clustering")
             return []
+        
+        if not SKLEARN_AVAILABLE:
+            logger.error("scikit-learn not available for clustering")
+            return products
             
         try:
             # Generate embeddings for products
@@ -170,18 +213,25 @@ class MultiClusterRecommender:
                 return products
                 
             # Convert to numpy array
-            embeddings_array = np.array(product_embeddings)
+            try:
+                embeddings_array = np.array(product_embeddings)
+            except Exception as e:
+                logger.error(f"Error converting embeddings to numpy array: {e}")
+                return products
             
             # Adjust n_clusters if needed
             actual_n_clusters = min(self.n_clusters, len(valid_products))
             
             # Create clusters
-            from sklearn.cluster import KMeans
-            kmeans = KMeans(n_clusters=actual_n_clusters, random_state=42)
-            clusters = kmeans.fit_predict(embeddings_array)
-            
-            # Store the model
-            self.product_cluster_model = kmeans
+            try:
+                kmeans = KMeans(n_clusters=actual_n_clusters, random_state=42)
+                clusters = kmeans.fit_predict(embeddings_array)
+                
+                # Store the model
+                self.product_cluster_model = kmeans
+            except Exception as e:
+                logger.error(f"Error creating clusters with KMeans: {e}")
+                return products
             
             # Update products with cluster information
             for i, product in enumerate(valid_products):
@@ -189,19 +239,26 @@ class MultiClusterRecommender:
                 
             # Store cluster embeddings for future use
             if self.storage and self.retriever:
-                for i, product in enumerate(valid_products):
-                    # Create document for the product
-                    document_id = f"product_{product.get('id')}"
-                    self.storage.add_vector(
-                        id=document_id,
-                        vector=product_embeddings[i],
-                        payload={
-                            "product_id": product.get('id'),
-                            "cluster": int(clusters[i]),
-                            "title": product.get('title', ''),
-                            "category": product.get('categories', [])
-                        }
-                    )
+                try:
+                    for i, product in enumerate(valid_products):
+                        # Create document for the product
+                        document_id = f"product_{product.get('id')}"
+                        
+                        if hasattr(self.storage, 'add_vector'):
+                            self.storage.add_vector(
+                                id=document_id,
+                                vector=product_embeddings[i],
+                                payload={
+                                    "product_id": product.get('id'),
+                                    "cluster": int(clusters[i]),
+                                    "title": product.get('title', ''),
+                                    "category": product.get('categories', [])
+                                }
+                            )
+                        else:
+                            logger.warning("Storage does not support add_vector method")
+                except Exception as e:
+                    logger.error(f"Error storing cluster embeddings: {e}")
             
             self.is_clustered = True
             logger.info(f"Successfully created {actual_n_clusters} product clusters")
@@ -239,10 +296,13 @@ class MultiClusterRecommender:
                     SET p.cluster = $cluster
                     """
                     
-                    self.product_kg.query(
-                        query, 
-                        {"id": product['id'], "cluster": product['cluster']}
-                    )
+                    try:
+                        self.product_kg.query(
+                            query, 
+                            {"id": product['id'], "cluster": product['cluster']}
+                        )
+                    except Exception as e:
+                        logger.error(f"Error updating cluster for product {product['id']}: {e}")
             
             logger.info("Updated cluster information in Neo4j")
             return True
@@ -265,7 +325,16 @@ class MultiClusterRecommender:
         logger.info(f"Getting cluster-based recommendations for product {product_id}")
         
         # Get product details
-        product = self.product_kg.get_product_details(product_id)
+        try:
+            if hasattr(self.product_kg, 'get_product_details'):
+                product = self.product_kg.get_product_details(product_id)
+            else:
+                logger.error("Product KG does not support get_product_details")
+                return []
+        except Exception as e:
+            logger.error(f"Error getting product details: {e}")
+            return []
+            
         if not product:
             logger.warning(f"Product not found: {product_id}")
             return []
@@ -275,12 +344,15 @@ class MultiClusterRecommender:
             # Try to infer cluster
             embedding = self._get_product_embedding(product)
             if embedding is not None and self.product_cluster_model:
-                # Predict cluster
-                cluster = int(self.product_cluster_model.predict([embedding])[0])
-                product['cluster'] = cluster
-                
-                # Update in Neo4j
-                self._update_product_clusters_in_neo4j([product])
+                try:
+                    # Predict cluster
+                    cluster = int(self.product_cluster_model.predict([embedding])[0])
+                    product['cluster'] = cluster
+                    
+                    # Update in Neo4j
+                    self._update_product_clusters_in_neo4j([product])
+                except Exception as e:
+                    logger.error(f"Error predicting cluster for product: {e}")
         
         # Get recommendations based on cluster
         if 'cluster' in product:
@@ -295,19 +367,24 @@ class MultiClusterRecommender:
                     p.price as price,
                     p.description as description,
                     p.images as images,
-                    p.cluster as cluster
+                    p.cluster as cluster,
+                    COALESCE(p.visited_num, 0) as visited_num
                 ORDER BY p.visited_num DESC
                 LIMIT $limit
                 """
                 
-                result = self.product_kg.query(
-                    query, 
-                    {
-                        "cluster": product['cluster'], 
-                        "product_id": product_id, 
-                        "limit": limit
-                    }
-                )
+                if hasattr(self.product_kg, 'query'):
+                    result = self.product_kg.query(
+                        query, 
+                        {
+                            "cluster": product['cluster'], 
+                            "product_id": product_id, 
+                            "limit": limit
+                        }
+                    )
+                else:
+                    logger.error("Product KG does not support query method")
+                    result = []
                 
                 if result:
                     # Process results into product objects
@@ -315,9 +392,12 @@ class MultiClusterRecommender:
                     for record in result:
                         # Get full product details
                         if 'id' in record:
-                            product_detail = self.product_kg.get_product_details(record['id'])
-                            if product_detail:
-                                recommendations.append(product_detail)
+                            try:
+                                product_detail = self.product_kg.get_product_details(record['id'])
+                                if product_detail:
+                                    recommendations.append(product_detail)
+                            except Exception as e:
+                                logger.error(f"Error getting product details for {record['id']}: {e}")
                     
                     logger.info(f"Found {len(recommendations)} cluster-based recommendations")
                     return recommendations
@@ -327,7 +407,15 @@ class MultiClusterRecommender:
         
         # Fallback to similar products if clustering is not available
         logger.info("Using fallback to similar products")
-        return self.product_kg.get_similar_products(product_id, limit)
+        try:
+            if hasattr(self.product_kg, 'get_similar_products'):
+                return self.product_kg.get_similar_products(product_id, limit)
+            else:
+                logger.warning("Product KG does not support get_similar_products")
+                return []
+        except Exception as e:
+            logger.error(f"Error getting fallback similar products: {e}")
+            return []
     
     def cluster_all_products(self) -> bool:
         """
@@ -346,11 +434,15 @@ class MultiClusterRecommender:
                 p.price as price,
                 p.description as description,
                 p.images as images,
-                p.visited_num as visited_num
+                COALESCE(p.visited_num, 0) as visited_num
             LIMIT 1000
             """
             
-            result = self.product_kg.query(query)
+            if hasattr(self.product_kg, 'query'):
+                result = self.product_kg.query(query)
+            else:
+                logger.error("Product KG does not support query method")
+                return False
             
             if not result:
                 logger.warning("No products found in knowledge graph")
@@ -361,14 +453,17 @@ class MultiClusterRecommender:
             for record in result:
                 # Get full product details
                 if 'id' in record:
-                    product_detail = self.product_kg.get_product_details(record['id'])
-                    if product_detail:
-                        products.append(product_detail)
+                    try:
+                        product_detail = self.product_kg.get_product_details(record['id'])
+                        if product_detail:
+                            products.append(product_detail)
+                    except Exception as e:
+                        logger.error(f"Error getting product details for {record['id']}: {e}")
             
             # Create clusters
             if products:
-                self.create_product_clusters(products)
-                return True
+                clustered_products = self.create_product_clusters(products)
+                return len(clustered_products) > 0
             else:
                 logger.warning("No valid products found for clustering")
                 return False

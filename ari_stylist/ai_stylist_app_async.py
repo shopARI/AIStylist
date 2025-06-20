@@ -3,10 +3,9 @@ Enhanced Asynchronous AI Stylist Application
 
 Main application entry point for the AI Stylist system with persistent memory support.
 Implements user identification and cross-session memory.
-Compatible with CAMEL-AI 0.2.43.
+Compatible with CAMEL-AI 0.2.59+.
 
-FIXED: Now properly passes parent app reference to chat manager to enable
-advanced ML ensemble system for all conversations.
+MIGRATED: Now uses AgentFactory instead of AsyncCAMELService for CAMEL 0.2.59+ compatibility.
 """
 
 import os
@@ -17,19 +16,21 @@ import httpx
 import datetime
 import uuid
 
+
 # Configure logging first, before any other imports
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("enhanced_ai_stylist_app_async")
 
-# Import AsyncCAMELService
-from async_camel_service import AsyncCAMELService
+# Import new agent factory instead of AsyncCAMELService
+from agent_factory import get_agent_factory
 
-# Import the enhanced memory integration
+# Import the new memory integration 
 from memory_integration_async import (
-    setup_stylist_memory_async,
-    save_memory_for_user_async,
-    optimize_memory_async,
-    extract_preferences_from_memory_async
+    MemoryManager,
+    setup_stylist_memory_async,  # Backward compatibility function
+    save_memory_for_user_async,  # Backward compatibility function
+    optimize_memory_async,  # Backward compatibility function
+    extract_preferences_from_memory_async  # Backward compatibility function
 )
 
 # Import the enhanced stylist agent
@@ -48,7 +49,7 @@ from enhanced_recommender_manager_async import EnhancedRecommenderManagerAsync
 try:
     # Import the async product retriever
     from product_retriever_async import ProductRetrieverAsync
-    logger.info("Using ProductRetrieverAsync (CAMEL-AI 0.2.43 compatible)")
+    logger.info("Using ProductRetrieverAsync (CAMEL-AI 0.2.59+ compatible)")
 except ImportError:
     logger.warning("Failed to import ProductRetrieverAsync module")
     # Define a fallback minimal ProductRetrieverAsync if needed
@@ -67,12 +68,28 @@ class EnhancedAIStylistApp:
     """
     Enhanced AI Stylist application with persistent memory and user identification.
     Implements cross-session memory and improved personalization.
-    Compatible with CAMEL-AI 0.2.43.
+    Compatible with CAMEL-AI 0.2.59+.
     
-    FIXED: Now properly integrates chat conversations with the advanced ML ensemble system.
+    MIGRATED: Now properly integrates with CAMEL 0.2.59+ using AgentFactory.
     """
     
     def __init__(self, neo4j_url=None, neo4j_username=None, neo4j_password=None):
+        # Add at the beginning of __init__ method
+
+        """Initialize with CAMEL-AI 0.2.64 verification"""
+        logger.info("Initializing Enhanced AI Stylist with CAMEL-AI 0.2.64...")
+        
+        # VERIFY CAMEL VERSION
+        try:
+            from camel import __version__ as camel_version
+            if not camel_version.startswith('0.2.64'):
+                logger.warning(f"CAMEL version {camel_version} may not be fully compatible")
+            else:
+                logger.info(f"✅ CAMEL-AI version {camel_version} verified")
+        except:
+            logger.warning("Could not verify CAMEL-AI version")
+    
+  
         """
         Initialize the Enhanced AI Stylist application.
         
@@ -107,7 +124,7 @@ class EnhancedAIStylistApp:
         # Use remote Qdrant if configurations are available
         if self.qdrant_url and self.qdrant_api_key:
             logger.info(f"Using remote Qdrant at {self.qdrant_url}")
-            # Initialize retriever with CAMEL-AI 0.2.43 compatible parameters
+            # Initialize retriever with CAMEL-AI 0.2.59+ compatible parameters
             self.product_retriever = ProductRetrieverAsync(
                 vector_storage_path="product_data/embeddings",
                 qdrant_url=self.qdrant_url,
@@ -116,17 +133,22 @@ class EnhancedAIStylistApp:
             )
         else:
             logger.info("Using local vector storage (remote Qdrant configuration not provided)")
-            # Initialize local retriever with CAMEL-AI 0.2.43 compatible parameters
+            # Initialize local retriever with CAMEL-AI 0.2.59+ compatible parameters
             self.product_retriever = ProductRetrieverAsync(
                 vector_storage_path="product_data/embeddings"
             )
         
-        # Initialize the CAMEL service
-        self.camel_service = AsyncCAMELService()
+        # MIGRATED: Use AgentFactory instead of AsyncCAMELService
+        self.agent_factory = get_agent_factory()
+        logger.info("Initialized AgentFactory for CAMEL 0.2.59+")
         
-        # Initialize the enhanced memory system
+        # MIGRATED: Initialize MemoryManager for new memory APIs
+        self.memory_manager = MemoryManager(self.product_kg)
+        logger.info("Initialized MemoryManager for CAMEL 0.2.59+")
+        
+        # Initialize the enhanced memory system with backward compatibility wrapper
         logger.info("Setting up enhanced memory system...")
-        self.memory_setup_func = setup_stylist_memory_async
+        self.memory_setup_func = self._setup_memory_for_user
         
         # Initialize the enhanced recommender manager
         logger.info("Initializing enhanced recommender manager...")
@@ -137,16 +159,14 @@ class EnhancedAIStylistApp:
             stylist_agent=None  # Will be set per session
         )
         
-        # ============================================================================
-        # 🚀 FIXED: Pass parent app reference to chat manager for ML integration
-        # ============================================================================
+        # Pass parent app reference to chat manager for ML integration
         logger.info("Creating enhanced chat manager with ML integration...")
         self.chat_manager = EnhancedChatManagerAsync(
             stylist_agent=None,  # Will be set per session
             product_kg=self.product_kg,
             product_retriever=self.product_retriever,
             memory_setup_func=self.memory_setup_func,
-            parent_app=self  # 🚀 NEW: Pass self reference for ML access
+            parent_app=self  # Pass self reference for ML access
         )
         
         # Track active sessions
@@ -165,7 +185,17 @@ class EnhancedAIStylistApp:
         # Verify and update database schema
         asyncio.create_task(self._setup_database_schema())
         
-        logger.info("✅ Enhanced AI Stylist initialized with FULL ML integration for chat!")
+        logger.info("✅ Enhanced AI Stylist initialized with CAMEL 0.2.59+ support!")
+    
+    async def _setup_memory_for_user(self, user_id=None, neo4j_client=None):
+        """
+        Backward compatibility wrapper for memory setup.
+        Uses the new MemoryManager internally.
+        """
+        return await self.memory_manager.create_memory(
+            user_id=user_id,
+            enable_mcp=True
+        )
     
     async def _setup_database_schema(self):
         """Set up and verify the database schema"""
@@ -215,6 +245,7 @@ class EnhancedAIStylistApp:
                 # Optimize memory for each session
                 for session_id, session in persistent_sessions.items():
                     try:
+                        # MIGRATED: Use optimize_memory_async from memory_integration_v2
                         await optimize_memory_async(
                             memory=session.memory,
                             user_id=session.user_id,
@@ -232,6 +263,47 @@ class EnhancedAIStylistApp:
             logger.error(f"Error in memory optimization worker: {e}")
     
     async def create_session(self, user_id=None):
+        """FIXED: Create a new chat session with proper error handling."""
+        try:
+            # Check existing sessions
+            if user_id and user_id in self.registered_users:
+                existing_session_id = self.registered_users[user_id]
+                if existing_session_id in self.active_sessions:
+                    return existing_session_id
+            
+            # Create session through chat manager
+            session = await self.chat_manager.get_or_create_session(user_id=user_id)
+            
+            # Ensure session has ID
+            if not hasattr(session, 'session_id') or not session.session_id:
+                session.session_id = str(uuid.uuid4())
+            
+            # Create memory and agent
+            if not hasattr(session, 'memory') or not session.memory:
+                memory = await self.memory_manager.create_memory(
+                    user_id=user_id, enable_mcp=True
+                )
+                session.memory = memory
+            
+            if not hasattr(session, 'stylist_agent') or not session.stylist_agent:
+                agent_factory = get_agent_factory()  # Use sync version
+                stylist_agent = await agent_factory.create_stylist_agent(
+                    memory=session.memory, enable_mcp=True
+                )
+                session.stylist_agent = stylist_agent
+            
+            # Store session
+            self.active_sessions[session.session_id] = session
+            if user_id:
+                self.registered_users[user_id] = session.session_id
+            
+            return session.session_id
+            
+        except Exception as e:
+            logger.error(f"Error creating session: {e}")
+            # Create minimal fallback
+            session_id = str(uuid.uuid4())
+            return session_id
         """
         Create a new chat session with persistent memory support.
         
@@ -263,21 +335,22 @@ class EnhancedAIStylistApp:
             
             # Update stylist agent if needed
             if not hasattr(session, 'stylist_agent') or not session.stylist_agent:
-                # Create a new agent using the CAMEL service
-                memory = await self.camel_service.setup_memory(
-                    memory_setup_func=self.memory_setup_func,
+                # MIGRATED: Create memory using MemoryManager
+                memory = await self.memory_manager.create_memory(
                     user_id=user_id,
-                    neo4j_client=self.product_kg
+                    enable_mcp=True
                 )
                 
                 session.memory = memory
                 
-                # Create a new agent
-                stylist_agent = await create_stylist_agent_async(
-                    memory=memory
+                # MIGRATED: Create agent using AgentFactory
+                stylist_agent = await self.agent_factory.create_stylist_agent(
+                    memory=memory,
+                    model_type=None,  # Will use default GPT-4O
+                    enable_mcp=True
                 )
                 session.stylist_agent = stylist_agent
-                logger.info("Created stylist agent for new session")
+                logger.info("Created stylist agent for new session using AgentFactory")
             
             # Add to active sessions
             self.active_sessions[session.session_id] = session
@@ -327,14 +400,16 @@ class EnhancedAIStylistApp:
                 session = await self.chat_manager.get_or_create_session(session_id=session_id)
                 
                 if not hasattr(session, 'stylist_agent') or not session.stylist_agent:
-                    # Create a new agent if needed using AsyncCAMELService
-                    memory = await self.camel_service.setup_memory(
-                        memory_setup_func=self.memory_setup_func,
+                    # MIGRATED: Create agent using new patterns
+                    memory = await self.memory_manager.create_memory(
                         user_id=session.user_id if hasattr(session, 'user_id') else None,
-                        neo4j_client=self.product_kg
+                        enable_mcp=True
                     )
                     
-                    stylist_agent = await create_stylist_agent_async(memory)
+                    stylist_agent = await self.agent_factory.create_stylist_agent(
+                        memory=memory,
+                        enable_mcp=True
+                    )
                     session.stylist_agent = stylist_agent
                     session.memory = memory
                     
@@ -385,10 +460,10 @@ class EnhancedAIStylistApp:
             # Save memory state if user_id is available
             if hasattr(session, 'user_id') and session.user_id and hasattr(session, 'memory') and session.memory:
                 try:
-                    await save_memory_for_user_async(
+                    # MIGRATED: Use MemoryManager for saving
+                    await self.memory_manager.save_memory(
                         memory=session.memory,
-                        user_id=session.user_id,
-                        neo4j_client=self.product_kg
+                        user_id=session.user_id
                     )
                     logger.info(f"Saved memory state for user {session.user_id}")
                 except Exception as e:
@@ -402,15 +477,7 @@ class EnhancedAIStylistApp:
             }
     
     async def get_session(self, session_id):
-        """
-        Get a session by ID.
-        
-        Args:
-            session_id: Session ID
-            
-        Returns:
-            ChatSession object or None if not found
-        """
+        """FIXED: Get a session by ID with proper error handling."""
         if not session_id:
             return None
             
@@ -420,10 +487,14 @@ class EnhancedAIStylistApp:
             
         # Try to get from chat manager
         try:
-            return await self.chat_manager.get_or_create_session(session_id=session_id)
+            session = await self.chat_manager.get_or_create_session(session_id=session_id)
+            if session:
+                self.active_sessions[session_id] = session
+                return session
         except Exception as e:
             logger.error(f"Error getting session {session_id}: {e}")
-            return None
+            
+        return None
     
     async def get_product_recommendations(self, session_id, product_id=None, query=None, limit=5, occasion=None):
         """
@@ -762,16 +833,12 @@ class EnhancedAIStylistApp:
                         product = await self.product_kg.get_product_details(product_id)
                         
                         if product and hasattr(session, 'memory') and session.memory:
-                            from memory_integration_async import add_product_interaction_to_memory_async
-                            
-                            # Add interaction to memory with Neo4j persistence
-                            await add_product_interaction_to_memory_async(
+                            # MIGRATED: Use MemoryManager for product interactions
+                            await self.memory_manager.add_product_interaction(
                                 memory=session.memory,
                                 product=product,
                                 interaction_type=interaction_type,
-                                persist_to_neo4j=True,
-                                user_id=user_id,
-                                neo4j_client=self.product_kg
+                                user_id=user_id
                             )
                     except Exception as e:
                         logger.error(f"Error recording interaction in Neo4j and memory: {e}")
@@ -817,16 +884,12 @@ class EnhancedAIStylistApp:
             
             # Add to memory if available
             if hasattr(session, 'memory') and session.memory:
-                from memory_integration_async import add_user_preference_to_memory_async
-                
-                # Add preference to memory with Neo4j persistence
-                await add_user_preference_to_memory_async(
+                # MIGRATED: Use MemoryManager for preferences
+                await self.memory_manager.add_preference(
                     memory=session.memory,
                     preference_type=preference_type,
                     preference_value=preference_value,
-                    persist_to_neo4j=True,
-                    user_id=user_id,
-                    neo4j_client=self.product_kg
+                    user_id=user_id
                 )
             
             # Use enhanced recommender manager
@@ -877,6 +940,7 @@ class EnhancedAIStylistApp:
             
             # Get from memory if available
             if hasattr(session, 'memory') and session.memory:
+                # MIGRATED: Use extract_preferences_from_memory_async from v2
                 preferences = await extract_preferences_from_memory_async(session.memory)
                 return preferences
             
@@ -901,7 +965,8 @@ class EnhancedAIStylistApp:
                 if hasattr(session, 'user_id') and session.user_id and hasattr(session, 'memory') and session.memory:
                     try:
                         logger.info(f"Performing final memory persistence for user {session.user_id}")
-                        await save_memory_for_user_async(session.memory, session.user_id, self.product_kg)
+                        # MIGRATED: Use MemoryManager for final save
+                        await self.memory_manager.save_memory(session.memory, session.user_id)
                     except Exception as e:
                         logger.error(f"Error in final memory persistence for session {session_id}: {e}")
             
@@ -917,8 +982,8 @@ class EnhancedAIStylistApp:
             if hasattr(self.product_kg, 'close'):
                 await self.product_kg.close()
             
-            # Close CAMEL service
-            await self.camel_service.close()
+            # Clean up AgentFactory resources
+            await self.agent_factory.cleanup()
             
             # Clean up enhanced recommender resources
             if hasattr(self, 'enhanced_recommender_manager'):

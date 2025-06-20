@@ -3,7 +3,9 @@ Ensemble Recommendation System for AI Stylist.
 
 This module implements an ensemble recommendation system that combines
 multiple recommenders for more robust and accurate recommendations.
-Compatible with CAMEL-AI 0.2.43.
+Compatible with CAMEL-AI 0.2.64.
+
+FIXED: Uses centralized imports and proper error handling.
 """
 
 import logging
@@ -11,8 +13,13 @@ import json
 from typing import List, Dict, Any, Optional, Tuple, Set
 from collections import Counter
 
-from camel.agents import ChatAgent
-from camel.messages import BaseMessage
+# FIXED: Use centralized imports with proper error handling
+from camel_imports import (
+    CAMEL_AVAILABLE,
+    ChatAgent,
+    BaseMessage,
+    CompatibilityLayer
+)
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -22,6 +29,8 @@ class EnsembleRecommender:
     """
     Implements an ensemble recommendation system that combines multiple
     recommenders for more robust and accurate recommendations.
+    
+    FIXED: Uses proper error handling for all CAMEL operations.
     """
     
     def __init__(
@@ -38,12 +47,16 @@ class EnsembleRecommender:
             product_retriever: Product retriever (optional)
             stylist_agent: CAMEL stylist agent (optional)
         """
-        logger.info("Initializing EnsembleRecommender")
+        logger.info("Initializing EnsembleRecommender with CAMEL 0.2.64 compatibility")
         self.product_kg = product_kg
         self.product_retriever = product_retriever
         self.stylist_agent = stylist_agent
         self.recommenders = []
         self.weights = {}
+        
+        # Check CAMEL availability
+        if not CAMEL_AVAILABLE:
+            logger.warning("CAMEL-AI not fully available, using fallback implementations")
         
         # Default weights for different recommendation types
         self.default_weights = {
@@ -112,11 +125,11 @@ class EnsembleRecommender:
             
             # Fallback to basic product retrieval
             if product_id:
-                return self.product_kg.get_similar_products(product_id, limit)
+                return self._get_fallback_similar_products(product_id, limit)
             elif query and self.product_retriever:
-                return self.product_retriever.search_by_natural_language(query, limit)
+                return self._get_fallback_query_products(query, limit)
             elif hasattr(self.product_kg, 'get_popular_products'):
-                return self.product_kg.get_popular_products(limit)
+                return self._get_fallback_popular_products(limit)
             else:
                 return []
         
@@ -129,31 +142,9 @@ class EnsembleRecommender:
             recommender_weight = self.weights.get(recommender_name, 1.0)
             
             try:
-                # Call appropriate method based on parameters
-                if product_id is not None and hasattr(recommender, 'get_similar_products'):
-                    recommendations = recommender.get_similar_products(product_id, limit)
-                    
-                elif product_id is not None and hasattr(recommender, 'get_visual_recommendations'):
-                    recommendations = recommender.get_visual_recommendations(product_id, limit)
-                    
-                elif product_id is not None and hasattr(recommender, 'get_recommendations') and 'product_id' in recommender.get_recommendations.__code__.co_varnames:
-                    recommendations = recommender.get_recommendations(product_id=product_id, limit=limit)
-                    
-                elif user_id is not None and hasattr(recommender, 'get_personalized_recommendations'):
-                    recommendations = recommender.get_personalized_recommendations(user_id, query=query, limit=limit)
-                    
-                elif user_id is not None and hasattr(recommender, 'get_recommendations') and 'user_id' in recommender.get_recommendations.__code__.co_varnames:
-                    recommendations = recommender.get_recommendations(user_id=user_id, limit=limit)
-                    
-                elif query is not None and hasattr(recommender, 'search_by_natural_language'):
-                    recommendations = recommender.search_by_natural_language(query, limit)
-                    
-                elif query is not None and hasattr(recommender, 'search_products'):
-                    recommendations = recommender.search_products(query, limit)
-                    
-                elif hasattr(recommender, 'get_recommendations'):
-                    # Generic recommendation method
-                    recommendations = recommender.get_recommendations(limit=limit)
+                recommendations = self._get_recommendations_from_recommender(
+                    recommender, user_id, session_id, product_id, query, limit
+                )
                 
                 # Add recommendations with weight
                 if recommendations:
@@ -170,8 +161,7 @@ class EnsembleRecommender:
         # Add basic product retrieval if needed
         if product_id and (not all_recommendations or len(all_recommendations) < 2):
             try:
-                # Get similar products
-                similar_products = self.product_kg.get_similar_products(product_id, limit)
+                similar_products = self._get_fallback_similar_products(product_id, limit)
                 
                 if similar_products:
                     logger.info(f"Got {len(similar_products)} similar products")
@@ -187,17 +177,16 @@ class EnsembleRecommender:
         # Add popular products if needed
         if not all_recommendations or len(all_recommendations) < 2:
             try:
-                if hasattr(self.product_kg, 'get_popular_products'):
-                    popular_products = self.product_kg.get_popular_products(limit)
+                popular_products = self._get_fallback_popular_products(limit)
+                
+                if popular_products:
+                    logger.info(f"Got {len(popular_products)} popular products")
                     
-                    if popular_products:
-                        logger.info(f"Got {len(popular_products)} popular products")
-                        
-                        all_recommendations.append({
-                            'recommender': 'popular',
-                            'weight': self.default_weights.get('popular', 0.6),
-                            'recommendations': popular_products
-                        })
+                    all_recommendations.append({
+                        'recommender': 'popular',
+                        'weight': self.default_weights.get('popular', 0.6),
+                        'recommendations': popular_products
+                    })
             except Exception as e:
                 logger.error(f"Error getting popular products: {e}")
         
@@ -254,7 +243,7 @@ class EnsembleRecommender:
             top_recommendations.append(product)
         
         # If we have a stylist agent, let it filter and explain the recommendations
-        if self.stylist_agent and top_recommendations:
+        if self.stylist_agent and top_recommendations and CAMEL_AVAILABLE:
             try:
                 # Add explanations to the recommendations
                 self._add_stylist_explanations(top_recommendations, user_id, query, product_id)
@@ -263,6 +252,97 @@ class EnsembleRecommender:
         
         logger.info(f"Found {len(top_recommendations)} ensemble recommendations")
         return top_recommendations
+    
+    def _get_recommendations_from_recommender(
+        self, 
+        recommender, 
+        user_id, 
+        session_id, 
+        product_id, 
+        query, 
+        limit
+    ) -> List[Dict[str, Any]]:
+        """
+        Get recommendations from a specific recommender with error handling.
+        
+        Args:
+            recommender: Recommender instance
+            user_id: User ID
+            session_id: Session ID
+            product_id: Product ID
+            query: Query string
+            limit: Limit
+            
+        Returns:
+            List of recommendations
+        """
+        try:
+            # Call appropriate method based on parameters
+            if product_id is not None and hasattr(recommender, 'get_similar_products'):
+                return recommender.get_similar_products(product_id, limit)
+                
+            elif product_id is not None and hasattr(recommender, 'get_visual_recommendations'):
+                return recommender.get_visual_recommendations(product_id, limit)
+                
+            elif product_id is not None and hasattr(recommender, 'get_recommendations'):
+                # Check if method accepts product_id parameter
+                import inspect
+                sig = inspect.signature(recommender.get_recommendations)
+                if 'product_id' in sig.parameters:
+                    return recommender.get_recommendations(product_id=product_id, limit=limit)
+                
+            elif user_id is not None and hasattr(recommender, 'get_personalized_recommendations'):
+                return recommender.get_personalized_recommendations(user_id, query=query, limit=limit)
+                
+            elif user_id is not None and hasattr(recommender, 'get_recommendations'):
+                # Check if method accepts user_id parameter
+                import inspect
+                sig = inspect.signature(recommender.get_recommendations)
+                if 'user_id' in sig.parameters:
+                    return recommender.get_recommendations(user_id=user_id, limit=limit)
+                
+            elif query is not None and hasattr(recommender, 'search_by_natural_language'):
+                return recommender.search_by_natural_language(query, limit)
+                
+            elif query is not None and hasattr(recommender, 'search_products'):
+                return recommender.search_products(query, limit)
+                
+            elif hasattr(recommender, 'get_recommendations'):
+                # Generic recommendation method
+                return recommender.get_recommendations(limit=limit)
+                
+            return []
+            
+        except Exception as e:
+            logger.error(f"Error calling recommender method: {e}")
+            return []
+    
+    def _get_fallback_similar_products(self, product_id: str, limit: int) -> List[Dict[str, Any]]:
+        """Get similar products as fallback"""
+        try:
+            if hasattr(self.product_kg, 'get_similar_products'):
+                return self.product_kg.get_similar_products(product_id, limit)
+        except Exception as e:
+            logger.error(f"Error getting fallback similar products: {e}")
+        return []
+    
+    def _get_fallback_query_products(self, query: str, limit: int) -> List[Dict[str, Any]]:
+        """Get query-based products as fallback"""
+        try:
+            if self.product_retriever and hasattr(self.product_retriever, 'search_by_natural_language'):
+                return self.product_retriever.search_by_natural_language(query, limit)
+        except Exception as e:
+            logger.error(f"Error getting fallback query products: {e}")
+        return []
+    
+    def _get_fallback_popular_products(self, limit: int) -> List[Dict[str, Any]]:
+        """Get popular products as fallback"""
+        try:
+            if hasattr(self.product_kg, 'get_popular_products'):
+                return self.product_kg.get_popular_products(limit)
+        except Exception as e:
+            logger.error(f"Error getting fallback popular products: {e}")
+        return []
     
     def _add_stylist_explanations(
         self, 
@@ -274,13 +354,15 @@ class EnsembleRecommender:
         """
         Add stylist explanations to recommendations.
         
+        FIXED: Uses CompatibilityLayer for message creation.
+        
         Args:
             recommendations: List of recommendations to explain
             user_id: Optional user ID for personalization
             query: Optional search query that led to these recommendations
             reference_product_id: Optional reference product ID
         """
-        if not self.stylist_agent or not recommendations:
+        if not self.stylist_agent or not recommendations or not CAMEL_AVAILABLE:
             return
             
         try:
@@ -294,9 +376,12 @@ class EnsembleRecommender:
                 prompt += f" who is looking for {query}"
                 
             if reference_product_id:
-                reference_product = self.product_kg.get_product_details(reference_product_id)
-                if reference_product:
-                    prompt += f" based on their interest in {reference_product.get('title')}"
+                try:
+                    reference_product = self.product_kg.get_product_details(reference_product_id)
+                    if reference_product:
+                        prompt += f" based on their interest in {reference_product.get('title')}"
+                except Exception as e:
+                    logger.warning(f"Could not get reference product details: {e}")
             
             prompt += ":\n\n"
             
@@ -315,19 +400,25 @@ class EnsembleRecommender:
             prompt += "3. Specific styling tips for wearing or using this item\n\n"
             prompt += "Keep your explanations conversational, personable, and focused on the stylistic aspects."
             
-            # Get stylist response
+            # Get stylist response using CompatibilityLayer
             try:
-                user_message = BaseMessage.make_user_message(
-                    role_name="User",
-                    content=prompt
-                )
-                
-                response = self.stylist_agent.step(user_message)
-                explanations = response.msg.content
-                
-                # Process explanations
-                self._process_explanations(recommendations, explanations)
-                
+                if CompatibilityLayer:
+                    user_message = CompatibilityLayer.create_user_message(
+                        content=prompt,
+                        role_name="User"
+                    )
+                    
+                    if user_message and hasattr(self.stylist_agent, 'step'):
+                        response = self.stylist_agent.step(user_message)
+                        explanations = response.msg.content if hasattr(response, 'msg') else str(response)
+                        
+                        # Process explanations
+                        self._process_explanations(recommendations, explanations)
+                    else:
+                        logger.warning("Could not create user message or stylist agent step failed")
+                else:
+                    logger.warning("CompatibilityLayer not available for stylist explanations")
+                    
             except Exception as e:
                 logger.error(f"Error getting stylist explanations: {e}")
                 

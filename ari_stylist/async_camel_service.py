@@ -224,7 +224,8 @@ class AsyncCAMELService:
             
         try:
             # Import here to avoid circular imports
-            from memory_integration_async import add_message_to_memory_async
+            #from memory_integration_async import add_message_to_memory_async
+            from memory_integration_v2 import add_message_to_memory_async
             
             logger.debug(f"Adding {sender} message to memory")
             result = await add_message_to_memory_async(

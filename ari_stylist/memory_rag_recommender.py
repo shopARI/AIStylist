@@ -3,7 +3,9 @@ Memory-Enhanced RAG Recommendation System for AI Stylist.
 
 This module implements a recommendation system that leverages the CAMEL memory
 system to enhance recommendations based on conversation history.
-Compatible with CAMEL-AI 0.2.43.
+Compatible with CAMEL-AI 0.2.64.
+
+FIXED: Uses MemoryManager and proper error handling.
 """
 
 import logging
@@ -12,10 +14,21 @@ import datetime
 from typing import List, Dict, Any, Optional, Tuple, Set
 from collections import Counter
 
-from camel.memories import LongtermAgentMemory, MemoryRecord, ScoreBasedContextCreator
-from camel.embeddings import OpenAIEmbedding
-from camel.storages import QdrantStorage
-from camel.types import OpenAIBackendRole, EmbeddingModelType
+# FIXED: Use centralized imports and MemoryManager
+from camel_imports import (
+    CAMEL_AVAILABLE,
+    LongtermAgentMemory,
+    MemoryRecord,
+    ScoreBasedContextCreator,
+    OpenAIEmbedding,
+    QdrantStorage,
+    EmbeddingModelType,
+    OpenAIBackendRole,
+    CompatibilityLayer
+)
+
+# FIXED: Import MemoryManager for proper memory handling
+from memory_integration_async import MemoryManager
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -25,6 +38,8 @@ class MemoryRAGRecommender:
     """
     Implements a recommendation system that leverages the CAMEL memory system
     to enhance recommendations based on conversation history.
+    
+    FIXED: Uses MemoryManager and proper async memory handling.
     """
     
     def __init__(
@@ -43,8 +58,16 @@ class MemoryRAGRecommender:
             memory_setup_func: Function to set up memory (optional)
             token_limit: Token limit for context window
         """
-        logger.info("Initializing MemoryRAGRecommender")
+        logger.info("Initializing MemoryRAGRecommender with CAMEL 0.2.64 compatibility")
         self.product_kg = product_kg
+        self.token_limit = token_limit
+        
+        # Check CAMEL availability
+        if not CAMEL_AVAILABLE:
+            logger.warning("CAMEL-AI not fully available, using fallback implementations")
+        
+        # FIXED: Initialize MemoryManager
+        self.memory_manager = MemoryManager(product_kg) if product_kg else None
         
         # Initialize memory
         if memory is not None:
@@ -52,8 +75,25 @@ class MemoryRAGRecommender:
             logger.info("Using provided memory instance")
         elif memory_setup_func is not None:
             try:
-                self.memory = memory_setup_func()
-                logger.info("Memory initialized using setup function")
+                # Handle both sync and async memory setup functions
+                if hasattr(memory_setup_func, '__call__'):
+                    # Try to call the function - handle both sync and async
+                    import asyncio
+                    try:
+                        if asyncio.iscoroutinefunction(memory_setup_func):
+                            # Async function - need to await it properly
+                            self.memory = None  # Will be set up later when called in async context
+                            self.memory_setup_func = memory_setup_func
+                            logger.info("Memory setup function is async - will initialize later")
+                        else:
+                            # Sync function
+                            self.memory = memory_setup_func()
+                            logger.info("Memory initialized using sync setup function")
+                    except Exception as e:
+                        logger.error(f"Error calling memory setup function: {e}")
+                        self.memory = self._create_default_memory(token_limit)
+                else:
+                    self.memory = self._create_default_memory(token_limit)
             except Exception as e:
                 logger.error(f"Error initializing memory with setup function: {e}")
                 self.memory = self._create_default_memory(token_limit)
@@ -61,51 +101,63 @@ class MemoryRAGRecommender:
             self.memory = self._create_default_memory(token_limit)
             logger.info("Created default memory instance")
     
-    def _create_default_memory(self, token_limit: int) -> LongtermAgentMemory:
+    def _create_default_memory(self, token_limit: int) -> Optional[LongtermAgentMemory]:
         """
         Create a default memory instance.
+        
+        FIXED: Uses CompatibilityLayer for memory creation.
         
         Args:
             token_limit: Token limit for context window
             
         Returns:
-            CAMEL memory instance
+            CAMEL memory instance or None
         """
+        if not CAMEL_AVAILABLE or not CompatibilityLayer:
+            logger.warning("CAMEL components not available for memory creation")
+            return None
+            
         try:
-            # Set up embedding model
-            embedding_model = OpenAIEmbedding(
-                model_type=EmbeddingModelType.TEXT_EMBEDDING_3_SMALL
+            memory = CompatibilityLayer.create_memory(
+                token_limit=token_limit,
+                enable_vector=True
             )
             
-            # Create vector storage
-            vector_storage = QdrantStorage(
-                vector_dim=embedding_model.get_output_dim(),
-                path="memory_data",
-                collection_name="stylist_memory"
-            )
-            
-            # Create context creator
-            context_creator = ScoreBasedContextCreator(
-                token_limit=token_limit
-            )
-            
-            # Create memory
-            memory = LongtermAgentMemory(
-                context_creator=context_creator,
-                vector_db_block=vector_storage
-            )
-            
-            return memory
+            if memory:
+                logger.info("Created default memory using CompatibilityLayer")
+                return memory
+            else:
+                logger.warning("CompatibilityLayer returned None memory")
+                return None
+                
         except Exception as e:
             logger.error(f"Error creating default memory: {e}")
-            # Return minimal memory without vector storage
-            return LongtermAgentMemory(
-                context_creator=ScoreBasedContextCreator(
-                    token_limit=token_limit
-                )
-            )
+            return None
     
-    def add_product_interaction(
+    async def _ensure_memory_initialized(self):
+        """
+        Ensure memory is initialized for async operations.
+        
+        FIXED: Handles async memory setup properly.
+        """
+        if self.memory is None and hasattr(self, 'memory_setup_func') and self.memory_setup_func:
+            try:
+                self.memory = await self.memory_setup_func()
+                logger.info("Memory initialized using async setup function")
+            except Exception as e:
+                logger.error(f"Error initializing memory async: {e}")
+                if self.memory_manager:
+                    try:
+                        self.memory = await self.memory_manager.create_memory(
+                            token_limit=self.token_limit,
+                            enable_vector_db=True
+                        )
+                        logger.info("Memory initialized using MemoryManager fallback")
+                    except Exception as e2:
+                        logger.error(f"Error creating memory with MemoryManager: {e2}")
+                        self.memory = None
+    
+    async def add_product_interaction(
         self, 
         user_id: str, 
         product_id: str, 
@@ -113,6 +165,8 @@ class MemoryRAGRecommender:
     ) -> bool:
         """
         Add a product interaction to memory.
+        
+        FIXED: Uses MemoryManager for proper async handling.
         
         Args:
             user_id: User ID
@@ -122,19 +176,62 @@ class MemoryRAGRecommender:
         Returns:
             True if successful, False otherwise
         """
+        await self._ensure_memory_initialized()
+        
         if not self.memory:
             logger.warning("Memory not available for adding product interaction")
             return False
             
         try:
             # Get product details
-            product = self.product_kg.get_product_details(product_id)
+            if hasattr(self.product_kg, 'get_product_details'):
+                product = await self.product_kg.get_product_details(product_id)
+            else:
+                logger.warning("Product KG does not support get_product_details")
+                return False
+                
             if not product:
                 logger.warning(f"Product not found: {product_id}")
                 return False
                 
+            # FIXED: Use MemoryManager for adding product interactions
+            if self.memory_manager:
+                success = await self.memory_manager.add_product_interaction(
+                    memory=self.memory,
+                    product=product,
+                    interaction_type=interaction_type,
+                    user_id=user_id
+                )
+                
+                if success:
+                    logger.info(f"Added product interaction to memory: {interaction_type} {product_id}")
+                    return True
+                else:
+                    logger.warning(f"Failed to add product interaction to memory")
+                    return False
+            else:
+                # Fallback to direct memory manipulation
+                return await self._add_interaction_direct(user_id, product, interaction_type)
+                
+        except Exception as e:
+            logger.error(f"Error adding product interaction to memory: {e}")
+            return False
+    
+    async def _add_interaction_direct(self, user_id: str, product: Dict[str, Any], interaction_type: str) -> bool:
+        """
+        Fallback method to add interaction directly to memory.
+        
+        Args:
+            user_id: User ID
+            product: Product dictionary
+            interaction_type: Interaction type
+            
+        Returns:
+            Success boolean
+        """
+        try:
             # Create memory record content
-            content = f"User {user_id} {interaction_type} product {product.get('title')} (ID: {product_id})."
+            content = f"User {user_id} {interaction_type} product {product.get('title')} (ID: {product.get('id')})."
             
             # Add product categories
             if product.get('categories'):
@@ -151,35 +248,34 @@ class MemoryRAGRecommender:
                 collections = ', '.join(product.get('collections'))
                 content += f" Collections: {collections}."
             
-            # Create memory record with metadata
-            record = MemoryRecord(
-                message=None,  # No message required for product interaction
-                content=content,
-                role_at_backend=OpenAIBackendRole.SYSTEM,
-                metadata={
-                    "type": "product_interaction",
-                    "user_id": user_id,
-                    "product_id": product_id,
-                    "interaction_type": interaction_type,
-                    "timestamp": datetime.datetime.now().isoformat(),
-                    "product_title": product.get('title', ''),
-                    "product_categories": product.get('categories', []),
-                    "product_tags": product.get('tags', []),
-                    "product_collections": product.get('collections', [])
-                }
-            )
+            # FIXED: Use CompatibilityLayer for memory record creation
+            if CAMEL_AVAILABLE and CompatibilityLayer:
+                # Create system message
+                message = CompatibilityLayer.create_assistant_message(
+                    content=content,
+                    role_name="System"
+                )
+                
+                if message:
+                    # Create memory record
+                    record = CompatibilityLayer.create_memory_record(
+                        message=message,
+                        role="system"
+                    )
+                    
+                    if record:
+                        # Write to memory
+                        success = CompatibilityLayer.write_to_memory(self.memory, [record])
+                        return success
             
-            # Add to memory
-            self.memory.write_records([record])
-            
-            logger.info(f"Added product interaction to memory: {interaction_type} {product_id}")
-            return True
+            logger.warning("Could not add interaction using CompatibilityLayer")
+            return False
             
         except Exception as e:
-            logger.error(f"Error adding product interaction to memory: {e}")
+            logger.error(f"Error in direct interaction addition: {e}")
             return False
     
-    def add_user_preference(
+    async def add_user_preference(
         self, 
         user_id: str, 
         preference_type: str, 
@@ -187,6 +283,8 @@ class MemoryRAGRecommender:
     ) -> bool:
         """
         Add user preference to memory.
+        
+        FIXED: Uses MemoryManager for proper async handling.
         
         Args:
             user_id: User ID
@@ -196,10 +294,48 @@ class MemoryRAGRecommender:
         Returns:
             True if successful, False otherwise
         """
+        await self._ensure_memory_initialized()
+        
         if not self.memory:
             logger.warning("Memory not available for adding user preference")
             return False
             
+        try:
+            # FIXED: Use MemoryManager for adding preferences
+            if self.memory_manager:
+                success = await self.memory_manager.add_preference(
+                    memory=self.memory,
+                    preference_type=preference_type,
+                    preference_value=preference_value,
+                    user_id=user_id
+                )
+                
+                if success:
+                    logger.info(f"Added user preference to memory: {preference_type} = {preference_value}")
+                    return True
+                else:
+                    logger.warning(f"Failed to add user preference to memory")
+                    return False
+            else:
+                # Fallback to direct memory manipulation
+                return await self._add_preference_direct(user_id, preference_type, preference_value)
+                
+        except Exception as e:
+            logger.error(f"Error adding user preference to memory: {e}")
+            return False
+    
+    async def _add_preference_direct(self, user_id: str, preference_type: str, preference_value: Any) -> bool:
+        """
+        Fallback method to add preference directly to memory.
+        
+        Args:
+            user_id: User ID
+            preference_type: Preference type
+            preference_value: Preference value
+            
+        Returns:
+            Success boolean
+        """
         try:
             # Format preference value for display
             if isinstance(preference_value, list):
@@ -210,31 +346,34 @@ class MemoryRAGRecommender:
             # Create memory record content
             content = f"User {user_id} preference: {preference_type} = {formatted_value}"
             
-            # Create memory record with metadata
-            record = MemoryRecord(
-                message=None,  # No message required for user preference
-                content=content,
-                role_at_backend=OpenAIBackendRole.SYSTEM,
-                metadata={
-                    "type": "user_preference",
-                    "user_id": user_id,
-                    "preference_type": preference_type,
-                    "preference_value": preference_value,
-                    "timestamp": datetime.datetime.now().isoformat()
-                }
-            )
+            # FIXED: Use CompatibilityLayer for memory record creation
+            if CAMEL_AVAILABLE and CompatibilityLayer:
+                # Create system message
+                message = CompatibilityLayer.create_assistant_message(
+                    content=content,
+                    role_name="System"
+                )
+                
+                if message:
+                    # Create memory record
+                    record = CompatibilityLayer.create_memory_record(
+                        message=message,
+                        role="system"
+                    )
+                    
+                    if record:
+                        # Write to memory
+                        success = CompatibilityLayer.write_to_memory(self.memory, [record])
+                        return success
             
-            # Add to memory
-            self.memory.write_records([record])
-            
-            logger.info(f"Added user preference to memory: {preference_type} = {formatted_value}")
-            return True
+            logger.warning("Could not add preference using CompatibilityLayer")
+            return False
             
         except Exception as e:
-            logger.error(f"Error adding user preference to memory: {e}")
+            logger.error(f"Error in direct preference addition: {e}")
             return False
     
-    def get_personalized_recommendations(
+    async def get_personalized_recommendations(
         self, 
         user_id: str, 
         query: Optional[str] = None, 
@@ -242,6 +381,8 @@ class MemoryRAGRecommender:
     ) -> List[Dict[str, Any]]:
         """
         Get personalized recommendations based on memory.
+        
+        FIXED: Uses MemoryManager for proper memory context retrieval.
         
         Args:
             user_id: User ID
@@ -253,14 +394,13 @@ class MemoryRAGRecommender:
         """
         logger.info(f"Getting personalized recommendations for user {user_id}")
         
+        await self._ensure_memory_initialized()
+        
         if not self.memory:
             logger.warning("Memory not available for recommendations")
             
             # Fallback to popular products
-            if hasattr(self.product_kg, 'get_popular_products'):
-                return self.product_kg.get_popular_products(limit)
-            else:
-                return []
+            return await self._get_fallback_recommendations(query, limit)
         
         try:
             # Create search query for memory
@@ -268,21 +408,14 @@ class MemoryRAGRecommender:
             if query:
                 search_query += f" Looking for {query}."
                 
-            # Retrieve relevant records from memory
-            memory_context = self._get_relevant_memory_context(search_query)
+            # FIXED: Retrieve relevant records from memory using MemoryManager
+            memory_context = await self._get_relevant_memory_context(search_query)
             
             if not memory_context:
                 logger.warning("No relevant memory context found")
                 
                 # Fallback to products matching the query
-                if query:
-                    return self._search_products_by_query(query, limit)
-                
-                # Fallback to popular products
-                if hasattr(self.product_kg, 'get_popular_products'):
-                    return self.product_kg.get_popular_products(limit)
-                else:
-                    return []
+                return await self._get_fallback_recommendations(query, limit)
             
             # Extract information from memory context
             categories, tags, collections, products = self._extract_memory_information(memory_context)
@@ -305,58 +438,70 @@ class MemoryRAGRecommender:
             if product_freq:
                 # Get details for most interacted products
                 for product_id, _ in product_freq.most_common(limit):
-                    product = self.product_kg.get_product_details(product_id)
-                    if product and product.get('id') not in [p.get('id') for p in recommendations]:
-                        recommendations.append(product)
-                        
-                        # Break if we have enough recommendations
-                        if len(recommendations) >= limit:
-                            break
+                    try:
+                        product = await self.product_kg.get_product_details(product_id)
+                        if product and product.get('id') not in [p.get('id') for p in recommendations]:
+                            recommendations.append(product)
+                            
+                            # Break if we have enough recommendations
+                            if len(recommendations) >= limit:
+                                break
+                    except Exception as e:
+                        logger.error(f"Error getting product details for {product_id}: {e}")
             
             # Add recommendations based on top categories, tags, and collections
             if len(recommendations) < limit:
                 # Try to get products matching top preferences
-                filter_products = self.product_kg.get_product_by_filter(
-                    category=top_categories[0] if top_categories else None,
-                    tag=top_tags[0] if top_tags else None,
-                    collection=top_collections[0] if top_collections else None,
-                    limit=limit - len(recommendations)
-                )
-                
-                # Add products not already in recommendations
-                for product in filter_products:
-                    if product.get('id') not in [p.get('id') for p in recommendations]:
-                        recommendations.append(product)
-                        
-                        # Break if we have enough recommendations
-                        if len(recommendations) >= limit:
-                            break
+                try:
+                    filter_products = await self.product_kg.get_product_by_filter(
+                        category=top_categories[0] if top_categories else None,
+                        tag=top_tags[0] if top_tags else None,
+                        collection=top_collections[0] if top_collections else None,
+                        limit=limit - len(recommendations)
+                    )
+                    
+                    # Add products not already in recommendations
+                    for product in filter_products:
+                        if product.get('id') not in [p.get('id') for p in recommendations]:
+                            recommendations.append(product)
+                            
+                            # Break if we have enough recommendations
+                            if len(recommendations) >= limit:
+                                break
+                except Exception as e:
+                    logger.error(f"Error getting filtered products: {e}")
             
             # If we still need more recommendations, search by query
             if len(recommendations) < limit and query:
-                query_products = self._search_products_by_query(query, limit - len(recommendations))
-                
-                # Add products not already in recommendations
-                for product in query_products:
-                    if product.get('id') not in [p.get('id') for p in recommendations]:
-                        recommendations.append(product)
-                        
-                        # Break if we have enough recommendations
-                        if len(recommendations) >= limit:
-                            break
+                try:
+                    query_products = await self._search_products_by_query(query, limit - len(recommendations))
+                    
+                    # Add products not already in recommendations
+                    for product in query_products:
+                        if product.get('id') not in [p.get('id') for p in recommendations]:
+                            recommendations.append(product)
+                            
+                            # Break if we have enough recommendations
+                            if len(recommendations) >= limit:
+                                break
+                except Exception as e:
+                    logger.error(f"Error searching products by query: {e}")
             
             # If we still need more recommendations, get popular products
-            if len(recommendations) < limit and hasattr(self.product_kg, 'get_popular_products'):
-                popular_products = self.product_kg.get_popular_products(limit - len(recommendations))
-                
-                # Add products not already in recommendations
-                for product in popular_products:
-                    if product.get('id') not in [p.get('id') for p in recommendations]:
-                        recommendations.append(product)
-                        
-                        # Break if we have enough recommendations
-                        if len(recommendations) >= limit:
-                            break
+            if len(recommendations) < limit:
+                try:
+                    popular_products = await self._get_popular_products(limit - len(recommendations))
+                    
+                    # Add products not already in recommendations
+                    for product in popular_products:
+                        if product.get('id') not in [p.get('id') for p in recommendations]:
+                            recommendations.append(product)
+                            
+                            # Break if we have enough recommendations
+                            if len(recommendations) >= limit:
+                                break
+                except Exception as e:
+                    logger.error(f"Error getting popular products: {e}")
             
             logger.info(f"Found {len(recommendations)} personalized recommendations")
             return recommendations[:limit]
@@ -365,18 +510,13 @@ class MemoryRAGRecommender:
             logger.error(f"Error getting personalized recommendations: {e}")
             
             # Fallback to products matching the query
-            if query:
-                return self._search_products_by_query(query, limit)
-            
-            # Fallback to popular products
-            if hasattr(self.product_kg, 'get_popular_products'):
-                return self.product_kg.get_popular_products(limit)
-            else:
-                return []
+            return await self._get_fallback_recommendations(query, limit)
     
-    def _get_relevant_memory_context(self, query: str) -> List[Dict[str, Any]]:
+    async def _get_relevant_memory_context(self, query: str) -> List[Dict[str, Any]]:
         """
         Get relevant context from memory.
+        
+        FIXED: Uses MemoryManager for context retrieval.
         
         Args:
             query: Search query
@@ -385,26 +525,18 @@ class MemoryRAGRecommender:
             List of relevant memory records
         """
         try:
-            # Get context from memory using CAMEL's interface
-            if hasattr(self.memory, 'get_context'):
-                context, _ = self.memory.get_context(query)
+            if self.memory_manager and self.memory:
+                # Use MemoryManager to get context
+                context, _ = await self.memory_manager.get_context(self.memory, query)
                 return context
-                
-            # Fallback to direct retrieval if get_context isn't available
-            if hasattr(self.memory, 'retrieve'):
-                records = self.memory.retrieve(query, k=10)
-                context = []
-                
-                for record in records:
-                    if hasattr(record, 'content'):
-                        context.append({"content": record.content})
-                    elif hasattr(record, 'message') and hasattr(record.message, 'content'):
-                        context.append({"content": record.message.content})
-                
+            elif self.memory and CAMEL_AVAILABLE and CompatibilityLayer:
+                # Use CompatibilityLayer as fallback
+                context, _ = CompatibilityLayer.get_memory_context(self.memory)
                 return context
+            else:
+                logger.warning("No method available to get memory context")
+                return []
                 
-            return []
-            
         except Exception as e:
             logger.error(f"Error getting memory context: {e}")
             return []
@@ -487,7 +619,7 @@ class MemoryRAGRecommender:
         
         return categories, tags, collections, products
     
-    def _search_products_by_query(self, query: str, limit: int) -> List[Dict[str, Any]]:
+    async def _search_products_by_query(self, query: str, limit: int) -> List[Dict[str, Any]]:
         """
         Search products by text query.
         
@@ -502,39 +634,44 @@ class MemoryRAGRecommender:
             # Check if product_kg has product_retriever
             if hasattr(self.product_kg, 'product_retriever') and self.product_kg.product_retriever:
                 # Use vector search
-                return self.product_kg.product_retriever.search_by_natural_language(query, limit)
+                if hasattr(self.product_kg.product_retriever, 'search_by_natural_language'):
+                    return await self.product_kg.product_retriever.search_by_natural_language(query, limit)
             
-            # Fallback to basic text search in Neo4j
-            search_query = """
-            MATCH (p:Product)
-            WHERE toLower(p.title) CONTAINS toLower($query) OR toLower(p.description) CONTAINS toLower($query)
-            OR (p)-[:IN_CATEGORY]->(:Category) WHERE toLower(Category.title) CONTAINS toLower($query)
-            OR (p)-[:TAGGED_WITH]->(:Tag) WHERE toLower(Tag.title) CONTAINS toLower($query)
-            RETURN 
-                p.id as id,
-                p.title as title,
-                p.price as price,
-                p.description as description,
-                p.images as images
-            LIMIT $limit
-            """
-            
-            result = self.product_kg.query(search_query, {"query": query, "limit": limit})
-            
-            if not result:
-                return []
+            # Fallback to basic filter search in product_kg
+            if hasattr(self.product_kg, 'get_product_by_filter'):
+                return await self.product_kg.get_product_by_filter(
+                    tag=query,  # Use query as tag for basic search
+                    limit=limit
+                )
                 
-            # Process results
-            products = []
-            
-            for record in result:
-                if 'id' in record:
-                    product = self.product_kg.get_product_details(record['id'])
-                    if product:
-                        products.append(product)
-            
-            return products
+            return []
             
         except Exception as e:
             logger.error(f"Error searching products by query: {e}")
+            return []
+    
+    async def _get_popular_products(self, limit: int) -> List[Dict[str, Any]]:
+        """Get popular products as fallback"""
+        try:
+            if hasattr(self.product_kg, 'get_popular_products'):
+                return await self.product_kg.get_popular_products(limit)
+            return []
+        except Exception as e:
+            logger.error(f"Error getting popular products: {e}")
+            return []
+    
+    async def _get_fallback_recommendations(self, query: Optional[str], limit: int) -> List[Dict[str, Any]]:
+        """Get fallback recommendations when memory is not available"""
+        try:
+            # Try query-based search first
+            if query:
+                results = await self._search_products_by_query(query, limit)
+                if results:
+                    return results
+            
+            # Fallback to popular products
+            return await self._get_popular_products(limit)
+            
+        except Exception as e:
+            logger.error(f"Error getting fallback recommendations: {e}")
             return []
