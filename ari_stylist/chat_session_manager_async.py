@@ -1144,12 +1144,13 @@ class EnhancedChatManagerAsync:
         logger.info(f"Extracted parameters: {params}")
         return params
 
+    # Patch for chat_session_manager_async.py - Replace the _handle_product_search method
+
     async def _handle_product_search(self, session: EnhancedChatSessionAsync, message: str) -> Tuple[str, Dict[str, Any]]:
         """
         Handle product search requests using the ADVANCED ML ENSEMBLE SYSTEM
         
-        Uses the parent app's get_product_recommendations method
-        which leverages the full ML ensemble instead of direct Neo4j queries.
+        FIXED: Ensures proper agent initialization and message handling.
         
         Args:
             session: Enhanced chat session
@@ -1322,62 +1323,77 @@ class EnhancedChatManagerAsync:
         try:
             logger.info("Processing product search message with agent")
             
-            # Process with error handling and retry logic
-            try:
-                # FIXED: Ensure agent exists and is properly initialized
-                if not session.stylist_agent:
-                    session.stylist_agent = await session.agent_factory.create_stylist_agent(
-                        memory=session.memory,
-                        enable_mcp=True
-                    )
-                
-                # FIXED: Validate agent state before using
-                if not hasattr(session.stylist_agent, 'conversation_history'):
-                    # Initialize conversation history
-                    from camel.messages import BaseMessage
-                    system_msg = BaseMessage.make_assistant_message(
-                        role_name="System",
-                        content="You are Ari, a fashion stylist..."
-                    )
-                    session.stylist_agent.conversation_history = [system_msg]
-                
-                # FIXED: Create user message with validation
+            # CRITICAL FIX: Ensure agent exists and is properly initialized
+            if not session.stylist_agent:
+                logger.info("Creating new stylist agent for session")
+                session.stylist_agent = await session.agent_factory.create_stylist_agent(
+                    memory=session.memory,
+                    enable_mcp=True
+                )
+            
+            # CRITICAL FIX: Use a wrapper function to ensure messages are never empty
+            async def process_with_agent_safe():
                 from camel.messages import BaseMessage
                 
-                # Ensure agent_context is not empty
-                if not agent_context or not agent_context.strip():
-                    agent_context = f"Help me find {message}"
+                # Validate agent has proper internal state
+                if hasattr(session.stylist_agent, '_messages'):
+                    if not session.stylist_agent._messages:
+                        # Initialize with system message
+                        session.stylist_agent._messages = [{
+                            "role": "system",
+                            "content": session.stylist_agent.system_message or "You are Ari, a fashion stylist."
+                        }]
+                    # Log current message count for debugging
+                    logger.debug(f"Agent has {len(session.stylist_agent._messages)} messages before processing")
                 
+                # Create the user message
                 user_message = BaseMessage.make_user_message(
                     role_name="User",
                     content=agent_context
                 )
                 
-                # FIXED: Validate message before sending to agent
-                if (user_message and 
-                    hasattr(user_message, 'content') and 
-                    user_message.content and 
-                    len(user_message.content.strip()) > 0):
-                    
-                    # Additional validation: ensure agent has conversation history
-                    if (hasattr(session.stylist_agent, 'conversation_history') and 
-                        len(session.stylist_agent.conversation_history) == 0):
-                        
-                        # Add system message to conversation history
-                        system_msg = BaseMessage.make_assistant_message(
-                            role_name="System",
-                            content="You are Ari, a fashion stylist helping clients find perfect outfits."
-                        )
-                        session.stylist_agent.conversation_history.append(system_msg)
-                    
-                    # Now try to get response
+                # Double-check the message is valid
+                if not user_message or not hasattr(user_message, 'content') or not user_message.content:
+                    logger.error("Invalid user message created")
+                    raise ValueError("Failed to create valid user message")
+                
+                # Process with agent
+                try:
                     response = session.stylist_agent.step(user_message)
-                    response_text = response.msg.content if hasattr(response, 'msg') else str(response)
                     
-                else:
-                    # Message validation failed - use fallback
-                    logger.warning("User message validation failed, using fallback")
-                    response_text = self._create_fallback_product_response(search_results)
+                    # Extract response content safely
+                    if hasattr(response, 'msg') and hasattr(response.msg, 'content'):
+                        return response.msg.content
+                    elif hasattr(response, 'content'):
+                        return response.content
+                    else:
+                        return str(response)
+                        
+                except Exception as e:
+                    # Check if it's the empty messages error
+                    if "empty array" in str(e):
+                        logger.error("Empty messages array error detected")
+                        
+                        # Try to reinitialize the agent
+                        logger.info("Reinitializing agent due to empty messages error")
+                        session.stylist_agent = await session.agent_factory.create_stylist_agent(
+                            memory=session.memory,
+                            enable_mcp=True
+                        )
+                        
+                        # Try once more
+                        response = session.stylist_agent.step(user_message)
+                        if hasattr(response, 'msg') and hasattr(response.msg, 'content'):
+                            return response.msg.content
+                        else:
+                            return str(response)
+                    else:
+                        raise
+            
+            # Process with safety wrapper
+            try:
+                response_text = await process_with_agent_safe()
+                logger.debug("Successfully got response from agent")
                 
             except Exception as e:
                 logger.error(f"Error in CAMEL agent processing: {e}")

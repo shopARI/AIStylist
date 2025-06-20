@@ -33,13 +33,26 @@ except ImportError as e:
             self.memory = memory
             self.conversation_history = []
             self.agent_id = str(uuid.uuid4())
+            # CRITICAL: Store the system message in messages for CAMEL
+            self._messages = [{"role": "system", "content": system_message}]
             logger.warning("Using fallback ChatAgent implementation")
             
         def step(self, message):
             """Fallback step method"""
             try:
                 content = message.content if hasattr(message, 'content') else str(message)
+                
+                # CRITICAL: Ensure messages array is never empty
+                if not hasattr(self, '_messages'):
+                    self._messages = [{"role": "system", "content": self.system_message}]
+                
+                # Add user message
+                self._messages.append({"role": "user", "content": content})
+                
                 response_content = f"I'd be happy to help with that. You said: {content}"
+                
+                # Add assistant response
+                self._messages.append({"role": "assistant", "content": response_content})
                 
                 class MockResponse:
                     def __init__(self, content):
@@ -98,6 +111,54 @@ except ImportError as e:
     logger.warning(f"MCPToolkit not available: {e}")
     MCP_TOOLKIT_AVAILABLE = False
     MCPToolkit = None
+
+
+class MessageSafeAgent(ChatAgent):
+    """
+    A wrapper around ChatAgent that ensures messages are never empty.
+    """
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._ensure_messages_initialized()
+    
+    def _ensure_messages_initialized(self):
+        """Ensure the agent always has at least a system message."""
+        # Check various possible message storage locations
+        if hasattr(self, '_messages') and isinstance(self._messages, list):
+            if len(self._messages) == 0:
+                self._messages.append({
+                    "role": "system",
+                    "content": self.system_message or "You are a helpful assistant."
+                })
+        
+        # Also ensure conversation_history is initialized
+        if not hasattr(self, 'conversation_history'):
+            self.conversation_history = []
+        
+        if len(self.conversation_history) == 0 and self.system_message:
+            system_msg = BaseMessage.make_assistant_message(
+                role_name="System",
+                content=self.system_message
+            )
+            self.conversation_history.append(system_msg)
+    
+    def step(self, message):
+        """Override step to ensure messages are never empty."""
+        # Always ensure messages are initialized before processing
+        self._ensure_messages_initialized()
+        
+        # If the base ChatAgent has a messages attribute, ensure it's not empty
+        if hasattr(super(), 'messages') and hasattr(super().messages, '__len__'):
+            if len(super().messages) == 0:
+                # Add system message to the base agent's messages
+                if hasattr(super(), 'add_message'):
+                    super().add_message({
+                        "role": "system",
+                        "content": self.system_message or "You are a helpful assistant."
+                    })
+        
+        # Call the parent step method
+        return super().step(message)
 
 
 class AgentFactory:
@@ -246,43 +307,52 @@ Always be encouraging, confident in your expertise, and focused on making the cl
             # Create agent with proper initialization
             if CAMEL_AGENTS_AVAILABLE and ChatAgent:
                 try:
-                    # FIXED: Create agent with proper system message handling
-                    agent = ChatAgent(
+                    # Use MessageSafeAgent wrapper for safety
+                    agent = MessageSafeAgent(
                         system_message=system_message,
                         model=model,
                         tools=processed_tools,
                         memory=memory
                     )
                     
-                    # FIXED: Ensure agent has proper initialization
+                    # CRITICAL: Initialize internal message tracking
+                    if not hasattr(agent, '_messages'):
+                        agent._messages = []
+                    
+                    # CRITICAL: Ensure system message is in _messages
+                    if len(agent._messages) == 0:
+                        agent._messages.append({
+                            "role": "system",
+                            "content": system_message
+                        })
+                    
+                    # Also ensure conversation_history is properly initialized
                     if not hasattr(agent, 'conversation_history'):
                         agent.conversation_history = []
                     
-                    # FIXED: Initialize conversation history with system message if empty
                     if len(agent.conversation_history) == 0:
                         system_msg = BaseMessage.make_assistant_message(
                             role_name="System",
                             content=system_message
                         )
                         agent.conversation_history = [system_msg]
-                        logger.debug("✅ Initialized agent conversation history")
                     
                     # Set agent ID for tracking
                     agent.agent_id = agent_id
                     agent.creation_time = start_time
                     
-                    logger.info(f"✅ Created CAMEL agent: {agent_id}")
+                    logger.info(f"✅ Created CAMEL agent with message safety: {agent_id}")
                     
                 except Exception as e:
                     logger.error(f"CAMEL agent creation failed: {e}")
                     # Create fallback agent
-                    agent = ChatAgent(system_message=system_message)
+                    agent = MessageSafeAgent(system_message=system_message)
                     agent.agent_id = agent_id
                     agent.creation_time = start_time
                     logger.warning(f"Created fallback agent: {agent_id}")
             else:
                 # Create minimal fallback agent
-                agent = ChatAgent(system_message=system_message)
+                agent = MessageSafeAgent(system_message=system_message)
                 agent.agent_id = agent_id
                 agent.creation_time = start_time
                 logger.warning(f"Created minimal fallback agent: {agent_id}")
@@ -310,7 +380,7 @@ Always be encouraging, confident in your expertise, and focused on making the cl
             
             # Create absolute minimal fallback
             try:
-                minimal_agent = ChatAgent(system_message=system_message or "You are a helpful assistant.")
+                minimal_agent = MessageSafeAgent(system_message=system_message or "You are a helpful assistant.")
                 minimal_agent.agent_id = agent_id
                 minimal_agent.creation_time = start_time
                 
@@ -324,7 +394,6 @@ Always be encouraging, confident in your expertise, and focused on making the cl
                 logger.error(f"Even minimal agent creation failed: {e2}")
                 raise RuntimeError(f"Complete agent creation failure: {e}")
     
-    # EXACT FIX FROM PASTE.TXT - Replace create_stylist_agent method
     async def create_stylist_agent(
         self,
         memory: Optional[Any] = None,
@@ -353,7 +422,7 @@ When asked specifically for product recommendations:
 
 Always maintain a friendly, encouraging tone that boosts the client's confidence."""
 
-        # FIXED: Create agent with proper initialization
+        # Create agent with proper initialization
         try:
             agent = await self.create_agent(
                 system_message=stylist_system_message,
@@ -390,7 +459,7 @@ Always maintain a friendly, encouraging tone that boosts the client's confidence
         except Exception as e:
             logger.error(f"❌ Error creating stylist agent: {e}")
             # Create minimal fallback
-            return ChatAgent(system_message=stylist_system_message)
+            return MessageSafeAgent(system_message=stylist_system_message)
     
     async def create_agent_with_custom_prompt(
         self,
@@ -437,32 +506,26 @@ Always maintain a friendly, encouraging tone that boosts the client's confidence
                 logger.warning("Agent has empty system_message")
                 return False
             
+            # CRITICAL: Validate message storage
+            if hasattr(agent, '_messages'):
+                if not isinstance(agent._messages, list):
+                    logger.warning("Agent _messages is not a list")
+                    return False
+                if len(agent._messages) == 0:
+                    logger.warning("Agent _messages is empty")
+                    return False
+            else:
+                logger.warning("Agent missing _messages attribute")
+                return False
+            
             # Conversation history validation
             if not hasattr(agent, 'conversation_history'):
                 logger.warning("Agent missing conversation_history")
                 agent.conversation_history = []
             
-            if len(agent.conversation_history) == 0:
-                # Initialize with system message
-                try:
-                    system_msg = BaseMessage.make_assistant_message(
-                        role_name="System",
-                        content=agent.system_message
-                    )
-                    agent.conversation_history = [system_msg]
-                    logger.debug("✅ Initialized agent conversation history during validation")
-                except Exception as e:
-                    logger.warning(f"Could not initialize conversation history: {e}")
-            
             # Test message processing (lightweight test)
             if CAMEL_AGENTS_AVAILABLE:
                 try:
-                    test_message = BaseMessage.make_user_message(
-                        role_name="User",
-                        content="Hello, this is a test message for validation."
-                    )
-                    
-                    # Try to create a response without actually calling the model
                     if hasattr(agent, 'step') and callable(agent.step):
                         logger.debug("✅ Agent has callable step method")
                     else:
@@ -504,7 +567,8 @@ Always maintain a friendly, encouraging tone that boosts the client's confidence
                     "type": getattr(agent, 'agent_type', 'generic'),
                     "creation_time": getattr(agent, 'creation_time', None),
                     "has_memory": hasattr(agent, 'memory') and agent.memory is not None,
-                    "has_tools": hasattr(agent, 'tools') and len(agent.tools) > 0
+                    "has_tools": hasattr(agent, 'tools') and len(agent.tools) > 0,
+                    "has_messages": hasattr(agent, '_messages') and len(agent._messages) > 0
                 }
         
         return {
@@ -581,7 +645,6 @@ async def cleanup_agent_factory():
                 logger.info("✅ Cleaned up global AgentFactory")
 
 
-# EXACT FIX FROM PASTE.TXT - Add validate_camel_setup function
 def validate_camel_setup():
     """Validate CAMEL-AI setup and configuration"""
     
@@ -623,16 +686,23 @@ def validate_camel_setup():
             model=model
         )
         
-        # Test message creation
-        test_msg = BaseMessage.make_user_message(
-            role_name="User",
-            content="Hello, this is a test message."
-        )
+        # CRITICAL: Check if agent has proper message initialization
+        if hasattr(agent, '_messages'):
+            print(f"✅ Agent has _messages attribute with {len(agent._messages)} messages")
+        else:
+            print("❌ Agent missing _messages attribute")
+            return False
         
         print("✅ Basic CAMEL components working")
         
         # Test agent step (this is where the error typically occurs)
         try:
+            # Create a test message
+            test_msg = BaseMessage.make_user_message(
+                role_name="User",
+                content="Hello, this is a test message."
+            )
+            
             response = agent.step(test_msg)
             print("✅ Agent step working correctly")
             return True
@@ -654,7 +724,7 @@ async def create_stylist_agent_async(
     enable_mcp: bool = False
 ) -> ChatAgent:
     """Backward compatible function to create stylist agent."""
-    factory = await get_agent_factory()
+    factory = await get_agent_factory_async()
     return await factory.create_stylist_agent(
         memory=memory,
         model_type=model_type,
@@ -673,7 +743,7 @@ async def create_agent_with_tools_async(
     max_tokens: int = 4000
 ) -> ChatAgent:
     """Backward compatible function to create agent with tools."""
-    factory = await get_agent_factory()
+    factory = await get_agent_factory_async()
     return await factory.create_agent(
         system_message=system_message,
         tools=tools,
