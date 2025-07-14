@@ -1,0 +1,420 @@
+2025-07-14 05:50:06,131 - migration_runner - ERROR - ❌ Import failed: No module named 'migrate_products_to_qdrant'
+2025-07-14 05:50:06,131 - migration_runner - ERROR - Make sure all required files are in the same directory
+2025-07-14 05:50:50,189 - neo4j_integration_fixed - INFO - ✅ Fixed Neo4j Integration loaded successfully
+2025-07-14 05:50:52,005 - agent_factory - INFO - ✅ CAMEL agents imported successfully
+2025-07-14 05:50:52,005 - agent_factory - INFO - ✅ SearchToolkit imported successfully
+2025-07-14 05:50:52,005 - agent_factory - INFO - ✅ MCPToolkit imported successfully
+2025-07-14 05:50:52,005 - agent_factory - INFO - ✅ Complete AgentFactory for CAMEL-AI 0.2.64 loaded successfully
+2025-07-14 05:50:52,006 - memory_integration_fixed - INFO - ✅ CAMEL-AI 0.2.64 memories imported successfully
+2025-07-14 05:50:52,006 - memory_integration_fixed - INFO - ✅ FIXED CAMEL-AI 0.2.64 Compatible Memory Integration loaded successfully
+2025-07-14 05:50:52,007 - camel_imports - INFO - CAMEL-AI version: 0.2.64
+2025-07-14 05:50:52,007 - camel_imports - INFO - ✅ ModelFactory imported
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ Types imported successfully
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ StorageType imported
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ ChatAgent imported
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ BaseAgent imported
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ LongtermAgentMemory imported
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ Memory components imported
+2025-07-14 05:50:52,008 - camel_imports - INFO - BaseMemory not available (optional)
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ BaseMessage imported
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ OpenAITokenCounter imported
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ Embeddings imported
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ BaseToolkit imported
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ SearchToolkit imported
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ MCPToolkit imported
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ RetrievalToolkit imported
+2025-07-14 05:50:52,008 - camel_imports - WARNING - BaseStorage not available
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ QdrantStorage imported
+2025-07-14 05:50:52,008 - camel_imports - WARNING - VectorStorage not available
+2025-07-14 05:50:52,008 - camel_imports - INFO - ✅ BaseRetriever imported
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ AutoRetriever imported
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ VectorRetriever imported
+2025-07-14 05:50:52,009 - camel_imports - INFO - CAMEL_AVAILABLE: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - === CAMEL Import Summary ===
+2025-07-14 05:50:52,009 - camel_imports - INFO - CAMEL Available: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - CAMEL Version: 0.2.64
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ camel: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ models: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ agents: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ memory: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ embeddings: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ toolkits: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ types: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ messages: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ storages: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ retrievers: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - ✅ utils: True
+2025-07-14 05:50:52,009 - camel_imports - INFO - ===============================
+2025-07-14 05:50:55,751 - hybrid_visual_recommender - INFO - ✅ PyTorch available for visual similarity
+2025-07-14 05:50:55,752 - root - WARNING - mlxtend not installed. Please install with: pip install mlxtend pandas
+2025-07-14 05:50:55,753 - integration_tests - INFO - ✅ All imports successful
+2025-07-14 05:50:55,754 - migration_runner - INFO - ✅ All imports successful
+2025-07-14 05:50:55,755 - migration_runner - INFO - 
+============================================================
+2025-07-14 05:50:55,755 - migration_runner - INFO - VECTOR MIGRATION RUNNER - DRY RUN
+2025-07-14 05:50:55,755 - migration_runner - INFO - ============================================================
+
+2025-07-14 05:50:55,755 - migration_runner - INFO - Initializing components...
+2025-07-14 05:50:55,755 - user_knowledge_graph - INFO - Initializing User Knowledge Graph connection to bolt://34.135.40.119:7687
+2025-07-14 05:50:55,755 - user_knowledge_graph - INFO - Successfully initialized Neo4j driver for users
+2025-07-14 05:50:55,905 - httpx - INFO - HTTP Request: GET https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333 "HTTP/1.1 200 OK"
+2025-07-14 05:50:55,996 - httpx - INFO - HTTP Request: GET https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333/collections "HTTP/1.1 200 OK"
+2025-07-14 05:50:55,997 - product_retriever_async - INFO - Collection already exists: products
+2025-07-14 05:50:55,997 - product_retriever_async - INFO - Qdrant client initialized successfully
+2025-07-14 05:50:55,998 - product_retriever_async - INFO - ProductRetrieverAsync initialized with collection: products
+2025-07-14 05:50:55,998 - hybrid_data_store - INFO - HybridDataStore initialized with Neo4j and Qdrant clients
+2025-07-14 05:50:55,998 - migration_runner - INFO - ✅ Components initialized
+2025-07-14 05:50:55,998 - migration_runner - INFO - 
+==================================================
+2025-07-14 05:50:55,998 - migration_runner - INFO - PRE-MIGRATION CHECKS
+2025-07-14 05:50:55,998 - migration_runner - INFO - ==================================================
+2025-07-14 05:50:55,998 - migration_runner - INFO - 
+1️⃣ Running integration tests...
+2025-07-14 05:50:55,998 - integration_tests - INFO - 🚀 Starting integration tests...
+2025-07-14 05:50:55,998 - integration_tests - INFO - 🔧 Setting up test environment...
+2025-07-14 05:50:55,998 - user_knowledge_graph - INFO - Initializing User Knowledge Graph connection to bolt://34.135.40.119:7687
+2025-07-14 05:50:55,998 - user_knowledge_graph - INFO - Successfully initialized Neo4j driver for users
+2025-07-14 05:50:56,110 - httpx - INFO - HTTP Request: GET https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333 "HTTP/1.1 200 OK"
+2025-07-14 05:50:56,200 - httpx - INFO - HTTP Request: GET https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333/collections "HTTP/1.1 200 OK"
+2025-07-14 05:50:56,201 - product_retriever_async - INFO - Collection already exists: products
+2025-07-14 05:50:56,201 - product_retriever_async - INFO - Qdrant client initialized successfully
+2025-07-14 05:50:56,201 - product_retriever_async - INFO - ProductRetrieverAsync initialized with collection: products
+2025-07-14 05:50:56,201 - hybrid_data_store - INFO - HybridDataStore initialized with Neo4j and Qdrant clients
+2025-07-14 05:50:56,201 - battle_agents - INFO - BattleAgents initialized with 2 agents
+2025-07-14 05:50:56,201 - competitive_search_system - INFO - CompetitiveSearchSystem initialized
+2025-07-14 05:50:56,202 - integration_tests - INFO - ✅ Test environment setup complete
+2025-07-14 05:50:56,202 - integration_tests - INFO - 
+🧪 Running test_neo4j_connectivity...
+2025-07-14 05:50:56,352 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: BELONGS_TO)} {position: line: 4, column: 34, offset: 145} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,353 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: HAS_STYLE)} {position: line: 5, column: 34, offset: 209} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,353 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: email)} {position: line: 14, column: 19, offset: 607} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,353 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: age_group)} {position: line: 17, column: 19, offset: 713} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,353 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: location)} {position: line: 16, column: 19, offset: 673} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,353 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: profile)} {position: line: 21, column: 23, offset: 850} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,354 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: gender)} {position: line: 18, column: 19, offset: 755} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,354 - integration_tests - INFO - Neo4j operations working correctly
+2025-07-14 05:50:56,354 - integration_tests - INFO - ✅ test_neo4j_connectivity PASSED
+2025-07-14 05:50:56,354 - integration_tests - INFO - 
+🧪 Running test_qdrant_connectivity...
+2025-07-14 05:50:56,388 - httpx - INFO - HTTP Request: GET https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333/collections/products "HTTP/1.1 200 OK"
+2025-07-14 05:50:56,392 - integration_tests - INFO - Qdrant stats: {'vectors_count': None, 'indexed_vectors_count': 33404, 'points_count': 39423, 'segments_count': 6, 'status': <CollectionStatus.GREEN: 'green'>}
+2025-07-14 05:50:56,393 - product_retriever_async - ERROR - Error getting embedding: 
+
+You tried to access openai.Embedding, but this is no longer supported in openai>=1.0.0 - see the README at https://github.com/openai/openai-python for the API.
+
+You can run `openai migrate` to automatically upgrade your codebase to use the 1.0.0 interface. 
+
+Alternatively, you can pin your installation to the old version, e.g. `pip install openai==0.28`
+
+A detailed migration guide is available here: https://github.com/openai/openai-python/discussions/742
+
+2025-07-14 05:50:56,540 - httpx - INFO - HTTP Request: POST https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333/collections/products/points/search "HTTP/1.1 200 OK"
+2025-07-14 05:50:56,542 - product_retriever_async - INFO - Found 0 products for query: test query
+2025-07-14 05:50:56,542 - integration_tests - INFO - Qdrant search returned 0 results
+2025-07-14 05:50:56,542 - integration_tests - INFO - ✅ test_qdrant_connectivity PASSED
+2025-07-14 05:50:56,542 - integration_tests - INFO - 
+🧪 Running test_user_operations_routing...
+2025-07-14 05:50:56,573 - hybrid_data_store - WARNING - Qdrant user vector fetch error: 'ProductRetrieverAsync' object has no attribute 'get_user_vector'
+2025-07-14 05:50:56,576 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: BELONGS_TO)} {position: line: 4, column: 34, offset: 145} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,576 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: HAS_STYLE)} {position: line: 5, column: 34, offset: 209} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,576 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: email)} {position: line: 14, column: 19, offset: 607} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,577 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: age_group)} {position: line: 17, column: 19, offset: 713} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,577 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: location)} {position: line: 16, column: 19, offset: 673} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,577 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: profile)} {position: line: 21, column: 23, offset: 850} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,577 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: gender)} {position: line: 18, column: 19, offset: 755} for query: '\n            MATCH (u:User {id: $user_id})\n            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)\n            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)\n            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)\n            WITH u, \n                 collect(DISTINCT {type: p.type, value: p.value, updated_at: p.updated_at}) as preferences,\n                 collect(DISTINCT seg.name) as segments,\n                 style\n            RETURN \n                u.id as id,\n                u.created_at as created_at,\n                u.last_active as last_active,\n                u.email as email,\n                u.name as name,\n                u.location as location,\n                u.age_group as age_group,\n                u.gender as gender,\n                preferences,\n                segments,\n                style.profile as style_profile,\n                style.updated_at as style_updated_at\n            '
+2025-07-14 05:50:56,577 - hybrid_data_store - ERROR - Error fetching user test_user_integration: 'users_queries'
+2025-07-14 05:50:56,577 - integration_tests - ERROR - Failed to get user via HybridDataStore
+2025-07-14 05:50:56,577 - integration_tests - ERROR - ❌ test_user_operations_routing FAILED
+2025-07-14 05:50:56,577 - integration_tests - INFO - 
+🧪 Running test_product_operations_routing...
+2025-07-14 05:50:56,578 - product_retriever_async - ERROR - Error getting embedding: 
+
+You tried to access openai.Embedding, but this is no longer supported in openai>=1.0.0 - see the README at https://github.com/openai/openai-python for the API.
+
+You can run `openai migrate` to automatically upgrade your codebase to use the 1.0.0 interface. 
+
+Alternatively, you can pin your installation to the old version, e.g. `pip install openai==0.28`
+
+A detailed migration guide is available here: https://github.com/openai/openai-python/discussions/742
+
+2025-07-14 05:50:56,748 - httpx - INFO - HTTP Request: POST https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333/collections/products/points/search "HTTP/1.1 200 OK"
+2025-07-14 05:50:56,749 - product_retriever_async - INFO - Found 0 products for query: dress
+2025-07-14 05:50:56,749 - hybrid_data_store - ERROR - Error searching products: 'products_queries'
+2025-07-14 05:50:56,749 - integration_tests - INFO - Product operations correctly routed. Found 0 products
+2025-07-14 05:50:56,749 - integration_tests - INFO - ✅ test_product_operations_routing PASSED
+2025-07-14 05:50:56,749 - integration_tests - INFO - 
+🧪 Running test_battle_system_basic...
+2025-07-14 05:50:56,751 - product_retriever_async - ERROR - Error getting embedding: 
+
+You tried to access openai.Embedding, but this is no longer supported in openai>=1.0.0 - see the README at https://github.com/openai/openai-python for the API.
+
+You can run `openai migrate` to automatically upgrade your codebase to use the 1.0.0 interface. 
+
+Alternatively, you can pin your installation to the old version, e.g. `pip install openai==0.28`
+
+A detailed migration guide is available here: https://github.com/openai/openai-python/discussions/742
+
+2025-07-14 05:50:56,806 - battle_agents - INFO - CypherBot completed search in 0.06s, found 0 products
+2025-07-14 05:50:56,807 - httpx - INFO - HTTP Request: POST https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333/collections/products/points/search "HTTP/1.1 200 OK"
+2025-07-14 05:50:56,807 - product_retriever_async - INFO - Found 0 products for query: red dress for wedding
+2025-07-14 05:50:56,808 - battle_agents - INFO - VibeBot completed search in 0.06s, found 0 products
+2025-07-14 05:50:56,808 - integration_tests - INFO - Battle executed successfully. Winner: draw
+2025-07-14 05:50:56,808 - integration_tests - INFO - Explanation: After analyzing both sets of results for "red dress for wedding":
+
+CypherBot (Neo4j Graph):
+- No results found
+- Score: 0.0/100
+
+VibeBot (Vector Search):
+- No results found
+- Score: 0.0/100
+
+🤝 It's a ...
+2025-07-14 05:50:56,808 - integration_tests - INFO - ✅ test_battle_system_basic PASSED
+2025-07-14 05:50:56,808 - integration_tests - INFO - 
+🧪 Running test_battle_system_with_filters...
+2025-07-14 05:50:56,809 - product_retriever_async - ERROR - Error getting embedding: 
+
+You tried to access openai.Embedding, but this is no longer supported in openai>=1.0.0 - see the README at https://github.com/openai/openai-python for the API.
+
+You can run `openai migrate` to automatically upgrade your codebase to use the 1.0.0 interface. 
+
+Alternatively, you can pin your installation to the old version, e.g. `pip install openai==0.28`
+
+A detailed migration guide is available here: https://github.com/openai/openai-python/discussions/742
+
+2025-07-14 05:50:56,812 - battle_agents - INFO - CypherBot completed search in 0.00s, found 0 products
+2025-07-14 05:50:56,898 - httpx - INFO - HTTP Request: POST https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333/collections/products/points/search "HTTP/1.1 200 OK"
+2025-07-14 05:50:56,899 - product_retriever_async - INFO - Found 0 products for query: formal dress for wedding
+2025-07-14 05:50:56,899 - battle_agents - INFO - VibeBot completed search in 0.09s, found 0 products
+2025-07-14 05:50:56,899 - integration_tests - INFO - CypherBot: 0 products
+2025-07-14 05:50:56,900 - integration_tests - INFO - VibeBot: 0 products
+2025-07-14 05:50:56,900 - integration_tests - WARNING - No products found by either agent
+2025-07-14 05:50:56,900 - integration_tests - INFO - ✅ test_battle_system_with_filters PASSED
+2025-07-14 05:50:56,900 - integration_tests - INFO - 
+🧪 Running test_product_search...
+2025-07-14 05:50:56,900 - product_retriever_async - ERROR - Error getting embedding: 
+
+You tried to access openai.Embedding, but this is no longer supported in openai>=1.0.0 - see the README at https://github.com/openai/openai-python for the API.
+
+You can run `openai migrate` to automatically upgrade your codebase to use the 1.0.0 interface. 
+
+Alternatively, you can pin your installation to the old version, e.g. `pip install openai==0.28`
+
+A detailed migration guide is available here: https://github.com/openai/openai-python/discussions/742
+
+2025-07-14 05:50:56,989 - httpx - INFO - HTTP Request: POST https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333/collections/products/points/search "HTTP/1.1 200 OK"
+2025-07-14 05:50:56,990 - product_retriever_async - INFO - Found 0 products for query: summer dress
+2025-07-14 05:50:56,990 - hybrid_data_store - ERROR - Error searching products: 'products_queries'
+2025-07-14 05:50:56,991 - integration_tests - INFO - Product search working. Found 0 products
+2025-07-14 05:50:56,991 - integration_tests - INFO - ✅ test_product_search PASSED
+2025-07-14 05:50:56,991 - integration_tests - INFO - 
+🧪 Running test_user_preferences...
+2025-07-14 05:50:57,054 - hybrid_data_store - WARNING - Qdrant user vector fetch error: 'ProductRetrieverAsync' object has no attribute 'get_user_vector'
+2025-07-14 05:50:57,054 - integration_tests - INFO - User preferences working. Preferences: {'preferred_categories': [], 'preferred_brands': [], 'preferred_colors': ['blue'], 'preferred_tags': [], 'budget_range': {}, 'size_preferences': {}, 'style_attributes': []}
+2025-07-14 05:50:57,054 - integration_tests - INFO - ✅ test_user_preferences PASSED
+2025-07-14 05:50:57,054 - integration_tests - INFO - 
+🧪 Running test_full_recommendation_flow...
+2025-07-14 05:50:57,055 - enhanced_ai_stylist_app_async - INFO - Initializing Enhanced AI Stylist with HybridDataStore integration...
+2025-07-14 05:50:57,055 - enhanced_ai_stylist_app_async - INFO - ✅ CAMEL-AI version 0.2.64 verified
+2025-07-14 05:50:57,055 - enhanced_ai_stylist_app_async - INFO - Connecting to Neo4j at bolt://34.135.40.119:7687 for user operations
+2025-07-14 05:50:57,055 - user_knowledge_graph - INFO - Initializing User Knowledge Graph connection to bolt://34.135.40.119:7687
+2025-07-14 05:50:57,055 - user_knowledge_graph - INFO - Successfully initialized Neo4j driver for users
+2025-07-14 05:50:57,055 - enhanced_ai_stylist_app_async - INFO - Initializing product retriever for Qdrant operations...
+2025-07-14 05:50:57,055 - enhanced_ai_stylist_app_async - INFO - Using remote Qdrant at https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io
+2025-07-14 05:50:57,188 - httpx - INFO - HTTP Request: GET https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333 "HTTP/1.1 200 OK"
+2025-07-14 05:50:57,279 - httpx - INFO - HTTP Request: GET https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333/collections "HTTP/1.1 200 OK"
+2025-07-14 05:50:57,280 - product_retriever_async - INFO - Collection already exists: products
+2025-07-14 05:50:57,280 - product_retriever_async - INFO - Qdrant client initialized successfully
+2025-07-14 05:50:57,280 - product_retriever_async - INFO - ProductRetrieverAsync initialized with collection: products
+2025-07-14 05:50:57,280 - enhanced_ai_stylist_app_async - INFO - Initializing HybridDataStore for intelligent operation routing...
+2025-07-14 05:50:57,280 - hybrid_data_store - INFO - HybridDataStore initialized with Neo4j and Qdrant clients
+2025-07-14 05:50:57,280 - enhanced_ai_stylist_app_async - INFO - Initializing Battle System for competitive search...
+2025-07-14 05:50:57,280 - battle_agents - INFO - BattleAgents initialized with 2 agents
+2025-07-14 05:50:57,281 - competitive_search_system - INFO - CompetitiveSearchSystem initialized
+2025-07-14 05:50:57,281 - agent_factory - INFO - ✅ AgentFactory initialized with comprehensive CAMEL 0.2.64 support
+2025-07-14 05:50:57,281 - agent_factory - INFO - ✅ Created global AgentFactory instance
+2025-07-14 05:50:57,281 - enhanced_ai_stylist_app_async - INFO - Initialized AgentFactory for CAMEL 0.2.59+
+2025-07-14 05:50:57,281 - memory_integration_fixed - INFO - ✅ CAMEL-AI 0.2.64 memory components available
+2025-07-14 05:50:57,281 - enhanced_ai_stylist_app_async - INFO - Initialized MemoryManager for CAMEL 0.2.59+
+2025-07-14 05:50:57,281 - enhanced_ai_stylist_app_async - INFO - Setting up enhanced memory system...
+2025-07-14 05:50:57,281 - enhanced_ai_stylist_app_async - INFO - Initializing enhanced recommender manager with HybridDataStore...
+2025-07-14 05:50:57,281 - enhanced_recommender_manager - INFO - Initializing EnhancedRecommenderManager with HybridDataStore
+2025-07-14 05:50:57,281 - enhanced_ai_stylist_app_async - INFO - Creating enhanced chat manager with ML integration and HybridDataStore...
+2025-07-14 05:50:57,281 - memory_integration_fixed - INFO - ✅ CAMEL-AI 0.2.64 memory components available
+2025-07-14 05:50:57,281 - enhanced_chat_session_manager_async - INFO - Enhanced Chat Manager initialized with HybridDataStore and Battle System
+2025-07-14 05:50:57,281 - enhanced_ai_stylist_app_async - INFO - ✅ Enhanced AI Stylist initialized with HybridDataStore and Battle System!
+2025-07-14 05:50:57,332 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT IF NOT EXISTS FOR (e:User) REQUIRE (e.id) IS UNIQUE` has no effect.} {description: `CONSTRAINT constraint_74fad970 FOR (e:User) REQUIRE (e.id) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE'
+2025-07-14 05:50:57,332 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT IF NOT EXISTS FOR (e:User) REQUIRE (e.id) IS UNIQUE` has no effect.} {description: `CONSTRAINT constraint_74fad970 FOR (e:User) REQUIRE (e.id) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT IF NOT EXISTS FOR (u:User) REQUIRE u.id IS UNIQUE'
+2025-07-14 05:50:57,364 - memory_integration_fixed - WARNING - Memory creation already in progress for test_user_integration_1024_False, waiting...
+2025-07-14 05:50:57,437 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT IF NOT EXISTS FOR (e:MemoryState) REQUIRE (e.id) IS UNIQUE` has no effect.} {description: `CONSTRAINT constraint_17fb97 FOR (e:MemoryState) REQUIRE (e.id) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT IF NOT EXISTS FOR (m:MemoryState) REQUIRE m.id IS UNIQUE'
+2025-07-14 05:50:57,437 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT IF NOT EXISTS FOR (e:MemoryState) REQUIRE (e.id) IS UNIQUE` has no effect.} {description: `CONSTRAINT constraint_17fb97 FOR (e:MemoryState) REQUIRE (e.id) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT IF NOT EXISTS FOR (m:MemoryState) REQUIRE m.id IS UNIQUE'
+2025-07-14 05:50:57,479 - memory_integration_fixed - INFO - ✅ Created minimal CAMEL memory with required arguments
+2025-07-14 05:50:57,479 - memory_integration_fixed - INFO - ✅ Loaded existing memory for user: test_user_integration
+2025-07-14 05:50:57,479 - enhanced_chat_session_manager_async - INFO - Created/loaded persistent memory for user test_user_integration
+2025-07-14 05:50:57,479 - enhanced_chat_session_manager_async - INFO - Generated new session ID: 2d42fc70-ed98-4b6a-85ce-7ce3bf45ff2c
+2025-07-14 05:50:57,479 - memory_integration_fixed - INFO - ✅ CAMEL-AI 0.2.64 memory components available
+2025-07-14 05:50:57,479 - enhanced_chat_session_manager_async - INFO - Created enhanced chat session with HybridDataStore support: 2d42fc70-ed98-4b6a-85ce-7ce3bf45ff2c for user: test_user_integration
+2025-07-14 05:50:57,482 - agent_factory - INFO - Creating new agent: stylist_main
+2025-07-14 05:50:58,410 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-14 05:50:58,413 - agent_factory - INFO - ✅ Created CAMEL agent with message safety: stylist_main
+2025-07-14 05:50:58,413 - agent_factory - INFO - ✅ Agent stylist_main created successfully in 0.93s
+2025-07-14 05:50:58,414 - agent_factory - INFO - ✅ Successfully created stylist agent with proper initialization
+2025-07-14 05:50:58,414 - enhanced_ai_stylist_app_async - INFO - Created new session: 2d42fc70-ed98-4b6a-85ce-7ce3bf45ff2c for user: test_user_integration
+2025-07-14 05:50:58,414 - enhanced_ai_stylist_app_async - INFO - 🚀 Processing message for session 2d42fc70-ed98-4b6a-85ce-7ce3bf45ff2c with FULL ML integration and Battle System
+2025-07-14 05:50:58,414 - enhanced_chat_session_manager_async - INFO - Processing message for session 2d42fc70-ed98-4b6a-85ce-7ce3bf45ff2c: I need a red dress for a summer wedding...
+2025-07-14 05:50:58,414 - enhanced_chat_session_manager_async - INFO - Returning existing session 2d42fc70-ed98-4b6a-85ce-7ce3bf45ff2c
+2025-07-14 05:50:58,414 - enhanced_chat_session_manager_async - INFO - Using session: 2d42fc70-ed98-4b6a-85ce-7ce3bf45ff2c
+2025-07-14 05:50:58,414 - enhanced_chat_session_manager_async - INFO - Detected message intent: product_request
+2025-07-14 05:50:58,414 - enhanced_chat_session_manager_async - INFO - 🎯 Handling as product search with BATTLE SYSTEM
+2025-07-14 05:50:58,418 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT IF NOT EXISTS FOR (e:UserPreference) REQUIRE (e.id) IS UNIQUE` has no effect.} {description: `CONSTRAINT constraint_50893b16 FOR (e:UserPreference) REQUIRE (e.id) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT IF NOT EXISTS FOR (p:UserPreference) REQUIRE p.id IS UNIQUE'
+2025-07-14 05:50:58,419 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT IF NOT EXISTS FOR (e:UserPreference) REQUIRE (e.id) IS UNIQUE` has no effect.} {description: `CONSTRAINT constraint_50893b16 FOR (e:UserPreference) REQUIRE (e.id) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT IF NOT EXISTS FOR (p:UserPreference) REQUIRE p.id IS UNIQUE'
+2025-07-14 05:50:58,523 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT IF NOT EXISTS FOR (e:ProductInteraction) REQUIRE (e.id) IS UNIQUE` has no effect.} {description: `CONSTRAINT constraint_d92e801d FOR (e:ProductInteraction) REQUIRE (e.id) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT IF NOT EXISTS FOR (i:ProductInteraction) REQUIRE i.id IS UNIQUE'
+2025-07-14 05:50:58,524 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT IF NOT EXISTS FOR (e:ProductInteraction) REQUIRE (e.id) IS UNIQUE` has no effect.} {description: `CONSTRAINT constraint_d92e801d FOR (e:ProductInteraction) REQUIRE (e.id) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT IF NOT EXISTS FOR (i:ProductInteraction) REQUIRE i.id IS UNIQUE'
+2025-07-14 05:50:58,628 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT IF NOT EXISTS FOR (e:StyleProfile) REQUIRE (e.id) IS UNIQUE` has no effect.} {description: `CONSTRAINT constraint_69863d6f FOR (e:StyleProfile) REQUIRE (e.id) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT IF NOT EXISTS FOR (s:StyleProfile) REQUIRE s.id IS UNIQUE'
+2025-07-14 05:50:58,628 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT IF NOT EXISTS FOR (e:StyleProfile) REQUIRE (e.id) IS UNIQUE` has no effect.} {description: `CONSTRAINT constraint_69863d6f FOR (e:StyleProfile) REQUIRE (e.id) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT IF NOT EXISTS FOR (s:StyleProfile) REQUIRE s.id IS UNIQUE'
+2025-07-14 05:50:58,732 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT IF NOT EXISTS FOR (e:UserSegment) REQUIRE (e.name) IS UNIQUE` has no effect.} {description: `CONSTRAINT constraint_81dd0f4a FOR (e:UserSegment) REQUIRE (e.name) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT IF NOT EXISTS FOR (seg:UserSegment) REQUIRE seg.name IS UNIQUE'
+2025-07-14 05:50:58,733 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE CONSTRAINT IF NOT EXISTS FOR (e:UserSegment) REQUIRE (e.name) IS UNIQUE` has no effect.} {description: `CONSTRAINT constraint_81dd0f4a FOR (e:UserSegment) REQUIRE (e.name) IS UNIQUE` already exists.} {position: None} for query: 'CREATE CONSTRAINT IF NOT EXISTS FOR (seg:UserSegment) REQUIRE seg.name IS UNIQUE'
+2025-07-14 05:50:58,837 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX IF NOT EXISTS FOR (e:User) ON (e.created_at)` has no effect.} {description: `RANGE INDEX index_ea1c90ea FOR (e:User) ON (e.created_at)` already exists.} {position: None} for query: 'CREATE INDEX IF NOT EXISTS FOR (u:User) ON (u.created_at)'
+2025-07-14 05:50:58,838 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX IF NOT EXISTS FOR (e:User) ON (e.created_at)` has no effect.} {description: `RANGE INDEX index_ea1c90ea FOR (e:User) ON (e.created_at)` already exists.} {position: None} for query: 'CREATE INDEX IF NOT EXISTS FOR (u:User) ON (u.created_at)'
+2025-07-14 05:50:58,942 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX IF NOT EXISTS FOR (e:User) ON (e.last_active)` has no effect.} {description: `RANGE INDEX index_6e7b88 FOR (e:User) ON (e.last_active)` already exists.} {position: None} for query: 'CREATE INDEX IF NOT EXISTS FOR (u:User) ON (u.last_active)'
+2025-07-14 05:50:58,942 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX IF NOT EXISTS FOR (e:User) ON (e.last_active)` has no effect.} {description: `RANGE INDEX index_6e7b88 FOR (e:User) ON (e.last_active)` already exists.} {position: None} for query: 'CREATE INDEX IF NOT EXISTS FOR (u:User) ON (u.last_active)'
+2025-07-14 05:50:59,046 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX IF NOT EXISTS FOR (e:ProductInteraction) ON (e.timestamp)` has no effect.} {description: `RANGE INDEX index_ac13597f FOR (e:ProductInteraction) ON (e.timestamp)` already exists.} {position: None} for query: 'CREATE INDEX IF NOT EXISTS FOR (i:ProductInteraction) ON (i.timestamp)'
+2025-07-14 05:50:59,047 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX IF NOT EXISTS FOR (e:ProductInteraction) ON (e.timestamp)` has no effect.} {description: `RANGE INDEX index_ac13597f FOR (e:ProductInteraction) ON (e.timestamp)` already exists.} {position: None} for query: 'CREATE INDEX IF NOT EXISTS FOR (i:ProductInteraction) ON (i.timestamp)'
+2025-07-14 05:50:59,151 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX IF NOT EXISTS FOR (e:ProductInteraction) ON (e.type)` has no effect.} {description: `RANGE INDEX index_86f86181 FOR (e:ProductInteraction) ON (e.type)` already exists.} {position: None} for query: 'CREATE INDEX IF NOT EXISTS FOR (i:ProductInteraction) ON (i.type)'
+2025-07-14 05:50:59,151 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX IF NOT EXISTS FOR (e:ProductInteraction) ON (e.type)` has no effect.} {description: `RANGE INDEX index_86f86181 FOR (e:ProductInteraction) ON (e.type)` already exists.} {position: None} for query: 'CREATE INDEX IF NOT EXISTS FOR (i:ProductInteraction) ON (i.type)'
+2025-07-14 05:50:59,255 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX IF NOT EXISTS FOR (e:UserPreference) ON (e.type)` has no effect.} {description: `RANGE INDEX index_357f666c FOR (e:UserPreference) ON (e.type)` already exists.} {position: None} for query: 'CREATE INDEX IF NOT EXISTS FOR (p:UserPreference) ON (p.type)'
+2025-07-14 05:50:59,256 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX IF NOT EXISTS FOR (e:UserPreference) ON (e.type)` has no effect.} {description: `RANGE INDEX index_357f666c FOR (e:UserPreference) ON (e.type)` already exists.} {position: None} for query: 'CREATE INDEX IF NOT EXISTS FOR (p:UserPreference) ON (p.type)'
+2025-07-14 05:50:59,360 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX IF NOT EXISTS FOR (e:UserPreference) ON (e.updated_at)` has no effect.} {description: `RANGE INDEX index_5f4baca7 FOR (e:UserPreference) ON (e.updated_at)` already exists.} {position: None} for query: 'CREATE INDEX IF NOT EXISTS FOR (p:UserPreference) ON (p.updated_at)'
+2025-07-14 05:50:59,361 - neo4j.notifications - INFO - Received notification from DBMS server: {severity: INFORMATION} {code: Neo.ClientNotification.Schema.IndexOrConstraintAlreadyExists} {category: SCHEMA} {title: `CREATE RANGE INDEX IF NOT EXISTS FOR (e:UserPreference) ON (e.updated_at)` has no effect.} {description: `RANGE INDEX index_5f4baca7 FOR (e:UserPreference) ON (e.updated_at)` already exists.} {position: None} for query: 'CREATE INDEX IF NOT EXISTS FOR (p:UserPreference) ON (p.updated_at)'
+2025-07-14 05:50:59,461 - user_knowledge_graph - INFO - User schema creation completed
+2025-07-14 05:50:59,461 - enhanced_chat_session_manager_async - INFO - Neo4j schema verified
+2025-07-14 05:50:59,462 - user_knowledge_graph - INFO - User schema creation completed
+2025-07-14 05:50:59,462 - enhanced_ai_stylist_app_async - ERROR - Error setting up database schema: object dict can't be used in 'await' expression
+2025-07-14 05:50:59,462 - enhanced_ai_stylist_app_async - WARNING - Continuing with limited database functionality
+2025-07-14 05:50:59,758 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-14 05:50:59,762 - enhanced_chat_session_manager_async - INFO - Added user message to enhanced memory
+2025-07-14 05:50:59,766 - enhanced_chat_session_manager_async - INFO - Extracted parameters: {'category': 'dress', 'collection': None, 'tag': 'summer wedding', 'min_price': None, 'max_price': None, 'occasion': 'summer wedding', 'colors': ['red'], 'materials': []}
+2025-07-14 05:50:59,766 - enhanced_chat_session_manager_async - INFO - Search parameters extracted: {'category': 'dress', 'collection': None, 'tag': 'summer wedding', 'min_price': None, 'max_price': None, 'occasion': 'summer wedding', 'colors': ['red'], 'materials': []}
+2025-07-14 05:50:59,766 - enhanced_chat_session_manager_async - INFO - Context from conversation: event_type=wedding, formality=None
+2025-07-14 05:50:59,766 - enhanced_chat_session_manager_async - INFO - 🎯 Using BATTLE SYSTEM for product search
+2025-07-14 05:50:59,767 - product_retriever_async - ERROR - Error getting embedding: 
+
+You tried to access openai.Embedding, but this is no longer supported in openai>=1.0.0 - see the README at https://github.com/openai/openai-python for the API.
+
+You can run `openai migrate` to automatically upgrade your codebase to use the 1.0.0 interface. 
+
+Alternatively, you can pin your installation to the old version, e.g. `pip install openai==0.28`
+
+A detailed migration guide is available here: https://github.com/openai/openai-python/discussions/742
+
+2025-07-14 05:50:59,770 - battle_agents - INFO - CypherBot completed search in 0.00s, found 0 products
+2025-07-14 05:50:59,850 - httpx - INFO - HTTP Request: POST https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333/collections/products/points/search "HTTP/1.1 200 OK"
+2025-07-14 05:50:59,851 - product_retriever_async - INFO - Found 0 products for query: I need a red dress for a summer wedding for wedding for summer wedding preferably in red
+2025-07-14 05:50:59,851 - battle_agents - INFO - VibeBot completed search in 0.09s, found 0 products
+2025-07-14 05:50:59,852 - enhanced_chat_session_manager_async - INFO - 🏆 Battle winner: draw
+2025-07-14 05:50:59,852 - enhanced_chat_session_manager_async - INFO - ✅ Battle system returned 0 products
+2025-07-14 05:50:59,852 - enhanced_chat_session_manager_async - INFO - Processing product search message with agent
+2025-07-14 05:51:00,023 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-14 05:51:00,188 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-14 05:51:00,397 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 400 Bad Request"
+2025-07-14 05:51:00,398 - camel.models.model_manager - ERROR - Error processing with model: <camel.models.openai_model.OpenAIModel object at 0x7f971ee5a2f0>
+2025-07-14 05:51:00,398 - camel.agents.chat_agent - ERROR - An error occurred while running model gpt-4o-mini, index: 0
+Traceback (most recent call last):
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/agents/chat_agent.py", line 1065, in _get_model_response
+    response = self.model_backend.run(
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/models/model_manager.py", line 228, in run
+    raise exc
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/models/model_manager.py", line 218, in run
+    response = self.current_model.run(messages, response_format, tools)
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/models/base_model.py", line 50, in wrapped_run
+    return original_run(self, messages, *args, **kwargs)
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/models/base_model.py", line 278, in run
+    return self._run(messages, response_format, tools)
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/models/openai_model.py", line 263, in _run
+    result = self._request_chat_completion(messages, tools)
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/models/openai_model.py", line 331, in _request_chat_completion
+    return self._client.chat.completions.create(
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/openai/_utils/_utils.py", line 279, in wrapper
+    return func(*args, **kwargs)
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 914, in create
+    return self._post(
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/openai/_base_client.py", line 1242, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/openai/_base_client.py", line 919, in request
+    return self._request(
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/openai/_base_client.py", line 1023, in _request
+    raise self._make_status_error_from_response(err.response) from None
+openai.BadRequestError: Error code: 400 - {'error': {'message': "Invalid 'messages': empty array. Expected an array with minimum length 1, but got an empty array instead.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'empty_array'}}
+2025-07-14 05:51:00,400 - enhanced_chat_session_manager_async - ERROR - Empty messages array error detected
+2025-07-14 05:51:00,400 - enhanced_chat_session_manager_async - INFO - Reinitializing agent due to empty messages error
+2025-07-14 05:51:00,400 - agent_factory - INFO - Returning existing agent: stylist_main
+2025-07-14 05:51:00,400 - agent_factory - INFO - ✅ Successfully created stylist agent with proper initialization
+2025-07-14 05:51:00,824 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-14 05:51:01,002 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-14 05:51:01,484 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/chat/completions "HTTP/1.1 400 Bad Request"
+2025-07-14 05:51:01,485 - camel.models.model_manager - ERROR - Error processing with model: <camel.models.openai_model.OpenAIModel object at 0x7f971ee5a2f0>
+2025-07-14 05:51:01,485 - camel.agents.chat_agent - ERROR - An error occurred while running model gpt-4o-mini, index: 0
+Traceback (most recent call last):
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/agents/chat_agent.py", line 1065, in _get_model_response
+    response = self.model_backend.run(
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/models/model_manager.py", line 228, in run
+    raise exc
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/models/model_manager.py", line 218, in run
+    response = self.current_model.run(messages, response_format, tools)
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/models/base_model.py", line 50, in wrapped_run
+    return original_run(self, messages, *args, **kwargs)
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/models/base_model.py", line 278, in run
+    return self._run(messages, response_format, tools)
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/models/openai_model.py", line 263, in _run
+    result = self._request_chat_completion(messages, tools)
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/camel/models/openai_model.py", line 331, in _request_chat_completion
+    return self._client.chat.completions.create(
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/openai/_utils/_utils.py", line 279, in wrapper
+    return func(*args, **kwargs)
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/openai/resources/chat/completions/completions.py", line 914, in create
+    return self._post(
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/openai/_base_client.py", line 1242, in post
+    return cast(ResponseT, self.request(cast_to, opts, stream=stream, stream_cls=stream_cls))
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/openai/_base_client.py", line 919, in request
+    return self._request(
+  File "/home/leo/fashion-env/lib/python3.10/site-packages/openai/_base_client.py", line 1023, in _request
+    raise self._make_status_error_from_response(err.response) from None
+openai.BadRequestError: Error code: 400 - {'error': {'message': "Invalid 'messages': empty array. Expected an array with minimum length 1, but got an empty array instead.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'empty_array'}}
+2025-07-14 05:51:01,486 - enhanced_chat_session_manager_async - ERROR - Error in CAMEL agent processing: Unable to process messages: the only provided model did not run successfully. Error: Error code: 400 - {'error': {'message': "Invalid 'messages': empty array. Expected an array with minimum length 1, but got an empty array instead.", 'type': 'invalid_request_error', 'param': 'messages', 'code': 'empty_array'}}
+2025-07-14 05:51:01,690 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-14 05:51:01,694 - enhanced_chat_session_manager_async - INFO - Added agent message to enhanced memory
+2025-07-14 05:51:01,694 - enhanced_chat_session_manager_async - INFO - Product search handled successfully
+2025-07-14 05:51:02,001 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"
+2025-07-14 05:51:02,010 - enhanced_ai_stylist_app_async - INFO - Saved memory state for user test_user_integration
+2025-07-14 05:51:02,011 - integration_tests - INFO - Battle system used: True
+2025-07-14 05:51:02,011 - integration_tests - INFO - Full flow test passed. Response length: 122
+2025-07-14 05:51:02,011 - integration_tests - INFO - ✅ test_full_recommendation_flow PASSED
+2025-07-14 05:51:02,011 - integration_tests - INFO - 
+🧪 Running test_migration_readiness...
+2025-07-14 05:51:02,110 - httpx - INFO - HTTP Request: GET https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io:6333/collections/products "HTTP/1.1 200 OK"
+2025-07-14 05:51:02,111 - integration_tests - ERROR - Migration readiness test failed: '>' not supported between instances of 'NoneType' and 'int'
+2025-07-14 05:51:02,111 - integration_tests - ERROR - ❌ test_migration_readiness FAILED
+2025-07-14 05:51:02,111 - integration_tests - INFO - 🧹 Cleaning up test environment...
+2025-07-14 05:51:02,111 - user_knowledge_graph - INFO - User Knowledge Graph connection closed successfully
+2025-07-14 05:51:02,112 - integration_tests - INFO - ✅ Cleanup complete
+2025-07-14 05:51:02,112 - integration_tests - INFO - 
+==================================================
+2025-07-14 05:51:02,112 - integration_tests - INFO - TEST SUMMARY
+2025-07-14 05:51:02,112 - integration_tests - INFO - ==================================================
+2025-07-14 05:51:02,112 - integration_tests - INFO - Total Tests: 10
+2025-07-14 05:51:02,112 - integration_tests - INFO - Passed: 8 (80.0%)
+2025-07-14 05:51:02,112 - integration_tests - INFO - Failed: 2 (20.0%)
+2025-07-14 05:51:02,112 - integration_tests - WARNING - 
+❌ 2 TESTS FAILED! Fix issues before migration.
+2025-07-14 05:51:02,112 - migration_runner - ERROR - ❌ Integration tests failed
+2025-07-14 05:51:02,112 - migration_runner - INFO - 
+2️⃣ Checking Neo4j product count...
+2025-07-14 05:51:02,112 - migration_runner - ERROR - Error getting Neo4j stats: 'NoneType' object has no attribute 'query'
+2025-07-14 05:51:02,112 - migration_runner - INFO - Found 0 products in Neo4j
+2025-07-14 05:51:02,112 - migration_runner - WARNING - ⚠️  No products found in Neo4j - nothing to migrate
+2025-07-14 05:51:02,113 - migration_runner - ERROR - Pre-migration checks failed. Aborting.
+2025-07-14 05:51:02,113 - user_knowledge_graph - INFO - User Knowledge Graph connection closed successfully
+2025-07-14 05:51:02,113 - enhanced_chat_session_manager_async - INFO - Final memory persistence on cancellation for session 2d42fc70-ed98-4b6a-85ce-7ce3bf45ff2c
+2025-07-14 05:51:02,113 - enhanced_ai_stylist_app_async - INFO - Memory optimization task cancelled
+2025-07-14 05:51:02,331 - httpx - INFO - HTTP Request: POST https://api.openai.com/v1/embeddings "HTTP/1.1 200 OK"

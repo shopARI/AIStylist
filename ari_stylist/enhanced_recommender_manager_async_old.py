@@ -4,7 +4,6 @@ Enhanced Recommender Manager for AI Stylist.
 This module provides a manager for creating and integrating all the enhanced
 recommendation systems into the AI Stylist application.
 Compatible with CAMEL-AI 0.2.43.
-INTEGRATED: Now uses HybridDataStore for product operations.
 """
 
 import logging
@@ -14,7 +13,9 @@ from typing import Dict, List, Any, Optional, Tuple
 # Import the recommender systems
 from multi_cluster_recommender import MultiClusterRecommender
 from hybrid_visual_recommender import HybridVisualRecommender
+
 from rfm_apriori_recommender_async import RFMAprioriRecommenderAsync
+
 from memory_rag_recommender import MemoryRAGRecommender
 from ensemble_recommender import EnsembleRecommender
 
@@ -26,30 +27,26 @@ class EnhancedRecommenderManagerAsync:
     """
     Manages the creation, configuration, and integration of enhanced
     recommendation systems for the AI Stylist application.
-    INTEGRATED: Uses HybridDataStore for product operations and UserKnowledgeGraphAsync for user operations.
     """
     
     def __init__(
         self, 
-        data_store=None,  # NEW: HybridDataStore for product operations
-        user_kg=None,  # NEW: UserKnowledgeGraphAsync for user operations
+        product_kg, 
         product_retriever=None, 
         memory_setup_func=None, 
         stylist_agent=None
     ):
         """
-        Initialize the enhanced recommender manager with HybridDataStore.
+        Initialize the enhanced recommender manager.
         
         Args:
-            data_store: HybridDataStore instance for product operations
-            user_kg: UserKnowledgeGraphAsync instance for user operations
+            product_kg: Neo4j product knowledge graph instance
             product_retriever: Product retriever (optional)
             memory_setup_func: Function to set up memory (optional)
             stylist_agent: CAMEL stylist agent (optional)
         """
-        logger.info("Initializing EnhancedRecommenderManager with HybridDataStore")
-        self.data_store = data_store  # For product operations
-        self.user_kg = user_kg  # For user operations
+        logger.info("Initializing EnhancedRecommenderManager")
+        self.product_kg = product_kg
         self.product_retriever = product_retriever
         self.memory_setup_func = memory_setup_func
         self.stylist_agent = stylist_agent
@@ -70,7 +67,7 @@ class EnhancedRecommenderManagerAsync:
         Returns:
             Dictionary of created recommenders
         """
-        logger.info("Creating all recommenders with HybridDataStore support")
+        logger.info("Creating all recommenders")
         
         try:
             # Create MultiClusterRecommender
@@ -109,19 +106,18 @@ class EnhancedRecommenderManagerAsync:
     
     def create_multi_cluster_recommender(self) -> Optional[MultiClusterRecommender]:
         """
-        Create a MultiClusterRecommender with HybridDataStore.
+        Create a MultiClusterRecommender.
         
         Returns:
             MultiClusterRecommender instance or None
         """
         try:
-            # Pass data_store instead of product_kg
             recommender = MultiClusterRecommender(
-                product_kg=self.data_store,  # Will use data_store for product operations
+                product_kg=self.product_kg,
                 n_clusters=8
             )
             
-            logger.info("Created MultiClusterRecommender with HybridDataStore")
+            logger.info("Created MultiClusterRecommender")
             return recommender
             
         except Exception as e:
@@ -130,19 +126,18 @@ class EnhancedRecommenderManagerAsync:
     
     def create_hybrid_visual_recommender(self) -> Optional[HybridVisualRecommender]:
         """
-        Create a HybridVisualRecommender with HybridDataStore.
+        Create a HybridVisualRecommender.
         
         Returns:
             HybridVisualRecommender instance or None
         """
         try:
-            # Pass data_store instead of product_kg
             recommender = HybridVisualRecommender(
-                product_kg=self.data_store,  # Will use data_store for product operations
+                product_kg=self.product_kg,
                 storage_path="product_data/visual_embeddings"
             )
             
-            logger.info("Created HybridVisualRecommender with HybridDataStore")
+            logger.info("Created HybridVisualRecommender")
             return recommender
             
         except Exception as e:
@@ -150,20 +145,18 @@ class EnhancedRecommenderManagerAsync:
             return None
     
     def create_rfm_apriori_recommender(self) -> Optional[RFMAprioriRecommenderAsync]:
-        """Create a RFMAprioriRecommenderAsync with separate data stores.
+        """Create a RFMAprioriRecommenderAsync.
         
         Returns:
             RFMAprioriRecommender instance or None
         """
         try:
-            # RFM needs both user and product operations
             recommender = RFMAprioriRecommenderAsync(
-                product_kg=self.data_store,  # For product operations
-                user_kg=self.user_kg,  # For user operations
+                product_kg=self.product_kg,
                 memory_setup_func=self.memory_setup_func
             )
             
-            logger.info("Created RFMAprioriRecommenderAsync with HybridDataStore")
+            logger.info("Created RFMAprioriRecommenderAsync")
             return recommender
             
         except Exception as e:
@@ -172,20 +165,18 @@ class EnhancedRecommenderManagerAsync:
     
     def create_memory_rag_recommender(self) -> Optional[MemoryRAGRecommender]:
         """
-        Create a MemoryRAGRecommender with separate data stores.
+        Create a MemoryRAGRecommender.
         
         Returns:
             MemoryRAGRecommender instance or None
         """
         try:
-            # Memory RAG needs both user and product operations
             recommender = MemoryRAGRecommender(
-                product_kg=self.data_store,  # For product operations
-                user_kg=self.user_kg,  # For user operations
+                product_kg=self.product_kg,
                 memory_setup_func=self.memory_setup_func
             )
             
-            logger.info("Created MemoryRAGRecommender with HybridDataStore")
+            logger.info("Created MemoryRAGRecommender")
             return recommender
             
         except Exception as e:
@@ -194,15 +185,15 @@ class EnhancedRecommenderManagerAsync:
     
     def create_ensemble_recommender(self) -> Optional[EnsembleRecommender]:
         """
-        Create an EnsembleRecommender with HybridDataStore.
+        Create an EnsembleRecommender.
         
         Returns:
             EnsembleRecommender instance or None
         """
         try:
-            # Create ensemble with data_store
+            # Create ensemble
             ensemble = EnsembleRecommender(
-                product_kg=self.data_store,  # For product operations
+                product_kg=self.product_kg,
                 product_retriever=self.product_retriever,
                 stylist_agent=self.stylist_agent
             )
@@ -220,7 +211,7 @@ class EnhancedRecommenderManagerAsync:
                 else:
                     ensemble.add_recommender(recommender, name=name)
             
-            logger.info("Created EnsembleRecommender with HybridDataStore")
+            logger.info("Created EnsembleRecommender")
             return ensemble
             
         except Exception as e:
@@ -230,12 +221,11 @@ class EnhancedRecommenderManagerAsync:
     def initialize_recommender_data(self) -> bool:
         """
         Initialize data for all recommenders.
-        Note: Some methods may need adjustment for HybridDataStore compatibility.
         
         Returns:
             True if successful, False otherwise
         """
-        logger.info("Initializing recommender data with HybridDataStore")
+        logger.info("Initializing recommender data")
         success = True
         
         try:
@@ -243,8 +233,6 @@ class EnhancedRecommenderManagerAsync:
             if 'multi_cluster' in self.recommenders:
                 try:
                     logger.info("Clustering all products")
-                    # Note: This method might need modification in MultiClusterRecommender
-                    # to work with HybridDataStore
                     self.recommenders['multi_cluster'].cluster_all_products()
                 except Exception as e:
                     logger.error(f"Error clustering products: {e}")
@@ -254,8 +242,6 @@ class EnhancedRecommenderManagerAsync:
             if 'hybrid_visual' in self.recommenders:
                 try:
                     logger.info("Indexing all products for visual search")
-                    # Note: This method might need modification in HybridVisualRecommender
-                    # to work with HybridDataStore
                     self.recommenders['hybrid_visual'].index_all_products()
                 except Exception as e:
                     logger.error(f"Error indexing products for visual search: {e}")
@@ -265,8 +251,6 @@ class EnhancedRecommenderManagerAsync:
             if 'rfm_apriori' in self.recommenders:
                 try:
                     logger.info("Loading transactions and generating association rules")
-                    # These methods should work if RFMAprioriRecommender is updated
-                    # to use separate user_kg for user operations
                     self.recommenders['rfm_apriori'].load_transactions_from_neo4j()
                     self.recommenders['rfm_apriori'].calculate_rfm()
                     self.recommenders['rfm_apriori'].find_association_rules()
@@ -281,7 +265,7 @@ class EnhancedRecommenderManagerAsync:
             logger.error(f"Error initializing recommender data: {e}")
             return False
     
-    async def get_recommendations(
+    def get_recommendations(
         self, 
         user_id: Optional[str] = None, 
         session_id: Optional[str] = None, 
@@ -304,7 +288,7 @@ class EnhancedRecommenderManagerAsync:
         """
         # Use ensemble if available
         if self.ensemble:
-            return await self.ensemble.get_recommendations(
+            return self.ensemble.get_recommendations(
                 user_id=user_id,
                 session_id=session_id,
                 product_id=product_id,
@@ -317,7 +301,7 @@ class EnhancedRecommenderManagerAsync:
             # Try memory RAG first
             if 'memory_rag' in self.recommenders and user_id:
                 try:
-                    return await self.recommenders['memory_rag'].get_personalized_recommendations(
+                    return self.recommenders['memory_rag'].get_personalized_recommendations(
                         user_id=user_id,
                         query=f"Products similar to {product_id}",
                         limit=limit
@@ -328,7 +312,7 @@ class EnhancedRecommenderManagerAsync:
             # Try hybrid visual
             if 'hybrid_visual' in self.recommenders:
                 try:
-                    return await self.recommenders['hybrid_visual'].get_visual_recommendations(
+                    return self.recommenders['hybrid_visual'].get_visual_recommendations(
                         product_id=product_id,
                         limit=limit
                     )
@@ -338,23 +322,22 @@ class EnhancedRecommenderManagerAsync:
             # Try multi cluster
             if 'multi_cluster' in self.recommenders:
                 try:
-                    return await self.recommenders['multi_cluster'].get_recommendations(
+                    return self.recommenders['multi_cluster'].get_recommendations(
                         product_id=product_id,
                         limit=limit
                     )
                 except Exception:
                     pass
             
-            # Fallback to data_store
-            if self.data_store:
-                return await self.data_store.get_similar_products(product_id, limit)
+            # Fallback to product_kg
+            return self.product_kg.get_similar_products(product_id, limit)
         
         # For user-based recommendations
         if user_id:
             # Try memory RAG first
             if 'memory_rag' in self.recommenders:
                 try:
-                    return await self.recommenders['memory_rag'].get_personalized_recommendations(
+                    return self.recommenders['memory_rag'].get_personalized_recommendations(
                         user_id=user_id,
                         query=query,
                         limit=limit
@@ -365,7 +348,7 @@ class EnhancedRecommenderManagerAsync:
             # Try RFM Apriori
             if 'rfm_apriori' in self.recommenders:
                 try:
-                    return await self.recommenders['rfm_apriori'].get_personalized_recommendations(
+                    return self.recommenders['rfm_apriori'].get_personalized_recommendations(
                         user_id=user_id,
                         limit=limit
                     )
@@ -373,15 +356,15 @@ class EnhancedRecommenderManagerAsync:
                     pass
         
         # For query-based recommendations
-        if query and self.data_store:
+        if query and self.product_retriever:
             try:
-                return await self.data_store.search_products(query=query, limit=limit)
+                return self.product_retriever.search_by_natural_language(query, limit)
             except Exception:
                 pass
         
         # Fallback to popular products
-        if self.data_store:
-            return await self.data_store.get_popular_products(limit)
+        if hasattr(self.product_kg, 'get_popular_products'):
+            return self.product_kg.get_popular_products(limit)
         else:
             return []
     
@@ -427,19 +410,6 @@ class EnhancedRecommenderManagerAsync:
                 logger.error(f"Error recording interaction in RFM Apriori: {e}")
                 success = False
         
-        # Also record through data_store if available
-        if self.data_store:
-            try:
-                asyncio.create_task(
-                    self.data_store.record_interaction(
-                        user_id=user_id,
-                        product_id=product_id,
-                        interaction_type=interaction_type
-                    )
-                )
-            except Exception as e:
-                logger.error(f"Error recording interaction in data_store: {e}")
-        
         return success
     
     def add_user_preference(
@@ -472,18 +442,5 @@ class EnhancedRecommenderManagerAsync:
             except Exception as e:
                 logger.error(f"Error adding user preference to memory RAG: {e}")
                 success = False
-        
-        # Also add through user_kg if available
-        if self.user_kg:
-            try:
-                asyncio.create_task(
-                    self.user_kg.update_user_preference(
-                        user_id=user_id,
-                        preference_type=preference_type,
-                        preference_value=preference_value
-                    )
-                )
-            except Exception as e:
-                logger.error(f"Error adding user preference to user_kg: {e}")
         
         return success

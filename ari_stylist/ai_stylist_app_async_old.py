@@ -6,7 +6,6 @@ Implements user identification and cross-session memory.
 Compatible with CAMEL-AI 0.2.59+.
 
 MIGRATED: Now uses AgentFactory instead of AsyncCAMELService for CAMEL 0.2.59+ compatibility.
-INTEGRATED: Now uses HybridDataStore for product operations (Qdrant) and UserKnowledgeGraph for users (Neo4j).
 """
 
 import os
@@ -37,14 +36,8 @@ from memory_integration_async import (
 # Import the enhanced stylist agent
 from stylist_agent_async import create_stylist_agent_async
 
-# UPDATED IMPORTS: Use UserKnowledgeGraph and HybridDataStore
-from user_knowledge_graph_async import UserKnowledgeGraphAsync
-from hybrid_data_store import HybridDataStore
-from product_retriever_async_enhanced import ProductRetrieverAsync
-
-# Import battle system components
-from battle_agents import BattleAgents
-from competitive_search_system import CompetitiveSearchSystem
+# Import the enhanced Neo4j integration
+from neo4j_integration_async import ProductKnowledgeGraphAsync
 
 # Import the enhanced chat manager
 from chat_session_manager_async import EnhancedChatManagerAsync
@@ -52,6 +45,24 @@ from chat_session_manager_async import EnhancedChatManagerAsync
 # Import the enhanced recommender manager
 from enhanced_recommender_manager_async import EnhancedRecommenderManagerAsync
 
+# Import the product retriever
+try:
+    # Import the async product retriever
+    from product_retriever_async import ProductRetrieverAsync
+    logger.info("Using ProductRetrieverAsync (CAMEL-AI 0.2.59+ compatible)")
+except ImportError:
+    logger.warning("Failed to import ProductRetrieverAsync module")
+    # Define a fallback minimal ProductRetrieverAsync if needed
+    class ProductRetrieverAsync:
+        def __init__(self, **kwargs):
+            self.initialized = False
+            logger.warning("Using minimal ProductRetrieverAsync placeholder")
+            
+        async def setup_product_indexing(self, *args, **kwargs):
+            logger.warning("Product indexing not available")
+            
+        async def search_products(self, *args, **kwargs):
+            return []
 
 class EnhancedAIStylistApp:
     """
@@ -60,12 +71,13 @@ class EnhancedAIStylistApp:
     Compatible with CAMEL-AI 0.2.59+.
     
     MIGRATED: Now properly integrates with CAMEL 0.2.59+ using AgentFactory.
-    INTEGRATED: Uses HybridDataStore for intelligent routing of product/user operations.
     """
     
     def __init__(self, neo4j_url=None, neo4j_username=None, neo4j_password=None):
-        """Initialize with CAMEL-AI 0.2.64 verification and HybridDataStore"""
-        logger.info("Initializing Enhanced AI Stylist with HybridDataStore integration...")
+        # Add at the beginning of __init__ method
+
+        """Initialize with CAMEL-AI 0.2.64 verification"""
+        logger.info("Initializing Enhanced AI Stylist with CAMEL-AI 0.2.64...")
         
         # VERIFY CAMEL VERSION
         try:
@@ -77,6 +89,17 @@ class EnhancedAIStylistApp:
         except:
             logger.warning("Could not verify CAMEL-AI version")
     
+  
+        """
+        Initialize the Enhanced AI Stylist application.
+        
+        Args:
+            neo4j_url: Neo4j connection URL
+            neo4j_username: Neo4j username
+            neo4j_password: Neo4j password
+        """
+        logger.info("Initializing Enhanced AI Stylist...")
+        
         # Use provided credentials or environment variables with defaults
         self.neo4j_url = neo4j_url or os.environ.get("NEO4J_URL", "bolt://34.135.40.119:7687")
         self.neo4j_username = neo4j_username or os.environ.get("NEO4J_USERNAME", "neo4j")
@@ -87,76 +110,63 @@ class EnhancedAIStylistApp:
         self.qdrant_api_key = os.environ.get("QDRANT_API_KEY")
         self.qdrant_collection_name = os.environ.get("QDRANT_COLLECTION_NAME", "products")
         
-        # UPDATED: Set up UserKnowledgeGraph for user operations only
-        logger.info(f"Connecting to Neo4j at {self.neo4j_url} for user operations")
-        self.user_kg = UserKnowledgeGraphAsync(
+        # Set up Neo4j integration with enhanced features
+        logger.info(f"Connecting to Neo4j at {self.neo4j_url}")
+        self.product_kg = ProductKnowledgeGraphAsync(
             url=self.neo4j_url,
             username=self.neo4j_username,
             password=self.neo4j_password
         )
         
-        # Set up ProductRetriever for Qdrant operations
-        logger.info("Initializing product retriever for Qdrant operations...")
+        # Set up product retriever with vector-based search
+        logger.info("Initializing product retriever...")
+        
+        # Use remote Qdrant if configurations are available
         if self.qdrant_url and self.qdrant_api_key:
             logger.info(f"Using remote Qdrant at {self.qdrant_url}")
+            # Initialize retriever with CAMEL-AI 0.2.59+ compatible parameters
             self.product_retriever = ProductRetrieverAsync(
+                vector_storage_path="product_data/embeddings",
                 qdrant_url=self.qdrant_url,
                 qdrant_api_key=self.qdrant_api_key,
-                collection_name=self.qdrant_collection_name
+                qdrant_collection_name=self.qdrant_collection_name
             )
         else:
-            logger.info("Using local Qdrant instance")
+            logger.info("Using local vector storage (remote Qdrant configuration not provided)")
+            # Initialize local retriever with CAMEL-AI 0.2.59+ compatible parameters
             self.product_retriever = ProductRetrieverAsync(
-                collection_name=self.qdrant_collection_name
+                vector_storage_path="product_data/embeddings"
             )
-        
-        # NEW: Initialize HybridDataStore for intelligent routing
-        logger.info("Initializing HybridDataStore for intelligent operation routing...")
-        self.data_store = HybridDataStore(
-            neo4j_client=self.user_kg,
-            qdrant_client=self.product_retriever
-        )
-        
-        # NEW: Initialize Battle System for competitive product search
-        logger.info("Initializing Battle System for competitive search...")
-        self.battle_agents = BattleAgents(
-            neo4j_client=self.user_kg,
-            qdrant_retriever=self.product_retriever
-        )
-        self.competitive_search = CompetitiveSearchSystem(self.battle_agents)
         
         # MIGRATED: Use AgentFactory instead of AsyncCAMELService
         self.agent_factory = get_agent_factory()
         logger.info("Initialized AgentFactory for CAMEL 0.2.59+")
         
         # MIGRATED: Initialize MemoryManager for new memory APIs
-        self.memory_manager = MemoryManager(self.user_kg)
+        self.memory_manager = MemoryManager(self.product_kg)
         logger.info("Initialized MemoryManager for CAMEL 0.2.59+")
         
         # Initialize the enhanced memory system with backward compatibility wrapper
         logger.info("Setting up enhanced memory system...")
         self.memory_setup_func = self._setup_memory_for_user
         
-        # UPDATED: Initialize recommender manager with HybridDataStore
-        logger.info("Initializing enhanced recommender manager with HybridDataStore...")
+        # Initialize the enhanced recommender manager
+        logger.info("Initializing enhanced recommender manager...")
         self.enhanced_recommender_manager = EnhancedRecommenderManagerAsync(
-            data_store=self.data_store,  # Pass HybridDataStore for product operations
-            user_kg=self.user_kg,  # Pass UserKG for user operations
+            product_kg=self.product_kg,
             product_retriever=self.product_retriever,
             memory_setup_func=self.memory_setup_func,
             stylist_agent=None  # Will be set per session
         )
         
-        # UPDATED: Pass components to chat manager
-        logger.info("Creating enhanced chat manager with ML integration and HybridDataStore...")
+        # Pass parent app reference to chat manager for ML integration
+        logger.info("Creating enhanced chat manager with ML integration...")
         self.chat_manager = EnhancedChatManagerAsync(
             stylist_agent=None,  # Will be set per session
-            user_kg=self.user_kg,  # For user operations
-            data_store=self.data_store,  # For product operations
+            product_kg=self.product_kg,
             product_retriever=self.product_retriever,
             memory_setup_func=self.memory_setup_func,
-            parent_app=self,  # Pass self reference for ML access
-            competitive_search=self.competitive_search  # Pass competitive search system
+            parent_app=self  # Pass self reference for ML access
         )
         
         # Track active sessions
@@ -175,7 +185,7 @@ class EnhancedAIStylistApp:
         # Verify and update database schema
         asyncio.create_task(self._setup_database_schema())
         
-        logger.info("✅ Enhanced AI Stylist initialized with HybridDataStore and Battle System!")
+        logger.info("✅ Enhanced AI Stylist initialized with CAMEL 0.2.59+ support!")
     
     async def _setup_memory_for_user(self, user_id=None, neo4j_client=None):
         """
@@ -190,13 +200,25 @@ class EnhancedAIStylistApp:
     async def _setup_database_schema(self):
         """Set up and verify the database schema"""
         try:
-            # Ensure the Neo4j schema is set up for user operations
-            if hasattr(self.user_kg, 'ensure_schema'):
-                await self.user_kg.ensure_schema()
+            # Ensure the Neo4j schema is set up for enhanced features
+            if hasattr(self.product_kg, 'ensure_schema'):
+                await self.product_kg.ensure_schema()
             
+            # Verify schema completeness
+            schema_valid, missing_elements = await self.product_kg.verify_database_schema()
+            if not schema_valid:
+                logger.warning(f"Database schema incomplete. Missing: {missing_elements}")
+                logger.warning("Some functionality may be limited due to missing schema elements")
+            else:
+                logger.info("Database schema verification successful")
+                
             # Get basic database statistics
-            stats = await self.data_store.get_stats()
-            logger.info(f"HybridDataStore statistics: {stats}")
+            stats = await self.product_kg.get_database_statistics()
+            if stats:
+                if 'product_count' in stats:
+                    logger.info(f"Database contains {stats['product_count']} products")
+                if 'user_count' in stats.get('user_statistics', {}):
+                    logger.info(f"Database contains {stats['user_statistics']['user_count']} users")
                 
         except Exception as e:
             logger.error(f"Error setting up database schema: {e}")
@@ -227,7 +249,7 @@ class EnhancedAIStylistApp:
                         await optimize_memory_async(
                             memory=session.memory,
                             user_id=session.user_id,
-                            neo4j_client=self.user_kg
+                            neo4j_client=self.product_kg
                         )
                         logger.info(f"Optimized memory for session {session_id}, user {session.user_id}")
                     except Exception as e:
@@ -241,7 +263,7 @@ class EnhancedAIStylistApp:
             logger.error(f"Error in memory optimization worker: {e}")
     
     async def create_session(self, user_id=None):
-        """Create a new chat session with proper error handling."""
+        """FIXED: Create a new chat session with proper error handling."""
         try:
             # Check existing sessions
             if user_id and user_id in self.registered_users:
@@ -275,6 +297,68 @@ class EnhancedAIStylistApp:
             if user_id:
                 self.registered_users[user_id] = session.session_id
             
+            return session.session_id
+            
+        except Exception as e:
+            logger.error(f"Error creating session: {e}")
+            # Create minimal fallback
+            session_id = str(uuid.uuid4())
+            return session_id
+        """
+        Create a new chat session with persistent memory support.
+        
+        Args:
+            user_id: Optional user ID for personalization
+            
+        Returns:
+            session_id: The ID of the created session
+        """
+        # Check if user already has an active session
+        if user_id and user_id in self.registered_users:
+            existing_session_id = self.registered_users[user_id]
+            if existing_session_id in self.active_sessions:
+                logger.info(f"Returning existing session for user {user_id}: {existing_session_id}")
+                return existing_session_id
+        
+        # Create stylist agent with memory for this session
+        try:
+            # Register user in Neo4j if provided
+            if user_id and self.product_kg:
+                try:
+                    await self.product_kg.create_or_update_user(user_id)
+                    logger.info(f"Registered user in Neo4j: {user_id}")
+                except Exception as e:
+                    logger.error(f"Error registering user in Neo4j: {e}")
+            
+            # Create a new session with the chat manager
+            session = await self.chat_manager.get_or_create_session(user_id=user_id)
+            
+            # Update stylist agent if needed
+            if not hasattr(session, 'stylist_agent') or not session.stylist_agent:
+                # MIGRATED: Create memory using MemoryManager
+                memory = await self.memory_manager.create_memory(
+                    user_id=user_id,
+                    enable_mcp=True
+                )
+                
+                session.memory = memory
+                
+                # MIGRATED: Create agent using AgentFactory
+                stylist_agent = await self.agent_factory.create_stylist_agent(
+                    memory=memory,
+                    model_type=None,  # Will use default GPT-4O
+                    enable_mcp=True
+                )
+                session.stylist_agent = stylist_agent
+                logger.info("Created stylist agent for new session using AgentFactory")
+            
+            # Add to active sessions
+            self.active_sessions[session.session_id] = session
+            
+            # Register user with this session
+            if user_id:
+                self.registered_users[user_id] = session.session_id
+            
             # Update the enhanced recommender manager with this session's stylist agent
             if hasattr(self, 'enhanced_recommender_manager') and self.enhanced_recommender_manager:
                 # Update the ensemble recommender with the session's stylist agent
@@ -288,7 +372,7 @@ class EnhancedAIStylistApp:
             
         except Exception as e:
             logger.error(f"Error creating session: {e}")
-            # Create minimal fallback
+            # Create a minimal session as fallback
             session_id = str(uuid.uuid4())
             return session_id
     
@@ -353,7 +437,7 @@ class EnhancedAIStylistApp:
         
         # Process the message using the chat manager
         try:
-            logger.info(f"🚀 Processing message for session {session_id} with FULL ML integration and Battle System")
+            logger.info(f"🚀 Processing message for session {session_id} with FULL ML integration")
             response, data = await self.chat_manager.process_message(
                 session_id=session_id,
                 user_id=session.user_id if hasattr(session, 'user_id') else None,
@@ -393,7 +477,7 @@ class EnhancedAIStylistApp:
             }
     
     async def get_session(self, session_id):
-        """Get a session by ID with proper error handling."""
+        """FIXED: Get a session by ID with proper error handling."""
         if not session_id:
             return None
             
@@ -414,7 +498,7 @@ class EnhancedAIStylistApp:
     
     async def get_product_recommendations(self, session_id, product_id=None, query=None, limit=5, occasion=None):
         """
-        Enhanced recommendation system using HybridDataStore and Battle System
+        Enhanced recommendation system with proper fallback chain
         
         This is the CORE ML ENSEMBLE METHOD that should be used for all recommendations
         
@@ -435,18 +519,21 @@ class EnhancedAIStylistApp:
             
         user_id = session.user_id if hasattr(session, 'user_id') else None
         
-        # Extract occasion from query if not provided
+        # Add occasion from query if provided
         if query and not occasion:
+            # Extract occasion from query
             occasions = ["wedding", "party", "work", "casual", "formal", "date", "dinner", "beach"]
             seasons = ["summer", "winter", "fall", "spring"]
             
             query_lower = query.lower()
             
+            # Check for occasions
             for occ in occasions:
                 if occ in query_lower:
                     occasion = occ
                     break
                     
+            # Check for seasons + occasions
             if not occasion:
                 for season in seasons:
                     if season in query_lower:
@@ -455,98 +542,218 @@ class EnhancedAIStylistApp:
                                 occasion = f"{season} {occ}"
                                 break
         
-        # Try different recommendation strategies
+        # Define all recommendation methods in priority order
+        recommendation_methods = []
         
-        # 1. If query is provided, use competitive search system
-        if query:
+        # Method 1: Similar products (if product_id provided)
+        if product_id:
+            recommendation_methods.extend([
+                ("similar_products_kg", self._try_similar_products_kg, product_id, limit),
+                ("similar_products_retriever", self._try_similar_products_retriever, product_id, limit),
+            ])
+        
+        # Method 2: Direct filter-based search (if query/occasion provided)
+        if query or occasion:
+            recommendation_methods.extend([
+                ("direct_filter_search", self._try_direct_filter_search, query, occasion, limit),
+                ("vector_search", self._try_vector_search, query, limit),
+            ])
+        
+        # Method 3: Enhanced recommender system
+        if hasattr(self, 'enhanced_recommender_manager') and self.enhanced_recommender_manager:
+            recommendation_methods.append(
+                ("enhanced_recommender", self._try_enhanced_recommender, user_id, session_id, product_id, query or occasion, limit)
+            )
+        
+        # Method 4: User preference-based fallbacks
+        recommendation_methods.extend([
+            ("user_preference_categories", self._try_user_preference_categories, session, limit),
+            ("user_preference_tags", self._try_user_preference_tags, session, limit),
+        ])
+        
+        # Method 5: General fallback methods
+        recommendation_methods.extend([
+            ("popular_products", self._try_popular_products, limit),
+            ("trending_products", self._try_trending_products, limit),
+            ("category_fallback", self._try_category_fallback, query, limit),
+            ("general_search", self._try_general_search, limit),
+        ])
+        
+        # Try each method until we get sufficient results
+        for method_name, method_func, *args in recommendation_methods:
             try:
-                logger.info(f"🎯 Using Battle System for query: {query}")
+                logger.info(f"Trying recommendation method: {method_name}")
+                results = await method_func(*args)
                 
-                # Build filters from occasion and user preferences
-                filters = {}
-                if occasion:
-                    filters['occasion'] = occasion
-                
-                if hasattr(session, 'get_or_fetch_user_preferences'):
-                    user_preferences = await session.get_or_fetch_user_preferences()
-                    if user_preferences.get('budget_range'):
-                        filters['min_price'] = user_preferences['budget_range'].get('min')
-                        filters['max_price'] = user_preferences['budget_range'].get('max')
-                
-                # Execute battle search
-                battle_results = await self.competitive_search.execute_battle(
-                    query=query,
-                    filters=filters,
-                    limit=limit,
-                    user_context=user_preferences if 'user_preferences' in locals() else None
-                )
-                
-                # Extract winning results
-                judgment = battle_results.get('judgment', {})
-                winner = judgment.get('winner', 'vector')
-                
-                if winner == 'cypher':
-                    results = battle_results['agents']['cypher']['products']
-                    logger.info(f"🏆 CypherBot won with {len(results)} products")
-                else:
-                    results = battle_results['agents']['vector']['products']
-                    logger.info(f"🏆 VibeBot won with {len(results)} products")
-                
-                if results:
-                    # Filter valid products
+                if results and len(results) > 0:
+                    # Filter out test/untitled products and zero-priced items
                     filtered_results = self._filter_valid_products(results)
+                    
                     if filtered_results:
+                        logger.info(f"✅ Got {len(filtered_results)} valid recommendations from {method_name}")
+                        
+                        # Record interactions if applicable
                         await self._record_product_interactions(session, filtered_results)
+                        
                         return filtered_results[:limit]
                         
             except Exception as e:
-                logger.error(f"Battle system failed: {e}")
+                logger.warning(f"Method {method_name} failed: {e}")
+                continue  # Try next method
         
-        # 2. If product_id provided, get similar products
-        if product_id:
-            try:
-                logger.info(f"Getting similar products for: {product_id}")
-                similar = await self.data_store.get_similar_products(product_id, limit)
-                if similar:
-                    filtered = self._filter_valid_products(similar)
-                    if filtered:
-                        await self._record_product_interactions(session, filtered)
-                        return filtered
-            except Exception as e:
-                logger.error(f"Similar products search failed: {e}")
+        # If we get here, all methods failed
+        logger.warning("All recommendation methods failed - returning empty list")
+        return []
+
+    # Helper methods for each recommendation strategy
+
+    async def _try_similar_products_kg(self, product_id, limit):
+        """Try getting similar products from knowledge graph"""
+        if hasattr(self.product_kg, 'get_similar_products'):
+            return await self.product_kg.get_similar_products(product_id, limit=limit)
+        return []
+
+    async def _try_similar_products_retriever(self, product_id, limit):
+        """Try getting similar products from retriever"""
+        if hasattr(self.product_retriever, 'search_similar_products'):
+            return await self.product_retriever.search_similar_products(product_id, limit=limit)
+        return []
+
+    async def _try_direct_filter_search(self, query, occasion, limit):
+        """Try direct filter search with product_kg"""
+        if not hasattr(self.product_kg, 'get_product_by_filter'):
+            return []
+            
+        # Extract potential parameters from query
+        category = None
+        tag = occasion
         
-        # 3. Try enhanced recommender system
-        if hasattr(self, 'enhanced_recommender_manager') and self.enhanced_recommender_manager:
-            try:
-                logger.info("Using enhanced recommender system")
-                results = await self.enhanced_recommender_manager.get_recommendations(
-                    user_id=user_id,
-                    session_id=session_id,
-                    product_id=product_id,
-                    query=query or occasion,
-                    limit=limit
-                )
-                if results:
-                    filtered = self._filter_valid_products(results)
-                    if filtered:
-                        await self._record_product_interactions(session, filtered)
-                        return filtered
-            except Exception as e:
-                logger.error(f"Enhanced recommender failed: {e}")
+        if query:
+            # Extract potential category from query
+            category_list = ["dress", "shirt", "pants", "jeans", "skirt", "blouse", 
+                            "sweater", "jacket", "coat", "suit", "blazer", "t-shirt", 
+                            "hoodie", "shorts", "swimwear", "activewear", "shoes"]
+            
+            query_lower = query.lower()
+            for cat in category_list:
+                if cat in query_lower:
+                    category = cat
+                    break
+            
+            # Extract potential tag from query if no occasion
+            if not tag:
+                tag_candidates = query.lower().split()
+                for potential_tag in tag_candidates:
+                    if len(potential_tag) > 3 and potential_tag not in ["need", "want", "looking", "for", "some", "with"]:
+                        tag = potential_tag
+                        break
         
-        # 4. Fallback to popular products
+        # Try the search
+        return await self.product_kg.get_product_by_filter(
+            category=category,
+            tag=tag,
+            limit=limit
+        )
+
+    async def _try_vector_search(self, query, limit):
+        """Try vector search with product retriever"""
+        if query and hasattr(self.product_retriever, 'search_by_natural_language'):
+            return await self.product_retriever.search_by_natural_language(
+                query=query,
+                limit=limit
+            )
+        return []
+
+    async def _try_enhanced_recommender(self, user_id, session_id, product_id, query, limit):
+        """Try enhanced recommender manager"""
         try:
-            logger.info("Falling back to popular products")
-            popular = await self.data_store.get_popular_products(limit)
-            if popular:
-                filtered = self._filter_valid_products(popular)
-                if filtered:
-                    await self._record_product_interactions(session, filtered)
-                    return filtered
+            return await self.enhanced_recommender_manager.get_recommendations(
+                user_id=user_id,
+                session_id=session_id,
+                product_id=product_id,
+                query=query,
+                limit=limit
+            )
+        except Exception as e:
+            logger.error(f"Enhanced recommender failed: {e}")
+            return []
+
+    async def _try_user_preference_categories(self, session, limit):
+        """Try recommendations based on user's preferred categories"""
+        try:
+            if hasattr(session, 'get_or_fetch_user_preferences'):
+                user_preferences = await session.get_or_fetch_user_preferences()
+                
+                if user_preferences and user_preferences.get("preferred_categories"):
+                    category = user_preferences["preferred_categories"][0]
+                    if hasattr(self.product_kg, 'get_products_by_category'):
+                        return await self.product_kg.get_products_by_category(category, limit=limit)
+        except Exception as e:
+            logger.error(f"User preference categories fallback failed: {e}")
+        return []
+
+    async def _try_user_preference_tags(self, session, limit):
+        """Try recommendations based on user's preferred tags"""
+        try:
+            if hasattr(session, 'get_or_fetch_user_preferences'):
+                user_preferences = await session.get_or_fetch_user_preferences()
+                
+                if user_preferences and user_preferences.get("preferred_tags"):
+                    tag = user_preferences["preferred_tags"][0]
+                    if hasattr(self.product_kg, 'get_products_by_tag'):
+                        return await self.product_kg.get_products_by_tag(tag, limit=limit)
+        except Exception as e:
+            logger.error(f"User preference tags fallback failed: {e}")
+        return []
+
+    async def _try_popular_products(self, limit):
+        """Try getting popular products"""
+        try:
+            if hasattr(self.product_kg, 'get_popular_products'):
+                return await self.product_kg.get_popular_products(limit=limit)
         except Exception as e:
             logger.error(f"Popular products fallback failed: {e}")
-        
-        logger.warning("All recommendation methods failed")
+        return []
+
+    async def _try_trending_products(self, limit):
+        """Try getting trending products"""
+        try:
+            if hasattr(self.product_kg, 'get_trending_products'):
+                return await self.product_kg.get_trending_products(limit=limit)
+        except Exception as e:
+            logger.error(f"Trending products fallback failed: {e}")
+        return []
+
+    async def _try_category_fallback(self, query, limit):
+        """Try fallback based on common categories"""
+        try:
+            # Default categories to try if no other method works
+            default_categories = ["dress", "shirt", "pants", "accessories"]
+            
+            # If query contains a category, try that first
+            if query:
+                query_lower = query.lower()
+                for category in default_categories:
+                    if category in query_lower:
+                        if hasattr(self.product_kg, 'get_products_by_category'):
+                            results = await self.product_kg.get_products_by_category(category, limit=limit)
+                            if results:
+                                return results
+            
+            # Try the first default category
+            if hasattr(self.product_kg, 'get_products_by_category'):
+                return await self.product_kg.get_products_by_category(default_categories[0], limit=limit)
+        except Exception as e:
+            logger.error(f"Category fallback failed: {e}")
+        return []
+
+    async def _try_general_search(self, limit):
+        """Final fallback - get any valid products"""
+        try:
+            if hasattr(self.product_kg, 'get_product_by_filter'):
+                return await self.product_kg.get_product_by_filter(limit=limit)
+        except Exception as e:
+            logger.error(f"General search fallback failed: {e}")
         return []
 
     def _filter_valid_products(self, products):
@@ -576,10 +783,11 @@ class EnhancedAIStylistApp:
                         )
         except Exception as e:
             logger.error(f"Error recording product interactions: {e}")
+            # Don't let interaction recording failures break the recommendation flow
 
     async def record_product_interaction(self, session_id, product_id, interaction_type="viewed"):
         """
-        Record a product interaction for a user using HybridDataStore.
+        Record a product interaction for a user.
         
         Args:
             session_id: Session ID
@@ -609,20 +817,42 @@ class EnhancedAIStylistApp:
                 logger.warning(f"Cannot record interaction: no user ID for session {session_id}")
                 return False
             
-            # Record interaction through data store
-            return await self.data_store.record_interaction(
-                user_id=user_id,
-                product_id=product_id,
-                interaction_type=interaction_type
-            )
+            # Use enhanced recommender manager
+            if hasattr(self, 'enhanced_recommender_manager') and self.enhanced_recommender_manager:
+                # Record interaction in recommender
+                result = self.enhanced_recommender_manager.record_interaction(
+                    user_id=user_id,
+                    product_id=product_id,
+                    interaction_type=interaction_type
+                )
+                
+                # Also record in Neo4j directly for better persistence
+                if hasattr(self.product_kg, 'create_or_update_user'):
+                    try:
+                        # Get product details
+                        product = await self.product_kg.get_product_details(product_id)
+                        
+                        if product and hasattr(session, 'memory') and session.memory:
+                            # MIGRATED: Use MemoryManager for product interactions
+                            await self.memory_manager.add_product_interaction(
+                                memory=session.memory,
+                                product=product,
+                                interaction_type=interaction_type,
+                                user_id=user_id
+                            )
+                    except Exception as e:
+                        logger.error(f"Error recording interaction in Neo4j and memory: {e}")
+                
+                return result
             
+            return True
         except Exception as e:
             logger.error(f"Error recording product interaction: {e}")
             return False
     
     async def add_user_preference(self, session_id, preference_type, preference_value):
         """
-        Add a user preference using UserKnowledgeGraph.
+        Add a user preference.
         
         Args:
             session_id: Session ID
@@ -652,20 +882,33 @@ class EnhancedAIStylistApp:
                 logger.warning(f"Cannot add preference: no user ID for session {session_id}")
                 return False
             
-            # Add preference through user_kg
-            return await self.user_kg.update_user_preference(
-                user_id=user_id,
-                preference_type=preference_type,
-                preference_value=preference_value
-            )
+            # Add to memory if available
+            if hasattr(session, 'memory') and session.memory:
+                # MIGRATED: Use MemoryManager for preferences
+                await self.memory_manager.add_preference(
+                    memory=session.memory,
+                    preference_type=preference_type,
+                    preference_value=preference_value,
+                    user_id=user_id
+                )
             
+            # Use enhanced recommender manager
+            if hasattr(self, 'enhanced_recommender_manager') and self.enhanced_recommender_manager:
+                # Add preference to recommender
+                return self.enhanced_recommender_manager.add_user_preference(
+                    user_id=user_id,
+                    preference_type=preference_type,
+                    preference_value=preference_value
+                )
+            
+            return True
         except Exception as e:
             logger.error(f"Error adding user preference: {e}")
             return False
     
     async def get_user_preferences(self, session_id):
         """
-        Get user preferences for a session using UserKnowledgeGraph.
+        Get user preferences for a session.
         
         Args:
             session_id: Session ID
@@ -690,10 +933,18 @@ class EnhancedAIStylistApp:
                 logger.warning(f"Cannot get preferences: no user ID for session {session_id}")
                 return {}
             
-            # Get from user_kg directly
-            preferences = await self.user_kg.get_user_preferences(user_id)
-            return preferences
+            # Get from Neo4j directly
+            if hasattr(self.product_kg, 'get_user_preferences'):
+                preferences = await self.product_kg.get_user_preferences(user_id)
+                return preferences
             
+            # Get from memory if available
+            if hasattr(session, 'memory') and session.memory:
+                # MIGRATED: Use extract_preferences_from_memory_async from v2
+                preferences = await extract_preferences_from_memory_async(session.memory)
+                return preferences
+            
+            return {}
         except Exception as e:
             logger.error(f"Error getting user preferences: {e}")
             return {}
@@ -727,9 +978,9 @@ class EnhancedAIStylistApp:
                     except Exception as e:
                         logger.error(f"Error closing session {session_id}: {e}")
             
-            # Close data store connections
-            if hasattr(self.user_kg, 'close'):
-                await self.user_kg.close()
+            # Close Neo4j connection
+            if hasattr(self.product_kg, 'close'):
+                await self.product_kg.close()
             
             # Clean up AgentFactory resources
             await self.agent_factory.cleanup()

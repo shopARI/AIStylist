@@ -5,7 +5,6 @@ This module provides an improved session manager with persistent memory
 across sessions and enhanced conversation capabilities.
 
 Uses the advanced ML ensemble system for all product recommendations.
-INTEGRATED: Now uses HybridDataStore and Battle System for product searches.
 """
 
 import sys
@@ -41,18 +40,12 @@ from memory_integration_async import (
     optimize_memory_async  # Backward compatibility function
 )
 
-# INTEGRATED: Import HybridDataStore and Battle System components
-from hybrid_data_store import HybridDataStore
-from battle_agents import BattleAgents
-from competitive_search_system import CompetitiveSearchSystem
-
 class EnhancedChatSessionAsync:
     """
     Enhanced chat session with persistent memory and cross-session capabilities.
     Uses CAMEL's memory system with Neo4j persistence.
     
     MIGRATED: Now uses AgentFactory for CAMEL 0.2.59+ compatibility.
-    INTEGRATED: Uses HybridDataStore for product operations.
     """
     
     def __init__(
@@ -60,8 +53,7 @@ class EnhancedChatSessionAsync:
         session_id: Optional[str] = None,
         user_id: Optional[str] = None,
         stylist_agent = None,
-        user_kg = None,  # Changed from product_kg
-        data_store = None,  # NEW: HybridDataStore
+        product_kg = None,
         product_retriever = None,
         memory = None,
         auto_persistence: bool = True,
@@ -71,8 +63,7 @@ class EnhancedChatSessionAsync:
         self.session_id = session_id or str(uuid.uuid4())
         self.user_id = user_id
         self.stylist_agent = stylist_agent
-        self.user_kg = user_kg  # For user operations
-        self.data_store = data_store  # For product operations
+        self.product_kg = product_kg
         self.product_retriever = product_retriever
         self.memory = memory
         self.parent_app = parent_app  # Store reference to main app
@@ -99,13 +90,13 @@ class EnhancedChatSessionAsync:
         
         # MIGRATED: Initialize AgentFactory and MemoryManager
         self.agent_factory = get_agent_factory()
-        self.memory_manager = MemoryManager(self.user_kg) if self.user_kg else None
+        self.memory_manager = MemoryManager(self.product_kg) if self.product_kg else None
         
         # Start persistence task if enabled
-        if self.auto_persistence and user_id and user_kg:
+        if self.auto_persistence and user_id and product_kg:
             self.persistence_task = asyncio.create_task(self._persistence_worker())
         
-        logger.info(f"Created enhanced chat session with HybridDataStore support: {self.session_id} for user: {self.user_id}")
+        logger.info(f"Created enhanced chat session with CAMEL 0.2.59+ support: {self.session_id} for user: {self.user_id}")
     
     async def add_message(self, content: str, sender: str, related_products: List[str] = None) -> Dict[str, Any]:
         """
@@ -199,7 +190,7 @@ class EnhancedChatSessionAsync:
                             logger.info(f"Final memory persistence for inactive session {self.session_id}")
                             await self.memory_manager.save_memory(self.memory, self.user_id)
                             # Optimize memory before ending
-                            await optimize_memory_async(self.memory, self.user_id, self.user_kg)
+                            await optimize_memory_async(self.memory, self.user_id, self.product_kg)
                         except Exception as e:
                             logger.error(f"Error in final memory persistence: {e}", exc_info=True)
                     break
@@ -362,11 +353,11 @@ class EnhancedChatSessionAsync:
             self.user_preferences = self.context["user_preferences"]
             return self.user_preferences
             
-        # If we have a user ID and user knowledge graph, try to fetch preferences
-        if self.user_id and self.user_kg:
+        # If we have a user ID and product knowledge graph, try to fetch preferences
+        if self.user_id and self.product_kg:
             try:
                 # Get preferences from Neo4j
-                preferences = await self.user_kg.get_user_preferences(self.user_id)
+                preferences = await self.product_kg.get_user_preferences(self.user_id)
                 
                 if preferences:
                     self.user_preferences = preferences
@@ -455,7 +446,7 @@ class EnhancedChatSessionAsync:
     
     async def record_product_interaction(self, product_id: str, interaction_type: str = "viewed") -> bool:
         """
-        Record a product interaction to memory and Neo4j using HybridDataStore
+        Record a product interaction to memory and Neo4j
         
         Args:
             product_id: Product ID
@@ -468,8 +459,8 @@ class EnhancedChatSessionAsync:
             return False
             
         try:
-            # INTEGRATED: Use data_store to get product details
-            product = await self.data_store.get_product(product_id)
+            # Get product details
+            product = await self.product_kg.get_product_details(product_id)
             
             if not product:
                 logger.warning(f"Product not found: {product_id}")
@@ -512,7 +503,7 @@ class EnhancedChatSessionAsync:
                 logger.info(f"Final memory persistence for session {self.session_id}")
                 await self.memory_manager.save_memory(self.memory, self.user_id)
                 # Optimize memory before closing
-                await optimize_memory_async(self.memory, self.user_id, self.user_kg)
+                await optimize_memory_async(self.memory, self.user_id, self.product_kg)
             except Exception as e:
                 logger.error(f"Error in final memory persistence: {e}", exc_info=True)
         
@@ -529,26 +520,22 @@ class EnhancedChatManagerAsync:
     Uses CAMEL's memory system with Neo4j persistence.
     
     MIGRATED: Now uses AgentFactory instead of AsyncCAMELService for CAMEL 0.2.59+ compatibility.
-    INTEGRATED: Uses HybridDataStore and Battle System for product searches.
+    Uses the advanced ML ensemble system for product recommendations.
     """
     
     def __init__(
         self,
         stylist_agent = None,
-        user_kg = None,  # Changed from product_kg
-        data_store = None,  # NEW: HybridDataStore
+        product_kg = None,
         product_retriever = None,
         memory_setup_func = None,
-        parent_app = None,  # Reference to parent app for advanced recommendations
-        competitive_search = None  # NEW: CompetitiveSearchSystem
+        parent_app = None  # Reference to parent app for advanced recommendations
     ):
         self.stylist_agent = stylist_agent
-        self.user_kg = user_kg  # For user operations
-        self.data_store = data_store  # For product operations
+        self.product_kg = product_kg
         self.product_retriever = product_retriever
         self.memory_setup_func = memory_setup_func
         self.parent_app = parent_app  # Store reference to main app
-        self.competitive_search = competitive_search  # Store competitive search system
         
         # Store active sessions
         self.active_sessions = {}
@@ -559,19 +546,19 @@ class EnhancedChatManagerAsync:
         
         # MIGRATED: Initialize AgentFactory and MemoryManager
         self.agent_factory = get_agent_factory()
-        self.memory_manager = MemoryManager(self.user_kg) if self.user_kg else None
+        self.memory_manager = MemoryManager(self.product_kg) if self.product_kg else None
         
         # Make sure schema is set up
-        if user_kg:
+        if product_kg:
             asyncio.create_task(self._ensure_schema())
         
-        logger.info("Enhanced Chat Manager initialized with HybridDataStore and Battle System")
+        logger.info("Enhanced Chat Manager initialized with CAMEL 0.2.59+ support and advanced ML integration")
     
     async def _ensure_schema(self):
         """Ensure the Neo4j schema is set up correctly"""
-        if hasattr(self.user_kg, 'ensure_schema'):
+        if hasattr(self.product_kg, 'ensure_schema'):
             try:
-                await self.user_kg.ensure_schema()
+                await self.product_kg.ensure_schema()
                 logger.info("Neo4j schema verified")
             except Exception as e:
                 logger.error(f"Error ensuring Neo4j schema: {e}", exc_info=True)
@@ -599,7 +586,7 @@ class EnhancedChatManagerAsync:
         if user_id and self.memory_manager:
             try:
                 # Create or update user in Neo4j
-                await self.user_kg.create_or_update_user(user_id)
+                await self.product_kg.create_or_update_user(user_id)
                 
                 # Try to load memory for returning user
                 memory = await self.memory_manager.create_memory(
@@ -616,7 +603,7 @@ class EnhancedChatManagerAsync:
         # If no memory loaded, create new memory
         if memory is None and self.memory_setup_func:
             try:
-                memory = await self.memory_setup_func(user_id=user_id, neo4j_client=self.user_kg)
+                memory = await self.memory_setup_func(user_id=user_id, neo4j_client=self.product_kg)
                 logger.info("Created new memory for session using fallback")
             except Exception as e:
                 logger.error(f"Failed to create memory: {e}", exc_info=True)
@@ -626,16 +613,15 @@ class EnhancedChatManagerAsync:
             session_id = str(uuid.uuid4())
             logger.info(f"Generated new session ID: {session_id}")
         
-        # Create new session with parent app reference and data stores
+        # Create new session with parent app reference
         session = EnhancedChatSessionAsync(
             session_id=session_id,
             user_id=user_id,
             stylist_agent=self.stylist_agent,
-            user_kg=self.user_kg,  # For user operations
-            data_store=self.data_store,  # For product operations
+            product_kg=self.product_kg,
             product_retriever=self.product_retriever,
             memory=memory,
-            auto_persistence=True if user_id and self.user_kg else False,
+            auto_persistence=True if user_id and self.product_kg else False,
             parent_app=self.parent_app  # Pass parent app reference
         )
         
@@ -903,6 +889,8 @@ class EnhancedChatManagerAsync:
         # Not a memory-related question
         return None
 
+
+
     def _generate_fallback_memory_response(self, memory_context: List[Dict[str, str]], message: str) -> str:
         """
         Generate a fallback response when CAMEL agent processing fails.
@@ -941,6 +929,7 @@ class EnhancedChatManagerAsync:
             logger.error(f"Error generating fallback memory response: {e}")
             return ("I remember we've been chatting about fashion advice. "
                 "What specifically would you like me to help you with?")
+
 
     async def _handle_conversation(self, session: EnhancedChatSessionAsync, message: str) -> Tuple[str, Dict[str, Any]]:
         """
@@ -1155,11 +1144,13 @@ class EnhancedChatManagerAsync:
         logger.info(f"Extracted parameters: {params}")
         return params
 
+    # Patch for chat_session_manager_async.py - Replace the _handle_product_search method
+
     async def _handle_product_search(self, session: EnhancedChatSessionAsync, message: str) -> Tuple[str, Dict[str, Any]]:
         """
-        Handle product search requests using BATTLE SYSTEM and HybridDataStore
+        Handle product search requests using the ADVANCED ML ENSEMBLE SYSTEM
         
-        INTEGRATED: Now uses competitive search system for product recommendations
+        FIXED: Ensures proper agent initialization and message handling.
         
         Args:
             session: Enhanced chat session
@@ -1228,75 +1219,40 @@ class EnhancedChatManagerAsync:
         logger.info(f"Search parameters extracted: {params}")
         logger.info(f"Context from conversation: event_type={event_type}, formality={formality}")
         
-        # Build search query for the Battle System
+        # Build search query for the ML system
         search_query = message
         if event_type:
             search_query += f" for {event_type}"
         if formality:
             search_query += f" {formality}"
         
-        # INTEGRATED: Use Battle System for product search
+        # Use the sophisticated recommendation system
         search_results = []
-        used_battle_system = False
         
-        if self.parent_app and hasattr(self.parent_app, 'competitive_search'):
+        if session.parent_app:
             try:
-                logger.info("🎯 Using BATTLE SYSTEM for product search")
+                logger.info("🚀 Using ADVANCED ML ENSEMBLE SYSTEM for product search")
                 
-                # Build filters for battle system
-                battle_filters = {}
-                if params.get("occasion"):
-                    battle_filters["occasion"] = params["occasion"]
-                if params.get("min_price"):
-                    battle_filters["min_price"] = params["min_price"]
-                if params.get("max_price"):
-                    battle_filters["max_price"] = params["max_price"]
-                if params.get("colors"):
-                    battle_filters["colors"] = params["colors"]
-                
-                # Execute battle
-                battle_results = await self.parent_app.competitive_search.execute_battle(
+                # Use the sophisticated recommendation system
+                search_results = await session.parent_app.get_product_recommendations(
+                    session_id=session.session_id,
                     query=search_query,
-                    filters=battle_filters,
                     limit=5,
-                    user_context=user_preferences
+                    occasion=params.get("occasion")
                 )
                 
-                # Extract winning results
-                judgment = battle_results.get('judgment', {})
-                winner = judgment.get('winner', 'vector')
-                
-                logger.info(f"🏆 Battle winner: {winner}")
-                
-                # Get products from winning agent
-                if winner == 'cypher':
-                    search_results = battle_results['agents']['cypher']['products']
-                else:
-                    search_results = battle_results['agents']['vector']['products']
-                
-                used_battle_system = True
-                logger.info(f"✅ Battle system returned {len(search_results)} products")
+                logger.info(f"✅ Advanced ML system returned {len(search_results)} products")
                 
             except Exception as e:
-                logger.error(f"❌ Battle system failed: {e}", exc_info=True)
+                logger.error(f"❌ Advanced ML system failed: {e}", exc_info=True)
                 
-                # Fall back to direct data_store search
-                logger.warning("🔄 Falling back to direct HybridDataStore search")
-                if self.data_store:
-                    search_results = await self.data_store.search_products(
-                        query=search_query,
-                        filters=params,
-                        limit=5
-                    )
+                # Only fall back to direct search if ML system completely fails
+                logger.warning("🔄 Falling back to direct Neo4j search as last resort")
+                search_results = await self._fallback_direct_search(session, params, formality, event_type)
         
         else:
-            logger.warning("❌ No competitive search system available - using direct search")
-            if self.data_store:
-                search_results = await self.data_store.search_products(
-                    query=search_query,
-                    filters=params,
-                    limit=5
-                )
+            logger.warning("❌ No parent app reference - using fallback direct search")
+            search_results = await self._fallback_direct_search(session, params, formality, event_type)
         
         # Update session with current products context
         if search_results:
@@ -1312,37 +1268,23 @@ class EnhancedChatManagerAsync:
         # Prepare product IDs for tracking
         product_ids = [product.get("id", "") for product in search_results if product.get("id")]
         
-        # Create agent context with battle results emphasis if used
-        if used_battle_system and 'battle_results' in locals():
-            judgment = battle_results.get('judgment', {})
-            winner = judgment.get('winner', 'unknown')
-            explanation = judgment.get('explanation', '')
-            
-            agent_context = f"""
-            {conversation_context}
+        # Create agent context with an emphasis on natural conversation
+        agent_context = f"""
+        {conversation_context}
 
-            I ran a competitive search between our graph-based system (CypherBot) and our semantic search (VibeBot).
-            {explanation}
+        I've found some wonderful pieces that match what you're looking for. When sharing these with the client, please:
 
-            Based on this analysis, here are the winning products I'd recommend:
-            """
-        else:
-            agent_context = f"""
-            {conversation_context}
-
-            I've found some wonderful pieces that match what you're looking for. When sharing these with the client, please:
-
-            - Speak conversationally as their personal stylist, Ari
-            - Weave the product details naturally into your response without bullet points or lists
-            - Connect each recommendation to their specific needs or the occasion they mentioned
-            - Explain why you're suggesting each piece (fabric quality, versatility, current trends, etc.)
-            - Express genuine enthusiasm for pieces you think would work particularly well
-            - Use phrases like "I'd recommend" or "I think you'd look great in" rather than just listing options
-            - Be specific about product details including exact names and prices
-            - Explain why each item would work well for their needs
-            - If recommending multiple items, describe each one clearly
-            Here are the products I've found:
-            """
+        - Speak conversationally as their personal stylist, Ari
+        - Weave the product details naturally into your response without bullet points or lists
+        - Connect each recommendation to their specific needs or the occasion they mentioned
+        - Explain why you're suggesting each piece (fabric quality, versatility, current trends, etc.)
+        - Express genuine enthusiasm for pieces you think would work particularly well
+        - Use phrases like "I'd recommend" or "I think you'd look great in" rather than just listing options
+        - Be specific about product details including exact names and prices
+        - Explain why each item would work well for their needs
+        - If recommending multiple items, describe each one clearly
+        Here are the products I've found:
+        """
 
         # Add specific product details to the context
         for idx, product in enumerate(search_results, 1):
@@ -1470,8 +1412,7 @@ class EnhancedChatManagerAsync:
                 "products": search_results,
                 "parameters": params,
                 "user_preferences": user_preferences,
-                "used_battle_system": used_battle_system,
-                "battle_winner": winner if 'winner' in locals() else None
+                "used_advanced_ml": bool(session.parent_app and search_results)  # Track if ML was used
             }
             
             logger.info("Product search handled successfully")
@@ -1504,6 +1445,91 @@ class EnhancedChatManagerAsync:
         else:
             return ("I'd be happy to help you find the perfect outfit! "
                     "Could you tell me more about what style or occasion you're shopping for?")
+    
+    async def _fallback_direct_search(self, session, params, formality, event_type):
+        """
+        Fallback direct Neo4j search (only used when ML ensemble fails)
+        
+        This is the OLD method that bypasses the ML system - should rarely be used
+        """
+        logger.warning("🔄 Using fallback direct Neo4j search (ML ensemble unavailable)")
+        
+        search_results = []
+        
+        if session.product_kg:
+            try:
+                # Make sure to prioritize formal attire if that's the context
+                if formality == "formal":
+                    # Try to search by formal tag first
+                    search_results = await session.product_kg.get_product_by_filter(
+                        tag="formal",
+                        category=params.get("category") or "dress", # Default to dresses for formal events
+                        limit=5
+                    )
+                    
+                    # If no formal tag results, try elegant/dressy/cocktail
+                    if not search_results:
+                        for formal_tag in ["elegant", "dressy", "cocktail", "gown"]:
+                            search_results = await session.product_kg.get_product_by_filter(
+                                tag=formal_tag,
+                                category=params.get("category") or "dress",
+                                limit=5
+                            )
+                            if search_results:
+                                break
+                
+                # If no results from formality search or formality not specified
+                if not search_results:
+                    # Use the regular filtered search
+                    search_results = await session.product_kg.get_product_by_filter(
+                        category=params.get("category"),
+                        collection=params.get("collection"),
+                        tag=params.get("tag"),
+                        min_price=params.get("min_price"),
+                        max_price=params.get("max_price"),
+                        limit=5
+                    )
+                
+                # Filter out test/untitled products and zero-priced items
+                filtered_results = []
+                for product in search_results:
+                    if (product.get('price', 0) > 0 and 
+                        product.get('title') and 
+                        'test' not in product.get('title', '').lower() and
+                        'untitled' not in product.get('title', '').lower()):
+                        filtered_results.append(product)
+
+                # Replace search_results with filtered_results
+                search_results = filtered_results
+                logger.info(f"Found {len(search_results)} products from direct Neo4j fallback")
+                
+                # If no results, try a more general search
+                if not search_results:
+                    logger.info(f"No results found, trying fallback search")
+                    
+                    # Try searching just for dresses for a wedding
+                    if event_type == "wedding":
+                        search_results = await session.product_kg.get_product_by_filter(
+                            category="dress",
+                            limit=5
+                        )
+                        logger.info(f"Fallback search for dresses found {len(search_results)} products")
+                    # Fall back to category
+                    elif params.get("category"):
+                        search_results = await session.product_kg.get_product_by_filter(
+                            category=params.get("category"),
+                            limit=5
+                        )
+                        logger.info(f"Fallback search by category found {len(search_results)} products")
+                    else:
+                        # Get popular products as final fallback
+                        search_results = await session.product_kg.get_popular_products(limit=5)
+                        logger.info(f"Fallback to popular products found {len(search_results)} products")
+                
+            except Exception as e:
+                logger.error(f"Error in direct Neo4j fallback search: {e}", exc_info=True)
+        
+        return search_results
     
     def _naturalize_response(self, response_text: str) -> str:
         """
@@ -1622,7 +1648,7 @@ class EnhancedChatManagerAsync:
                 if not hasattr(session, 'memory') or not session.memory:
                     logger.info("Creating new memory for session")
                     if self.memory_setup_func:
-                        memory = await self.memory_setup_func(user_id=user_id, neo4j_client=self.user_kg)
+                        memory = await self.memory_setup_func(user_id=user_id, neo4j_client=self.product_kg)
                     else:
                         memory = await session.memory_manager.create_memory(user_id=user_id, enable_mcp=True)
                     session.memory = memory
@@ -1660,8 +1686,8 @@ class EnhancedChatManagerAsync:
                     return meta_response
                     
             if intent == "product_request":
-                # Handle as a product search - NOW USES BATTLE SYSTEM! 🎯
-                logger.info("🎯 Handling as product search with BATTLE SYSTEM")
+                # Handle as a product search - NOW USES ADVANCED ML SYSTEM! 🚀
+                logger.info("🚀 Handling as product search with ADVANCED ML ENSEMBLE")
                 return await self._handle_product_search(session, message)
                 
             if intent == "greeting":
