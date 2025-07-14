@@ -401,7 +401,7 @@ class HybridVisualRecommender:
         # Get product details
         try:
             if hasattr(self.product_kg, 'get_product_details'):
-                product = self.product_kg.get_product(product_id)
+                product = self.product_kg.get_product_details(product_id)
             else:
                 logger.error("Product KG does not support get_product_details")
                 return []
@@ -465,7 +465,7 @@ class HybridVisualRecommender:
                                     
                                 # Get full product details
                                 try:
-                                    product_detail = self.product_kg.get_product(result_product_id)
+                                    product_detail = self.product_kg.get_product_details(result_product_id)
                                     if product_detail:
                                         # Check if already in recommendations
                                         if not any(r.get('id') == result_product_id for r in recommendations):
@@ -603,7 +603,7 @@ class HybridVisualRecommender:
             
             for item in similar_products:
                 try:
-                    product = self.product_kg.get_product(item['id'])
+                    product = self.product_kg.get_product_details(item['id'])
                     if product:
                         product['similarity_score'] = item['similarity']
                         recommendations.append(product)
@@ -704,7 +704,7 @@ class HybridVisualRecommender:
                 # Get full product details
                 if 'id' in record:
                     try:
-                        product_detail = self.product_kg.get_product(record['id'])
+                        product_detail = self.product_kg.get_product_details(record['id'])
                         if product_detail:
                             products.append(product_detail)
                     except Exception as e:

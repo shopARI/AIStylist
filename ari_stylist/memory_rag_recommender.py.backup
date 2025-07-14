@@ -185,7 +185,7 @@ class MemoryRAGRecommender:
         try:
             # Get product details
             if hasattr(self.product_kg, 'get_product_details'):
-                product = await self.product_kg.get_product(product_id)
+                product = await self.product_kg.get_product_details(product_id)
             else:
                 logger.warning("Product KG does not support get_product_details")
                 return False
@@ -439,7 +439,7 @@ class MemoryRAGRecommender:
                 # Get details for most interacted products
                 for product_id, _ in product_freq.most_common(limit):
                     try:
-                        product = await self.product_kg.get_product(product_id)
+                        product = await self.product_kg.get_product_details(product_id)
                         if product and product.get('id') not in [p.get('id') for p in recommendations]:
                             recommendations.append(product)
                             

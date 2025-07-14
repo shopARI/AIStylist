@@ -327,7 +327,7 @@ class MultiClusterRecommender:
         # Get product details
         try:
             if hasattr(self.product_kg, 'get_product_details'):
-                product = self.product_kg.get_product(product_id)
+                product = self.product_kg.get_product_details(product_id)
             else:
                 logger.error("Product KG does not support get_product_details")
                 return []
@@ -393,7 +393,7 @@ class MultiClusterRecommender:
                         # Get full product details
                         if 'id' in record:
                             try:
-                                product_detail = self.product_kg.get_product(record['id'])
+                                product_detail = self.product_kg.get_product_details(record['id'])
                                 if product_detail:
                                     recommendations.append(product_detail)
                             except Exception as e:
@@ -454,7 +454,7 @@ class MultiClusterRecommender:
                 # Get full product details
                 if 'id' in record:
                     try:
-                        product_detail = self.product_kg.get_product(record['id'])
+                        product_detail = self.product_kg.get_product_details(record['id'])
                         if product_detail:
                             products.append(product_detail)
                     except Exception as e:

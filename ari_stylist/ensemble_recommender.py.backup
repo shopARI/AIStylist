@@ -377,7 +377,7 @@ class EnsembleRecommender:
                 
             if reference_product_id:
                 try:
-                    reference_product = self.product_kg.get_product(reference_product_id)
+                    reference_product = self.product_kg.get_product_details(reference_product_id)
                     if reference_product:
                         prompt += f" based on their interest in {reference_product.get('title')}"
                 except Exception as e:

@@ -132,7 +132,7 @@ class RFMAprioriRecommenderAsync:
         
         # Get product details if price is not provided
         if price is None:
-            product = await self.product_kg.get_product(product_id)
+            product = await self.product_kg.get_product_details(product_id)
             if product:
                 price = product.get('price', 0.0)
             else:
@@ -673,7 +673,7 @@ class RFMAprioriRecommenderAsync:
             recommendations = []
             
             for product_id in recommended_ids:
-                product = await self.product_kg.get_product(product_id)
+                product = await self.product_kg.get_product_details(product_id)
                 if product:
                     recommendations.append(product)
             
