@@ -294,7 +294,6 @@ class FashionEmbeddingsPipeline:
                 AND p.embedding_id IS NULL
             """
 
-
             if self.processed_products:
                 need_embedding_query += " AND NOT p.id IN $processed"
                 need_embedding_query += " RETURN count(p) as count"  # ADD THIS LINE!
