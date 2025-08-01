@@ -291,11 +291,12 @@ class FashionEmbeddingsPipeline:
             need_embedding_query = """
                 MATCH (p:Product:FashionProduct)
                 WHERE p.ready_for_embedding = true
-                  AND p.embedding_id IS NULL
+                AND p.embedding_id IS NULL
             """
-            
+
             if self.processed_products:
                 need_embedding_query += " AND NOT p.id IN $processed"
+                need_embedding_query += " RETURN count(p) as count"  # ADD THIS LINE!
                 need_result = session.run(need_embedding_query, processed=list(self.processed_products)).single()
             else:
                 need_result = session.run(need_embedding_query + " RETURN count(p) as count").single()
@@ -330,6 +331,10 @@ class FashionEmbeddingsPipeline:
                     skip=processed,
                     limit=CONFIG['pipeline']['neo4j_batch_size']
                 )
+                # products = await self._get_product_batch_with_context(
+                #     skip=processed,
+                #     limit=10  # HARDCODE to 10!
+#)
                 
                 if not products:
                     break
@@ -375,6 +380,7 @@ class FashionEmbeddingsPipeline:
                 OPTIONAL MATCH (p)-[:IN_PRICE_RANGE]->(pr:PriceRange)
                 OPTIONAL MATCH (p)-[:HAS_STATUS]->(s:Status)
                 
+                /*
                 // Get category hierarchy
                 OPTIONAL MATCH cat_path = (c)-[:SUBCATEGORY_OF*0..]->(root:Category)
                 WHERE NOT (root)-[:SUBCATEGORY_OF]->()
@@ -391,6 +397,7 @@ class FashionEmbeddingsPipeline:
                 WITH p, c, b, col, pr, s, cat_path, siblings,
                      collect(DISTINCT brand_product.title)[..5] as brand_family
                 
+                                 
                 RETURN p,
                        collect(DISTINCT c) as categories,
                        b as brand,
@@ -400,6 +407,17 @@ class FashionEmbeddingsPipeline:
                        [node in nodes(cat_path) | node.name] as category_path,
                        siblings,
                        brand_family
+                ORDER BY p.visited_num DESC
+                */
+                RETURN p,
+                       collect(DISTINCT c) as categories,
+                       b as brand,
+                       collect(DISTINCT col.name) as collections,
+                       pr.name as price_range,
+                       s.name as status,
+                       [] as category_path,  // Empty array instead of nodes(cat_path)
+                       [] as siblings,       // Empty array
+                       [] as brand_family    // Empty array
                 ORDER BY p.visited_num DESC
             """, skip=skip, limit=limit)
             
