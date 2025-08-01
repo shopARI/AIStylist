@@ -1,10 +1,11 @@
 #!/usr/bin/env python3
 """
-Optimized Fashion Classification Pipeline v2
-- Correctly processes only :NeedsAI labeled products
-- Improved error handling and resume capability
-- Better cost tracking and reporting
-- Category-specific classification strategies
+Fashion Classification Pipeline v3
+- Fixed double-counting bug
+- Better stuck batch handling
+- Accurate progress tracking
+- Force completion for stuck batches
+- Better error recovery
 """
 
 import os
@@ -19,23 +20,21 @@ from tqdm import tqdm
 import openai
 from neo4j import GraphDatabase
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams
 from dotenv import load_dotenv
 import logging
 import math
 import traceback
 from dataclasses import dataclass, field
 from collections import defaultdict
-import numpy as np
-from concurrent.futures import ThreadPoolExecutor
 import hashlib
 
 load_dotenv()
 
-# Enhanced logging with file output
+# Enhanced logging
 log_dir = Path('./fashion_classification_pipeline/logs')
 log_dir.mkdir(parents=True, exist_ok=True)
-log_file = log_dir / f'classifier_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
+log_file = log_dir / f'classifier_v3_{datetime.now().strftime("%Y%m%d_%H%M%S")}.log'
 
 logging.basicConfig(
     level=logging.INFO,
@@ -47,7 +46,7 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Enhanced Configuration
+# Configuration with bug fixes
 CONFIG = {
     'neo4j': {
         'url': os.getenv('NEO4J_URL', 'bolt://34.135.40.119:7687'),
@@ -57,8 +56,8 @@ CONFIG = {
     'openai': {
         'api_key': os.getenv('OPENAI_API_KEY'),
         'max_queue_tokens': 20_000_000,
-        'tokens_per_request': 300,  # Optimized based on actual usage
-        'safety_margin': 0.80,  # 80% utilization
+        'tokens_per_request': 300,
+        'safety_margin': 0.80,
         'model': 'gpt-4o-mini',
         'temperature': 0.1,
         'cost_per_1k_tokens': {
@@ -73,11 +72,12 @@ CONFIG = {
     },
     'batch': {
         'output_dir': './fashion_classification_pipeline',
-        'requests_per_file': 2000,  # Optimal for 20 concurrent batches
+        'requests_per_file': 2000,
         'db_chunk_size': 5000,
-        'check_interval': 60,  # Check every minute
+        'check_interval': 60,
         'max_concurrent_batches': 20,
         'batch_timeout_hours': 24,
+        'stuck_batch_timeout_hours': 2,  # NEW: Force timeout for stuck batches
         'retry_failed_batches': True,
         'max_retries': 3
     },
@@ -92,14 +92,14 @@ CONFIG = {
         'enable_removal': True,
         'archive_before_removal': True
     },
-    'resume': {
-        'enable': True,
-        'checkpoint_interval': 1000,  # Save state every N products
-        'track_individual_products': True
+    'recovery': {
+        'enable_force_completion': True,  # NEW: Allow forcing stuck batches
+        'check_result_files_first': True,  # NEW: Check if results exist before API
+        'skip_problematic_batches': True   # NEW: Skip batches that repeatedly fail
     }
 }
 
-# Category-specific prompts for better accuracy
+# Category-specific prompts
 CATEGORY_PROMPTS = {
     'beauty': """This is a Beauty category product. Note that:
 - Fashion items: fashion-forward sunglasses, cosmetic bags, beauty organizers that are stylish accessories
@@ -118,9 +118,10 @@ CATEGORY_PROMPTS = {
 - Non-fashion accessories: phone cases, computer accessories, home accessories"""
 }
 
+
 @dataclass
 class BatchInfo:
-    """Enhanced batch information with tracking"""
+    """Enhanced batch information"""
     filename: str
     path: str
     request_count: int
@@ -135,24 +136,15 @@ class BatchInfo:
     product_ids: List[str] = field(default_factory=list)
     estimated_cost: float = 0.0
     actual_cost: Optional[float] = None
-
-@dataclass
-class ClassificationResult:
-    """Structured classification result"""
-    product_id: str
-    is_fashion: bool
-    confidence: float
-    category: Optional[str]
-    reasoning: str
-    processing_time: float
-    tokens_used: Dict[str, int] = field(default_factory=dict)
+    last_checked: Optional[str] = None  # NEW: Track when we last checked
+    products_processed: int = 0  # NEW: Track actual processed count
 
 
-class OptimizedFashionClassifierV2:
-    """Complete rewrite with all improvements"""
+class FashionClassifierV3:
+    """Version 3 with bug fixes and better recovery"""
     
     def __init__(self):
-        logger.info("Initializing Optimized Fashion Classifier v2")
+        logger.info("Initializing Fashion Classifier v3 with bug fixes")
         
         # API clients
         self.client = openai.OpenAI(api_key=CONFIG['openai']['api_key'])
@@ -178,20 +170,21 @@ class OptimizedFashionClassifierV2:
                     self.reports_dir, self.checkpoints_dir, self.manual_review_dir]:
             dir.mkdir(parents=True, exist_ok=True)
         
-        # State management
-        self.state_file = self.base_dir / 'pipeline_state_v2.json'
+        # State management - v3 uses different file to avoid conflicts
+        self.state_file = self.base_dir / 'pipeline_state_v3.json'
         self.state = self._load_state()
         
-        # Product tracking for resume capability
-        self.processed_products_file = self.base_dir / 'processed_products.json'
+        # Product tracking
+        self.processed_products_file = self.base_dir / 'processed_products_v3.json'
         self.processed_products = self._load_processed_products()
         
-        # Statistics
+        # Statistics - fixed to avoid double counting
         self.stats = defaultdict(int)
-        self.cost_tracker = {
-            'estimated_total': 0.0,
-            'actual_total': 0.0,
-            'by_batch': {}
+        self.actual_counts = {
+            'fashion': 0,
+            'non_fashion': 0,
+            'uncertain': 0,
+            'manual_review': 0
         }
         
         # Calculate optimal parameters
@@ -204,6 +197,9 @@ class OptimizedFashionClassifierV2:
                 with open(self.state_file, 'r') as f:
                     state = json.load(f)
                     logger.info(f"Resumed from previous state: {state['current_phase']}")
+                    # Migrate old state if needed
+                    if 'actual_processed' not in state:
+                        state['actual_processed'] = state.get('processed_products', 0)
                     return state
             except Exception as e:
                 logger.warning(f"Could not load state file: {e}")
@@ -214,7 +210,8 @@ class OptimizedFashionClassifierV2:
             'start_time': datetime.now().isoformat(),
             'total_products': 0,
             'needs_ai_products': 0,
-            'processed_products': 0,
+            'processed_products': 0,  # This will track batch completion
+            'actual_processed': 0,  # NEW: Track actual DB updates
             'fashion_products': 0,
             'non_fashion_products': 0,
             'uncertain_products': 0,
@@ -223,12 +220,13 @@ class OptimizedFashionClassifierV2:
             'current_phase': 'validation',
             'checkpoints': [],
             'errors': [],
-            'warnings': []
+            'warnings': [],
+            'stuck_batches': []  # NEW: Track problematic batches
         }
     
     def _load_processed_products(self) -> Set[str]:
-        """Load set of already processed product IDs for resume capability"""
-        if self.processed_products_file.exists() and CONFIG['resume']['track_individual_products']:
+        """Load set of already processed product IDs"""
+        if self.processed_products_file.exists():
             try:
                 with open(self.processed_products_file, 'r') as f:
                     return set(json.load(f))
@@ -236,19 +234,12 @@ class OptimizedFashionClassifierV2:
                 pass
         return set()
     
-    def _save_processed_products(self):
-        """Save processed product IDs"""
-        if CONFIG['resume']['track_individual_products']:
-            with open(self.processed_products_file, 'w') as f:
-                json.dump(list(self.processed_products), f)
-    
     def _calculate_optimal_parameters(self):
-        """Calculate optimal batch parameters based on limits"""
+        """Calculate optimal batch parameters"""
         max_tokens = CONFIG['openai']['max_queue_tokens'] * CONFIG['openai']['safety_margin']
         tokens_per_request = CONFIG['openai']['tokens_per_request']
         requests_per_batch = CONFIG['batch']['requests_per_file']
         
-        # Calculate concurrent batches
         tokens_per_batch = requests_per_batch * tokens_per_request
         max_concurrent = int(max_tokens / tokens_per_batch)
         
@@ -257,17 +248,15 @@ class OptimizedFashionClassifierV2:
             CONFIG['batch']['max_concurrent_batches']
         )
         
-        # Log configuration
         logger.info("=== Optimal Parameters ===")
         logger.info(f"Max concurrent batches: {CONFIG['batch']['max_concurrent_batches']}")
         logger.info(f"Requests per batch: {requests_per_batch:,}")
         logger.info(f"Est. tokens per batch: {tokens_per_batch:,}")
-        logger.info(f"Total token capacity: {max_tokens:,}")
     
     async def run(self):
-        """Main pipeline execution with phase management"""
+        """Main pipeline execution"""
         logger.info("="*60)
-        logger.info("Starting Fashion Classification Pipeline v2")
+        logger.info("Starting Fashion Classification Pipeline v3")
         logger.info(f"Run ID: {self.state['run_id']}")
         logger.info("="*60)
         
@@ -275,20 +264,23 @@ class OptimizedFashionClassifierV2:
             # Phase 1: Validation
             if self.state['current_phase'] == 'validation':
                 if not await self._phase1_validation():
-                    logger.error("Validation failed. Please run neo4j_cleanup.py first!")
+                    logger.error("Validation failed!")
                     return
                 self.state['current_phase'] = 'preparation'
                 self._save_state()
             
-            # Phase 2: Preparation
+            # Phase 2: Preparation (skip if resuming)
             if self.state['current_phase'] == 'preparation':
-                await self._phase2_prepare_batches()
+                if not self.state['batches']:  # Only prepare if no batches exist
+                    await self._phase2_prepare_batches()
+                else:
+                    logger.info("Skipping preparation - batches already exist")
                 self.state['current_phase'] = 'processing'
                 self._save_state()
             
-            # Phase 3: Processing
+            # Phase 3: Processing with better recovery
             if self.state['current_phase'] == 'processing':
-                await self._phase3_process_batches()
+                await self._phase3_process_batches_with_recovery()
                 self.state['current_phase'] = 'review'
                 self._save_state()
             
@@ -321,11 +313,10 @@ class OptimizedFashionClassifierV2:
             self.neo4j_driver.close()
     
     async def _phase1_validation(self) -> bool:
-        """Validate that cleanup has run and database is ready"""
+        """Validate database state"""
         logger.info("\n=== PHASE 1: Validation ===")
         
         with self.neo4j_driver.session() as session:
-            # Check for NeedsAI labeled products
             result = session.run("""
                 MATCH (p:Product)
                 RETURN 
@@ -338,44 +329,16 @@ class OptimizedFashionClassifierV2:
             
             total = result['total']
             needs_ai = result['needs_ai']
-            fashion = result['fashion']
-            marked_removal = result['marked_removal']
-            already_classified = result['already_classified']
             
             logger.info(f"Database Status:")
             logger.info(f"  Total products: {total:,}")
             logger.info(f"  Needs AI classification: {needs_ai:,}")
-            logger.info(f"  Already marked as fashion: {fashion:,}")
-            logger.info(f"  Marked for removal: {marked_removal:,}")
-            logger.info(f"  Already classified by AI: {already_classified:,}")
+            logger.info(f"  Already marked as fashion: {result['fashion']:,}")
+            logger.info(f"  Already classified by AI: {result['already_classified']:,}")
             
-            # Validation checks
             if needs_ai == 0:
-                logger.error("❌ No products found with :NeedsAI label!")
-                logger.error("Please run neo4j_cleanup.py first to mark products.")
+                logger.error("No products found with :NeedsAI label!")
                 return False
-            
-            if marked_removal > 0:
-                logger.warning(f"⚠️  {marked_removal:,} products still marked for removal")
-                logger.warning("Consider deleting these before running classification")
-            
-            # Check for resume scenario
-            if already_classified > 0 and CONFIG['resume']['enable']:
-                logger.info(f"\n📌 Resume Mode: {already_classified:,} products already classified")
-                logger.info("Will skip these products")
-            
-            # Get category breakdown for NeedsAI products
-            logger.info("\nCategories needing AI classification:")
-            category_result = session.run("""
-                MATCH (p:Product:NeedsAI)-[:IN_CATEGORY]->(c:Category)
-                WHERE p.classified_at IS NULL
-                RETURN c.name as category, count(p) as count
-                ORDER BY count DESC
-                LIMIT 20
-            """)
-            
-            for record in category_result:
-                logger.info(f"  {record['category']}: {record['count']:,}")
             
             # Update state
             self.state['total_products'] = total
@@ -385,7 +348,7 @@ class OptimizedFashionClassifierV2:
             return True
     
     async def _phase2_prepare_batches(self):
-        """Prepare optimized batch files"""
+        """Prepare batch files"""
         logger.info("\n=== PHASE 2: Batch Preparation ===")
         
         # Get unprocessed NeedsAI products
@@ -393,17 +356,10 @@ class OptimizedFashionClassifierV2:
             count_query = """
                 MATCH (p:Product:NeedsAI)
                 WHERE p.classified_at IS NULL
-                """
+                RETURN count(p) as total
+            """
             
-            if CONFIG['resume']['track_individual_products'] and self.processed_products:
-                count_query += " AND NOT p.id IN $processed_ids"
-                params = {'processed_ids': list(self.processed_products)}
-            else:
-                params = {}
-            
-            count_query += " RETURN count(p) as total"
-            
-            result = session.run(count_query, **params).single()
+            result = session.run(count_query).single()
             unprocessed_count = result['total']
         
         if unprocessed_count == 0:
@@ -412,7 +368,7 @@ class OptimizedFashionClassifierV2:
         
         logger.info(f"Products to process: {unprocessed_count:,}")
         
-        # Enhanced prompt template
+        # Prompt template
         base_prompt = """Classify this product as fashion or non-fashion.
 
 Product Information:
@@ -420,17 +376,8 @@ Product Information:
 
 {category_specific_guidance}
 
-Fashion items include:
-- Clothing (all types of apparel)
-- Footwear (shoes, boots, sandals, etc.)
-- Fashion accessories (bags, belts, scarves, hats, fashion jewelry)
-- Fashion eyewear (sunglasses, designer frames)
-
-Non-fashion items include:
-- Beauty products (makeup, skincare, fragrances)
-- Home goods, electronics, tools
-- Sports equipment (not apparel)
-- Non-fashion accessories (phone cases, tech accessories)
+Fashion items include: clothing, footwear, fashion accessories, fashion bags/jewelry
+Non-fashion items include: home goods, electronics, tools, sports equipment, beauty products
 
 Respond with ONLY a JSON object:
 {{
@@ -445,38 +392,26 @@ Respond with ONLY a JSON object:
         processed = 0
         current_batch = []
         
-        # Estimate costs
-        estimated_requests = unprocessed_count
-        estimated_cost = self._estimate_cost(estimated_requests)
+        estimated_cost = self._estimate_cost(unprocessed_count)
         logger.info(f"Estimated API cost: ${estimated_cost:.2f}")
         
         with tqdm(total=unprocessed_count, desc="Creating batches") as pbar:
             while processed < unprocessed_count:
                 with self.neo4j_driver.session() as session:
-                    # Query with proper label check
                     query = """
                     MATCH (p:Product:NeedsAI)
                     WHERE p.classified_at IS NULL
-                    """
-                    
-                    if CONFIG['resume']['track_individual_products'] and self.processed_products:
-                        query += " AND NOT p.id IN $processed_ids"
-                    
-                    query += """
                     WITH p SKIP $skip LIMIT $limit
                     OPTIONAL MATCH (p)-[:IN_CATEGORY]->(c:Category)
                     OPTIONAL MATCH (p)-[:BY_BRAND]->(b:Brand)
                     RETURN p, c.name as category, b.name as brand
                     """
                     
-                    params = {
-                        'skip': processed,
-                        'limit': CONFIG['batch']['db_chunk_size']
-                    }
-                    if CONFIG['resume']['track_individual_products'] and self.processed_products:
-                        params['processed_ids'] = list(self.processed_products)
-                    
-                    results = session.run(query, **params)
+                    results = session.run(
+                        query,
+                        skip=processed,
+                        limit=CONFIG['batch']['db_chunk_size']
+                    )
                     
                     chunk_count = 0
                     for record in results:
@@ -484,21 +419,14 @@ Respond with ONLY a JSON object:
                         product['category'] = record['category']
                         product['brand'] = record['brand']
                         
-                        # Skip if already processed
-                        if product['id'] in self.processed_products:
-                            continue
-                        
-                        # Create classification request
-                        request = self._create_enhanced_request(
-                            product, base_prompt
-                        )
+                        # Create request
+                        request = self._create_enhanced_request(product, base_prompt)
                         current_batch.append(request)
                         chunk_count += 1
                         
                         # Save batch when full
                         if len(current_batch) >= CONFIG['batch']['requests_per_file']:
-                            batch_info = self._save_batch(batch_num, current_batch)
-                            self.cost_tracker['estimated_total'] += batch_info.estimated_cost
+                            self._save_batch(batch_num, current_batch)
                             batch_num += 1
                             current_batch = []
                         
@@ -511,18 +439,12 @@ Respond with ONLY a JSON object:
         
         # Save final batch
         if current_batch:
-            batch_info = self._save_batch(batch_num, current_batch)
-            self.cost_tracker['estimated_total'] += batch_info.estimated_cost
+            self._save_batch(batch_num, current_batch)
         
         logger.info(f"\n✓ Created {len(self.state['batches'])} batch files")
-        logger.info(f"Total estimated cost: ${self.cost_tracker['estimated_total']:.2f}")
-        
-        # Save preparation checkpoint
-        self._save_checkpoint('preparation_complete')
     
     def _create_enhanced_request(self, product: Dict, base_prompt: str) -> Dict:
-        """Create enhanced classification request with category-specific guidance"""
-        # Build product info
+        """Create classification request"""
         info_parts = []
         
         if product.get('id'):
@@ -530,7 +452,6 @@ Respond with ONLY a JSON object:
         if product.get('title'):
             info_parts.append(f"Title: {product['title']}")
         if product.get('description'):
-            # Smart truncation to preserve key information
             desc = self._smart_truncate(product.get('description', ''), 400)
             info_parts.append(f"Description: {desc}")
         if product.get('category'):
@@ -551,7 +472,6 @@ Respond with ONLY a JSON object:
                     category_guidance = guidance
                     break
         
-        # Format prompt
         prompt = base_prompt.format(
             product_info=product_info,
             category_specific_guidance=category_guidance
@@ -574,17 +494,15 @@ Respond with ONLY a JSON object:
         }
     
     def _smart_truncate(self, text: str, max_length: int) -> str:
-        """Intelligently truncate text preserving key information"""
+        """Intelligently truncate text"""
         if len(text) <= max_length:
             return text
         
-        # Try to break at sentence boundary
         truncated = text[:max_length]
         last_period = truncated.rfind('.')
         if last_period > max_length * 0.8:
             return truncated[:last_period + 1]
         
-        # Break at word boundary
         last_space = truncated.rfind(' ')
         if last_space > max_length * 0.9:
             return truncated[:last_space] + '...'
@@ -594,8 +512,6 @@ Respond with ONLY a JSON object:
     def _estimate_cost(self, request_count: int) -> float:
         """Estimate API costs"""
         tokens_per_request = CONFIG['openai']['tokens_per_request']
-        
-        # Assume 80% input, 20% output
         input_tokens = request_count * tokens_per_request * 0.8
         output_tokens = request_count * tokens_per_request * 0.2
         
@@ -604,46 +520,34 @@ Respond with ONLY a JSON object:
         
         return input_cost + output_cost
     
-    def _save_batch(self, batch_num: int, requests: List[Dict]) -> BatchInfo:
-        """Save batch file with enhanced tracking"""
+    def _save_batch(self, batch_num: int, requests: List[Dict]):
+        """Save batch file"""
         filename = f"batch_{batch_num:05d}.jsonl"
         filepath = self.batch_dir / filename
         
-        # Extract product IDs
         product_ids = [r['custom_id'].replace('product_', '') for r in requests]
         
-        # Write batch file
         with open(filepath, 'w') as f:
             for request in requests:
                 f.write(json.dumps(request) + '\n')
         
         # Create batch info
-        batch_info = BatchInfo(
-            filename=filename,
-            path=str(filepath),
-            request_count=len(requests),
-            status='created',
-            created_at=datetime.now().isoformat(),
-            product_ids=product_ids,
-            estimated_cost=self._estimate_cost(len(requests))
-        )
-        
-        # Convert to dict for JSON serialization
-        self.state['batches'][filename] = {
-            'path': batch_info.path,
-            'request_count': batch_info.request_count,
-            'status': batch_info.status,
-            'created_at': batch_info.created_at,
-            'product_ids': batch_info.product_ids,
-            'estimated_cost': batch_info.estimated_cost
+        batch_info = {
+            'path': str(filepath),
+            'request_count': len(requests),
+            'status': 'created',
+            'created_at': datetime.now().isoformat(),
+            'product_ids': product_ids,
+            'estimated_cost': self._estimate_cost(len(requests)),
+            'products_processed': 0  # NEW: Track actual processed
         }
         
+        self.state['batches'][filename] = batch_info
         self._save_state()
-        return batch_info
     
-    async def _phase3_process_batches(self):
-        """Process batches with enhanced monitoring and error handling"""
-        logger.info("\n=== PHASE 3: Batch Processing ===")
+    async def _phase3_process_batches_with_recovery(self):
+        """Process batches with better recovery mechanisms"""
+        logger.info("\n=== PHASE 3: Batch Processing with Recovery ===")
         
         total_batches = len(self.state['batches'])
         if total_batches == 0:
@@ -651,71 +555,95 @@ Respond with ONLY a JSON object:
             return
         
         logger.info(f"Total batches: {total_batches}")
-        logger.info(f"Max concurrent: {CONFIG['batch']['max_concurrent_batches']}")
         
-        completed = 0
-        failed = 0
+        # First, check for any completed batches we haven't processed
+        await self._recover_completed_batches()
+        
+        # Count current status
+        completed = sum(1 for b in self.state['batches'].values() if b['status'] == 'completed')
+        failed = sum(1 for b in self.state['batches'].values() 
+                    if b['status'] == 'failed' and b.get('retry_count', 0) >= CONFIG['batch']['max_retries'])
+        
         start_time = time.time()
         
-        # Progress tracking
-        progress_bar = tqdm(total=total_batches, desc="Processing batches")
-        
-        while completed + failed < total_batches:
-            # Get current queue status
-            active_batches = await self._get_active_batches()
-            active_count = len(active_batches)
-            
-            # Submit new batches
-            available_slots = CONFIG['batch']['max_concurrent_batches'] - active_count
-            if available_slots > 0:
-                submitted = await self._submit_new_batches(available_slots)
-                if submitted > 0:
-                    logger.debug(f"Submitted {submitted} new batches")
-            
-            # Monitor and process completed batches
-            completed_this_round = await self._monitor_and_process_batches()
-            completed += completed_this_round
-            progress_bar.update(completed_this_round)
-            
-            # Count failed batches
-            failed = sum(1 for b in self.state['batches'].values() 
-                        if b['status'] == 'failed' and b.get('retry_count', 0) >= CONFIG['batch']['max_retries'])
-            
-            # Calculate ETA
-            if completed > 0:
-                elapsed = time.time() - start_time
-                avg_time = elapsed / completed
-                remaining = total_batches - completed - failed
-                eta = timedelta(seconds=avg_time * remaining)
+        # Progress tracking with actual counts
+        with tqdm(total=total_batches, initial=completed, desc="Processing batches") as progress_bar:
+            while completed + failed < total_batches:
+                # Get current queue status
+                active_batches = await self._get_active_batches_with_timeout_check()
+                active_count = len(active_batches)
+                
+                # Check for stuck batches
+                stuck_count = await self._handle_stuck_batches()
+                if stuck_count > 0:
+                    logger.warning(f"Force-completed {stuck_count} stuck batches")
+                
+                # Submit new batches
+                available_slots = CONFIG['batch']['max_concurrent_batches'] - active_count
+                if available_slots > 0:
+                    submitted = await self._submit_new_batches(available_slots)
+                    if submitted > 0:
+                        logger.debug(f"Submitted {submitted} new batches")
+                
+                # Monitor and process completed batches
+                completed_this_round = await self._monitor_and_process_batches_v3()
+                if completed_this_round > 0:
+                    completed += completed_this_round
+                    progress_bar.update(completed_this_round)
+                
+                # Update counts
+                failed = sum(1 for b in self.state['batches'].values() 
+                           if b['status'] == 'failed' and b.get('retry_count', 0) >= CONFIG['batch']['max_retries'])
+                
+                # Update progress bar info
                 progress_bar.set_postfix({
                     'Active': active_count,
                     'Failed': failed,
-                    'ETA': str(eta).split('.')[0]
+                    'Processed': f"{self.state['actual_processed']:,}"
                 })
-            
-            # Save checkpoint periodically
-            if completed % 10 == 0 and completed > 0:
-                self._save_checkpoint(f'processing_{completed}_batches')
-            
-            # Wait before next check
-            if completed + failed < total_batches:
-                await asyncio.sleep(CONFIG['batch']['check_interval'])
+                
+                # Save checkpoint periodically
+                if completed % 10 == 0 and completed > 0:
+                    self._save_checkpoint(f'processing_{completed}_batches')
+                
+                # Wait before next check
+                if completed + failed < total_batches:
+                    await asyncio.sleep(CONFIG['batch']['check_interval'])
         
-        progress_bar.close()
-        
-        # Final summary
         total_time = (time.time() - start_time) / 3600
         logger.info(f"\n✓ Batch processing complete!")
         logger.info(f"  Total time: {total_time:.1f} hours")
         logger.info(f"  Successful: {completed}")
         logger.info(f"  Failed: {failed}")
-        logger.info(f"  Actual API cost: ${self.cost_tracker['actual_total']:.2f}")
-        
-        if failed > 0:
-            self._export_failed_batches()
+        logger.info(f"  Products processed: {self.state['actual_processed']:,}")
     
-    async def _get_active_batches(self) -> List[str]:
-        """Get list of currently active batch IDs"""
+    async def _recover_completed_batches(self):
+        """Check for completed batches we haven't processed yet"""
+        logger.info("Checking for unprocessed completed batches...")
+        
+        recovered = 0
+        for filename, batch_info in self.state['batches'].items():
+            if batch_info['status'] in ['submitted', 'processing']:
+                # Check if result file exists
+                result_file = self.results_dir / f"results_{filename}"
+                if result_file.exists() and batch_info.get('products_processed', 0) == 0:
+                    logger.info(f"Found unprocessed results for {filename}")
+                    # Process the results
+                    if batch_info.get('batch_id'):
+                        try:
+                            batch = self.client.batches.retrieve(batch_info['batch_id'])
+                            await self._process_batch_results_v3(filename, batch, force_process=True)
+                            batch_info['status'] = 'completed'
+                            recovered += 1
+                        except:
+                            pass
+        
+        if recovered > 0:
+            logger.info(f"Recovered {recovered} completed batches")
+            self._save_state()
+    
+    async def _get_active_batches_with_timeout_check(self) -> List[str]:
+        """Get active batches and check for timeouts"""
         active = []
         try:
             batches = self.client.batches.list(limit=100)
@@ -727,19 +655,49 @@ Respond with ONLY a JSON object:
         
         return active
     
+    async def _handle_stuck_batches(self) -> int:
+        """Handle batches that are stuck"""
+        if not CONFIG['recovery']['enable_force_completion']:
+            return 0
+        
+        stuck_count = 0
+        current_time = datetime.now()
+        stuck_timeout = timedelta(hours=CONFIG['batch']['stuck_batch_timeout_hours'])
+        
+        for filename, batch_info in self.state['batches'].items():
+            if batch_info['status'] in ['submitted', 'processing']:
+                # Check if it's been stuck too long
+                last_checked = batch_info.get('last_checked')
+                if last_checked:
+                    last_checked_time = datetime.fromisoformat(last_checked)
+                    if current_time - last_checked_time > stuck_timeout:
+                        # Check if result file exists
+                        result_file = self.results_dir / f"results_{filename}"
+                        if result_file.exists():
+                            logger.warning(f"Force-completing stuck batch {filename}")
+                            batch_info['status'] = 'force_completed'
+                            stuck_count += 1
+                            # Try to process results if they exist
+                            if batch_info.get('batch_id'):
+                                try:
+                                    batch = self.client.batches.retrieve(batch_info['batch_id'])
+                                    await self._process_batch_results_v3(filename, batch, force_process=True)
+                                except:
+                                    pass
+        
+        return stuck_count
+    
     async def _submit_new_batches(self, limit: int) -> int:
-        """Submit new batches with retry logic"""
+        """Submit new batches"""
         submitted = 0
         
         for filename, batch_info in self.state['batches'].items():
             if submitted >= limit:
                 break
             
-            # Skip if not ready for submission
             if batch_info['status'] not in ['created', 'retry']:
                 continue
             
-            # Check retry count
             if batch_info.get('retry_count', 0) >= CONFIG['batch']['max_retries']:
                 continue
             
@@ -769,13 +727,11 @@ Respond with ONLY a JSON object:
                     'batch_id': batch_response.id,
                     'file_id': file_response.id,
                     'submitted_at': datetime.now().isoformat(),
+                    'last_checked': datetime.now().isoformat(),
                     'retry_count': batch_info.get('retry_count', 0)
                 })
                 
                 submitted += 1
-                self.stats['batches_submitted'] += 1
-                
-                # Small delay between submissions
                 await asyncio.sleep(1)
                 
             except Exception as e:
@@ -784,59 +740,69 @@ Respond with ONLY a JSON object:
                 batch_info['error'] = str(e)
                 batch_info['retry_count'] = batch_info.get('retry_count', 0) + 1
                 
-                # Mark for retry if under limit
                 if batch_info['retry_count'] < CONFIG['batch']['max_retries']:
                     batch_info['status'] = 'retry'
-                    logger.info(f"Will retry {filename} (attempt {batch_info['retry_count']})")
         
         self._save_state()
         return submitted
     
-    async def _monitor_and_process_batches(self) -> int:
-        """Monitor batches and process results with cost tracking"""
+    async def _monitor_and_process_batches_v3(self) -> int:
+        """Monitor batches with better error handling"""
         completed_count = 0
         
         for filename, batch_info in self.state['batches'].items():
             if batch_info['status'] not in ['submitted', 'processing']:
                 continue
             
+            # Update last checked time
+            batch_info['last_checked'] = datetime.now().isoformat()
+            
             try:
-                batch = self.client.batches.retrieve(batch_info['batch_id'])
+                # First check if result file exists (faster than API call)
+                result_file = self.results_dir / f"results_{filename}"
                 
-                if batch.status == 'completed':
-                    logger.info(f"✓ Batch {filename} completed!")
-                    
-                    # Process results
-                    results = await self._process_batch_results(filename, batch)
-                    
-                    # Update cost tracking
-                    if hasattr(batch, 'request_counts'):
-                        actual_cost = self._calculate_actual_cost(batch)
-                        self.cost_tracker['actual_total'] += actual_cost
-                        self.cost_tracker['by_batch'][filename] = actual_cost
-                        batch_info['actual_cost'] = actual_cost
-                    
-                    batch_info['status'] = 'completed'
-                    batch_info['completed_at'] = datetime.now().isoformat()
-                    completed_count += 1
-                    self.stats['batches_completed'] += 1
-                    
-                elif batch.status == 'failed':
-                    logger.error(f"✗ Batch {filename} failed!")
-                    batch_info['status'] = 'failed'
-                    batch_info['error'] = str(batch.errors) if hasattr(batch, 'errors') else 'Unknown error'
-                    batch_info['retry_count'] = batch_info.get('retry_count', 0) + 1
-                    
-                    # Mark for retry if under limit
-                    if CONFIG['batch']['retry_failed_batches'] and batch_info['retry_count'] < CONFIG['batch']['max_retries']:
-                        batch_info['status'] = 'retry'
-                        logger.info(f"Will retry {filename}")
-                    else:
-                        self.stats['batches_failed'] += 1
-                    
-                elif batch.status in ['in_progress', 'finalizing']:
-                    if batch_info['status'] != 'processing':
-                        batch_info['status'] = 'processing'
+                if CONFIG['recovery']['check_result_files_first'] and result_file.exists():
+                    # Results exist, mark as completed
+                    if batch_info.get('products_processed', 0) == 0:
+                        logger.info(f"✓ Batch {filename} completed (found results)!")
+                        
+                        # Get batch object for cost tracking
+                        if batch_info.get('batch_id'):
+                            try:
+                                batch = self.client.batches.retrieve(batch_info['batch_id'])
+                                await self._process_batch_results_v3(filename, batch)
+                            except:
+                                # Process without batch object
+                                await self._process_batch_results_v3(filename, None)
+                        
+                        batch_info['status'] = 'completed'
+                        batch_info['completed_at'] = datetime.now().isoformat()
+                        completed_count += 1
+                
+                else:
+                    # Check via API
+                    if batch_info.get('batch_id'):
+                        batch = self.client.batches.retrieve(batch_info['batch_id'])
+                        
+                        if batch.status == 'completed':
+                            logger.info(f"✓ Batch {filename} completed!")
+                            await self._process_batch_results_v3(filename, batch)
+                            batch_info['status'] = 'completed'
+                            batch_info['completed_at'] = datetime.now().isoformat()
+                            completed_count += 1
+                            
+                        elif batch.status == 'failed':
+                            logger.error(f"✗ Batch {filename} failed!")
+                            batch_info['status'] = 'failed'
+                            batch_info['error'] = str(batch.errors) if hasattr(batch, 'errors') else 'Unknown error'
+                            batch_info['retry_count'] = batch_info.get('retry_count', 0) + 1
+                            
+                            if CONFIG['batch']['retry_failed_batches'] and batch_info['retry_count'] < CONFIG['batch']['max_retries']:
+                                batch_info['status'] = 'retry'
+                            
+                        elif batch.status in ['in_progress', 'finalizing']:
+                            if batch_info['status'] != 'processing':
+                                batch_info['status'] = 'processing'
                     
             except Exception as e:
                 logger.error(f"Error monitoring {filename}: {e}")
@@ -844,80 +810,51 @@ Respond with ONLY a JSON object:
         
         self._save_state()
         return completed_count
-        
-    def _calculate_actual_cost(self, batch) -> float:
-        """Calculate actual cost from batch object"""
-        try:
-            if not hasattr(batch, 'request_counts'):
-                return 0.0
-            
-            # Try different possible attribute names
-            request_counts = batch.request_counts
-            
-            # Check for different possible attribute names
-            input_tokens = getattr(request_counts, 'total_input_tokens', 
-                                getattr(request_counts, 'input_tokens', 
-                                getattr(request_counts, 'total_tokens_input', 0)))
-            
-            output_tokens = getattr(request_counts, 'total_output_tokens',
-                                getattr(request_counts, 'output_tokens',
-                                getattr(request_counts, 'total_tokens_output', 0)))
-            
-            if input_tokens == 0 and output_tokens == 0:
-                # Log the actual structure for debugging
-                logger.debug(f"BatchRequestCounts attributes: {dir(request_counts)}")
-                return 0.0
-            
-            input_cost = (input_tokens / 1000) * CONFIG['openai']['cost_per_1k_tokens']['input']
-            output_cost = (output_tokens / 1000) * CONFIG['openai']['cost_per_1k_tokens']['output']
-            
-            return input_cost + output_cost
-        except Exception as e:
-            logger.debug(f"Could not calculate cost: {e}")
-            return 0.0
     
-    async def _process_batch_results(self, filename: str, batch) -> List[ClassificationResult]:
-        """Process batch results with enhanced error handling"""
+    async def _process_batch_results_v3(self, filename: str, batch: Optional[Any], force_process: bool = False):
+        """Process batch results with accurate counting"""
         logger.debug(f"Processing results for {filename}...")
         
+        # Check if already processed
+        batch_info = self.state['batches'].get(filename, {})
+        if batch_info.get('products_processed', 0) > 0 and not force_process:
+            logger.debug(f"Batch {filename} already processed")
+            return
+        
         result_file = self.results_dir / f"results_{filename}"
-        results = []
         
         try:
-            # Download results
-            if not result_file.exists():
+            # Download results if needed
+            if not result_file.exists() and batch and hasattr(batch, 'output_file_id'):
                 content = self.client.files.content(batch.output_file_id)
                 with open(result_file, 'w') as f:
                     f.write(content.text)
             
+            if not result_file.exists():
+                logger.error(f"No result file for {filename}")
+                return
+            
             # Parse results
+            classifications = []
             errors = 0
+            
             with open(result_file, 'r') as f:
                 for line_num, line in enumerate(f, 1):
                     try:
                         result = json.loads(line)
                         product_id = result['custom_id'].replace('product_', '')
                         
-                        # Skip if already processed (resume capability)
-                        if product_id in self.processed_products:
-                            continue
-                        
                         # Extract response
                         response_content = result['response']['body']['choices'][0]['message']['content']
                         response = json.loads(response_content)
                         
-                        # Create classification result
-                        classification = ClassificationResult(
-                            product_id=product_id,
-                            is_fashion=response.get('is_fashion', False),
-                            confidence=float(response.get('confidence', 0.0)),
-                            category=response.get('category'),
-                            reasoning=response.get('reasoning', ''),
-                            processing_time=0.0
-                        )
-                        
-                        results.append(classification)
-                        self.processed_products.add(product_id)
+                        classifications.append({
+                            'product_id': product_id,
+                            'is_fashion': response.get('is_fashion', False),
+                            'confidence': float(response.get('confidence', 0.0)),
+                            'category': response.get('category'),
+                            'reasoning': response.get('reasoning', '')
+                        })
                         
                     except Exception as e:
                         errors += 1
@@ -927,23 +864,25 @@ Respond with ONLY a JSON object:
                 logger.warning(f"  {errors} errors while parsing {filename}")
             
             # Update database with results
-            if results:
-                await self._update_products_batch(results)
-                logger.info(f"  Processed {len(results)} classifications")
+            if classifications:
+                processed_count = await self._update_products_batch_v3(classifications)
+                
+                # Update batch info with actual processed count
+                batch_info['products_processed'] = processed_count
+                self.state['actual_processed'] += processed_count
+                
+                logger.info(f"  Processed {processed_count} products from {filename}")
             
-            # Save checkpoint
-            if len(self.processed_products) % CONFIG['resume']['checkpoint_interval'] == 0:
-                self._save_processed_products()
-                self._save_checkpoint(f'processed_{len(self.processed_products)}_products')
+            # Save checkpoint periodically
+            if self.state['actual_processed'] % 10000 == 0:
+                self._save_checkpoint(f'processed_{self.state["actual_processed"]}_products')
             
         except Exception as e:
             logger.error(f"Failed to process results for {filename}: {e}")
             self.stats['processing_errors'] += 1
-        
-        return results
     
-    async def _update_products_batch(self, classifications: List[ClassificationResult]):
-        """Update products with classification results"""
+    async def _update_products_batch_v3(self, classifications: List[Dict]) -> int:
+        """Update products with accurate counting - NO DOUBLE COUNTING"""
         # Categorize by confidence
         high_confidence_fashion = []
         high_confidence_non_fashion = []
@@ -951,120 +890,136 @@ Respond with ONLY a JSON object:
         low_confidence = []
         
         for c in classifications:
-            if c.confidence >= CONFIG['classification']['confidence_thresholds']['high']:
-                if c.is_fashion:
+            if c['confidence'] >= CONFIG['classification']['confidence_thresholds']['high']:
+                if c['is_fashion']:
                     high_confidence_fashion.append(c)
                 else:
                     high_confidence_non_fashion.append(c)
-            elif c.confidence >= CONFIG['classification']['confidence_thresholds']['medium']:
+            elif c['confidence'] >= CONFIG['classification']['confidence_thresholds']['medium']:
                 medium_confidence.append(c)
             else:
                 low_confidence.append(c)
         
-        # Process each category
+        total_processed = 0
+        
+        # Process each category and track actual updates
         if high_confidence_fashion:
-            await self._update_fashion_products(high_confidence_fashion)
-            self.state['fashion_products'] += len(high_confidence_fashion)
+            count = await self._update_fashion_products(high_confidence_fashion)
+            self.actual_counts['fashion'] += count
+            total_processed += count
         
         if high_confidence_non_fashion:
             if CONFIG['classification']['enable_removal']:
-                await self._process_non_fashion_removal(high_confidence_non_fashion)
+                count = await self._process_non_fashion_removal(high_confidence_non_fashion)
             else:
-                await self._mark_non_fashion_products(high_confidence_non_fashion)
-            self.state['non_fashion_products'] += len(high_confidence_non_fashion)
+                count = await self._mark_non_fashion_products(high_confidence_non_fashion)
+            self.actual_counts['non_fashion'] += count
+            total_processed += count
         
         if medium_confidence:
-            await self._mark_uncertain_products(medium_confidence)
-            self.state['uncertain_products'] += len(medium_confidence)
+            count = await self._mark_uncertain_products(medium_confidence)
+            self.actual_counts['uncertain'] += count
+            total_processed += count
         
         if low_confidence:
-            await self._mark_manual_review(low_confidence)
-            self.state['manual_review_products'] += len(low_confidence)
+            count = await self._mark_manual_review(low_confidence)
+            self.actual_counts['manual_review'] += count
+            total_processed += count
         
-        self.state['processed_products'] += len(classifications)
+        # Update state with ACTUAL counts, not classifications count
+        self.state['fashion_products'] = self.actual_counts['fashion']
+        self.state['non_fashion_products'] = self.actual_counts['non_fashion']
+        self.state['uncertain_products'] = self.actual_counts['uncertain']
+        self.state['manual_review_products'] = self.actual_counts['manual_review']
+        
         self._save_state()
+        
+        return total_processed
     
-    async def _update_fashion_products(self, products: List[ClassificationResult]):
-        """Update confirmed fashion products"""
+    async def _update_fashion_products(self, products: List[Dict]) -> int:
+        """Update fashion products and return actual count updated"""
         with self.neo4j_driver.session() as session:
             query = """
             UNWIND $products as item
             MATCH (p:Product {id: item.product_id})
+            WHERE p:NeedsAI
             SET p:FashionProduct,
                 p.is_fashion = true,
                 p.fashion_confidence = item.confidence,
                 p.fashion_category = item.category,
                 p.classification_reasoning = item.reasoning,
                 p.classified_at = datetime(),
-                p.classified_by = 'ai_pipeline_v2',
+                p.classified_by = 'ai_pipeline_v3',
                 p.ready_for_embedding = true
             REMOVE p:NonFashionProduct, p:UncertainProduct, p:RequiresReview, p:NeedsAI
             RETURN count(p) as updated
             """
             
-            # Convert to dict format
             products_dict = [
                 {
-                    'product_id': p.product_id,
-                    'confidence': p.confidence,
-                    'category': p.category,
-                    'reasoning': p.reasoning
+                    'product_id': p['product_id'],
+                    'confidence': p['confidence'],
+                    'category': p['category'],
+                    'reasoning': p['reasoning']
                 }
                 for p in products
             ]
             
             # Process in batches
+            total_updated = 0
             batch_size = 1000
             for i in range(0, len(products_dict), batch_size):
                 batch = products_dict[i:i + batch_size]
                 result = session.run(query, products=batch)
                 updated = sum(record['updated'] for record in result)
-                logger.debug(f"Updated {updated} fashion products")
+                total_updated += updated
+            
+            return total_updated
     
-    async def _mark_non_fashion_products(self, products: List[ClassificationResult]):
-        """Mark non-fashion products without deletion"""
+    async def _mark_non_fashion_products(self, products: List[Dict]) -> int:
+        """Mark non-fashion products"""
         with self.neo4j_driver.session() as session:
             query = """
             UNWIND $products as item
             MATCH (p:Product {id: item.product_id})
+            WHERE p:NeedsAI
             SET p:NonFashionProduct,
                 p.is_fashion = false,
                 p.fashion_confidence = item.confidence,
                 p.classification_reasoning = item.reasoning,
                 p.classified_at = datetime(),
-                p.classified_by = 'ai_pipeline_v2'
+                p.classified_by = 'ai_pipeline_v3'
             REMOVE p:FashionProduct, p:UncertainProduct, p:RequiresReview, p:NeedsAI
             RETURN count(p) as updated
             """
             
             products_dict = [
                 {
-                    'product_id': p.product_id,
-                    'confidence': p.confidence,
-                    'reasoning': p.reasoning
+                    'product_id': p['product_id'],
+                    'confidence': p['confidence'],
+                    'reasoning': p['reasoning']
                 }
                 for p in products
             ]
             
             result = session.run(query, products=products_dict)
             updated = sum(record['updated'] for record in result)
-            logger.debug(f"Marked {updated} non-fashion products")
+            return updated
     
-    async def _process_non_fashion_removal(self, products: List[ClassificationResult]):
-        """Archive and remove high-confidence non-fashion products"""
+    async def _process_non_fashion_removal(self, products: List[Dict]) -> int:
+        """Archive and remove non-fashion products"""
         if CONFIG['classification']['archive_before_removal']:
             # Archive products
             timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
             archive_file = self.archive_dir / f"removed_products_{timestamp}.json"
             
-            product_ids = [p.product_id for p in products]
+            product_ids = [p['product_id'] for p in products]
             archived_data = []
             
             with self.neo4j_driver.session() as session:
-                # Get full product data
                 query = """
                 MATCH (p:Product)
-                WHERE p.id IN $ids
+                WHERE p.id IN $ids AND p:NeedsAI
                 OPTIONAL MATCH (p)-[r]->(related)
                 RETURN p, collect({type: type(r), related: properties(related)}) as relationships
                 """
@@ -1074,51 +1029,55 @@ Respond with ONLY a JSON object:
                     result = session.run(query, ids=chunk_ids)
                     
                     for record in result:
-                        classification = next(p for p in products if p.product_id == record['p']['id'])
-                        archived_data.append({
-                            'product': dict(record['p']),
-                            'relationships': record['relationships'],
-                            'classification': {
-                                'is_fashion': classification.is_fashion,
-                                'confidence': classification.confidence,
-                                'reasoning': classification.reasoning
-                            },
-                            'archived_at': datetime.now().isoformat()
-                        })
+                        if record['p']:  # Check product exists
+                            classification = next((p for p in products if p['product_id'] == record['p']['id']), None)
+                            if classification:
+                                archived_data.append({
+                                    'product': dict(record['p']),
+                                    'relationships': record['relationships'],
+                                    'classification': {
+                                        'is_fashion': classification['is_fashion'],
+                                        'confidence': classification['confidence'],
+                                        'reasoning': classification['reasoning']
+                                    },
+                                    'archived_at': datetime.now().isoformat()
+                                })
             
             # Save archive
-            with open(archive_file, 'w') as f:
-                json.dump(archived_data, f, indent=2)
-            
-            logger.info(f"Archived {len(archived_data)} products to {archive_file}")
+            if archived_data:
+                with open(archive_file, 'w') as f:
+                    json.dump(archived_data, f, indent=2)
+                logger.info(f"Archived {len(archived_data)} products to {archive_file}")
         
         # Remove from database
+        total_deleted = 0
         with self.neo4j_driver.session() as session:
             query = """
             UNWIND $ids as id
             MATCH (p:Product {id: id})
+            WHERE p:NeedsAI
             DETACH DELETE p
             RETURN count(*) as deleted
             """
             
-            product_ids = [p.product_id for p in products]
+            product_ids = [p['product_id'] for p in products]
             batch_size = 100
-            total_deleted = 0
             
             for i in range(0, len(product_ids), batch_size):
                 batch_ids = product_ids[i:i + batch_size]
                 result = session.run(query, ids=batch_ids)
                 deleted = sum(record['deleted'] for record in result)
                 total_deleted += deleted
-            
-            logger.debug(f"Deleted {total_deleted} non-fashion products")
+        
+        return total_deleted
     
-    async def _mark_uncertain_products(self, products: List[ClassificationResult]):
-        """Mark products with medium confidence"""
+    async def _mark_uncertain_products(self, products: List[Dict]) -> int:
+        """Mark uncertain products"""
         with self.neo4j_driver.session() as session:
             query = """
             UNWIND $products as item
             MATCH (p:Product {id: item.product_id})
+            WHERE p:NeedsAI
             SET p:UncertainProduct,
                 p.is_fashion = item.is_fashion,
                 p.fashion_confidence = item.confidence,
@@ -1126,63 +1085,63 @@ Respond with ONLY a JSON object:
                 p.classification_reasoning = item.reasoning,
                 p.needs_review = true,
                 p.classified_at = datetime(),
-                p.classified_by = 'ai_pipeline_v2'
+                p.classified_by = 'ai_pipeline_v3'
             REMOVE p:FashionProduct, p:NonFashionProduct, p:NeedsAI
             RETURN count(p) as updated
             """
             
             products_dict = [
                 {
-                    'product_id': p.product_id,
-                    'is_fashion': p.is_fashion,
-                    'confidence': p.confidence,
-                    'category': p.category,
-                    'reasoning': p.reasoning
+                    'product_id': p['product_id'],
+                    'is_fashion': p['is_fashion'],
+                    'confidence': p['confidence'],
+                    'category': p.get('category'),
+                    'reasoning': p['reasoning']
                 }
                 for p in products
             ]
             
             result = session.run(query, products=products_dict)
             updated = sum(record['updated'] for record in result)
-            logger.debug(f"Marked {updated} products as uncertain")
+            return updated
     
-    async def _mark_manual_review(self, products: List[ClassificationResult]):
-        """Mark low confidence products for manual review"""
+    async def _mark_manual_review(self, products: List[Dict]) -> int:
+        """Mark products for manual review"""
         with self.neo4j_driver.session() as session:
             query = """
             UNWIND $products as item
             MATCH (p:Product {id: item.product_id})
+            WHERE p:NeedsAI
             SET p:RequiresReview,
                 p.is_fashion = item.is_fashion,
                 p.fashion_confidence = item.confidence,
                 p.classification_reasoning = item.reasoning,
                 p.review_reason = 'Low confidence classification',
                 p.classified_at = datetime(),
-                p.classified_by = 'ai_pipeline_v2'
+                p.classified_by = 'ai_pipeline_v3'
             REMOVE p:FashionProduct, p:NonFashionProduct, p:NeedsAI
             RETURN count(p) as updated
             """
             
             products_dict = [
                 {
-                    'product_id': p.product_id,
-                    'is_fashion': p.is_fashion,
-                    'confidence': p.confidence,
-                    'reasoning': p.reasoning
+                    'product_id': p['product_id'],
+                    'is_fashion': p['is_fashion'],
+                    'confidence': p['confidence'],
+                    'reasoning': p['reasoning']
                 }
                 for p in products
             ]
             
             result = session.run(query, products=products_dict)
             updated = sum(record['updated'] for record in result)
-            logger.debug(f"Marked {updated} products for manual review")
+            return updated
     
     async def _phase4_export_review(self):
         """Export products needing manual review"""
         logger.info("\n=== PHASE 4: Export for Manual Review ===")
         
         with self.neo4j_driver.session() as session:
-            # Get products needing review
             result = session.run("""
                 MATCH (p:Product)
                 WHERE (p:UncertainProduct OR p:RequiresReview)
@@ -1212,52 +1171,32 @@ Respond with ONLY a JSON object:
                 review_data.append(dict(record))
             
             if review_data:
-                # Create review CSV
                 df = pd.DataFrame(review_data)
                 timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
                 
-                # Main review file
                 review_file = self.manual_review_dir / f'manual_review_{timestamp}.csv'
                 df.to_csv(review_file, index=False)
                 
-                # Separate files by type
-                for review_type in df['review_type'].unique():
-                    type_df = df[df['review_type'] == review_type]
-                    type_file = self.manual_review_dir / f'review_{review_type}_{timestamp}.csv'
-                    type_df.to_csv(type_file, index=False)
-                
                 logger.info(f"Exported {len(review_data)} products for manual review")
-                logger.info(f"Review files saved to: {self.manual_review_dir}")
-                
-                # Summary by type
-                logger.info("\nReview Summary:")
-                for review_type, count in df['review_type'].value_counts().items():
-                    logger.info(f"  {review_type}: {count:,} products")
+                logger.info(f"Review file: {review_file}")
             else:
                 logger.info("No products need manual review!")
     
     async def _phase5_finalize(self):
-        """Final cleanup and reporting"""
+        """Final reporting and cleanup"""
         logger.info("\n=== PHASE 5: Finalization ===")
-        
-        # Save final processed products list
-        self._save_processed_products()
         
         # Verify database state
         await self._verify_final_state()
         
-        # Generate comprehensive reports
+        # Generate reports
         self._generate_final_reports()
         
-        # Setup Qdrant collection
+        # Setup Qdrant if needed
         await self._setup_qdrant_collection()
-        
-        # Clean up if requested
-        if self.state.get('cleanup_temp_files', False):
-            self._cleanup_temporary_files()
     
     async def _verify_final_state(self):
-        """Verify the final database state"""
+        """Verify final database state"""
         logger.info("\nVerifying final database state...")
         
         with self.neo4j_driver.session() as session:
@@ -1269,8 +1208,7 @@ Respond with ONLY a JSON object:
                     sum(CASE WHEN p:NonFashionProduct THEN 1 ELSE 0 END) as non_fashion,
                     sum(CASE WHEN p:UncertainProduct THEN 1 ELSE 0 END) as uncertain,
                     sum(CASE WHEN p:RequiresReview THEN 1 ELSE 0 END) as review,
-                    sum(CASE WHEN p:NeedsAI AND p.classified_at IS NULL THEN 1 ELSE 0 END) as unprocessed,
-                    sum(CASE WHEN p.classified_at IS NOT NULL THEN 1 ELSE 0 END) as classified
+                    sum(CASE WHEN p:NeedsAI AND p.classified_at IS NULL THEN 1 ELSE 0 END) as unprocessed
             """).single()
             
             logger.info("Database State:")
@@ -1280,12 +1218,11 @@ Respond with ONLY a JSON object:
             logger.info(f"  Uncertain products: {result['uncertain']:,}")
             logger.info(f"  Needs review: {result['review']:,}")
             logger.info(f"  Still unprocessed: {result['unprocessed']:,}")
-            logger.info(f"  Total classified: {result['classified']:,}")
             
             self.state['verified_counts'] = dict(result)
     
     async def _setup_qdrant_collection(self):
-        """Setup Qdrant collection for embeddings"""
+        """Setup Qdrant collection"""
         try:
             collections = self.qdrant.get_collections()
             exists = any(c.name == CONFIG['qdrant']['collection'] for c in collections.collections)
@@ -1294,7 +1231,7 @@ Respond with ONLY a JSON object:
                 self.qdrant.create_collection(
                     collection_name=CONFIG['qdrant']['collection'],
                     vectors_config=VectorParams(
-                        size=1536,  # text-embedding-3-small
+                        size=1536,
                         distance=Distance.COSINE
                     )
                 )
@@ -1305,14 +1242,12 @@ Respond with ONLY a JSON object:
             logger.error(f"Error setting up Qdrant: {e}")
     
     def _generate_final_reports(self):
-        """Generate comprehensive final reports"""
+        """Generate comprehensive reports"""
         logger.info("\nGenerating final reports...")
         
-        # Calculate metrics
         start_time = datetime.fromisoformat(self.state['start_time'])
         total_hours = (datetime.now() - start_time).total_seconds() / 3600
         
-        # Main report
         report = {
             'run_info': {
                 'run_id': self.state['run_id'],
@@ -1322,42 +1257,25 @@ Respond with ONLY a JSON object:
             },
             'products': {
                 'initial_needs_ai': self.state['needs_ai_products'],
-                'processed': self.state['processed_products'],
-                'fashion_identified': self.state['fashion_products'],
-                'non_fashion_identified': self.state['non_fashion_products'],
-                'uncertain': self.state['uncertain_products'],
-                'manual_review': self.state['manual_review_products']
+                'processed': self.state['actual_processed'],
+                'fashion_identified': self.actual_counts['fashion'],
+                'non_fashion_identified': self.actual_counts['non_fashion'],
+                'uncertain': self.actual_counts['uncertain'],
+                'manual_review': self.actual_counts['manual_review']
             },
             'batches': {
                 'total': len(self.state['batches']),
-                'completed': self.stats.get('batches_completed', 0),
-                'failed': self.stats.get('batches_failed', 0)
-            },
-            'costs': {
-                'estimated_total': self.cost_tracker['estimated_total'],
-                'actual_total': self.cost_tracker['actual_total'],
-                'cost_per_product': self.cost_tracker['actual_total'] / max(self.state['processed_products'], 1)
-            },
-            'performance': {
-                'products_per_hour': round(self.state['processed_products'] / max(total_hours, 1), 2),
-                'avg_batch_time_hours': round(total_hours / max(self.stats.get('batches_completed', 1), 1), 2)
+                'completed': sum(1 for b in self.state['batches'].values() if b['status'] == 'completed'),
+                'failed': sum(1 for b in self.state['batches'].values() if b['status'] == 'failed')
             },
             'database_verification': self.state.get('verified_counts', {}),
             'errors': len(self.state.get('errors', [])),
             'warnings': len(self.state.get('warnings', []))
         }
         
-        # Save main report
         report_file = self.reports_dir / f'final_report_{self.state["run_id"]}.json'
         with open(report_file, 'w') as f:
             json.dump(report, f, indent=2)
-        
-        # Generate cost breakdown
-        self._generate_cost_report()
-        
-        # Generate error report if any
-        if self.state.get('errors'):
-            self._generate_error_report()
         
         # Print summary
         logger.info("\n" + "="*60)
@@ -1365,69 +1283,13 @@ Respond with ONLY a JSON object:
         logger.info("="*60)
         logger.info(f"Run ID: {self.state['run_id']}")
         logger.info(f"Total Runtime: {total_hours:.1f} hours")
-        logger.info(f"Products Processed: {self.state['processed_products']:,}")
-        logger.info(f"Fashion Products: {self.state['fashion_products']:,} ({self.state['fashion_products']/max(self.state['processed_products'],1)*100:.1f}%)")
-        logger.info(f"Non-Fashion Products: {self.state['non_fashion_products']:,}")
-        logger.info(f"Uncertain Products: {self.state['uncertain_products']:,}")
-        logger.info(f"Manual Review Needed: {self.state['manual_review_products']:,}")
-        logger.info(f"\nTotal API Cost: ${self.cost_tracker['actual_total']:.2f}")
-        logger.info(f"Cost per Product: ${self.cost_tracker['actual_total']/max(self.state['processed_products'],1):.4f}")
+        logger.info(f"Products Processed: {self.state['actual_processed']:,}")
+        logger.info(f"Fashion Products: {self.actual_counts['fashion']:,}")
+        logger.info(f"Non-Fashion Products: {self.actual_counts['non_fashion']:,}")
+        logger.info(f"Uncertain Products: {self.actual_counts['uncertain']:,}")
+        logger.info(f"Manual Review Needed: {self.actual_counts['manual_review']:,}")
         logger.info(f"\nReports saved to: {self.reports_dir}")
         logger.info("="*60)
-    
-    def _generate_cost_report(self):
-        """Generate detailed cost breakdown"""
-        cost_data = []
-        
-        for batch_name, cost in self.cost_tracker['by_batch'].items():
-            batch_info = self.state['batches'].get(batch_name, {})
-            cost_data.append({
-                'batch': batch_name,
-                'products': batch_info.get('request_count', 0),
-                'estimated_cost': batch_info.get('estimated_cost', 0),
-                'actual_cost': cost,
-                'variance': cost - batch_info.get('estimated_cost', 0)
-            })
-        
-        if cost_data:
-            df = pd.DataFrame(cost_data)
-            cost_file = self.reports_dir / f'cost_breakdown_{self.state["run_id"]}.csv'
-            df.to_csv(cost_file, index=False)
-            
-            # Summary stats
-            logger.info(f"\nCost Analysis:")
-            logger.info(f"  Total Estimated: ${self.cost_tracker['estimated_total']:.2f}")
-            logger.info(f"  Total Actual: ${self.cost_tracker['actual_total']:.2f}")
-            logger.info(f"  Variance: ${self.cost_tracker['actual_total'] - self.cost_tracker['estimated_total']:.2f}")
-    
-    def _generate_error_report(self):
-        """Generate error report"""
-        error_file = self.reports_dir / f'errors_{self.state["run_id"]}.json'
-        with open(error_file, 'w') as f:
-            json.dump(self.state.get('errors', []), f, indent=2)
-        
-        logger.info(f"Error report saved to: {error_file}")
-    
-    def _export_failed_batches(self):
-        """Export information about failed batches"""
-        failed_batches = []
-        
-        for filename, batch_info in self.state['batches'].items():
-            if batch_info['status'] == 'failed':
-                failed_batches.append({
-                    'filename': filename,
-                    'product_count': batch_info.get('request_count', 0),
-                    'error': batch_info.get('error', 'Unknown'),
-                    'retry_count': batch_info.get('retry_count', 0),
-                    'product_ids': batch_info.get('product_ids', [])[:10]  # First 10 for reference
-                })
-        
-        if failed_batches:
-            failed_file = self.reports_dir / f'failed_batches_{self.state["run_id"]}.json'
-            with open(failed_file, 'w') as f:
-                json.dump(failed_batches, f, indent=2)
-            
-            logger.warning(f"Failed batch details saved to: {failed_file}")
     
     def _save_state(self):
         """Save pipeline state"""
@@ -1438,11 +1300,11 @@ Respond with ONLY a JSON object:
             json.dump(self.state, f, indent=2)
     
     def _save_checkpoint(self, checkpoint_name: str):
-        """Save a checkpoint for recovery"""
+        """Save checkpoint"""
         checkpoint = {
             'name': checkpoint_name,
             'timestamp': datetime.now().isoformat(),
-            'processed_products': len(self.processed_products),
+            'processed_products': self.state['actual_processed'],
             'state_snapshot': self.state.copy()
         }
         
@@ -1452,23 +1314,11 @@ Respond with ONLY a JSON object:
         
         self.state['checkpoints'].append(checkpoint_name)
         logger.debug(f"Saved checkpoint: {checkpoint_name}")
-    
-    def _cleanup_temporary_files(self):
-        """Clean up temporary files"""
-        logger.info("\nCleaning up temporary files...")
-        
-        # Keep results and reports, only remove batch files
-        batch_count = 0
-        for batch_file in self.batch_dir.glob("batch_*.jsonl"):
-            batch_file.unlink()
-            batch_count += 1
-        
-        logger.info(f"Removed {batch_count} batch files")
 
 
 async def main():
     """Main execution"""
-    pipeline = OptimizedFashionClassifierV2()
+    pipeline = FashionClassifierV3()
     await pipeline.run()
 
 
