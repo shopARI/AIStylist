@@ -11,7 +11,7 @@ Features:
 - Full logging and reporting
 - Resume capability for interrupted runs
 
-# Examples your team can use:
+# Examples 
 
 # Dry run with aggressive deduplication
 python neo4j_cleanup.py --duplicate-strategy aggressive --dry-run
