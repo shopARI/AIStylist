@@ -411,8 +411,10 @@ class EnhancedFashionCleaner:
         logger.info(f"\nTotal marked for removal: {total_marked:,}")
         return total_marked
     
+    # Replace the mark_fashion_products method in neo4j_cleanup.py with this updated version:
+
     def mark_fashion_products(self, include_uncategorized=True):
-        """Mark obvious fashion products"""
+        """Mark obvious fashion products AND set all necessary properties"""
         logger.info("\n=== Marking Fashion Products ===")
         
         gc.collect()
@@ -428,8 +430,8 @@ class EnhancedFashionCleaner:
                         AND NOT p:MarkedForRemoval
                         AND NOT p:FashionProduct
                         AND NOT (toLower(c.name) CONTAINS 'equipment' OR 
-                                 toLower(c.name) CONTAINS 'tools' OR
-                                 toLower(c.name) CONTAINS 'accessories > home')
+                                toLower(c.name) CONTAINS 'tools' OR
+                                toLower(c.name) CONTAINS 'accessories > home')
                         RETURN count(p) as total_count
                     """
                 else:
@@ -439,8 +441,8 @@ class EnhancedFashionCleaner:
                         AND NOT p:MarkedForRemoval
                         AND NOT p:FashionProduct
                         AND NOT (toLower(c.name) CONTAINS 'equipment' OR 
-                                 toLower(c.name) CONTAINS 'tools' OR
-                                 toLower(c.name) CONTAINS 'accessories > home')
+                                toLower(c.name) CONTAINS 'tools' OR
+                                toLower(c.name) CONTAINS 'accessories > home')
                         RETURN count(p) as total_count
                     """
                 
@@ -463,13 +465,17 @@ class EnhancedFashionCleaner:
                             AND NOT p:MarkedForRemoval
                             AND NOT p:FashionProduct
                             AND NOT (toLower(c.name) CONTAINS 'equipment' OR 
-                                     toLower(c.name) CONTAINS 'tools' OR
-                                     toLower(c.name) CONTAINS 'accessories > home')
+                                    toLower(c.name) CONTAINS 'tools' OR
+                                    toLower(c.name) CONTAINS 'accessories > home')
                             WITH p, c LIMIT $batch_size
                             REMOVE p:NeedsAI
                             SET p:FashionProduct
                             SET p.classification_reason = 'Category: ' + c.name
+                            SET p.classification_source = 'keyword_based'
                             SET p.classified_at = datetime()
+                            SET p.is_fashion = true  // NEW: Set this property
+                            SET p.fashion_confidence = 0.95  // NEW: High confidence for keyword matches
+                            SET p.ready_for_embedding = true  // NEW: Mark as ready
                             RETURN count(p) as count
                         """
                     else:
@@ -479,12 +485,16 @@ class EnhancedFashionCleaner:
                             AND NOT p:MarkedForRemoval
                             AND NOT p:FashionProduct
                             AND NOT (toLower(c.name) CONTAINS 'equipment' OR 
-                                     toLower(c.name) CONTAINS 'tools' OR
-                                     toLower(c.name) CONTAINS 'accessories > home')
+                                    toLower(c.name) CONTAINS 'tools' OR
+                                    toLower(c.name) CONTAINS 'accessories > home')
                             WITH p, c LIMIT $batch_size
                             SET p:FashionProduct
                             SET p.classification_reason = 'Category: ' + c.name
+                            SET p.classification_source = 'keyword_based'
                             SET p.classified_at = datetime()
+                            SET p.is_fashion = true  // NEW: Set this property
+                            SET p.fashion_confidence = 0.95  // NEW: High confidence for keyword matches
+                            SET p.ready_for_embedding = true  // NEW: Mark as ready
                             RETURN count(p) as count
                         """
                     
@@ -789,7 +799,7 @@ if __name__ == "__main__":
 
 
 
-    
+
 # #!/usr/bin/env python3
 # """
 # Aggressive cleanup of obvious non-fashion products
