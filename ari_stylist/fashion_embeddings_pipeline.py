@@ -801,10 +801,28 @@ class FashionEmbeddingsPipeline:
         logger.info("\nVerifying embeddings...")
         
         # Check Qdrant
-        collection_info = self.qdrant.get_collection(CONFIG['qdrant']['collection'])
-        vectors_count = collection_info.vectors_count
-        
-        logger.info(f"Vectors in Qdrant: {vectors_count:,}")
+        try:
+            collection_info = self.qdrant.get_collection(CONFIG['qdrant']['collection'])
+            
+            # Handle different possible attribute names for vector count
+            vectors_count = None
+            if hasattr(collection_info, 'vectors_count'):
+                vectors_count = collection_info.vectors_count
+            elif hasattr(collection_info, 'points_count'):
+                vectors_count = collection_info.points_count
+            elif hasattr(collection_info, 'vector_count'):
+                vectors_count = collection_info.vector_count
+            
+            # If still None, try to get count directly
+            if vectors_count is None:
+                count_result = self.qdrant.count(collection_name=CONFIG['qdrant']['collection'])
+                vectors_count = count_result.count if hasattr(count_result, 'count') else 0
+            
+            logger.info(f"Vectors in Qdrant: {vectors_count:,}")
+            
+        except Exception as e:
+            logger.warning(f"Could not get Qdrant collection info: {e}")
+            vectors_count = 0
         
         # Check Neo4j
         with self.neo4j_driver.session() as session:
@@ -812,8 +830,8 @@ class FashionEmbeddingsPipeline:
                 MATCH (p:Product:FashionProduct)
                 WHERE p.embedding_id IS NOT NULL
                 RETURN count(p) as embedded_count,
-                       min(p.embedding_created_at) as earliest,
-                       max(p.embedding_created_at) as latest
+                    min(p.embedding_created_at) as earliest,
+                    max(p.embedding_created_at) as latest
             """).single()
             
             logger.info(f"Products with embedding_id in Neo4j: {result['embedded_count']:,}")
