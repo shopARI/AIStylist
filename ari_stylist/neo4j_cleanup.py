@@ -498,6 +498,7 @@ class EnhancedFashionCleaner:
                             RETURN count(p) as count
                         """
                     
+                    
                     batch_result = session.run(
                         batch_query,
                         pattern=category_pattern,
