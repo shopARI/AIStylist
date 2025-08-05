@@ -85,7 +85,7 @@ class EnhancedAIStylistApp:
         # Read Qdrant configuration from environment
         self.qdrant_url = os.environ.get("QDRANT_URL")
         self.qdrant_api_key = os.environ.get("QDRANT_API_KEY")
-        self.qdrant_collection_name = os.environ.get("QDRANT_COLLECTION_NAME", "products")
+        self.qdrant_collection_name = os.environ.get("QDRANT_COLLECTION_NAME", "fashion_products")
         
         # UPDATED: Set up UserKnowledgeGraph for user operations only
         logger.info(f"Connecting to Neo4j at {self.neo4j_url} for user operations")

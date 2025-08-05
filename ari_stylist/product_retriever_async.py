@@ -58,7 +58,7 @@ class ProductRetrieverAsync:
         self, 
         qdrant_url: Optional[str] = None, 
         qdrant_api_key: Optional[str] = None, 
-        qdrant_collection_name: str = "products",
+        qdrant_collection_name: str = "fashion_products",
         vector_storage_path: str = None  # Kept for backward compatibility
     ):
         """

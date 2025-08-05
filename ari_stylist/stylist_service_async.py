@@ -163,7 +163,8 @@ class StylistServiceAsync:
         
         # MIGRATED: Initialize AgentFactory and MemoryManager
         self.agent_factory = get_agent_factory()
-        self.memory_manager = MemoryManager(self.app.product_kg)
+       # self.memory_manager = MemoryManager(self.app.user_kg)
+        manager = MemoryManager(self.app.user_kg)
         
         # Active sessions tracking
         self.active_sessions = {}
@@ -207,7 +208,7 @@ class StylistServiceAsync:
                 raise RuntimeError("AgentFactory not available")
             
             # Test MemoryManager
-            manager = MemoryManager(self.app.product_kg)
+            manager = MemoryManager(self.app.user_kg)
             if not manager:
                 raise RuntimeError("MemoryManager not available")
             
@@ -811,14 +812,14 @@ async def _get_non_personalized_recommendations(service, product_id, query, limi
     """Get recommendations without session-specific personalization"""
     try:
         # Create a temporary session or use generic logic
-        if product_id and hasattr(service.app.product_kg, 'get_similar_products'):
-            return await service.app.product_kg.get_similar_products(product_id, limit)
+        if product_id and hasattr(service.app.data_store, 'get_similar_products'):
+            return await service.app.data_store.get_similar_products(product_id, limit)
         
         elif query and hasattr(service.app.product_retriever, 'search_by_natural_language'):
             return await service.app.product_retriever.search_by_natural_language(query, limit)
         
-        elif hasattr(service.app.product_kg, 'get_popular_products'):
-            return await service.app.product_kg.get_popular_products(limit)
+        elif hasattr(service.app.data_store, 'get_popular_products'):
+            return await service.app.data_store.get_popular_products(limit)
             
     except Exception as e:
         logger.error(f"Error in non-personalized recommendations: {e}")
@@ -843,7 +844,7 @@ async def _get_direct_database_recommendations(service, product_id, query, limit
             LIMIT $limit
             """
             
-            result = await service.app.product_kg.query(neo4j_query, {
+            result = await service.app.data_store.query(neo4j_query, {
                 "product_id": product_id,
                 "limit": limit
             })
@@ -866,7 +867,7 @@ async def _get_direct_database_recommendations(service, product_id, query, limit
         LIMIT $limit
         """
         
-        result = await service.app.product_kg.query(popular_query, {"limit": limit})
+        result = await service.app.data_store.query(popular_query, {"limit": limit})
         
         if result:
             return [_format_product_from_db_record(record) for record in result]

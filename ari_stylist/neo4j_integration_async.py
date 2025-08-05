@@ -1,5 +1,5 @@
 """
-FIXED Asynchronous Neo4j Integration for AI Stylist
+Asynchronous Neo4j Integration for AI Stylist
 
 Resolves recursion issues and improves async handling.
 """
@@ -58,7 +58,7 @@ except ImportError:
 
 class ProductKnowledgeGraphAsync:
     """
-    FIXED Neo4j integration with proper async handling and recursion prevention.
+    Neo4j integration with proper async handling and recursion prevention.
     """
     
     def __init__(self, url, username, password):
