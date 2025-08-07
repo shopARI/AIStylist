@@ -40,7 +40,7 @@ from stylist_agent_async import create_stylist_agent_async
 # UPDATED IMPORTS: Use UserKnowledgeGraph and HybridDataStore
 from user_knowledge_graph_async import UserKnowledgeGraphAsync
 from hybrid_data_store import HybridDataStore
-from product_retriever_async_enhanced import ProductRetrieverAsync
+from product_retriever_async import ProductRetrieverAsync
 
 # Import battle system components
 from battle_agents import BattleAgents
