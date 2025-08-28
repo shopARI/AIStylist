@@ -42,6 +42,7 @@ class BattleExecutor:
             "vibe_wins": 0,
             "consensus_wins": 0,
             "avg_execution_time": 0.0,
+            "total_execution_time": 0.0,  # Add this line
             "total_errors": 0
         }
         

@@ -13,162 +13,21 @@ from typing import Dict, Any, Optional, List, Tuple
 
 logger = logging.getLogger("memory_integration_fixed")
 
-# Import CAMEL-AI 0.2.64 APIs with proper error handling
-try:
-    from camel.memories import (
-        LongtermAgentMemory,
-        ChatHistoryBlock, 
-        VectorDBBlock,
-        MemoryRecord,
-        ScoreBasedContextCreator
-    )
-    from camel.messages import BaseMessage
-    from camel.utils import OpenAITokenCounter
-    from camel.types import ModelType, OpenAIBackendRole
-    CAMEL_MEMORIES_AVAILABLE = True
+# UPDATED: Use centralized imports from camel_imports.py
+from camel_imports import (
+    LongtermAgentMemory, ChatHistoryBlock, VectorDBBlock,
+    MemoryRecord, ScoreBasedContextCreator, BaseMessage,
+    OpenAITokenCounter, ModelType, OpenAIBackendRole,
+    CAMEL_AVAILABLE
+)
+
+# Check if memory components are available
+CAMEL_MEMORIES_AVAILABLE = CAMEL_AVAILABLE and LongtermAgentMemory is not None
+
+if CAMEL_MEMORIES_AVAILABLE:
     logger.info("✅ CAMEL-AI 0.2.64 memories imported successfully")
-except ImportError as e:
-    logger.error(f"❌ Failed to import CAMEL memories: {e}")
-    CAMEL_MEMORIES_AVAILABLE = False
-    
-    # Create safe fallbacks that match the expected API
-    class LongtermAgentMemory:
-        def __init__(self, context_creator=None, chat_history_block=None, vector_db_block=None, **kwargs):
-            self.records = []
-            self.context_creator = context_creator
-            self.chat_history_block = chat_history_block
-            self.vector_db_block = vector_db_block
-        
-        def write_records(self, records): 
-            if hasattr(self, 'records'):
-                self.records.extend(records)
-        
-        def get_context(self): 
-            if self.context_creator and hasattr(self.context_creator, 'create_context'):
-                return self.context_creator.create_context(self.records)
-            
-            # Fallback context creation
-            messages = []
-            for record in getattr(self, 'records', []):
-                if hasattr(record, 'message') and hasattr(record.message, 'content'):
-                    role = "user" if hasattr(record, 'role_at_backend') and record.role_at_backend == "user" else "assistant"
-                    messages.append({
-                        "role": role,
-                        "content": record.message.content
-                    })
-            return messages, len(str(messages))
-    
-    class MemoryRecord:
-        def __init__(self, message=None, role_at_backend=None, **kwargs):
-            self.message = message
-            self.role_at_backend = role_at_backend
-    
-    class ScoreBasedContextCreator:
-        def __init__(self, token_counter=None, token_limit=1024, **kwargs):
-            self.token_counter = token_counter
-            self.token_limit = token_limit
-        
-        def create_context(self, records):
-            """Create context from memory records - FIXED"""
-            try:
-                messages = []
-                total_tokens = 0
-                
-                if not records:
-                    return messages, total_tokens
-                    
-                # Process records into OpenAI format
-                for record in records[-10:]:  # Limit to last 10 records
-                    try:
-                        if hasattr(record, 'message') and record.message:
-                            message = record.message
-                            
-                            # Determine role
-                            if hasattr(record, 'role_at_backend'):
-                                role = record.role_at_backend
-                                if role == "user":
-                                    role = "user"
-                                else:
-                                    role = "assistant"
-                            else:
-                                role = "assistant"
-                            
-                            # Get content
-                            content = ""
-                            if hasattr(message, 'content'):
-                                content = message.content
-                            elif isinstance(message, str):
-                                content = message
-                            else:
-                                content = str(message)
-                            
-                            if content and len(content.strip()) > 0:
-                                openai_message = {
-                                    "role": role,
-                                    "content": content.strip()
-                                }
-                                messages.append(openai_message)
-                                
-                                # Rough token estimation
-                                total_tokens += len(content.split()) * 1.3
-                                
-                                # Stop if we exceed token limit
-                                if total_tokens > self.token_limit:
-                                    break
-                                    
-                    except Exception as e:
-                        logger.debug(f"Error processing record: {e}")
-                        continue
-                
-                return messages, int(total_tokens)
-                
-            except Exception as e:
-                logger.error(f"Error creating context: {e}")
-                return [], 0
-    
-    class ChatHistoryBlock:
-        def __init__(self, **kwargs):
-            pass
-    
-    class VectorDBBlock:
-        def __init__(self, **kwargs):
-            pass
-    
-    class BaseMessage:
-        def __init__(self, role_name, content, meta_dict=None):
-            self.role_name = role_name
-            self.content = content
-            self.meta_dict = meta_dict
-        
-        @classmethod
-        def make_user_message(cls, role_name="User", content="", meta_dict=None):
-            return cls(role_name, content, meta_dict)
-        
-        @classmethod  
-        def make_assistant_message(cls, role_name="Assistant", content="", meta_dict=None):
-            return cls(role_name, content, meta_dict)
-    
-    class OpenAITokenCounter:
-        def __init__(self, model_type=None):
-            self.model_type = model_type or "gpt-4o-mini"
-        
-        def count_tokens(self, text):
-            """Simple token counting estimation"""
-            if not text:
-                return 0
-            # Rough estimation: 1 token ≈ 0.75 words
-            words = len(str(text).split())
-            return int(words * 1.3)
-    
-    class ModelType:
-        GPT_4O = "gpt-4o"
-        GPT_4O_MINI = "gpt-4o-mini"
-        GPT_3_5_TURBO = "gpt-3.5-turbo"
-    
-    class OpenAIBackendRole:
-        USER = "user"
-        ASSISTANT = "assistant"
-        SYSTEM = "system"
+else:
+    logger.error("❌ CAMEL memories not available, using fallback implementations")
 
 
 class MemoryManager:

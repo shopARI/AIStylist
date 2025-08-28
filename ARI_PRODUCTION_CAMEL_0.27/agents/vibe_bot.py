@@ -78,49 +78,86 @@ class VibeBotAgent:
     ) -> List[Dict[str, Any]]:
         """
         Search for products using aesthetic similarity.
-        
-        This method:
-        1. Uses CAMEL agent to determine strategy
-        2. Executes Qdrant queries based on strategy
-        3. Returns aesthetic-based recommendations
-        
-        Args:
-            query: Search query
-            limit: Maximum results
-            filters: Optional filters
-            ml_intelligence: ML insights for this agent
-            user_context: User information
-            
-        Returns:
-            List of products with aesthetic metadata
         """
         start_time = datetime.now()
         self.stats["total_searches"] += 1
         
-        logger.info(f"{self.name} searching: '{query[:50]}...'")
+        logger.debug(f">>> {self.name}.search() START")
+        logger.info(f"{self.name} searching: query='{query[:50]}...', filters={filters}")
         
         try:
             # Get strategy from CAMEL agent
+            logger.debug("Getting agent strategy...")
+            strategy_start = datetime.now()
             strategy = await self._get_agent_strategy(
                 query, ml_intelligence, filters, user_context
             )
+            strategy_time = (datetime.now() - strategy_start).total_seconds()
+            logger.debug(f"Strategy determined in {strategy_time:.2f}s: {strategy[:100]}...")
             
             # Execute strategy
+            logger.debug("Executing strategy...")
+            exec_start = datetime.now()
             results = await self._execute_strategy(
                 strategy, query, limit, filters, ml_intelligence
             )
+            exec_time = (datetime.now() - exec_start).total_seconds()
+            logger.debug(f"Strategy executed in {exec_time:.2f}s, got {len(results)} results")
             
             # Update statistics
             elapsed = (datetime.now() - start_time).total_seconds()
             self._update_stats(len(results), elapsed, success=True)
             
             logger.info(f"{self.name} found {len(results)} products in {elapsed:.2f}s")
+            logger.debug(f"<<< {self.name}.search() END")
             return results
             
         except Exception as e:
-            logger.error(f"{self.name} search failed: {e}")
+            logger.error(f"!!! {self.name} search failed: {e}", exc_info=True)
             self.stats["failed_searches"] += 1
             return []
+      
+    async def _semantic_search(self, query: str, limit: int, filters: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+        logger.debug(f">>> _semantic_search: query='{query[:50]}...', limit={limit}")
+        try:
+            # Enhance query with filter terms instead of using metadata filters
+            enhanced_query = query
+            if filters:
+                if 'category' in filters:
+                    enhanced_query = f"{filters['category']} {enhanced_query}"
+                    logger.debug(f"Added category to query: {filters['category']}")
+                if 'colors' in filters:
+                    enhanced_query = f"{' '.join(filters['colors'])} {enhanced_query}"
+                    logger.debug(f"Added colors to query: {filters['colors']}")
+            
+            logger.debug(f"Calling Qdrant with enhanced_query: '{enhanced_query[:50]}...'")
+            search_start = asyncio.get_event_loop().time()
+            
+            # Don't pass filters - they reference non-existent fields
+            results = await self.qdrant.search_by_natural_language(
+                query=enhanced_query,
+                limit=limit,
+                filters=None  # Critical: Set to None
+            )
+            
+            search_time = asyncio.get_event_loop().time() - search_start
+            logger.debug(f"Qdrant search returned in {search_time:.2f}s with {len(results)} results")
+            
+            products = []
+            for i, product in enumerate(results):
+                if isinstance(product, dict):
+                    product['vibe_reason'] = "Semantic similarity match"
+                    products.append(product)
+                    if i < 3:  # Log first 3
+                        logger.debug(f"  Product {i}: {product.get('title', 'NO_TITLE')[:30]}")
+            
+            logger.debug(f"<<< _semantic_search returning {len(products)} products")
+            return products
+            
+        except Exception as e:
+            logger.error(f"!!! Semantic search failed: {e}", exc_info=True)
+            return []
+  
     
     async def _get_agent_strategy(
         self,
@@ -253,25 +290,21 @@ Respond with the strategy name and brief explanation."""
         
         return unique_results[:limit]
     
-    async def _semantic_search(
-        self,
-        query: str,
-        limit: int,
-        filters: Optional[Dict[str, Any]]
-    ) -> List[Dict[str, Any]]:
-        """
-        Perform semantic embedding search using natural language.
-        """
-        # # BETTER: Use connection pool
-        # async with self.qdrant_pool.get_connection() as conn:
-        #     await conn.search_by_natural_language(...)
-
+    async def _semantic_search(self, query: str, limit: int, filters: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
         try:
-            # Use the primary Qdrant method
+            # Enhance query with filter terms instead of using metadata filters
+            enhanced_query = query
+            if filters:
+                if 'category' in filters:
+                    enhanced_query = f"{filters['category']} {enhanced_query}"
+                if 'colors' in filters:
+                    enhanced_query = f"{' '.join(filters['colors'])} {enhanced_query}"
+            
+            # Don't pass filters - they reference non-existent fields
             results = await self.qdrant.search_by_natural_language(
-                query=query,
+                query=enhanced_query,
                 limit=limit,
-                filters=filters
+                filters=None  # <-- Critical: Set to None
             )
             
             products = []

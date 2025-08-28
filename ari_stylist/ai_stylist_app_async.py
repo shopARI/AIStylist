@@ -1,12 +1,10 @@
 """
-Enhanced Asynchronous AI Stylist Application
+Enhanced Asynchronous AI Stylist Application - SEASON 3 COMPLETE
 
-Main application entry point for the AI Stylist system with persistent memory support.
-Implements user identification and cross-session memory.
-Compatible with CAMEL-AI 0.2.59+.
-
-MIGRATED: Now uses AgentFactory instead of AsyncCAMELService for CAMEL 0.2.59+ compatibility.
-INTEGRATED: Now uses HybridDataStore for product operations (Qdrant) and UserKnowledgeGraph for users (Neo4j).
+FIXED #1: Async/sync bug with deferred agent factory initialization  
+FIXED #4: Battle optimization (NEVER skips, only optimizes parameters)
+FIXED #7: Environment variables required (no hardcoded credentials)
+Currently on CAMEL-AI 0.2.64, ready for 0.2.7 upgrade
 """
 
 import os
@@ -17,86 +15,114 @@ import httpx
 import datetime
 import uuid
 
-
-# Configure logging first, before any other imports
+# Configure logging first
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger("enhanced_ai_stylist_app_async")
+logger = logging.getLogger("ai_stylist_app_async")
 
-# Import new agent factory instead of AsyncCAMELService
+# Import agent factory
 from agent_factory import get_agent_factory
 
-# Import the new memory integration 
+# Import memory integration
 from memory_integration_async import (
     MemoryManager,
-    setup_stylist_memory_async,  # Backward compatibility function
-    save_memory_for_user_async,  # Backward compatibility function
-    optimize_memory_async,  # Backward compatibility function
-    extract_preferences_from_memory_async  # Backward compatibility function
+    setup_stylist_memory_async,
+    save_memory_for_user_async,
+    optimize_memory_async,
+    extract_preferences_from_memory_async
 )
 
-# Import the enhanced stylist agent
+# Import stylist agent
 from stylist_agent_async import create_stylist_agent_async
 
-# UPDATED IMPORTS: Use UserKnowledgeGraph and HybridDataStore
+# Import data stores
 from user_knowledge_graph_async import UserKnowledgeGraphAsync
 from hybrid_data_store import HybridDataStore
 from product_retriever_async import ProductRetrieverAsync
 
-# Import battle system components
+# Import battle system
 from battle_agents import BattleAgents
 from competitive_search_system import CompetitiveSearchSystem
 
-# Import the enhanced chat manager
+# Import chat manager
 from chat_session_manager_async import EnhancedChatManagerAsync
 
-# Import the enhanced recommender manager
+# Import recommender manager
 from enhanced_recommender_manager_async import EnhancedRecommenderManagerAsync
 
 
 class EnhancedAIStylistApp:
     """
-    Enhanced AI Stylist application with persistent memory and user identification.
-    Implements cross-session memory and improved personalization.
-    Compatible with CAMEL-AI 0.2.59+.
-    
-    MIGRATED: Now properly integrates with CAMEL 0.2.59+ using AgentFactory.
-    INTEGRATED: Uses HybridDataStore for intelligent routing of product/user operations.
+    Enhanced AI Stylist application with ALL Season 3 fixes.
+    FIXED #1: Async/sync initialization bug
+    FIXED #4: Battle optimization for luxury fashion
+    FIXED #7: Secure environment configuration
+    Currently: CAMEL 0.2.64
+    Target: CAMEL 0.2.7 for Anthropic support
     """
     
     def __init__(self, neo4j_url=None, neo4j_username=None, neo4j_password=None):
-        """Initialize with CAMEL-AI 0.2.64 verification and HybridDataStore"""
-        logger.info("Initializing Enhanced AI Stylist with HybridDataStore integration...")
+        """
+        Initialize with Season 3 fixes:
+        - Fix #1: Defer agent factory for async initialization
+        - Fix #7: Require environment variables
+        """
+        logger.info("Initializing AI Stylist with Season 3 fixes...")
         
         # VERIFY CAMEL VERSION
         try:
             from camel import __version__ as camel_version
-            if not camel_version.startswith('0.2.64'):
-                logger.warning(f"CAMEL version {camel_version} may not be fully compatible")
+            logger.info(f"CAMEL-AI version detected: {camel_version}")
+            
+            # Check version compatibility
+            if camel_version.startswith('0.2.64'):
+                logger.info("✅ Running on CAMEL 0.2.64 (current supported version)")
+            elif camel_version.startswith('0.2.7'):
+                logger.info("✅ Running on CAMEL 0.2.7 (target version with Anthropic)")
             else:
-                logger.info(f"✅ CAMEL-AI version {camel_version} verified")
+                logger.warning(f"⚠️ CAMEL {camel_version} may have compatibility issues")
+                logger.warning("Supported versions: 0.2.64 (current), 0.2.7 (target)")
         except:
             logger.warning("Could not verify CAMEL-AI version")
-    
-        # Use provided credentials or environment variables with defaults
-        self.neo4j_url = neo4j_url or os.environ.get("NEO4J_URL", "bolt://34.135.40.119:7687")
-        self.neo4j_username = neo4j_username or os.environ.get("NEO4J_USERNAME", "neo4j")
-        self.neo4j_password = neo4j_password or os.environ.get("NEO4J_PASSWORD", "shopari1234")
         
-        # Read Qdrant configuration from environment
+        # FIX #7: REQUIRE environment variables (no hardcoded defaults)
+        self.neo4j_url = neo4j_url or os.environ.get("NEO4J_URL")
+        self.neo4j_username = neo4j_username or os.environ.get("NEO4J_USERNAME")
+        self.neo4j_password = neo4j_password or os.environ.get("NEO4J_PASSWORD")
+        
+        # Validate required credentials
+        if not self.neo4j_url:
+            raise ValueError(
+                "NEO4J_URL is required. Set it as environment variable or pass as parameter.\n"
+                "Example: export NEO4J_URL='bolt://your-server:7687'"
+            )
+        if not self.neo4j_username:
+            raise ValueError(
+                "NEO4J_USERNAME is required. Set it as environment variable or pass as parameter.\n"
+                "Example: export NEO4J_USERNAME='neo4j'"
+            )
+        if not self.neo4j_password:
+            raise ValueError(
+                "NEO4J_PASSWORD is required. Set it as environment variable or pass as parameter.\n"
+                "Example: export NEO4J_PASSWORD='your-secure-password'"
+            )
+        
+        # Log connection info (without password)
+        logger.info(f"Connecting to Neo4j at {self.neo4j_url} as {self.neo4j_username}")
+        
+        # Read Qdrant configuration
         self.qdrant_url = os.environ.get("QDRANT_URL")
         self.qdrant_api_key = os.environ.get("QDRANT_API_KEY")
         self.qdrant_collection_name = os.environ.get("QDRANT_COLLECTION_NAME", "fashion_products")
         
-        # UPDATED: Set up UserKnowledgeGraph for user operations only
-        logger.info(f"Connecting to Neo4j at {self.neo4j_url} for user operations")
+        # Set up UserKnowledgeGraph
         self.user_kg = UserKnowledgeGraphAsync(
             url=self.neo4j_url,
             username=self.neo4j_username,
             password=self.neo4j_password
         )
         
-        # Set up ProductRetriever for Qdrant operations
-        logger.info("Initializing product retriever for Qdrant operations...")
+        # Set up ProductRetriever
+        logger.info("Initializing product retriever...")
         if self.qdrant_url and self.qdrant_api_key:
             logger.info(f"Using remote Qdrant at {self.qdrant_url}")
             self.product_retriever = ProductRetrieverAsync(
@@ -110,78 +136,100 @@ class EnhancedAIStylistApp:
                 collection_name=self.qdrant_collection_name
             )
         
-        # NEW: Initialize HybridDataStore for intelligent routing
-        logger.info("Initializing HybridDataStore for intelligent operation routing...")
+        # Initialize HybridDataStore
+        logger.info("Initializing HybridDataStore...")
         self.data_store = HybridDataStore(
             neo4j_client=self.user_kg,
             qdrant_client=self.product_retriever
         )
         
-        # NEW: Initialize Battle System for competitive product search
-        logger.info("Initializing Battle System for competitive search...")
+        # Initialize Battle System
+        logger.info("Initializing Battle System...")
         self.battle_agents = BattleAgents(
             neo4j_client=self.user_kg,
             qdrant_retriever=self.product_retriever
         )
         self.competitive_search = CompetitiveSearchSystem(self.battle_agents)
         
-        # MIGRATED: Use AgentFactory instead of AsyncCAMELService
-        self.agent_factory = get_agent_factory()
-        logger.info("Initialized AgentFactory for CAMEL 0.2.59+")
+        # FIX #1: DEFER agent factory initialization
+        # Will be initialized asynchronously in _ensure_agent_factory()
+        self.agent_factory = None
+        self._agent_factory_initialized = False
+        self._agent_factory_lock = asyncio.Lock()
         
-        # MIGRATED: Initialize MemoryManager for new memory APIs
+        # Initialize MemoryManager
         self.memory_manager = MemoryManager(self.user_kg)
-        logger.info("Initialized MemoryManager for CAMEL 0.2.59+")
+        logger.info("Initialized MemoryManager")
         
-        # Initialize the enhanced memory system with backward compatibility wrapper
-        logger.info("Setting up enhanced memory system...")
+        # Setup memory function
         self.memory_setup_func = self._setup_memory_for_user
         
-        # UPDATED: Initialize recommender manager with HybridDataStore
-        logger.info("Initializing enhanced recommender manager with HybridDataStore...")
+        # Initialize recommender manager (will get agent factory later)
+        logger.info("Initializing recommender manager...")
         self.enhanced_recommender_manager = EnhancedRecommenderManagerAsync(
-            data_store=self.data_store,  # Pass HybridDataStore for product operations
-            user_kg=self.user_kg,  # Pass UserKG for user operations
+            data_store=self.data_store,
+            user_kg=self.user_kg,
             product_retriever=self.product_retriever,
             memory_setup_func=self.memory_setup_func,
-            stylist_agent=None  # Will be set per session
+            stylist_agent=None,
+            competitive_search=self.competitive_search
         )
         
-        # UPDATED: Pass components to chat manager
-        logger.info("Creating enhanced chat manager with ML integration and HybridDataStore...")
+        # Initialize chat manager (will get agent factory later)
+        logger.info("Creating chat manager...")
         self.chat_manager = EnhancedChatManagerAsync(
-            stylist_agent=None,  # Will be set per session
-            user_kg=self.user_kg,  # For user operations
-            data_store=self.data_store,  # For product operations
+            stylist_agent=None,
+            user_kg=self.user_kg,
+            data_store=self.data_store,
             product_retriever=self.product_retriever,
             memory_setup_func=self.memory_setup_func,
-            parent_app=self,  # Pass self reference for ML access
-            competitive_search=self.competitive_search  # Pass competitive search system
+            parent_app=self,
+            competitive_search=self.competitive_search
         )
         
-        # Track active sessions
+        # Track active sessions with size limit
         self.active_sessions = {}
+        self.max_sessions = 100
         
-        # User registry for cross-session support
+        # User registry
         self.registered_users = {}
         
         # Memory optimization settings
-        self.memory_optimization_interval = 3600  # 1 hour
+        self.memory_optimization_interval = 3600
         self.memory_optimization_task = None
         
-        # Start the memory optimization task
+        # Start optimization task
         self.memory_optimization_task = asyncio.create_task(self._memory_optimization_worker())
         
-        # Verify and update database schema
+        # Verify database schema
         asyncio.create_task(self._setup_database_schema())
         
-        logger.info("✅ Enhanced AI Stylist initialized with HybridDataStore and Battle System!")
+        logger.info("✅ AI Stylist initialized with Season 3 fixes!")
+    
+    async def _ensure_agent_factory(self):
+        """
+        FIX #1: Ensure agent factory is initialized (async-safe)
+        This solves the async/sync initialization issue
+        """
+        if not self._agent_factory_initialized:
+            async with self._agent_factory_lock:
+                if not self._agent_factory_initialized:
+                    logger.info("Initializing AgentFactory asynchronously...")
+                    try:
+                        # Use async version if available
+                        from agent_factory import get_agent_factory_async
+                        self.agent_factory = await get_agent_factory_async()
+                    except ImportError:
+                        # Fall back to sync version
+                        self.agent_factory = get_agent_factory()
+                    
+                    self._agent_factory_initialized = True
+                    logger.info("✅ AgentFactory initialized successfully")
+        
+        return self.agent_factory
     
     async def _setup_memory_for_user(self, user_id=None, neo4j_client=None):
-        """
-        Backward compatibility wrapper for memory setup.
-        Uses the new MemoryManager internally.
-        """
+        """Setup memory for user"""
         return await self.memory_manager.create_memory(
             user_id=user_id,
             enable_mcp=True
@@ -190,69 +238,80 @@ class EnhancedAIStylistApp:
     async def _setup_database_schema(self):
         """Set up and verify the database schema"""
         try:
-            # Ensure the Neo4j schema is set up for user operations
             if hasattr(self.user_kg, 'ensure_schema'):
                 await self.user_kg.ensure_schema()
             
-            # Get basic database statistics
             stats = await self.data_store.get_stats()
             logger.info(f"HybridDataStore statistics: {stats}")
-                
         except Exception as e:
             logger.error(f"Error setting up database schema: {e}")
             logger.warning("Continuing with limited database functionality")
     
     async def _memory_optimization_worker(self):
-        """
-        Background task to periodically optimize memory for all sessions
-        """
+        """Background task to periodically optimize memory"""
         try:
             while True:
-                # Sleep for the optimization interval
                 await asyncio.sleep(self.memory_optimization_interval)
+                
+                # Clean up old sessions
+                await self._cleanup_old_sessions()
                 
                 # Get active sessions with persistent memory
                 persistent_sessions = {
                     session_id: session
                     for session_id, session in self.active_sessions.items()
-                    if hasattr(session, 'user_id') and session.user_id and hasattr(session, 'memory') and session.memory
+                    if hasattr(session, 'user_id') and session.user_id 
+                    and hasattr(session, 'memory') and session.memory
                 }
                 
-                logger.info(f"Running memory optimization for {len(persistent_sessions)} sessions")
+                logger.info(f"Optimizing memory for {len(persistent_sessions)} sessions")
                 
-                # Optimize memory for each session
                 for session_id, session in persistent_sessions.items():
                     try:
-                        # MIGRATED: Use optimize_memory_async from memory_integration_v2
                         await optimize_memory_async(
                             memory=session.memory,
                             user_id=session.user_id,
                             neo4j_client=self.user_kg
                         )
-                        logger.info(f"Optimized memory for session {session_id}, user {session.user_id}")
                     except Exception as e:
                         logger.error(f"Error optimizing memory for session {session_id}: {e}")
                 
         except asyncio.CancelledError:
-            # Task was cancelled - log and exit gracefully
             logger.info("Memory optimization task cancelled")
-        
         except Exception as e:
             logger.error(f"Error in memory optimization worker: {e}")
     
+    async def _cleanup_old_sessions(self):
+        """Clean up old sessions to prevent memory leak"""
+        if len(self.active_sessions) > self.max_sessions:
+            sorted_sessions = sorted(
+                self.active_sessions.items(),
+                key=lambda x: getattr(x[1], 'last_activity_time', datetime.datetime.min)
+            )
+            
+            to_remove = len(self.active_sessions) - int(self.max_sessions * 0.8)
+            for session_id, _ in sorted_sessions[:to_remove]:
+                del self.active_sessions[session_id]
+                logger.info(f"Cleaned up old session: {session_id}")
+    
     async def create_session(self, user_id=None):
-        """Create a new chat session with proper error handling."""
+        """
+        Create a new chat session
+        FIX #1: Ensure agent factory is initialized before use
+        """
         try:
+            # FIX #1: Ensure agent factory exists
+            await self._ensure_agent_factory()
+            
             # Check existing sessions
             if user_id and user_id in self.registered_users:
                 existing_session_id = self.registered_users[user_id]
                 if existing_session_id in self.active_sessions:
                     return existing_session_id
             
-            # Create session through chat manager
+            # Create session
             session = await self.chat_manager.get_or_create_session(user_id=user_id)
             
-            # Ensure session has ID
             if not hasattr(session, 'session_id') or not session.session_id:
                 session.session_id = str(uuid.uuid4())
             
@@ -264,107 +323,155 @@ class EnhancedAIStylistApp:
                 session.memory = memory
             
             if not hasattr(session, 'stylist_agent') or not session.stylist_agent:
-                agent_factory = get_agent_factory()  # Use sync version
-                stylist_agent = await agent_factory.create_stylist_agent(
+                stylist_agent = await self.agent_factory.create_stylist_agent(
                     memory=session.memory, enable_mcp=True
                 )
                 session.stylist_agent = stylist_agent
             
-            # Store session
+            # Store session with cleanup check
+            if len(self.active_sessions) >= self.max_sessions:
+                await self._cleanup_old_sessions()
+            
             self.active_sessions[session.session_id] = session
             if user_id:
                 self.registered_users[user_id] = session.session_id
             
-            # Update the enhanced recommender manager with this session's stylist agent
-            if hasattr(self, 'enhanced_recommender_manager') and self.enhanced_recommender_manager:
-                # Update the ensemble recommender with the session's stylist agent
-                if hasattr(self.enhanced_recommender_manager, 'ensemble') and self.enhanced_recommender_manager.ensemble:
-                    self.enhanced_recommender_manager.ensemble.stylist_agent = session.stylist_agent
-                    logger.info("Updated ensemble recommender with session stylist agent")
+            # Update recommender manager
+            if self.enhanced_recommender_manager and hasattr(self.enhanced_recommender_manager, 'ensemble'):
+                self.enhanced_recommender_manager.ensemble.stylist_agent = session.stylist_agent
             
-            logger.info(f"Created new session: {session.session_id} for user: {user_id}")
-            
+            logger.info(f"Created session: {session.session_id} for user: {user_id}")
             return session.session_id
             
         except Exception as e:
             logger.error(f"Error creating session: {e}")
-            # Create minimal fallback
-            session_id = str(uuid.uuid4())
-            return session_id
+            return str(uuid.uuid4())
+    
+    def _optimize_battle_parameters(self, query: str, user_context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        FIX #4: Optimize battle parameters based on query type
+        NEVER skips battles - only optimizes HOW the battle runs
+        
+        For luxury fashion context, adjusts:
+        - Prefetch limits (more for browsing, less for specific items)
+        - Timeout (longer for complex queries)
+        - Detail level (higher for VIP clients)
+        """
+        params = {
+            "prefetch_limit": 10,  # Default
+            "timeout": 5.0,  # Default 5 seconds
+            "include_details": True,
+            "quality_threshold": 0.7
+        }
+        
+        query_lower = query.lower()
+        
+        # Luxury context adjustments
+        luxury_keywords = ["couture", "designer", "luxury", "high-end", "exclusive", "bespoke"]
+        if any(word in query_lower for word in luxury_keywords):
+            params["prefetch_limit"] = 20  # Get more options for luxury searches
+            params["quality_threshold"] = 0.9  # Higher quality bar
+            params["include_details"] = True
+            logger.info("🎯 Luxury context detected - optimizing for premium results")
+        
+        # Specific item optimization
+        specific_items = ["dress", "gown", "suit", "jacket", "coat"]
+        if any(item in query_lower for item in specific_items):
+            params["prefetch_limit"] = 15  # Moderate prefetch
+            params["timeout"] = 4.0  # Slightly faster
+            logger.info("🎯 Specific item search - balanced optimization")
+        
+        # Occasion-based optimization
+        occasions = ["wedding", "gala", "event", "party", "formal"]
+        if any(occ in query_lower for occ in occasions):
+            params["prefetch_limit"] = 25  # More options for occasions
+            params["timeout"] = 6.0  # More time for complex matching
+            params["include_details"] = True
+            params["quality_threshold"] = 0.8
+            logger.info("🎯 Occasion search - optimizing for variety")
+        
+        # VIP client optimization
+        if user_context and user_context.get("vip_status"):
+            params["prefetch_limit"] = 30  # Maximum options
+            params["timeout"] = 8.0  # No rush for VIP
+            params["quality_threshold"] = 0.95  # Only the best
+            logger.info("🎯 VIP client - maximum quality optimization")
+        
+        # Wardrobe building optimization
+        if "wardrobe" in query_lower or "capsule" in query_lower or "collection" in query_lower:
+            params["prefetch_limit"] = 40  # Need variety for wardrobe
+            params["timeout"] = 10.0  # Complex coordination
+            params["include_coordination"] = True
+            logger.info("🎯 Wardrobe building - optimizing for coordination")
+        
+        return params
+    
+    def _apply_luxury_filters(self, filters: Dict[str, Any], user_context: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        FIX #4: Apply luxury-specific filters
+        """
+        luxury_filters = filters.copy()
+        
+        # Luxury brand tiers
+        luxury_brands = [
+            "Chanel", "Dior", "Gucci", "Prada", "Versace", "Balenciaga",
+            "Saint Laurent", "Bottega Veneta", "Burberry", "Givenchy"
+        ]
+        
+        # Add brand filter if user has brand preferences
+        if user_context.get('preferred_brands'):
+            luxury_filters['brands'] = user_context['preferred_brands']
+        else:
+            # Suggest luxury brands by default for high-quality searches
+            luxury_filters['suggested_brands'] = luxury_brands[:5]
+        
+        # Adjust price range for luxury items
+        if not luxury_filters.get('min_price'):
+            luxury_filters['min_price'] = 500  # Minimum for luxury items
+        
+        return luxury_filters
     
     async def send_message(self, session_id, message):
-        """
-        Send a message to the stylist and get a response.
-        
-        Args:
-            session_id: Session ID
-            message: User message
-            
-        Returns:
-            Tuple of (response, additional data)
-        """
+        """Send a message to the stylist"""
         if not session_id:
-            logger.error("No session ID provided")
-            return "I'm sorry, there was an issue with your session. Let's start a new conversation.", {
-                "error": "No session ID provided"
-            }
-            
-        # Check if session exists
+            return "I'm sorry, there was an issue with your session.", {"error": "No session ID"}
+        
+        # Ensure agent factory is ready
+        await self._ensure_agent_factory()
+        
+        # Get or recover session
         if session_id not in self.active_sessions:
             try:
-                # Try to get the session from the chat manager
                 session = await self.chat_manager.get_or_create_session(session_id=session_id)
                 
-                if not hasattr(session, 'stylist_agent') or not session.stylist_agent:
-                    # MIGRATED: Create agent using new patterns
-                    memory = await self.memory_manager.create_memory(
-                        user_id=session.user_id if hasattr(session, 'user_id') else None,
-                        enable_mcp=True
-                    )
-                    
+                if not hasattr(session, 'stylist_agent'):
+                    memory = await self.memory_manager.create_memory(enable_mcp=True)
                     stylist_agent = await self.agent_factory.create_stylist_agent(
-                        memory=memory,
-                        enable_mcp=True
+                        memory=memory, enable_mcp=True
                     )
                     session.stylist_agent = stylist_agent
                     session.memory = memory
-                    
-                    # Update the enhanced recommender manager
-                    if hasattr(self, 'enhanced_recommender_manager') and self.enhanced_recommender_manager:
-                        if hasattr(self.enhanced_recommender_manager, 'ensemble') and self.enhanced_recommender_manager.ensemble:
-                            self.enhanced_recommender_manager.ensemble.stylist_agent = stylist_agent
                 
-                # Add to active sessions
                 self.active_sessions[session_id] = session
-                logger.info(f"Recovered session: {session_id}")
-                
-                # Register user with this session if applicable
-                if hasattr(session, 'user_id') and session.user_id:
-                    self.registered_users[session.user_id] = session_id
                 
             except Exception as e:
                 logger.error(f"Error recovering session {session_id}: {e}")
-                return "I'm sorry, I couldn't find your previous conversation. Let's start a new one.", {
-                    "error": f"Session not found: {session_id}"
-                }
+                return "Let's start a new conversation.", {"error": f"Session not found: {session_id}"}
         
-        # Get the session
+        # Process message
         session = self.active_sessions[session_id]
         
-        # Process the message using the chat manager
         try:
-            logger.info(f"🚀 Processing message for session {session_id} with FULL ML integration and Battle System")
+            logger.info(f"🚀 Processing message with BATTLE SYSTEM for session {session_id}")
             response, data = await self.chat_manager.process_message(
                 session_id=session_id,
                 user_id=session.user_id if hasattr(session, 'user_id') else None,
                 message=message
             )
             
-            # If products were recommended, record interactions
+            # Record interactions
             if 'products' in data and session_id in self.active_sessions:
-                session = self.active_sessions[session_id]
                 user_id = session.user_id if hasattr(session, 'user_id') else None
-                
                 if user_id and hasattr(session, 'record_product_interaction'):
                     for product in data['products']:
                         if 'id' in product:
@@ -373,35 +480,119 @@ class EnhancedAIStylistApp:
                                 interaction_type="recommended"
                             )
             
-            # Save memory state if user_id is available
-            if hasattr(session, 'user_id') and session.user_id and hasattr(session, 'memory') and session.memory:
+            # Save memory state
+            if hasattr(session, 'user_id') and session.user_id and hasattr(session, 'memory'):
                 try:
-                    # MIGRATED: Use MemoryManager for saving
-                    await self.memory_manager.save_memory(
-                        memory=session.memory,
-                        user_id=session.user_id
-                    )
-                    logger.info(f"Saved memory state for user {session.user_id}")
+                    await self.memory_manager.save_memory(session.memory, session.user_id)
                 except Exception as e:
-                    logger.error(f"Error saving memory state: {e}")
+                    logger.error(f"Error saving memory: {e}")
             
             return response, data
+            
         except Exception as e:
             logger.error(f"Error processing message: {e}")
-            return "I'm sorry, I encountered an issue while processing your request. Could you try rephrasing or asking something else?", {
-                "error": str(e)
-            }
+            return "I encountered an issue. Could you try rephrasing?", {"error": str(e)}
+    
+    async def get_product_recommendations(self, session_id, product_id=None, query=None, limit=5, occasion=None):
+        """
+        Get product recommendations using BATTLE SYSTEM
+        FIX #4: ALWAYS uses battle system with optimized parameters
+        """
+        session = await self.get_session(session_id)
+        if not session:
+            logger.error(f"Session not found: {session_id}")
+            return []
+        
+        user_id = session.user_id if hasattr(session, 'user_id') else None
+        
+        # Get user context for optimization
+        user_context = {}
+        if hasattr(session, 'get_or_fetch_user_preferences'):
+            user_context = await session.get_or_fetch_user_preferences()
+        
+        # Check VIP status
+        if user_id and self.user_kg:
+            try:
+                user_details = await self.user_kg.get_user_details(user_id)
+                if user_details and user_details.get('vip_status'):
+                    user_context['vip_status'] = True
+            except:
+                pass
+        
+        # Extract occasion from query
+        if query and not occasion:
+            occasions = ["wedding", "party", "work", "casual", "formal", "date", "dinner", "beach", "gala"]
+            query_lower = query.lower()
+            for occ in occasions:
+                if occ in query_lower:
+                    occasion = occ
+                    break
+        
+        # Build the full query
+        full_query = query or occasion or "stylish recommendations"
+        
+        # FIX #4: Get optimized battle parameters
+        battle_params = self._optimize_battle_parameters(full_query, user_context)
+        
+        # ALWAYS use battle system for queries
+        try:
+            logger.info(f"🎯 Executing OPTIMIZED Battle for: {full_query}")
+            logger.info(f"Battle parameters: {battle_params}")
+            
+            # Build filters
+            filters = {}
+            if occasion:
+                filters['occasion'] = occasion
+            
+            # Apply luxury filters if detected
+            if battle_params.get('quality_threshold', 0.7) > 0.8:
+                filters = self._apply_luxury_filters(filters, user_context)
+            
+            if user_context.get('budget_range'):
+                filters['min_price'] = user_context['budget_range'].get('min')
+                filters['max_price'] = user_context['budget_range'].get('max')
+            
+            # Execute battle with optimized parameters
+            battle_results = await self.competitive_search.execute_battle(
+                query=full_query,
+                filters=filters,
+                limit=limit,
+                user_context=user_context,
+                **battle_params  # Pass optimization parameters
+            )
+            
+            # Get winner's results
+            judgment = battle_results.get('judgment', {})
+            winner = judgment.get('winner', 'vector')
+            
+            if winner == 'cypher':
+                results = battle_results['agents']['cypher']['products']
+                logger.info(f"🏆 CypherBot won with {len(results)} products")
+            else:
+                results = battle_results['agents']['vector']['products']
+                logger.info(f"🏆 VibeBot won with {len(results)} products")
+            
+            if results:
+                filtered = self._filter_valid_products(results)
+                if filtered:
+                    await self._record_product_interactions(session, filtered)
+                    return filtered[:limit]
+            
+            logger.warning("Battle system returned no results")
+            return []
+            
+        except Exception as e:
+            logger.error(f"Battle system error: {e}")
+            return []
     
     async def get_session(self, session_id):
-        """Get a session by ID with proper error handling."""
+        """Get a session by ID"""
         if not session_id:
             return None
-            
-        # Check active sessions first
+        
         if session_id in self.active_sessions:
             return self.active_sessions[session_id]
-            
-        # Try to get from chat manager
+        
         try:
             session = await self.chat_manager.get_or_create_session(session_id=session_id)
             if session:
@@ -409,163 +600,24 @@ class EnhancedAIStylistApp:
                 return session
         except Exception as e:
             logger.error(f"Error getting session {session_id}: {e}")
-            
+        
         return None
     
-    async def get_product_recommendations(self, session_id, product_id=None, query=None, limit=5, occasion=None):
-        """
-        Enhanced recommendation system using HybridDataStore and Battle System
-        
-        This is the CORE ML ENSEMBLE METHOD that should be used for all recommendations
-        
-        Args:
-            session_id: Session ID
-            product_id: Optional product ID for similar products
-            query: Optional search query
-            limit: Maximum number of recommendations
-            occasion: Optional occasion to filter recommendations
-            
-        Returns:
-            List of recommended products
-        """
-        session = await self.get_session(session_id)
-        if not session:
-            logger.error(f"Session not found: {session_id}")
-            return []
-            
-        user_id = session.user_id if hasattr(session, 'user_id') else None
-        
-        # Extract occasion from query if not provided
-        if query and not occasion:
-            occasions = ["wedding", "party", "work", "casual", "formal", "date", "dinner", "beach"]
-            seasons = ["summer", "winter", "fall", "spring"]
-            
-            query_lower = query.lower()
-            
-            for occ in occasions:
-                if occ in query_lower:
-                    occasion = occ
-                    break
-                    
-            if not occasion:
-                for season in seasons:
-                    if season in query_lower:
-                        for occ in occasions:
-                            if occ in query_lower:
-                                occasion = f"{season} {occ}"
-                                break
-        
-        # Try different recommendation strategies
-        
-        # 1. If query is provided, use competitive search system
-        if query:
-            try:
-                logger.info(f"🎯 Using Battle System for query: {query}")
-                
-                # Build filters from occasion and user preferences
-                filters = {}
-                if occasion:
-                    filters['occasion'] = occasion
-                
-                if hasattr(session, 'get_or_fetch_user_preferences'):
-                    user_preferences = await session.get_or_fetch_user_preferences()
-                    if user_preferences.get('budget_range'):
-                        filters['min_price'] = user_preferences['budget_range'].get('min')
-                        filters['max_price'] = user_preferences['budget_range'].get('max')
-                
-                # Execute battle search
-                battle_results = await self.competitive_search.execute_battle(
-                    query=query,
-                    filters=filters,
-                    limit=limit,
-                    user_context=user_preferences if 'user_preferences' in locals() else None
-                )
-                
-                # Extract winning results
-                judgment = battle_results.get('judgment', {})
-                winner = judgment.get('winner', 'vector')
-                
-                if winner == 'cypher':
-                    results = battle_results['agents']['cypher']['products']
-                    logger.info(f"🏆 CypherBot won with {len(results)} products")
-                else:
-                    results = battle_results['agents']['vector']['products']
-                    logger.info(f"🏆 VibeBot won with {len(results)} products")
-                
-                if results:
-                    # Filter valid products
-                    filtered_results = self._filter_valid_products(results)
-                    if filtered_results:
-                        await self._record_product_interactions(session, filtered_results)
-                        return filtered_results[:limit]
-                        
-            except Exception as e:
-                logger.error(f"Battle system failed: {e}")
-        
-        # 2. If product_id provided, get similar products
-        if product_id:
-            try:
-                logger.info(f"Getting similar products for: {product_id}")
-                similar = await self.data_store.get_similar_products(product_id, limit)
-                if similar:
-                    filtered = self._filter_valid_products(similar)
-                    if filtered:
-                        await self._record_product_interactions(session, filtered)
-                        return filtered
-            except Exception as e:
-                logger.error(f"Similar products search failed: {e}")
-        
-        # 3. Try enhanced recommender system
-        if hasattr(self, 'enhanced_recommender_manager') and self.enhanced_recommender_manager:
-            try:
-                logger.info("Using enhanced recommender system")
-                results = await self.enhanced_recommender_manager.get_recommendations(
-                    user_id=user_id,
-                    session_id=session_id,
-                    product_id=product_id,
-                    query=query or occasion,
-                    limit=limit
-                )
-                if results:
-                    filtered = self._filter_valid_products(results)
-                    if filtered:
-                        await self._record_product_interactions(session, filtered)
-                        return filtered
-            except Exception as e:
-                logger.error(f"Enhanced recommender failed: {e}")
-        
-        # 4. Fallback to popular products
-        try:
-            logger.info("Falling back to popular products")
-            popular = await self.data_store.get_popular_products(limit)
-            if popular:
-                filtered = self._filter_valid_products(popular)
-                if filtered:
-                    await self._record_product_interactions(session, filtered)
-                    return filtered
-        except Exception as e:
-            logger.error(f"Popular products fallback failed: {e}")
-        
-        logger.warning("All recommendation methods failed")
-        return []
-
     def _filter_valid_products(self, products):
-        """Filter out invalid products (test products, zero prices, etc.)"""
+        """Filter out invalid products"""
         if not products:
             return []
-            
-        filtered_results = []
-        for product in products:
-            if (product.get('price', 0) > 0 and 
-                product.get('title') and 
-                'test' not in product.get('title', '').lower() and
-                'untitled' not in product.get('title', '').lower()):
-                filtered_results.append(product)
         
-        return filtered_results
-
+        return [
+            product for product in products
+            if product.get('price', 0) > 0 
+            and product.get('title')
+            and 'test' not in product.get('title', '').lower()
+            and 'untitled' not in product.get('title', '').lower()
+        ]
+    
     async def _record_product_interactions(self, session, products):
-        """Record product interactions for recommendations"""
+        """Record product interactions"""
         try:
             if hasattr(session, 'record_product_interaction'):
                 for product in products:
@@ -575,41 +627,28 @@ class EnhancedAIStylistApp:
                             interaction_type="recommended"
                         )
         except Exception as e:
-            logger.error(f"Error recording product interactions: {e}")
-
+            logger.error(f"Error recording interactions: {e}")
+    
     async def record_product_interaction(self, session_id, product_id, interaction_type="viewed"):
-        """
-        Record a product interaction for a user using HybridDataStore.
-        
-        Args:
-            session_id: Session ID
-            product_id: Product ID
-            interaction_type: Type of interaction (e.g., "viewed", "liked", "purchased")
-            
-        Returns:
-            True if successful, False otherwise
-        """
+        """Record a product interaction for a user"""
         session = await self.get_session(session_id)
         if not session:
             logger.error(f"Session not found: {session_id}")
             return False
-            
+        
         try:
-            # Use session's record_product_interaction method if available
             if hasattr(session, 'record_product_interaction'):
                 return await session.record_product_interaction(
                     product_id=product_id,
                     interaction_type=interaction_type
                 )
             
-            # Get user ID from session
             user_id = session.user_id if hasattr(session, 'user_id') else None
             
             if not user_id:
                 logger.warning(f"Cannot record interaction: no user ID for session {session_id}")
                 return False
             
-            # Record interaction through data store
             return await self.data_store.record_interaction(
                 user_id=user_id,
                 product_id=product_id,
@@ -621,38 +660,25 @@ class EnhancedAIStylistApp:
             return False
     
     async def add_user_preference(self, session_id, preference_type, preference_value):
-        """
-        Add a user preference using UserKnowledgeGraph.
-        
-        Args:
-            session_id: Session ID
-            preference_type: Type of preference (e.g., "color", "style", "budget")
-            preference_value: Value of the preference
-            
-        Returns:
-            True if successful, False otherwise
-        """
+        """Add a user preference"""
         session = await self.get_session(session_id)
         if not session:
             logger.error(f"Session not found: {session_id}")
             return False
-            
+        
         try:
-            # Use session's add_preference method if available
             if hasattr(session, 'add_preference'):
                 return await session.add_preference(
                     preference_type=preference_type,
                     preference_value=preference_value
                 )
             
-            # Get user ID from session
             user_id = session.user_id if hasattr(session, 'user_id') else None
             
             if not user_id:
                 logger.warning(f"Cannot add preference: no user ID for session {session_id}")
                 return False
             
-            # Add preference through user_kg
             return await self.user_kg.update_user_preference(
                 user_id=user_id,
                 preference_type=preference_type,
@@ -664,33 +690,22 @@ class EnhancedAIStylistApp:
             return False
     
     async def get_user_preferences(self, session_id):
-        """
-        Get user preferences for a session using UserKnowledgeGraph.
-        
-        Args:
-            session_id: Session ID
-            
-        Returns:
-            Dictionary of user preferences
-        """
+        """Get user preferences for a session"""
         session = await self.get_session(session_id)
         if not session:
             logger.error(f"Session not found: {session_id}")
             return {}
-            
+        
         try:
-            # Use session's get_or_fetch_user_preferences method if available
             if hasattr(session, 'get_or_fetch_user_preferences'):
                 return await session.get_or_fetch_user_preferences()
             
-            # Get user ID from session
             user_id = session.user_id if hasattr(session, 'user_id') else None
             
             if not user_id:
                 logger.warning(f"Cannot get preferences: no user ID for session {session_id}")
                 return {}
             
-            # Get from user_kg directly
             preferences = await self.user_kg.get_user_preferences(user_id)
             return preferences
             
@@ -701,7 +716,7 @@ class EnhancedAIStylistApp:
     async def close(self):
         """Clean up resources and close connections"""
         try:
-            # Cancel the memory optimization task
+            # Cancel optimization task
             if self.memory_optimization_task:
                 self.memory_optimization_task.cancel()
                 try:
@@ -709,17 +724,15 @@ class EnhancedAIStylistApp:
                 except asyncio.CancelledError:
                     pass
             
-            # Final memory persistence for all sessions
+            # Save all memory states
             for session_id, session in self.active_sessions.items():
-                if hasattr(session, 'user_id') and session.user_id and hasattr(session, 'memory') and session.memory:
+                if hasattr(session, 'user_id') and session.user_id and hasattr(session, 'memory'):
                     try:
-                        logger.info(f"Performing final memory persistence for user {session.user_id}")
-                        # MIGRATED: Use MemoryManager for final save
                         await self.memory_manager.save_memory(session.memory, session.user_id)
                     except Exception as e:
-                        logger.error(f"Error in final memory persistence for session {session_id}: {e}")
+                        logger.error(f"Error saving memory for {session_id}: {e}")
             
-            # Close session resources
+            # Close sessions
             for session_id, session in self.active_sessions.items():
                 if hasattr(session, 'close'):
                     try:
@@ -727,14 +740,18 @@ class EnhancedAIStylistApp:
                     except Exception as e:
                         logger.error(f"Error closing session {session_id}: {e}")
             
-            # Close data store connections
+            # Clear session pool
+            self.active_sessions.clear()
+            
+            # Close connections
             if hasattr(self.user_kg, 'close'):
                 await self.user_kg.close()
             
-            # Clean up AgentFactory resources
-            await self.agent_factory.cleanup()
+            # Clean up agent factory if it was initialized
+            if self.agent_factory:
+                await self.agent_factory.cleanup()
             
-            # Clean up enhanced recommender resources
+            # Close recommenders
             if hasattr(self, 'enhanced_recommender_manager'):
                 for name, recommender in self.enhanced_recommender_manager.recommenders.items():
                     if hasattr(recommender, 'close'):
@@ -742,7 +759,8 @@ class EnhancedAIStylistApp:
                             await recommender.close()
                         except Exception as e:
                             logger.error(f"Error closing recommender {name}: {e}")
-                
-            logger.info("Closed Enhanced AI Stylist resources")
+            
+            logger.info("✅ Closed AI Stylist resources")
+            
         except Exception as e:
             logger.error(f"Error closing resources: {e}")

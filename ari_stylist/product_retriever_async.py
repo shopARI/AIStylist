@@ -1,1356 +1,562 @@
 """
-Enhanced Product Retriever for AI Stylist - Qdrant Implementation
-Provides full product operations for the vector migration
+Asynchronous Product Retriever for AI Stylist.
+
+This module implements an asynchronous product retriever using Qdrant vector search.
+Compatible with CAMEL-AI 0.2.64.
+
+FIXED: Uses centralized imports and proper error handling.
 """
 
 import os
 import logging
 import json
-import asyncio
-from typing import Dict, List, Any, Optional, Tuple
-from product_field_mapping import map_fashion_product
-
-import numpy as np
-from datetime import datetime
 import uuid
+import datetime
+import asyncio
+from typing import Dict, List, Any, Optional, Union, Tuple
 
-logger = logging.getLogger("product_retriever_async")
+# FIXED: Use centralized imports with error handling
+from camel_imports import (
+    CAMEL_AVAILABLE,
+    OpenAIEmbedding,
+    EmbeddingModelType,
+    RetrievalToolkit
+)
 
-# Try to import Qdrant client
+# For Qdrant integration
 try:
-    from qdrant_client import QdrantClient
-    from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, Range, ScoredPoint
+    import qdrant_client
+    from qdrant_client.http import models
+    from qdrant_client.http.exceptions import UnexpectedResponse
     QDRANT_AVAILABLE = True
 except ImportError:
-    logger.warning("Qdrant client not installed. Install with: pip install qdrant-client")
     QDRANT_AVAILABLE = False
+    logging.warning("Qdrant not installed. Install with: pip install qdrant-client")
 
-# Try to import OpenAI for embeddings - UPDATED FOR v1.0+
+# For async HTTP calls
 try:
-    from openai import OpenAI
-    OPENAI_AVAILABLE = True
+    import httpx
+    HTTPX_AVAILABLE = True
 except ImportError:
-    logger.warning("OpenAI not installed. Install with: pip install openai")
-    OPENAI_AVAILABLE = False
+    HTTPX_AVAILABLE = False
+    logging.warning("httpx not installed. Install with: pip install httpx")
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger("product_retriever_async")
 
 class ProductRetrieverAsync:
     """
-    Enhanced asynchronous product retriever using Qdrant for vector-based search.
-    Implements full product operations as specified in the migration plan.
+    Asynchronous product retriever using Qdrant for vector-based search.
+    Optimized for remote Qdrant collections.
+    Compatible with CAMEL-AI 0.2.64.
+    
+    FIXED: Uses proper error handling for all CAMEL components.
     """
     
     def __init__(
-        self,
-        qdrant_url: Optional[str] = None,
-        qdrant_api_key: Optional[str] = None,
-        collection_name: str = None,
-        embedding_model: str = "text-embedding-3-small"
+        self, 
+        qdrant_url: Optional[str] = None, 
+        qdrant_api_key: Optional[str] = None, 
+        qdrant_collection_name: str = "products",
+        vector_storage_path: str = None  # Kept for backward compatibility
     ):
         """
-        Initialize the enhanced product retriever.
+        Initialize the product retriever with Qdrant vector search.
+        
+        FIXED: Added proper error handling for CAMEL components.
         
         Args:
-            qdrant_url: Qdrant server URL
-            qdrant_api_key: Qdrant API key
-            collection_name: Name of the product collection
-            embedding_model: OpenAI embedding model to use
+            qdrant_url: URL of Qdrant instance
+            qdrant_api_key: API key for Qdrant authentication
+            qdrant_collection_name: Name of the collection in Qdrant
+            vector_storage_path: Ignored, kept for backward compatibility
         """
-        # Use environment variable if collection_name not provided
-        self.collection_name = collection_name or os.environ.get("QDRANT_COLLECTION_NAME", "fashion_products")
-        self.embedding_model = embedding_model
+        self.qdrant_collection_name = qdrant_collection_name
+        self.product_kg = None  # Will be set in setup_product_indexing
         
-        # Get config from environment if not provided
-        self.qdrant_url = qdrant_url or os.environ.get("QDRANT_URL", "http://localhost:6333")
+        # Get Qdrant config from environment if not provided
+        self.qdrant_url = qdrant_url or os.environ.get("QDRANT_URL")
         self.qdrant_api_key = qdrant_api_key or os.environ.get("QDRANT_API_KEY")
         
-        # Initialize OpenAI client - NEW FOR v1.0+
-        self.openai_client = None
-        if OPENAI_AVAILABLE:
-            self.openai_client = OpenAI()
-        
-        # Initialize clients
-        self.client = None
-        self._init_client()
-        
-        # Cache for embeddings
-        self.embedding_cache = {}
-        
-        logger.info(f"ProductRetrieverAsync initialized with collection: {self.collection_name}")
-    
-    def _init_client(self):
-        """Initialize Qdrant client"""
-        if not QDRANT_AVAILABLE:
-            logger.error("Qdrant client not available")
+        if not self.qdrant_url:
+            logger.error("No Qdrant URL provided")
+            self.initialized = False
             return
+            
+        logger.info(f"Initializing ProductRetrieverAsync with Qdrant at: {self.qdrant_url}")
+        
+        # Check CAMEL availability
+        if not CAMEL_AVAILABLE:
+            logger.warning("CAMEL-AI not fully available, using fallback implementations")
         
         try:
-            self.client = QdrantClient(
-                url=self.qdrant_url,
-                api_key=self.qdrant_api_key,
-            )
+            # FIXED: Initialize embedding model with error handling
+            if CAMEL_AVAILABLE and OpenAIEmbedding and EmbeddingModelType:
+                self.embedding_model = OpenAIEmbedding(
+                    model_type=EmbeddingModelType.TEXT_EMBEDDING_ADA_2
+                )
+                logger.info("Embedding model initialized successfully")
+            else:
+                logger.error("CAMEL embedding components not available")
+                self.embedding_model = None
+                self.initialized = False
+                return
             
-            # Ensure collection exists
-            self._ensure_collection()
+            # Initialize Qdrant client (synchronous client for now)
+            if QDRANT_AVAILABLE:
+                try:
+                    self.qdrant_client = qdrant_client.QdrantClient(
+                        url=self.qdrant_url,
+                        api_key=self.qdrant_api_key
+                    )
+                    logger.info(f"Connected to Qdrant instance: {self.qdrant_url}")
+                    
+                    # Check if collection exists, create if it doesn't
+                    self._ensure_collection_exists_sync()
+                except Exception as e:
+                    logger.error(f"Error connecting to Qdrant: {e}")
+                    self.qdrant_client = None
+                
+                # HTTP client for async operations with Qdrant REST API
+                if HTTPX_AVAILABLE:
+                    try:
+                        self.http_client = httpx.AsyncClient(
+                            base_url=self.qdrant_url,
+                            headers={"api-key": self.qdrant_api_key} if self.qdrant_api_key else None,
+                            timeout=60.0
+                        )
+                    except Exception as e:
+                        logger.error(f"Error creating HTTP client: {e}")
+                        self.http_client = None
+                else:
+                    logger.warning("httpx not available for async operations")
+                    self.http_client = None
+            else:
+                self.qdrant_client = None
+                self.http_client = None
+                logger.warning("Qdrant client not available")
             
-            logger.info("Qdrant client initialized successfully")
+            # FIXED: Set up retrieval toolkit with error handling
+            if CAMEL_AVAILABLE and RetrievalToolkit:
+                try:
+                    self.retrieval_toolkit = RetrievalToolkit()
+                    self.retrieval_tools = self.retrieval_toolkit.get_tools()
+                    logger.info("Retrieval toolkit initialized successfully")
+                except Exception as e:
+                    logger.warning(f"Error initializing retrieval toolkit: {e}")
+                    self.retrieval_toolkit = None
+                    self.retrieval_tools = []
+            else:
+                logger.warning("CAMEL RetrievalToolkit not available")
+                self.retrieval_toolkit = None
+                self.retrieval_tools = []
+            
+            logger.info("ProductRetrieverAsync initialized successfully")
+            self.initialized = True
+            
         except Exception as e:
-            logger.error(f"Failed to initialize Qdrant client: {e}")
-            self.client = None
+            logger.error(f"Error initializing ProductRetrieverAsync: {e}")
+            # Create empty placeholders for graceful degradation
+            self.embedding_model = None
+            self.qdrant_client = None
+            self.http_client = None
+            self.retrieval_toolkit = None
+            self.retrieval_tools = []
+            self.initialized = False
     
-    def _ensure_collection(self):
-        """Ensure the product collection exists"""
-        if not self.client:
-            return
+    def _ensure_collection_exists_sync(self) -> bool:
+        """
+        Ensure that the Qdrant collection exists, creating it if necessary.
+        This is a synchronous method used during initialization.
         
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not self.qdrant_client or not QDRANT_AVAILABLE:
+            return False
+            
         try:
             # Check if collection exists
-            collections = self.client.get_collections()
-            collection_names = [c.name for c in collections.collections]
+            collections = self.qdrant_client.get_collections()
+            collection_exists = any(c.name == self.qdrant_collection_name for c in collections.collections)
             
-            if self.collection_name not in collection_names:
-                # Create collection with proper schema
-                self.client.create_collection(
-                    collection_name=self.collection_name,
-                    vectors_config=VectorParams(
+            if not collection_exists:
+                logger.info(f"Creating collection '{self.qdrant_collection_name}'...")
+                # Create the collection
+                self.qdrant_client.create_collection(
+                    collection_name=self.qdrant_collection_name,
+                    vectors_config=models.VectorParams(
                         size=1536,  # OpenAI embedding size
-                        distance=Distance.COSINE
+                        distance=models.Distance.COSINE
                     )
                 )
-                logger.info(f"Created collection: {self.collection_name}")
-            else:
-                logger.info(f"Collection already exists: {self.collection_name}")
-        except Exception as e:
-            logger.error(f"Error ensuring collection: {e}")
-    
-    async def get_embedding(self, text: str) -> Optional[List[float]]:
-        """Get embedding for text using OpenAI"""
-        if not OPENAI_AVAILABLE or not self.openai_client:
-            # Return random embedding for testing
-            return np.random.rand(1536).tolist()
-        
-        # Check cache
-        if text in self.embedding_cache:
-            return self.embedding_cache[text]
-        
-        try:
-            # Use OpenAI v1.0+ API to get embedding
-            response = await asyncio.to_thread(
-                self.openai_client.embeddings.create,
-                input=text,
-                model=self.embedding_model
-            )
+                logger.info(f"Collection '{self.qdrant_collection_name}' created successfully")
             
-            # Extract embedding using new response format
-            embedding = response.data[0].embedding
-            
-            # Cache the embedding
-            self.embedding_cache[text] = embedding
-            
-            return embedding
-        except Exception as e:
-            logger.error(f"Error getting embedding: {e}")
-            # Return random embedding as fallback
-            return np.random.rand(1536).tolist()
-    
-    async def index_product(self, product: Dict[str, Any]) -> bool:
-        """
-        Index a product in Qdrant
-        
-        Args:
-            product: Product dictionary with required fields
-            
-        Returns:
-            bool: Success status
-        """
-        if not self.client or not product.get('id'):
-            return False
-        
-        try:
-            # Create searchable text from product
-            search_text = self._create_search_text(product)
-            
-            # Get embedding
-            embedding = await self.get_embedding(search_text)
-            if not embedding:
-                return False
-            
-            # Create point
-            point = PointStruct(
-                id=product['id'],
-                vector=embedding,
-                payload={
-                    "id": product['id'],
-                    "title": product.get('title', ''),
-                    "description": product.get('description', ''),
-                    "price": float(product.get('price', 0)),
-                    "category": product.get('category', ''),
-                    "subcategory": product.get('subcategory', ''),
-                    "brand": product.get('brand', ''),
-                    "colors": product.get('colors', []),
-                    "sizes": product.get('sizes', []),
-                    "tags": product.get('tags', []),
-                    "materials": product.get('materials', []),
-                    "collections": product.get('collections', []),
-                    "images": product.get('images', []),
-                    "created_at": product.get('created_at', datetime.now().isoformat()),
-                    "updated_at": datetime.now().isoformat(),
-                    "popularity_score": float(product.get('popularity_score', 0)),
-                    "return_rate": float(product.get('return_rate', 0)),
-                    "in_stock": product.get('in_stock', True),
-                    "visited_num": int(product.get('visited_num', 0))
-                }
-            )
-            
-            # Upsert to Qdrant
-            await asyncio.to_thread(
-                self.client.upsert,
-                collection_name=self.collection_name,
-                points=[point]
-            )
-            
-            logger.info(f"Indexed product: {product['id']}")
             return True
-            
         except Exception as e:
-            logger.error(f"Error indexing product: {e}")
+            logger.error(f"Error ensuring collection exists: {e}")
             return False
     
-    async def get_product_details(self, product_id: str) -> Optional[Dict[str, Any]]:
+    async def ensure_collection_exists(self) -> bool:
         """
-        Get product details by ID
+        Asynchronous version to ensure that the Qdrant collection exists.
+        
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        if not self.http_client or not HTTPX_AVAILABLE:
+            return self._ensure_collection_exists_sync()
+            
+        try:
+            # Check if collection exists using REST API
+            response = await self.http_client.get("/collections")
+            if response.status_code != 200:
+                logger.error(f"Failed to get collections: {response.text}")
+                return False
+                
+            collections = response.json()
+            collection_names = [c["name"] for c in collections["collections"]]
+            collection_exists = self.qdrant_collection_name in collection_names
+            
+            if not collection_exists:
+                logger.info(f"Creating collection '{self.qdrant_collection_name}'...")
+                # Create the collection using REST API
+                create_payload = {
+                    "vectors": {
+                        "size": 1536,
+                        "distance": "Cosine"
+                    }
+                }
+                response = await self.http_client.put(
+                    f"/collections/{self.qdrant_collection_name}",
+                    json=create_payload
+                )
+                
+                if response.status_code != 200:
+                    logger.error(f"Failed to create collection: {response.text}")
+                    return False
+                    
+                logger.info(f"Collection '{self.qdrant_collection_name}' created successfully")
+            
+            return True
+        except Exception as e:
+            logger.error(f"Error ensuring collection exists: {e}")
+            return False
+    
+    async def setup_product_indexing(self, product_kg) -> bool:
+        """
+        Set up product indexing for vector search.
         
         Args:
-            product_id: Product ID
+            product_kg: ProductKnowledgeGraph instance
             
         Returns:
-            Product dictionary or None
+            bool: True if successful, False otherwise
         """
-        if not self.client:
-            return None
+        if not product_kg:
+            logger.error("No product knowledge graph provided")
+            return False
+            
+        self.product_kg = product_kg
         
-        try:
-            # Retrieve point by ID
-            points = await asyncio.to_thread(
-                self.client.retrieve,
-                collection_name=self.collection_name,
-                ids=[product_id]
-            )
-            
-            if points:
-                return map_fashion_product(points[0].payload)
-            
-            return None
-            
-        except Exception as e:
-            logger.error(f"Error getting product details: {e}")
-            return None
+        # Ensure collection exists
+        await self.ensure_collection_exists()
+        
+        logger.info("Product indexing setup successful")
+        return True
     
-    async def get_products_by_filter(
-        self,
-        category: Optional[str] = None,
-        subcategory: Optional[str] = None,
-        brand: Optional[str] = None,
-        min_price: Optional[float] = None,
-        max_price: Optional[float] = None,
-        colors: Optional[List[str]] = None,
-        tags: Optional[List[str]] = None,
-        in_stock: Optional[bool] = None,
-        limit: int = 10
+    async def search_products(
+        self, 
+        query: str, 
+        limit: int = 5, 
+        similarity_threshold: float = 0.7
     ) -> List[Dict[str, Any]]:
         """
-        Get products by metadata filters
+        Search for products based on a query using vector similarity.
         
+        Args:
+            query: Search query
+            limit: Maximum number of results
+            similarity_threshold: Minimum similarity score
+            
         Returns:
-            List of products matching filters
+            List[Dict[str, Any]]: List of product dictionaries
         """
-        if not self.client:
+        logger.info(f"Searching products with query: '{query}'")
+        
+        if not query or len(query.strip()) == 0:
+            logger.warning("Empty query provided")
+            return []
+        
+        if not self.initialized:
+            logger.error("ProductRetrieverAsync not properly initialized")
+            return []
+        
+        if not self.embedding_model:
+            logger.error("Embedding model not available")
             return []
         
         try:
-            # Build filter conditions for fashion_products fields
-            must_conditions = []
+            # Generate embedding for the query
+            query_embedding = self.embedding_model.embed(query)
             
-            if category:
-                # Fashion products use 'categories' field
-                must_conditions.append(
-                    FieldCondition(key="categories", match={"any": [category]})
-                )
+            # Search the Qdrant collection
+            search_results = []
             
-            if subcategory:
-                # Map to product_type
-                must_conditions.append(
-                    FieldCondition(key="product_type", match={"value": subcategory})
-                )
-            
-            if brand:
-                must_conditions.append(
-                    FieldCondition(key="brand", match={"value": brand})
-                )
-            
-            if min_price is not None or max_price is not None:
-                price_range = Range(
-                    gte=min_price if min_price is not None else 0,
-                    lte=max_price if max_price is not None else 999999
-                )
-                must_conditions.append(
-                    FieldCondition(key="price", range=price_range)
-                )
-            
-            if colors:
-                # Fashion products use 'primary_color' field
-                for color in colors:
-                    must_conditions.append(
-                        FieldCondition(key="primary_color", match={"value": color})
+            if self.http_client and HTTPX_AVAILABLE:
+                # Use async REST API
+                search_payload = {
+                    "vector": query_embedding,
+                    "limit": limit,
+                    "with_payload": True,
+                    "score_threshold": similarity_threshold
+                }
+                
+                try:
+                    response = await self.http_client.post(
+                        f"/collections/{self.qdrant_collection_name}/points/search",
+                        json=search_payload
                     )
-            
-            if tags:
-                # Map to collections
-                for tag in tags:
-                    must_conditions.append(
-                        FieldCondition(key="collections", match={"any": [tag]})
+                    
+                    if response.status_code != 200:
+                        logger.error(f"Search failed: {response.text}")
+                        return []
+                    
+                    search_results = response.json()["result"]
+                except Exception as e:
+                    logger.error(f"Error in async search: {e}")
+                    search_results = []
+            elif self.qdrant_client and QDRANT_AVAILABLE:
+                # Fall back to synchronous client if async fails
+                try:
+                    sync_results = self.qdrant_client.search(
+                        collection_name=self.qdrant_collection_name,
+                        query_vector=query_embedding,
+                        limit=limit,
+                        score_threshold=similarity_threshold
                     )
+                    
+                    search_results = [
+                        {"id": hit.id, "score": hit.score, "payload": hit.payload}
+                        for hit in sync_results
+                    ]
+                except Exception as e:
+                    logger.error(f"Error in sync search: {e}")
+                    search_results = []
+            else:
+                logger.warning("No Qdrant client available for search")
+                return []
             
-            # Create filter
-            filter_obj = None
-            if must_conditions:
-                filter_obj = Filter(must=must_conditions)
+            logger.info(f"Found {len(search_results)} results from Qdrant")
             
-            # Search with filters (using a dummy vector for filter-only search)
-            dummy_vector = [0.0] * 1536
+            # Extract product IDs from search results
+            product_ids = [
+                hit["payload"].get("product_id") 
+                for hit in search_results 
+                if "payload" in hit and "product_id" in hit["payload"]
+            ]
             
-            response = await asyncio.to_thread(
-                self.client.query_points,
-                collection_name=self.collection_name,
-                query=dummy_vector,
-                query_filter=filter_obj,
-                limit=limit,
-                score_threshold=0.3  # Accept all scores since we're filtering
-            )
+            # If we have a product knowledge graph, fetch product details
+            products = []
+            if self.product_kg and product_ids:
+                for product_id in product_ids:
+                    try:
+                        if hasattr(self.product_kg, 'get_product_details'):
+                            product = await self.product_kg.get_product_details(product_id)
+                            if product:
+                                products.append(product)
+                        else:
+                            logger.warning("Product KG does not support get_product_details")
+                    except Exception as e:
+                        logger.error(f"Error fetching product {product_id}: {e}")
             
-            # Extract points from QueryResponse
-            points = response.points if hasattr(response, "points") else []
-            
-            # Map products
-            products = [map_fashion_product(point.payload) for point in points if hasattr(point, 'payload')]
-            
-            logger.info(f"Found {len(products)} products with filters")
             return products
             
         except Exception as e:
-            logger.error(f"Error getting products by filter: {e}")
+            logger.error(f"Error searching products: {e}")
             return []
     
-    async def get_similar_products(
-        self,
-        product_id: str,
+    async def search_by_natural_language(
+        self, 
+        query: str, 
         limit: int = 5
     ) -> List[Dict[str, Any]]:
         """
-        Get products similar to a given product
+        Search products using natural language query.
+        
+        Args:
+            query: Natural language query
+            limit: Maximum number of results
+            
+        Returns:
+            List[Dict[str, Any]]: List of product dictionaries
+        """
+        logger.info(f"Searching by natural language: '{query}'")
+        return await self.search_products(query, limit, similarity_threshold=0.6)
+    
+    async def search_similar_products(
+        self, 
+        product_id: str, 
+        limit: int = 5
+    ) -> List[Dict[str, Any]]:
+        """
+        Find products similar to a given product.
         
         Args:
             product_id: Reference product ID
-            limit: Number of similar products
+            limit: Maximum number of similar products
             
         Returns:
-            List of similar products
+            List[Dict[str, Any]]: List of similar products
         """
-        if not self.client:
-            return []
+        logger.info(f"Finding products similar to {product_id}")
         
+        if not self.product_kg:
+            logger.error("No product knowledge graph available")
+            return []
+            
         try:
-            # Get the reference product
-            ref_product = await self.get_product_details(product_id)
-            if not ref_product:
+            # Get product details
+            if hasattr(self.product_kg, 'get_product_details'):
+                product = await self.product_kg.get_product_details(product_id)
+            else:
+                logger.error("Product KG does not support get_product_details")
                 return []
             
-            # Create search text
-            search_text = self._create_search_text(ref_product)
-            
-            # Get embedding
-            embedding = await self.get_embedding(search_text)
-            if not embedding:
+            if not product:
+                logger.warning(f"Product not found: {product_id}")
                 return []
+                
+            # Use the product title and description as search query
+            query = f"{product.get('title', '')} {product.get('description', '')}"
             
             # Search for similar products
-            response = await asyncio.to_thread(
-                self.client.query_points,
-                collection_name=self.collection_name,
-                query=embedding,
-                limit=limit + 1,  # Get one extra to exclude self
-                score_threshold=0.6
+            similar_products = await self.search_products(
+                query=query,
+                limit=limit + 1,  # Add 1 to account for the product itself
+                similarity_threshold=0.6
             )
             
-            # Extract points from QueryResponse
-            points = response.points if hasattr(response, "points") else []
-            
-            # Extract products and exclude the reference product
-            similar_products = []
-            for point in points:
-                if hasattr(point, 'payload') and point.payload.get('product_id') != product_id:
-                    similar_products.append(map_fashion_product(point.payload))
+            # Remove the reference product from the results
+            similar_products = [p for p in similar_products if p.get('id') != product_id]
             
             return similar_products[:limit]
             
         except Exception as e:
-            logger.error(f"Error getting similar products: {e}")
+            logger.error(f"Error finding similar products: {e}")
             return []
     
-    async def get_popular_products(self, limit: int = 10) -> List[Dict[str, Any]]:
+    async def index_product(self, product: Dict[str, Any]) -> bool:
         """
-        Get popular products based on popularity score
-        
-        Returns:
-            List of popular products
-        """
-        if not self.client:
-            return []
-        
-        try:
-            # Filter by high fashion_confidence (mapped to popularity_score)
-            filter_obj = Filter(
-                must=[
-                    FieldCondition(
-                        key="fashion_confidence",
-                        range=Range(gte=0.7)
-                    )
-                ]
-            )
-            
-            # Use dummy vector for filter-based search
-            dummy_vector = [0.0] * 1536
-            
-            response = await asyncio.to_thread(
-                self.client.query_points,
-                collection_name=self.collection_name,
-                query=dummy_vector,
-                query_filter=filter_obj,
-                limit=limit,
-                score_threshold=0.3
-            )
-            
-            # Extract points from QueryResponse
-            points = response.points if hasattr(response, "points") else []
-            
-            # Map and sort products
-            products = [map_fashion_product(point.payload) for point in points if hasattr(point, 'payload')]
-            products.sort(key=lambda x: x.get('popularity_score', 0), reverse=True)
-            
-            return products
-            
-        except Exception as e:
-            logger.error(f"Error getting popular products: {e}")
-            return []
-    
-    async def search_by_natural_language(
-        self,
-        query: str,
-        limit: int = 10,
-        filters: Optional[Dict[str, Any]] = None
-    ) -> List[Dict[str, Any]]:
-        """
-        Search products using natural language query
+        Index a product for vector search.
         
         Args:
-            query: Natural language search query
-            limit: Maximum results
-            filters: Optional metadata filters
+            product: Product dictionary
             
         Returns:
-            List of matching products
+            bool: True if successful, False otherwise
         """
-        if not self.client:
-            return []
+        logger.info(f"Indexing product: {product.get('id', 'unknown')}")
+        
+        if not product or 'id' not in product:
+            logger.error("Invalid product data")
+            return False
+            
+        if not self.embedding_model:
+            logger.error("Embedding model not available")
+            return False
+            
+        product_id = product.get('id')
         
         try:
-            # Get query embedding
-            embedding = await self.get_embedding(query)
-            if not embedding:
-                return []
+            # Generate a document for the product
+            doc_text = f"{product.get('title', '')} {product.get('description', '')}"
             
-            # Build filter from provided filters
-            filter_obj = None
-            if filters:
-                must_conditions = []
+            # Skip if document is too short
+            if len(doc_text.strip()) < 10:
+                logger.warning(f"Document too short for product {product_id}")
+                return False
                 
-                # Map standard fields to fashion_products fields
-                if 'category' in filters:
-                    must_conditions.append(
-                        FieldCondition(key="categories", match={"any": [filters['category']]})
+            # Generate embedding
+            embedding = self.embedding_model.embed(doc_text)
+            
+            # Store in Qdrant
+            if self.http_client and HTTPX_AVAILABLE:
+                # Use async REST API
+                point_id = str(uuid.uuid4())
+                point_payload = {
+                    "points": [
+                        {
+                            "id": point_id,
+                            "vector": embedding,
+                            "payload": {
+                                "product_id": product_id,
+                                "text": doc_text,
+                                "title": product.get('title', ''),
+                                "timestamp": str(datetime.datetime.now())
+                            }
+                        }
+                    ]
+                }
+                
+                try:
+                    response = await self.http_client.put(
+                        f"/collections/{self.qdrant_collection_name}/points",
+                        json=point_payload
                     )
-                
-                if 'min_price' in filters:
-                    must_conditions.append(
-                        FieldCondition(
-                            key="price",
-                            range=Range(gte=filters['min_price'])
-                        )
+                    
+                    if response.status_code != 200:
+                        logger.error(f"Failed to index product: {response.text}")
+                        return False
+                        
+                    return True
+                except Exception as e:
+                    logger.error(f"Error in async indexing: {e}")
+                    return False
+            elif self.qdrant_client and QDRANT_AVAILABLE:
+                # Fall back to synchronous client
+                try:
+                    self.qdrant_client.upsert(
+                        collection_name=self.qdrant_collection_name,
+                        points=[
+                            models.PointStruct(
+                                id=str(uuid.uuid4()),
+                                vector=embedding,
+                                payload={
+                                    "product_id": product_id,
+                                    "text": doc_text,
+                                    "title": product.get('title', ''),
+                                    "timestamp": str(datetime.datetime.now())
+                                }
+                            )
+                        ]
                     )
+                    return True
+                except Exception as e:
+                    logger.error(f"Error in sync indexing: {e}")
+                    return False
+            else:
+                logger.error("No Qdrant client available for indexing")
+                return False
                 
-                if 'max_price' in filters:
-                    must_conditions.append(
-                        FieldCondition(
-                            key="price",
-                            range=Range(lte=filters['max_price'])
-                        )
-                    )
-                
-                if must_conditions:
-                    filter_obj = Filter(must=must_conditions)
-            
-            # Search
-            response = await asyncio.to_thread(
-                self.client.query_points,
-                collection_name=self.collection_name,
-                query=embedding,
-                query_filter=filter_obj,
-                limit=limit,
-                score_threshold=0.3  # Lower threshold for fashion products
-            )
-            
-            # Extract points from QueryResponse
-            points = response.points if hasattr(response, "points") else []
-            
-            # Map products
-            products = [map_fashion_product(point.payload) for point in points if hasattr(point, 'payload')]
-            
-            logger.info(f"Found {len(products)} products for query: {query}")
-            return products
-            
         except Exception as e:
-            logger.error(f"Error in natural language search: {e}")
-            return []
+            logger.error(f"Error indexing product {product_id}: {e}")
+            return False
     
-    async def bulk_index_products(self, products: List[Dict[str, Any]], batch_size: int = 100) -> Tuple[int, int]:
+    def get_tools(self) -> List:
         """
-        Bulk index products for migration
+        Get the retrieval tools for function calling.
         
-        Args:
-            products: List of products to index
-            batch_size: Batch size for indexing
-            
         Returns:
-            Tuple of (successful, failed) counts
+            List: List of retrieval tools
         """
-        if not self.client:
-            return 0, len(products)
-        
-        successful = 0
-        failed = 0
-        
-        # Process in batches
-        for i in range(0, len(products), batch_size):
-            batch = products[i:i + batch_size]
-            points = []
-            
-            for product in batch:
-                try:
-                    # Create search text
-                    search_text = self._create_search_text(product)
-                    
-                    # Get embedding
-                    embedding = await self.get_embedding(search_text)
-                    if not embedding:
-                        failed += 1
-                        continue
-                    
-                    # Create point
-                    point = PointStruct(
-                        id=product.get('id', str(uuid.uuid4())),
-                        vector=embedding,
-                        payload=self._prepare_payload(product)
-                    )
-                    
-                    points.append(point)
-                    
-                except Exception as e:
-                    logger.error(f"Error preparing product for indexing: {e}")
-                    failed += 1
-            
-            # Bulk upsert
-            if points:
-                try:
-                    await asyncio.to_thread(
-                        self.client.upsert,
-                        collection_name=self.collection_name,
-                        points=points
-                    )
-                    successful += len(points)
-                    logger.info(f"Indexed batch of {len(points)} products")
-                except Exception as e:
-                    logger.error(f"Error bulk indexing: {e}")
-                    failed += len(points)
-        
-        logger.info(f"Bulk indexing complete: {successful} successful, {failed} failed")
-        return successful, failed
+        return self.retrieval_tools if self.retrieval_tools else []
     
-    def _create_search_text(self, product: Dict[str, Any]) -> str:
-        """Create searchable text from product data"""
-        parts = []
-        
-        # Add main fields
-        if product.get('title'):
-            parts.append(product['title'])
-        
-        if product.get('description'):
-            parts.append(product['description'])
-        
-        if product.get('category'):
-            parts.append(f"Category: {product['category']}")
-        
-        if product.get('brand'):
-            parts.append(f"Brand: {product['brand']}")
-        
-        # Add list fields
-        if product.get('colors'):
-            colors = product['colors'] if isinstance(product['colors'], list) else [product['colors']]
-            parts.append(f"Colors: {', '.join(colors)}")
-        
-        if product.get('tags'):
-            tags = product['tags'] if isinstance(product['tags'], list) else [product['tags']]
-            parts.append(f"Tags: {', '.join(tags)}")
-        
-        if product.get('materials'):
-            materials = product['materials'] if isinstance(product['materials'], list) else [product['materials']]
-            parts.append(f"Materials: {', '.join(materials)}")
-        
-        return " ".join(parts)
-    
-    def _prepare_payload(self, product: Dict[str, Any]) -> Dict[str, Any]:
-        """Prepare product payload for Qdrant"""
-        return {
-            "id": product.get('id', str(uuid.uuid4())),
-            "title": product.get('title', ''),
-            "description": product.get('description', ''),
-            "price": float(product.get('price', 0)),
-            "category": product.get('category', ''),
-            "subcategory": product.get('subcategory', ''),
-            "brand": product.get('brand', ''),
-            "colors": self._ensure_list(product.get('colors', [])),
-            "sizes": self._ensure_list(product.get('sizes', [])),
-            "tags": self._ensure_list(product.get('tags', [])),
-            "materials": self._ensure_list(product.get('materials', [])),
-            "collections": self._ensure_list(product.get('collections', [])),
-            "images": self._ensure_list(product.get('images', [])),
-            "created_at": product.get('created_at', datetime.now().isoformat()),
-            "updated_at": datetime.now().isoformat(),
-            "popularity_score": float(product.get('popularity_score', 0)),
-            "return_rate": float(product.get('return_rate', 0)),
-            "in_stock": product.get('in_stock', True),
-            "visited_num": int(product.get('visited_num', 0))
-        }
-    
-    def _ensure_list(self, value: Any) -> List[Any]:
-        """Ensure value is a list"""
-        if isinstance(value, list):
-            return value
-        elif value:
-            return [value]
-        return []
-    
-    async def get_collection_stats(self) -> Dict[str, Any]:
-        """Get statistics about the collection"""
-        if not self.client:
-            return {}
-        
-        try:
-            info = await asyncio.to_thread(
-                self.client.get_collection,
-                collection_name=self.collection_name
-            )
-            
-            return {
-                "vectors_count": info.vectors_count,
-                "indexed_vectors_count": info.indexed_vectors_count,
-                "points_count": info.points_count,
-                "segments_count": info.segments_count,
-                "status": info.status
-            }
-            
-        except Exception as e:
-            logger.error(f"Error getting collection stats: {e}")
-            return {}
-
-
-# """
-# Enhanced Product Retriever for AI Stylist - Qdrant Implementation
-# Provides full product operations for the vector migration
-# """
-
-# import os
-# import logging
-# import json
-# import asyncio
-# from typing import Dict, List, Any, Optional, Tuple
-# from product_field_mapping import map_fashion_product
-
-# import numpy as np
-# from datetime import datetime
-# import uuid
-
-# logger = logging.getLogger("product_retriever_async")
-
-# # Try to import Qdrant client
-# try:
-#     from qdrant_client import QdrantClient
-#     from qdrant_client.models import Distance, VectorParams, PointStruct, Filter, FieldCondition, Range, ScoredPoint
-#     QDRANT_AVAILABLE = True
-# except ImportError:
-#     logger.warning("Qdrant client not installed. Install with: pip install qdrant-client")
-#     QDRANT_AVAILABLE = False
-
-# # Try to import OpenAI for embeddings - UPDATED FOR v1.0+
-# try:
-#     from openai import OpenAI
-#     OPENAI_AVAILABLE = True
-# except ImportError:
-#     logger.warning("OpenAI not installed. Install with: pip install openai")
-#     OPENAI_AVAILABLE = False
-
-
-# class ProductRetrieverAsync:
-#     """
-#     Enhanced asynchronous product retriever using Qdrant for vector-based search.
-#     Implements full product operations as specified in the migration plan.
-#     """
-    
-#     def __init__(
-#         self,
-#         qdrant_url: Optional[str] = None,
-#         qdrant_api_key: Optional[str] = None,
-#         collection_name: str = "fashion_products",
-#         embedding_model: str = "text-embedding-3-small"
-#     ):
-#         """
-#         Initialize the enhanced product retriever.
-        
-#         Args:
-#             qdrant_url: Qdrant server URL
-#             qdrant_api_key: Qdrant API key
-#             collection_name: Name of the product collection
-#             embedding_model: OpenAI embedding model to use
-#         """
-#         self.collection_name = collection_name
-#         self.embedding_model = embedding_model
-        
-#         # Get config from environment if not provided
-#         self.qdrant_url = qdrant_url or os.environ.get("QDRANT_URL", "http://localhost:6333")
-#         self.qdrant_api_key = qdrant_api_key or os.environ.get("QDRANT_API_KEY")
-        
-#         # Initialize OpenAI client - NEW FOR v1.0+
-#         self.openai_client = None
-#         if OPENAI_AVAILABLE:
-#             self.openai_client = OpenAI()
-        
-#         # Initialize clients
-#         self.client = None
-#         self._init_client()
-        
-#         # Cache for embeddings
-#         self.embedding_cache = {}
-        
-#         logger.info(f"ProductRetrieverAsync initialized with collection: {collection_name}")
-    
-#     def _init_client(self):
-#         """Initialize Qdrant client"""
-#         if not QDRANT_AVAILABLE:
-#             logger.error("Qdrant client not available")
-#             return
-        
-#         try:
-#             self.client = QdrantClient(
-#                 url=self.qdrant_url,
-#                 api_key=self.qdrant_api_key,
-#             )
-            
-#             # Ensure collection exists
-#             self._ensure_collection()
-            
-#             logger.info("Qdrant client initialized successfully")
-#         except Exception as e:
-#             logger.error(f"Failed to initialize Qdrant client: {e}")
-#             self.client = None
-    
-#     def _ensure_collection(self):
-#         """Ensure the product collection exists"""
-#         if not self.client:
-#             return
-        
-#         try:
-#             # Check if collection exists
-#             collections = self.client.get_collections()
-#             collection_names = [c.name for c in collections.collections]
-            
-#             if self.collection_name not in collection_names:
-#                 # Create collection with proper schema
-#                 self.client.create_collection(
-#                     collection_name=self.collection_name,
-#                     vectors_config=VectorParams(
-#                         size=1536,  # OpenAI embedding size
-#                         distance=Distance.COSINE
-#                     )
-#                 )
-#                 logger.info(f"Created collection: {self.collection_name}")
-#             else:
-#                 logger.info(f"Collection already exists: {self.collection_name}")
-#         except Exception as e:
-#             logger.error(f"Error ensuring collection: {e}")
-    
-#     async def get_embedding(self, text: str) -> Optional[List[float]]:
-#         """Get embedding for text using OpenAI"""
-#         if not OPENAI_AVAILABLE or not self.openai_client:
-#             # Return random embedding for testing
-#             return np.random.rand(1536).tolist()
-        
-#         # Check cache
-#         if text in self.embedding_cache:
-#             return self.embedding_cache[text]
-        
-#         try:
-#             # Use OpenAI v1.0+ API to get embedding
-#             response = await asyncio.to_thread(
-#                 self.openai_client.embeddings.create,
-#                 input=text,
-#                 model=self.embedding_model
-#             )
-            
-#             # Extract embedding using new response format
-#             embedding = response.data[0].embedding
-            
-#             # Cache the embedding
-#             self.embedding_cache[text] = embedding
-            
-#             return embedding
-#         except Exception as e:
-#             logger.error(f"Error getting embedding: {e}")
-#             # Return random embedding as fallback
-#             return np.random.rand(1536).tolist()
-    
-#     async def index_product(self, product: Dict[str, Any]) -> bool:
-#         """
-#         Index a product in Qdrant
-        
-#         Args:
-#             product: Product dictionary with required fields
-            
-#         Returns:
-#             bool: Success status
-#         """
-#         if not self.client or not product.get('id'):
-#             return False
-        
-#         try:
-#             # Create searchable text from product
-#             search_text = self._create_search_text(product)
-            
-#             # Get embedding
-#             embedding = await self.get_embedding(search_text)
-#             if not embedding:
-#                 return False
-            
-#             # Create point
-#             point = PointStruct(
-#                 id=product['id'],
-#                 vector=embedding,
-#                 payload={
-#                     "id": product['id'],
-#                     "title": product.get('title', ''),
-#                     "description": product.get('description', ''),
-#                     "price": float(product.get('price', 0)),
-#                     "category": product.get('category', ''),
-#                     "subcategory": product.get('subcategory', ''),
-#                     "brand": product.get('brand', ''),
-#                     "colors": product.get('colors', []),
-#                     "sizes": product.get('sizes', []),
-#                     "tags": product.get('tags', []),
-#                     "materials": product.get('materials', []),
-#                     "collections": product.get('collections', []),
-#                     "images": product.get('images', []),
-#                     "created_at": product.get('created_at', datetime.now().isoformat()),
-#                     "updated_at": datetime.now().isoformat(),
-#                     "popularity_score": float(product.get('popularity_score', 0)),
-#                     "return_rate": float(product.get('return_rate', 0)),
-#                     "in_stock": product.get('in_stock', True),
-#                     "visited_num": int(product.get('visited_num', 0))
-#                 }
-#             )
-            
-#             # Upsert to Qdrant
-#             await asyncio.to_thread(
-#                 self.client.upsert,
-#                 collection_name=self.collection_name,
-#                 points=[point]
-#             )
-            
-#             logger.info(f"Indexed product: {product['id']}")
-#             return True
-            
-#         except Exception as e:
-#             logger.error(f"Error indexing product: {e}")
-#             return False
-    
-#     async def get_product_details(self, product_id: str) -> Optional[Dict[str, Any]]:
-#         """
-#         Get product details by ID
-        
-#         Args:
-#             product_id: Product ID
-            
-#         Returns:
-#             Product dictionary or None
-#         """
-#         if not self.client:
-#             return None
-        
-#         try:
-#             # Retrieve point by ID
-#             points = await asyncio.to_thread(
-#                 self.client.retrieve,
-#                 collection_name=self.collection_name,
-#                 ids=[product_id]
-#             )
-            
-#             if points:
-#                 return points[0].payload
-            
-#             return None
-            
-#         except Exception as e:
-#             logger.error(f"Error getting product details: {e}")
-#             return None
-    
-#     async def get_products_by_filter(
-#         self,
-#         category: Optional[str] = None,
-#         subcategory: Optional[str] = None,
-#         brand: Optional[str] = None,
-#         min_price: Optional[float] = None,
-#         max_price: Optional[float] = None,
-#         colors: Optional[List[str]] = None,
-#         tags: Optional[List[str]] = None,
-#         in_stock: Optional[bool] = None,
-#         limit: int = 10
-#     ) -> List[Dict[str, Any]]:
-#         """
-#         Get products by metadata filters
-        
-#         Returns:
-#             List of products matching filters
-#         """
-#         if not self.client:
-#             return []
-        
-#         try:
-#             # Build filter conditions
-#             must_conditions = []
-            
-#             if category:
-#                 must_conditions.append(
-#                     FieldCondition(key="category", match={"value": category})
-#                 )
-            
-#             if subcategory:
-#                 must_conditions.append(
-#                     FieldCondition(key="subcategory", match={"value": subcategory})
-#                 )
-            
-#             if brand:
-#                 must_conditions.append(
-#                     FieldCondition(key="brand", match={"value": brand})
-#                 )
-            
-#             if min_price is not None or max_price is not None:
-#                 price_range = Range(
-#                     gte=min_price if min_price is not None else 0,
-#                     lte=max_price if max_price is not None else 999999
-#                 )
-#                 must_conditions.append(
-#                     FieldCondition(key="price", range=price_range)
-#                 )
-            
-#             if colors:
-#                 for color in colors:
-#                     must_conditions.append(
-#                         FieldCondition(key="colors", match={"any": [color]})
-#                     )
-            
-#             if tags:
-#                 for tag in tags:
-#                     must_conditions.append(
-#                         FieldCondition(key="tags", match={"any": [tag]})
-#                     )
-            
-#             if in_stock is not None:
-#                 must_conditions.append(
-#                     FieldCondition(key="in_stock", match={"value": in_stock})
-#                 )
-            
-#             # Create filter
-#             filter_obj = None
-#             if must_conditions:
-#                 filter_obj = Filter(must=must_conditions)
-            
-#             # Search with filters (using a dummy vector for filter-only search)
-#             dummy_vector = [0.0] * 1536
-            
-#             results = await asyncio.to_thread(
-#                 self.client.query_points,
-#                 collection_name=self.collection_name,
-#                 query=dummy_vector,
-#                 query_filter=filter_obj,
-#                 limit=limit,
-#                 score_threshold=0.3  # Accept all scores since we're filtering
-#             )
-#             logger.info(f"Query returned type: {type(results)}, has points: {hasattr(results, "points") if results else False}")
-#             # Extract points from QueryResponse
-#             if hasattr(results, "points"):
-#                 results = results.points
-            
-#             # Extract products from results
-#             logger.info(f"Processing {len(results) if hasattr(results, \'__len__\') else \'unknown\'} results")
-#             products = [map_fashion_product(hit.payload) for hit in results]
-            
-#             logger.info(f"Found {len(products)} products with filters")
-#             return products
-            
-#         except Exception as e:
-#             logger.error(f"Error getting products by filter: {e}")
-#             return []
-    
-#     async def get_similar_products(
-#         self,
-#         product_id: str,
-#         limit: int = 5
-#     ) -> List[Dict[str, Any]]:
-#         """
-#         Get products similar to a given product
-        
-#         Args:
-#             product_id: Reference product ID
-#             limit: Number of similar products
-            
-#         Returns:
-#             List of similar products
-#         """
-#         if not self.client:
-#             return []
-        
-#         try:
-#             # Get the reference product
-#             ref_product = await self.get_product_details(product_id)
-#             if not ref_product:
-#                 return []
-            
-#             # Create search text
-#             search_text = self._create_search_text(ref_product)
-            
-#             # Get embedding
-#             embedding = await self.get_embedding(search_text)
-#             if not embedding:
-#                 return []
-            
-#             # Search for similar products
-#             results = await asyncio.to_thread(
-#                 self.client.query_points,
-#                 collection_name=self.collection_name,
-#                 query=embedding,
-#                 limit=limit + 1,  # Get one extra to exclude self
-#                 score_threshold=0.6
-#             )
-#             logger.info(f"Query returned type: {type(results)}, has points: {hasattr(results, "points") if results else False}")
-#             # Extract points from QueryResponse
-#             if hasattr(results, "points"):
-#                 results = results.points
-            
-#             # Extract products and exclude the reference product
-#             similar_logger.info(f"Processing {len(results) if hasattr(results, \'__len__\') else \'unknown\'} results")
-#             products = []
-#             for hit in results:
-#                 if hit.payload.get('id') != product_id:
-#                     similar_products.append(hit.payload)
-            
-#             return similar_products[:limit]
-            
-#         except Exception as e:
-#             logger.error(f"Error getting similar products: {e}")
-#             return []
-    
-#     async def get_popular_products(self, limit: int = 10) -> List[Dict[str, Any]]:
-#         """
-#         Get popular products based on popularity score
-        
-#         Returns:
-#             List of popular products
-#         """
-#         if not self.client:
-#             return []
-        
-#         try:
-#             # Filter by high popularity score
-#             filter_obj = Filter(
-#                 must=[
-#                     FieldCondition(
-#                         key="popularity_score",
-#                         range=Range(gte=0.7)
-#                     )
-#                 ]
-#             )
-            
-#             # Use dummy vector for filter-based search
-#             dummy_vector = [0.0] * 1536
-            
-#             results = await asyncio.to_thread(
-#                 self.client.query_points,
-#                 collection_name=self.collection_name,
-#                 query=dummy_vector,
-#                 query_filter=filter_obj,
-#                 limit=limit,
-#                 score_threshold=0.3
-#             )
-#             logger.info(f"Query returned type: {type(results)}, has points: {hasattr(results, "points") if results else False}")
-#             # Extract points from QueryResponse
-#             if hasattr(results, "points"):
-#                 results = results.points
-            
-#             # Sort by popularity score
-#             logger.info(f"Processing {len(results) if hasattr(results, \'__len__\') else \'unknown\'} results")
-#             products = [map_fashion_product(hit.payload) for hit in results]
-#             products.sort(key=lambda x: x.get('popularity_score', 0), reverse=True)
-            
-#             return products
-            
-#         except Exception as e:
-#             logger.error(f"Error getting popular products: {e}")
-#             return []
-    
-#     async def search_by_natural_language(
-#         self,
-#         query: str,
-#         limit: int = 10,
-#         filters: Optional[Dict[str, Any]] = None
-#     ) -> List[Dict[str, Any]]:
-#         """
-#         Search products using natural language query
-        
-#         Args:
-#             query: Natural language search query
-#             limit: Maximum results
-#             filters: Optional metadata filters
-            
-#         Returns:
-#             List of matching products
-#         """
-#         if not self.client:
-#             return []
-        
-#         try:
-#             # Get query embedding
-#             embedding = await self.get_embedding(query)
-#             logger.info(f"Got embedding for query \'{query}\': {embedding is not None}")
-#             if not embedding:
-#                 return []
-            
-#             # Build filter from provided filters
-#             filter_obj = None
-#             if filters:
-#                 must_conditions = []
-                
-#                 if 'category' in filters:
-#                     must_conditions.append(
-#                         FieldCondition(key="category", match={"value": filters['category']})
-#                     )
-                
-#                 if 'min_price' in filters:
-#                     must_conditions.append(
-#                         FieldCondition(
-#                             key="price",
-#                             range=Range(gte=filters['min_price'])
-#                         )
-#                     )
-                
-#                 if 'max_price' in filters:
-#                     must_conditions.append(
-#                         FieldCondition(
-#                             key="price",
-#                             range=Range(lte=filters['max_price'])
-#                         )
-#                     )
-                
-#                 if must_conditions:
-#                     filter_obj = Filter(must=must_conditions)
-            
-#             # Search
-#             results = await asyncio.to_thread(
-#                 self.client.query_points,
-#                 collection_name=self.collection_name,
-#                 query=embedding,
-#                 query_filter=filter_obj,
-#                 limit=limit,
-#                 score_threshold=0.5
-#             )
-#             logger.info(f"Query returned type: {type(results)}, has points: {hasattr(results, "points") if results else False}")
-#             # Extract points from QueryResponse
-#             if hasattr(results, "points"):
-#                 results = results.points
-            
-#             # Extract and return products
-#             logger.info(f"Processing {len(results) if hasattr(results, \'__len__\') else \'unknown\'} results")
-#             products = [map_fashion_product(hit.payload) for hit in results]
-            
-#             logger.info(f"Found {len(products)} products for query: {query}")
-#             return products
-            
-#         except Exception as e:
-#             logger.error(f"Error in natural language search: {e}")
-#             return []
-    
-#     async def bulk_index_products(self, products: List[Dict[str, Any]], batch_size: int = 100) -> Tuple[int, int]:
-#         """
-#         Bulk index products for migration
-        
-#         Args:
-#             products: List of products to index
-#             batch_size: Batch size for indexing
-            
-#         Returns:
-#             Tuple of (successful, failed) counts
-#         """
-#         if not self.client:
-#             return 0, len(products)
-        
-#         successful = 0
-#         failed = 0
-        
-#         # Process in batches
-#         for i in range(0, len(products), batch_size):
-#             batch = products[i:i + batch_size]
-#             points = []
-            
-#             for product in batch:
-#                 try:
-#                     # Create search text
-#                     search_text = self._create_search_text(product)
-                    
-#                     # Get embedding
-#                     embedding = await self.get_embedding(search_text)
-#                     if not embedding:
-#                         failed += 1
-#                         continue
-                    
-#                     # Create point
-#                     point = PointStruct(
-#                         id=product.get('id', str(uuid.uuid4())),
-#                         vector=embedding,
-#                         payload=self._prepare_payload(product)
-#                     )
-                    
-#                     points.append(point)
-                    
-#                 except Exception as e:
-#                     logger.error(f"Error preparing product for indexing: {e}")
-#                     failed += 1
-            
-#             # Bulk upsert
-#             if points:
-#                 try:
-#                     await asyncio.to_thread(
-#                         self.client.upsert,
-#                         collection_name=self.collection_name,
-#                         points=points
-#                     )
-#                     successful += len(points)
-#                     logger.info(f"Indexed batch of {len(points)} products")
-#                 except Exception as e:
-#                     logger.error(f"Error bulk indexing: {e}")
-#                     failed += len(points)
-        
-#         logger.info(f"Bulk indexing complete: {successful} successful, {failed} failed")
-#         return successful, failed
-    
-#     def _create_search_text(self, product: Dict[str, Any]) -> str:
-#         """Create searchable text from product data"""
-#         parts = []
-        
-#         # Add main fields
-#         if product.get('title'):
-#             parts.append(product['title'])
-        
-#         if product.get('description'):
-#             parts.append(product['description'])
-        
-#         if product.get('category'):
-#             parts.append(f"Category: {product['category']}")
-        
-#         if product.get('brand'):
-#             parts.append(f"Brand: {product['brand']}")
-        
-#         # Add list fields
-#         if product.get('colors'):
-#             colors = product['colors'] if isinstance(product['colors'], list) else [product['colors']]
-#             parts.append(f"Colors: {', '.join(colors)}")
-        
-#         if product.get('tags'):
-#             tags = product['tags'] if isinstance(product['tags'], list) else [product['tags']]
-#             parts.append(f"Tags: {', '.join(tags)}")
-        
-#         if product.get('materials'):
-#             materials = product['materials'] if isinstance(product['materials'], list) else [product['materials']]
-#             parts.append(f"Materials: {', '.join(materials)}")
-        
-#         return " ".join(parts)
-    
-#     def _prepare_payload(self, product: Dict[str, Any]) -> Dict[str, Any]:
-#         """Prepare product payload for Qdrant"""
-#         return {
-#             "id": product.get('id', str(uuid.uuid4())),
-#             "title": product.get('title', ''),
-#             "description": product.get('description', ''),
-#             "price": float(product.get('price', 0)),
-#             "category": product.get('category', ''),
-#             "subcategory": product.get('subcategory', ''),
-#             "brand": product.get('brand', ''),
-#             "colors": self._ensure_list(product.get('colors', [])),
-#             "sizes": self._ensure_list(product.get('sizes', [])),
-#             "tags": self._ensure_list(product.get('tags', [])),
-#             "materials": self._ensure_list(product.get('materials', [])),
-#             "collections": self._ensure_list(product.get('collections', [])),
-#             "images": self._ensure_list(product.get('images', [])),
-#             "created_at": product.get('created_at', datetime.now().isoformat()),
-#             "updated_at": datetime.now().isoformat(),
-#             "popularity_score": float(product.get('popularity_score', 0)),
-#             "return_rate": float(product.get('return_rate', 0)),
-#             "in_stock": product.get('in_stock', True),
-#             "visited_num": int(product.get('visited_num', 0))
-#         }
-    
-#     def _ensure_list(self, value: Any) -> List[Any]:
-#         """Ensure value is a list"""
-#         if isinstance(value, list):
-#             return value
-#         elif value:
-#             return [value]
-#         return []
-    
-#     async def get_collection_stats(self) -> Dict[str, Any]:
-#         """Get statistics about the collection"""
-#         if not self.client:
-#             return {}
-        
-#         try:
-#             info = await asyncio.to_thread(
-#                 self.client.get_collection,
-#                 collection_name=self.collection_name
-#             )
-            
-#             return {
-#                 "vectors_count": info.vectors_count,
-#                 "indexed_vectors_count": info.indexed_vectors_count,
-#                 "points_count": info.points_count,
-#                 "segments_count": info.segments_count,
-#                 "status": info.status
-#             }
-            
-#         except Exception as e:
-#             logger.error(f"Error getting collection stats: {e}")
-#             return {}
+    async def close(self):
+        """Close all resources"""
+        if self.http_client and HTTPX_AVAILABLE:
+            try:
+                await self.http_client.aclose()
+            except Exception as e:
+                logger.error(f"Error closing HTTP client: {e}")

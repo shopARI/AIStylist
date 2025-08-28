@@ -11,109 +11,24 @@ from datetime import datetime
 
 logger = logging.getLogger("agent_factory")
 
-# Import CAMEL components with comprehensive error handling
-try:
-    from camel.agents import ChatAgent
-    from camel.models import ModelFactory
-    from camel.types import ModelType, ModelPlatformType
-    from camel.messages import BaseMessage
-    from camel.utils import OpenAITokenCounter
-    CAMEL_AGENTS_AVAILABLE = True
+# UPDATED: Use centralized imports from camel_imports.py
+from camel_imports import (
+    ChatAgent, ModelFactory, ModelType, ModelPlatformType,
+    BaseMessage, OpenAITokenCounter, CAMEL_AVAILABLE as CAMEL_AGENTS_AVAILABLE,
+    SearchToolkit, MCPToolkit
+)
+
+# Check toolkit availability
+SEARCH_TOOLKIT_AVAILABLE = SearchToolkit is not None
+MCP_TOOLKIT_AVAILABLE = MCPToolkit is not None
+
+if CAMEL_AGENTS_AVAILABLE:
     logger.info("✅ CAMEL agents imported successfully")
-except ImportError as e:
-    logger.error(f"❌ Failed to import CAMEL agents: {e}")
-    CAMEL_AGENTS_AVAILABLE = False
-    
-    # Create comprehensive fallbacks
-    class ChatAgent:
-        def __init__(self, system_message="", model=None, tools=None, memory=None, **kwargs):
-            self.system_message = system_message
-            self.model = model
-            self.tools = tools or []
-            self.memory = memory
-            self.conversation_history = []
-            self.agent_id = str(uuid.uuid4())
-            # CRITICAL: Store the system message in messages for CAMEL
-            self._messages = [{"role": "system", "content": system_message}]
-            logger.warning("Using fallback ChatAgent implementation")
-            
-        def step(self, message):
-            """Fallback step method"""
-            try:
-                content = message.content if hasattr(message, 'content') else str(message)
-                
-                # CRITICAL: Ensure messages array is never empty
-                if not hasattr(self, '_messages'):
-                    self._messages = [{"role": "system", "content": self.system_message}]
-                
-                # Add user message
-                self._messages.append({"role": "user", "content": content})
-                
-                response_content = f"I'd be happy to help with that. You said: {content}"
-                
-                # Add assistant response
-                self._messages.append({"role": "assistant", "content": response_content})
-                
-                class MockResponse:
-                    def __init__(self, content):
-                        self.msg = type('Msg', (), {'content': content})()
-                
-                return MockResponse(response_content)
-            except Exception as e:
-                logger.error(f"Error in fallback agent step: {e}")
-                return type('MockResponse', (), {
-                    'msg': type('Msg', (), {'content': 'I apologize, but I encountered an error processing your request.'})()
-                })()
-    
-    class ModelFactory:
-        @staticmethod
-        def create(**kwargs):
-            logger.warning("Using fallback ModelFactory")
-            return type('MockModel', (), {'run': lambda *args: "Mock response"})()
-    
-    class ModelType:
-        GPT_4O = "gpt-4o"
-        GPT_4O_MINI = "gpt-4o-mini"
-        GPT_3_5_TURBO = "gpt-3.5-turbo"
-    
-    class ModelPlatformType:
-        OPENAI = "openai"
-    
-    class BaseMessage:
-        def __init__(self, role_name, content, meta_dict=None):
-            self.role_name = role_name
-            self.content = content
-            self.meta_dict = meta_dict or {}
-        
-        @classmethod
-        def make_user_message(cls, role_name="User", content="", meta_dict=None):
-            return cls(role_name, content, meta_dict)
-        
-        @classmethod  
-        def make_assistant_message(cls, role_name="Assistant", content="", meta_dict=None):
-            return cls(role_name, content, meta_dict)
-
-# Import toolkits with error handling
-try:
-    from camel.toolkits import SearchToolkit
-    SEARCH_TOOLKIT_AVAILABLE = True
-    logger.info("✅ SearchToolkit imported successfully")
-except ImportError as e:
-    logger.warning(f"SearchToolkit not available: {e}")
-    SEARCH_TOOLKIT_AVAILABLE = False
-    SearchToolkit = None
-
-try:
-    from camel.toolkits import MCPToolkit
-    MCP_TOOLKIT_AVAILABLE = True
-    logger.info("✅ MCPToolkit imported successfully")  
-except ImportError as e:
-    logger.warning(f"MCPToolkit not available: {e}")
-    MCP_TOOLKIT_AVAILABLE = False
-    MCPToolkit = None
+else:
+    logger.error("❌ CAMEL agents not available, using fallback implementations")
 
 
-class MessageSafeAgent(ChatAgent):
+class MessageSafeAgent(ChatAgent if ChatAgent else object):
     """
     A wrapper around ChatAgent that ensures messages are never empty.
     """
@@ -438,7 +353,7 @@ Always maintain a friendly, encouraging tone that boosts the client's confidence
             
             # FIXED: Ensure agent has a system message in the conversation history
             if hasattr(agent, 'system_message') and not agent.system_message:
-                from camel.messages import BaseMessage
+                from camel_imports import BaseMessage
                 agent.system_message = BaseMessage.make_assistant_message(
                     role_name="System",
                     content=stylist_system_message
@@ -446,7 +361,7 @@ Always maintain a friendly, encouraging tone that boosts the client's confidence
             
             # FIXED: Initialize agent's message history if empty
             if hasattr(agent, 'conversation_history') and not agent.conversation_history:
-                from camel.messages import BaseMessage
+                from camel_imports import BaseMessage
                 system_msg = BaseMessage.make_assistant_message(
                     role_name="System", 
                     content=stylist_system_message
@@ -652,8 +567,8 @@ def validate_camel_setup():
     
     # Check CAMEL version
     try:
-        import camel
-        print(f"✅ CAMEL version: {camel.__version__}")
+        from camel_imports import CAMEL_VERSION
+        print(f"✅ CAMEL version: {CAMEL_VERSION}")
     except ImportError:
         print("❌ CAMEL-AI not installed")
         return False
@@ -668,10 +583,7 @@ def validate_camel_setup():
     
     # Test basic agent creation
     try:
-        from camel.agents import ChatAgent
-        from camel.models import ModelFactory
-        from camel.types import ModelType, ModelPlatformType
-        from camel.messages import BaseMessage
+        from camel_imports import ChatAgent, ModelFactory, ModelType, ModelPlatformType, BaseMessage
         
         # Test model creation
         model = ModelFactory.create(

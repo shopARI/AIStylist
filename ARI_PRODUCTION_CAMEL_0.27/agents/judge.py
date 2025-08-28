@@ -465,16 +465,27 @@ Respond with strategy and reasoning."""
         
         return ", ".join(summaries)
     
+    # def _count_consensus(
+    #     self,
+    #     cypher_results: List[Dict[str, Any]],
+    #     vibe_results: List[Dict[str, Any]]
+    # ) -> int:
+    #     """Count products both agents found."""
+    #     cypher_ids = {p.get('id') for p in cypher_results if p.get('id')}
+    #     vibe_ids = {p.get('id') for p in vibe_results if p.get('id')}
+    #     return len(cypher_ids & vibe_ids)
+    
     def _count_consensus(
         self,
         cypher_results: List[Dict[str, Any]],
         vibe_results: List[Dict[str, Any]]
     ) -> int:
-        """Count products both agents found."""
-        cypher_ids = {p.get('id') for p in cypher_results if p.get('id')}
-        vibe_ids = {p.get('id') for p in vibe_results if p.get('id')}
-        return len(cypher_ids & vibe_ids)
-    
+        """Count products both agents found using title matching."""
+        # Since IDs don't match, use titles for consensus
+        cypher_titles = {p.get('title').lower().strip() for p in cypher_results if p.get('title')}
+        vibe_titles = {p.get('title').lower().strip() for p in vibe_results if p.get('title')}
+        return len(cypher_titles & vibe_titles)
+
     def _calculate_confidence(
         self,
         winner: str,

@@ -5,7 +5,7 @@ This module implements a recommendation system that uses clustering
 to group similar products and users for better recommendations.
 Compatible with CAMEL-AI 0.2.64.
 
-FIXED: Uses centralized imports and proper error handling.
+Uses centralized imports and proper error handling.
 """
 
 import logging
@@ -19,7 +19,7 @@ except ImportError:
     SKLEARN_AVAILABLE = False
     logging.warning("scikit-learn not installed. Please install with: pip install scikit-learn")
 
-# FIXED: Use centralized imports with error handling
+# Use centralized imports with error handling
 from camel_imports import (
     CAMEL_AVAILABLE,
     OpenAIEmbedding,
@@ -37,7 +37,7 @@ class MultiClusterRecommender:
     Implements a recommendation system that uses clustering to group
     similar products and users for better recommendations.
     
-    FIXED: Uses proper error handling for all CAMEL components.
+    Uses proper error handling for all CAMEL components.
     """
     
     def __init__(
@@ -50,7 +50,7 @@ class MultiClusterRecommender:
         """
         Initialize the multi-cluster recommender.
         
-        FIXED: Added proper error handling for CAMEL components.
+        Added proper error handling for CAMEL components.
         
         Args:
             product_kg: Neo4j product knowledge graph instance
@@ -76,7 +76,7 @@ class MultiClusterRecommender:
             self.is_clustered = False
             return
         
-        # FIXED: Initialize embedding model with error handling
+        # Initialize embedding model with error handling
         try:
             if CAMEL_AVAILABLE and OpenAIEmbedding and EmbeddingModelType:
                 self.embedding_model = embedding_model or OpenAIEmbedding(
@@ -91,7 +91,7 @@ class MultiClusterRecommender:
             self.embedding_model = None
             logger.warning("Using fallback without embeddings")
         
-        # FIXED: Initialize storage and retriever with error handling
+        # Initialize storage and retriever with error handling
         if self.embedding_model and CAMEL_AVAILABLE:
             try:
                 if QdrantStorage:
@@ -471,3 +471,4 @@ class MultiClusterRecommender:
         except Exception as e:
             logger.error(f"Error clustering all products: {e}")
             return False
+        

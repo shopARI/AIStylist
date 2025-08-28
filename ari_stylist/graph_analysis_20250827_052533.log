@@ -1,0 +1,43 @@
+2025-08-27 05:25:33,703 - __main__ - INFO - Config file analyzer_config.yaml not found, using defaults
+2025-08-27 05:25:33,977 - __main__ - INFO - Connected to bolt://0.0.0.0:17687
+2025-08-27 05:25:33,978 - __main__ - INFO - ============================================================
+2025-08-27 05:25:33,978 - __main__ - INFO - NEO4J DIAGNOSTIC ANALYSIS
+2025-08-27 05:25:33,978 - __main__ - INFO - ============================================================
+2025-08-27 05:25:33,978 - __main__ - INFO - Discovering schema...
+2025-08-27 05:25:58,671 - __main__ - INFO - Schema cached
+2025-08-27 05:25:58,678 - __main__ - INFO - Analyzing duplicates...
+2025-08-27 05:26:00,120 - __main__ - ERROR - Fatal error: The result has failed. Either this result or another result in the same transaction has encountered an error.
+Traceback (most recent call last):
+  File "/home/leo/AIStylist/ari_stylist/neo4j_adaptive_analyzer.py", line 842, in analyze_duplicates
+    record = result.single()
+  File "/opt/conda/lib/python3.10/site-packages/neo4j/_sync/work/result.py", line 610, in single
+    self._buffer(2)
+  File "/opt/conda/lib/python3.10/site-packages/neo4j/_sync/work/result.py", line 448, in _buffer
+    for record in self:
+  File "/opt/conda/lib/python3.10/site-packages/neo4j/_sync/work/result.py", line 398, in __iter__
+    self._connection.fetch_message()
+  File "/opt/conda/lib/python3.10/site-packages/neo4j/_sync/io/_common.py", line 184, in inner
+    func(*args, **kwargs)
+  File "/opt/conda/lib/python3.10/site-packages/neo4j/_sync/io/_bolt.py", line 864, in fetch_message
+    res = self._process_message(tag, fields)
+  File "/opt/conda/lib/python3.10/site-packages/neo4j/_sync/io/_bolt5.py", line 500, in _process_message
+    response.on_failure(summary_metadata or {})
+  File "/opt/conda/lib/python3.10/site-packages/neo4j/_sync/io/_common.py", line 254, in on_failure
+    raise self._hydrate_error(metadata)
+neo4j.exceptions.TransientError: {code: Neo.TransientError.General.MemoryPoolOutOfMemoryError} {message: The allocation of an extra 305.1 MiB would use more than the limit 609.0 MiB. Currently using 304.0 MiB. dbms.memory.transaction.total.max threshold reached}
+
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/home/leo/AIStylist/ari_stylist/neo4j_adaptive_analyzer.py", line 958, in run
+    self.results['duplicates'] = self.analyze_duplicates()
+  File "/home/leo/AIStylist/ari_stylist/neo4j_adaptive_analyzer.py", line 852, in analyze_duplicates
+    result.consume()
+  File "/opt/conda/lib/python3.10/site-packages/neo4j/_sync/work/result.py", line 560, in consume
+    self._exhaust()
+  File "/opt/conda/lib/python3.10/site-packages/neo4j/_sync/work/result.py", line 490, in _exhaust
+    for _ in self:
+  File "/opt/conda/lib/python3.10/site-packages/neo4j/_sync/work/result.py", line 408, in __iter__
+    raise ResultFailedError(
+neo4j.exceptions.ResultFailedError: The result has failed. Either this result or another result in the same transaction has encountered an error.
+2025-08-27 05:26:00,122 - __main__ - INFO - Closed connection to bolt://0.0.0.0:17687

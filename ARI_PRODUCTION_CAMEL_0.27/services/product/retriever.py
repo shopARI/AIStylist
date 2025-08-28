@@ -50,8 +50,9 @@ class ProductRetrieverService:
         qdrant_api_key: Optional[str] = None,
         collection_name: Optional[str] = None,
         embedding_model: str = "text-embedding-3-small",
+        embedding_timeout: float = 30.0,
         embedding_cache_size: int = 1000,
-        query_timeout: float = 30.0,
+        query_timeout: float = 90.0,
         max_retry_attempts: int = 3,
         retry_delay: float = 1.0
     ):
@@ -74,8 +75,11 @@ class ProductRetrieverService:
             raise RuntimeError("OpenAI client not available")
         
         # Configuration
+        self.embedding_timeout = embedding_timeout
+
         self.collection_name = collection_name or os.environ.get("QDRANT_COLLECTION_NAME", "fashion_products")
         self.embedding_model = embedding_model
+
         self.qdrant_url = qdrant_url or os.environ.get("QDRANT_URL", "http://localhost:6333")
         self.qdrant_api_key = qdrant_api_key or os.environ.get("QDRANT_API_KEY")
         
@@ -128,6 +132,18 @@ class ProductRetrieverService:
                         await asyncio.sleep(self.retry_delay * (attempt + 1))
                     else:
                         raise RuntimeError(f"Failed to initialize Qdrant client: {e}")
+
+    async def close(self):
+        """Gracefully closes the Qdrant client connection."""
+        if self.client:
+            try:
+                # The Qdrant client has a close method for resource cleanup.
+                # We run it in a separate thread to avoid blocking the event loop.
+                await asyncio.to_thread(self.client.close)
+                logger.info("Qdrant client connection closed successfully.")
+            except Exception as e:
+                logger.error(f"Error closing Qdrant client: {e}")
+        self.client = None
 
     async def _ensure_collection_async(self):
         """Ensure the product collection exists (async version)."""
@@ -184,7 +200,7 @@ class ProductRetrieverService:
                         input=text,
                         model=self.embedding_model
                     ),
-                    timeout=10.0
+                    timeout=90.0
                 )
                 
                 embedding = response.data[0].embedding
@@ -264,7 +280,7 @@ class ProductRetrieverService:
                             input=batch,
                             model=self.embedding_model
                         ),
-                        timeout=30.0  # Longer timeout for batch
+                        timeout=90.0  # Longer timeout for batch
                     )
                     
                     # Process response
@@ -499,8 +515,14 @@ class ProductRetrieverService:
             
             # Build filter conditions
             must_conditions = self._build_filter_conditions(
-                category, subcategory, brand, min_price, max_price,
-                colors, tags, in_stock
+                category=category,
+                subcategory=subcategory, 
+                brand=brand,
+                min_price=min_price,
+                max_price=max_price,
+                colors=colors,
+                tags=tags,
+                in_stock=in_stock
             )
             
             filter_obj = {"must": must_conditions} if must_conditions else None

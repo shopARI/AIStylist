@@ -1,486 +1,943 @@
 """
-Ensemble Recommendation System for AI Stylist.
-
-This module implements an ensemble recommendation system that combines
-multiple recommenders for more robust and accurate recommendations.
-Compatible with CAMEL-AI 0.2.64.
-
-FIXED: Uses centralized imports and proper error handling.
+Ensemble Recommender - COMPLETE INTELLIGENCE PROVIDER FOR CAMEL AGENTS
+Coordinates ML systems to provide intelligence to battle agents
+NEVER provides direct recommendations - only insights
+Compatible with CAMEL-AI 0.2.64, ready for 0.2.7
 """
 
 import logging
+import asyncio
 import json
+import time
 from typing import List, Dict, Any, Optional, Tuple, Set
-from collections import Counter
+from collections import Counter, defaultdict, OrderedDict
+from datetime import datetime, timedelta
+from dataclasses import dataclass, field
+import hashlib
 
-# FIXED: Use centralized imports with proper error handling
-from camel_imports import (
-    CAMEL_AVAILABLE,
-    ChatAgent,
-    BaseMessage,
-    CompatibilityLayer
-)
-
-# Configure logging
-logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("ensemble_recommender")
+
+
+@dataclass
+class IntelligencePacket:
+    """Structured intelligence data"""
+    source: str
+    target_agent: str  # 'cypher', 'vibe', or 'shared'
+    intelligence_type: str
+    data: Dict[str, Any]
+    confidence: float
+    timestamp: datetime = field(default_factory=datetime.now)
+    
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "source": self.source,
+            "target": self.target_agent,
+            "type": self.intelligence_type,
+            "confidence": self.confidence,
+            "timestamp": self.timestamp.isoformat(),
+            "data": self.data
+        }
+
+
+class IntelligenceRouter:
+    """Routes intelligence to appropriate CAMEL agents"""
+    
+    def __init__(self):
+        # Define routing rules based on intelligence type
+        self.routing_rules = {
+            # Data-driven intelligence goes to CypherBot
+            "cypher": {
+                "keywords": [
+                    "cluster", "rfm", "segment", "behavior", "pattern",
+                    "collaborative", "graph", "relationship", "purchase",
+                    "frequency", "monetary", "recency", "association"
+                ],
+                "sources": [
+                    "multi_cluster_recommender",
+                    "rfm_apriori_recommender",
+                    "behavioral_analyzer",
+                    "graph_pattern_detector"
+                ]
+            },
+            # Aesthetic intelligence goes to VibeBot
+            "vibe": {
+                "keywords": [
+                    "visual", "style", "aesthetic", "color", "design",
+                    "trend", "fashion", "vibe", "look", "appearance",
+                    "texture", "pattern", "silhouette", "mood"
+                ],
+                "sources": [
+                    "hybrid_visual_recommender",
+                    "style_analyzer",
+                    "trend_detector",
+                    "aesthetic_scorer"
+                ]
+            },
+            # Contextual intelligence goes to both
+            "shared": {
+                "keywords": [
+                    "memory", "context", "preference", "history", "session",
+                    "interaction", "feedback", "profile", "intent"
+                ],
+                "sources": [
+                    "memory_rag_recommender",
+                    "context_analyzer",
+                    "preference_tracker",
+                    "session_manager"
+                ]
+            }
+        }
+    
+    def route_intelligence(
+        self,
+        source_name: str,
+        intelligence_type: str,
+        data: Dict[str, Any]
+    ) -> str:
+        """
+        Determine which agent should receive this intelligence
+        
+        Returns:
+            'cypher', 'vibe', or 'shared'
+        """
+        source_lower = source_name.lower()
+        type_lower = intelligence_type.lower()
+        
+        # Check source-based routing
+        for target, rules in self.routing_rules.items():
+            for source_pattern in rules["sources"]:
+                if source_pattern in source_lower:
+                    return target
+        
+        # Check keyword-based routing
+        for target, rules in self.routing_rules.items():
+            for keyword in rules["keywords"]:
+                if keyword in type_lower or keyword in source_lower:
+                    return target
+        
+        # Check data content for routing hints
+        if isinstance(data, dict):
+            data_str = json.dumps(data).lower()
+            
+            # Count keyword matches
+            keyword_counts = {}
+            for target, rules in self.routing_rules.items():
+                count = sum(1 for kw in rules["keywords"] if kw in data_str)
+                keyword_counts[target] = count
+            
+            # Route to target with most matches
+            if keyword_counts:
+                best_target = max(keyword_counts, key=keyword_counts.get)
+                if keyword_counts[best_target] > 0:
+                    return best_target
+        
+        # Default to shared
+        return "shared"
+
+
+class IntelligenceAggregator:
+    """Aggregates and processes intelligence from multiple sources"""
+    
+    def __init__(self):
+        self.intelligence_buffer = OrderedDict()
+        self.max_buffer_size = 1000
+        self.aggregation_window = timedelta(seconds=5)
+    
+    def add_intelligence(self, packet: IntelligencePacket):
+        """Add intelligence packet to buffer"""
+        key = f"{packet.source}:{packet.intelligence_type}:{packet.timestamp.timestamp()}"
+        self.intelligence_buffer[key] = packet
+        
+        # Maintain buffer size
+        if len(self.intelligence_buffer) > self.max_buffer_size:
+            # Remove oldest entries
+            for _ in range(len(self.intelligence_buffer) - self.max_buffer_size):
+                self.intelligence_buffer.popitem(last=False)
+    
+    def aggregate_recent(
+        self,
+        window: Optional[timedelta] = None
+    ) -> Dict[str, List[IntelligencePacket]]:
+        """
+        Aggregate recent intelligence by target agent
+        
+        Returns:
+            Dict mapping target agents to intelligence packets
+        """
+        window = window or self.aggregation_window
+        cutoff_time = datetime.now() - window
+        
+        aggregated = defaultdict(list)
+        
+        for packet in self.intelligence_buffer.values():
+            if packet.timestamp >= cutoff_time:
+                aggregated[packet.target_agent].append(packet)
+        
+        return dict(aggregated)
+    
+    def get_confidence_scores(self) -> Dict[str, float]:
+        """Calculate aggregate confidence scores by source"""
+        source_confidences = defaultdict(list)
+        
+        for packet in self.intelligence_buffer.values():
+            source_confidences[packet.source].append(packet.confidence)
+        
+        # Calculate average confidence per source
+        return {
+            source: sum(confs) / len(confs)
+            for source, confs in source_confidences.items()
+        }
+
+
+class MLSystemCoordinator:
+    """Coordinates multiple ML systems to provide intelligence"""
+    
+    def __init__(self):
+        self.ml_systems = {}
+        self.system_weights = {}
+        self.system_stats = defaultdict(lambda: {
+            "calls": 0,
+            "successes": 0,
+            "failures": 0,
+            "total_time": 0.0,
+            "avg_confidence": 0.0
+        })
+    
+    def register_ml_system(
+        self,
+        name: str,
+        system: Any,
+        weight: float = 1.0
+    ):
+        """Register an ML system"""
+        self.ml_systems[name] = system
+        self.system_weights[name] = weight
+        logger.info(f"Registered ML system: {name} (weight: {weight})")
+    
+    async def gather_intelligence(
+        self,
+        query: str,
+        user_id: Optional[str],
+        session_id: Optional[str],
+        product_id: Optional[str],
+        context: Optional[Dict[str, Any]]
+    ) -> List[IntelligencePacket]:
+        """
+        Gather intelligence from all ML systems
+        
+        Returns:
+            List of intelligence packets
+        """
+        if not self.ml_systems:
+            return []
+        
+        # Create tasks for parallel execution
+        tasks = []
+        for name, system in self.ml_systems.items():
+            task = self._get_system_intelligence(
+                name, system, query, user_id,
+                session_id, product_id, context
+            )
+            tasks.append((name, task))
+        
+        # Execute all tasks
+        results = await asyncio.gather(
+            *[task for _, task in tasks],
+            return_exceptions=True
+        )
+        
+        # Process results into intelligence packets
+        packets = []
+        for (name, _), result in zip(tasks, results):
+            if isinstance(result, Exception):
+                self._record_system_failure(name, result)
+            elif result:
+                self._record_system_success(name, result)
+                packets.extend(result)
+        
+        return packets
+    
+    async def _get_system_intelligence(
+        self,
+        name: str,
+        system: Any,
+        query: str,
+        user_id: Optional[str],
+        session_id: Optional[str],
+        product_id: Optional[str],
+        context: Optional[Dict[str, Any]]
+    ) -> List[IntelligencePacket]:
+        """Get intelligence from a specific ML system"""
+        start_time = time.time()
+        packets = []
+        
+        try:
+            # Different intelligence extraction based on system type
+            intelligence_data = await self._extract_intelligence_by_type(
+                name, system, query, user_id,
+                session_id, product_id, context
+            )
+            
+            # Convert to intelligence packets
+            if intelligence_data:
+                for intel_type, data in intelligence_data.items():
+                    if data and isinstance(data, dict):
+                        confidence = data.get("confidence", 0.5) * self.system_weights[name]
+                        
+                        packet = IntelligencePacket(
+                            source=name,
+                            target_agent="",  # Will be set by router
+                            intelligence_type=intel_type,
+                            data=data,
+                            confidence=min(confidence, 1.0)
+                        )
+                        packets.append(packet)
+            
+            # Update stats
+            elapsed = time.time() - start_time
+            self.system_stats[name]["calls"] += 1
+            self.system_stats[name]["successes"] += 1
+            self.system_stats[name]["total_time"] += elapsed
+            
+        except Exception as e:
+            logger.error(f"Error getting intelligence from {name}: {e}")
+            self.system_stats[name]["calls"] += 1
+            self.system_stats[name]["failures"] += 1
+        
+        return packets
+    
+    async def _extract_intelligence_by_type(
+        self,
+        name: str,
+        system: Any,
+        query: str,
+        user_id: Optional[str],
+        session_id: Optional[str],
+        product_id: Optional[str],
+        context: Optional[Dict[str, Any]]
+    ) -> Dict[str, Any]:
+        """Extract intelligence based on system type"""
+        intelligence = {}
+        
+        # Clustering systems
+        if "cluster" in name.lower():
+            intelligence.update(
+                await self._extract_cluster_intelligence(
+                    system, query, product_id
+                )
+            )
+        
+        # Visual/aesthetic systems
+        if "visual" in name.lower() or "aesthetic" in name.lower():
+            intelligence.update(
+                await self._extract_visual_intelligence(
+                    system, product_id, query
+                )
+            )
+        
+        # RFM/behavioral systems
+        if "rfm" in name.lower() or "behavior" in name.lower():
+            intelligence.update(
+                await self._extract_behavioral_intelligence(
+                    system, user_id
+                )
+            )
+        
+        # Memory/context systems
+        if "memory" in name.lower() or "context" in name.lower():
+            intelligence.update(
+                await self._extract_contextual_intelligence(
+                    system, user_id, session_id, query
+                )
+            )
+        
+        # Generic extraction for unknown types
+        if not intelligence:
+            intelligence.update(
+                await self._extract_generic_intelligence(
+                    system, query, user_id, product_id
+                )
+            )
+        
+        return intelligence
+    
+    async def _extract_cluster_intelligence(
+        self,
+        system: Any,
+        query: str,
+        product_id: Optional[str]
+    ) -> Dict[str, Any]:
+        """Extract clustering intelligence"""
+        intelligence = {}
+        
+        try:
+            if hasattr(system, "get_cluster_analysis"):
+                analysis = await asyncio.to_thread(
+                    system.get_cluster_analysis,
+                    query=query,
+                    product_id=product_id
+                )
+                intelligence["cluster_analysis"] = {
+                    "clusters": analysis.get("clusters", []),
+                    "keywords": analysis.get("keywords", []),
+                    "distribution": analysis.get("distribution", {}),
+                    "coherence": analysis.get("coherence", 0.5),
+                    "confidence": 0.8
+                }
+            
+            if product_id and hasattr(system, "get_product_cluster"):
+                cluster_info = await asyncio.to_thread(
+                    system.get_product_cluster,
+                    product_id
+                )
+                intelligence["product_cluster"] = {
+                    "cluster_id": cluster_info.get("cluster_id"),
+                    "neighbors": cluster_info.get("neighbors", []),
+                    "characteristics": cluster_info.get("characteristics", {}),
+                    "confidence": 0.85
+                }
+        
+        except Exception as e:
+            logger.warning(f"Cluster intelligence extraction error: {e}")
+        
+        return intelligence
+    
+    async def _extract_visual_intelligence(
+        self,
+        system: Any,
+        product_id: Optional[str],
+        query: str
+    ) -> Dict[str, Any]:
+        """Extract visual/aesthetic intelligence"""
+        intelligence = {}
+        
+        try:
+            if product_id and hasattr(system, "analyze_visual_features"):
+                features = await asyncio.to_thread(
+                    system.analyze_visual_features,
+                    product_id
+                )
+                intelligence["visual_features"] = {
+                    "colors": features.get("dominant_colors", []),
+                    "patterns": features.get("patterns", []),
+                    "textures": features.get("textures", []),
+                    "style_attributes": features.get("styles", []),
+                    "complexity": features.get("complexity", "medium"),
+                    "aesthetic_score": features.get("score", 0.5),
+                    "confidence": 0.9
+                }
+            
+            if hasattr(system, "analyze_style_query"):
+                style_analysis = await asyncio.to_thread(
+                    system.analyze_style_query,
+                    query
+                )
+                intelligence["style_analysis"] = {
+                    "inferred_styles": style_analysis.get("styles", []),
+                    "mood": style_analysis.get("mood", "neutral"),
+                    "formality": style_analysis.get("formality", "casual"),
+                    "season": style_analysis.get("season"),
+                    "confidence": 0.7
+                }
+        
+        except Exception as e:
+            logger.warning(f"Visual intelligence extraction error: {e}")
+        
+        return intelligence
+    
+    async def _extract_behavioral_intelligence(
+        self,
+        system: Any,
+        user_id: Optional[str]
+    ) -> Dict[str, Any]:
+        """Extract behavioral intelligence"""
+        intelligence = {}
+        
+        if not user_id:
+            return intelligence
+        
+        try:
+            if hasattr(system, "get_user_segment"):
+                segment = await asyncio.to_thread(
+                    system.get_user_segment,
+                    user_id
+                )
+                intelligence["user_segment"] = {
+                    "segment": segment.get("segment", "standard"),
+                    "tier": segment.get("tier", "regular"),
+                    "recency": segment.get("recency_score", 0),
+                    "frequency": segment.get("frequency_score", 0),
+                    "monetary": segment.get("monetary_score", 0),
+                    "lifetime_value": segment.get("ltv", 0),
+                    "confidence": 0.85
+                }
+            
+            if hasattr(system, "get_purchase_patterns"):
+                patterns = await asyncio.to_thread(
+                    system.get_purchase_patterns,
+                    user_id
+                )
+                intelligence["purchase_patterns"] = {
+                    "frequent_items": patterns.get("frequent", []),
+                    "associations": patterns.get("rules", []),
+                    "seasonality": patterns.get("seasonal", {}),
+                    "brand_loyalty": patterns.get("brands", {}),
+                    "price_sensitivity": patterns.get("price_range", {}),
+                    "confidence": 0.75
+                }
+        
+        except Exception as e:
+            logger.warning(f"Behavioral intelligence extraction error: {e}")
+        
+        return intelligence
+    
+    async def _extract_contextual_intelligence(
+        self,
+        system: Any,
+        user_id: Optional[str],
+        session_id: Optional[str],
+        query: str
+    ) -> Dict[str, Any]:
+        """Extract contextual intelligence"""
+        intelligence = {}
+        
+        try:
+            if hasattr(system, "get_relevant_memories"):
+                memories = await asyncio.to_thread(
+                    system.get_relevant_memories,
+                    user_id=user_id,
+                    session_id=session_id,
+                    query=query,
+                    k=5
+                )
+                intelligence["memory_context"] = {
+                    "relevant_memories": memories,
+                    "memory_count": len(memories),
+                    "confidence": 0.9 if memories else 0.3
+                }
+            
+            if hasattr(system, "get_session_context"):
+                session_context = await asyncio.to_thread(
+                    system.get_session_context,
+                    session_id
+                )
+                intelligence["session_context"] = {
+                    "intent": session_context.get("intent"),
+                    "conversation_stage": session_context.get("stage"),
+                    "topics": session_context.get("topics", []),
+                    "mood": session_context.get("mood"),
+                    "confidence": 0.8
+                }
+            
+            if user_id and hasattr(system, "get_user_preferences"):
+                preferences = await asyncio.to_thread(
+                    system.get_user_preferences,
+                    user_id
+                )
+                intelligence["user_preferences"] = {
+                    "styles": preferences.get("preferred_styles", []),
+                    "brands": preferences.get("preferred_brands", []),
+                    "categories": preferences.get("preferred_categories", []),
+                    "colors": preferences.get("preferred_colors", []),
+                    "avoid": preferences.get("avoid_list", []),
+                    "budget": preferences.get("budget_range", {}),
+                    "confidence": 0.85
+                }
+        
+        except Exception as e:
+            logger.warning(f"Contextual intelligence extraction error: {e}")
+        
+        return intelligence
+    
+    async def _extract_generic_intelligence(
+        self,
+        system: Any,
+        query: str,
+        user_id: Optional[str],
+        product_id: Optional[str]
+    ) -> Dict[str, Any]:
+        """Extract generic intelligence from unknown system types"""
+        intelligence = {}
+        
+        try:
+            # Try various common method names
+            if hasattr(system, "get_intelligence"):
+                intel = await asyncio.to_thread(
+                    system.get_intelligence,
+                    query=query,
+                    user_id=user_id,
+                    product_id=product_id
+                )
+                intelligence["generic_intelligence"] = intel
+            
+            elif hasattr(system, "analyze"):
+                analysis = await asyncio.to_thread(
+                    system.analyze,
+                    query
+                )
+                intelligence["generic_analysis"] = analysis
+            
+            elif hasattr(system, "get_insights"):
+                insights = await asyncio.to_thread(
+                    system.get_insights,
+                    query=query
+                )
+                intelligence["generic_insights"] = insights
+        
+        except Exception as e:
+            logger.warning(f"Generic intelligence extraction error: {e}")
+        
+        return intelligence
+    
+    def _record_system_success(self, name: str, packets: List[IntelligencePacket]):
+        """Record successful intelligence extraction"""
+        if packets:
+            avg_confidence = sum(p.confidence for p in packets) / len(packets)
+            
+            current_avg = self.system_stats[name]["avg_confidence"]
+            total_successes = self.system_stats[name]["successes"]
+            
+            # Update running average
+            self.system_stats[name]["avg_confidence"] = (
+                (current_avg * total_successes + avg_confidence) /
+                (total_successes + 1)
+            )
+    
+    def _record_system_failure(self, name: str, error: Exception):
+        """Record failed intelligence extraction"""
+        logger.error(f"ML system {name} failed: {error}")
+    
+    def get_system_stats(self) -> Dict[str, Any]:
+        """Get statistics for all ML systems"""
+        stats = {}
+        
+        for name, system_stats in self.system_stats.items():
+            if system_stats["calls"] > 0:
+                stats[name] = {
+                    "success_rate": system_stats["successes"] / system_stats["calls"] * 100,
+                    "avg_response_time": system_stats["total_time"] / system_stats["calls"],
+                    "avg_confidence": system_stats["avg_confidence"],
+                    "total_calls": system_stats["calls"],
+                    "weight": self.system_weights.get(name, 1.0)
+                }
+        
+        return stats
+
 
 class EnsembleRecommender:
     """
-    Implements an ensemble recommendation system that combines multiple
-    recommenders for more robust and accurate recommendations.
+    Coordinates ML recommenders to provide intelligence for CAMEL battle agents.
     
-    FIXED: Uses proper error handling for all CAMEL operations.
+    KEY PRINCIPLE: This class NEVER returns products, only intelligence!
+    - Gathers insights from multiple ML systems
+    - Routes intelligence to appropriate CAMEL agents
+    - Enhances battle quality without bypassing it
     """
     
-    def __init__(
-        self, 
-        product_kg, 
-        product_retriever=None, 
-        stylist_agent=None
-    ):
-        """
-        Initialize the ensemble recommender.
+    def __init__(self):
+        """Initialize the ensemble intelligence coordinator"""
+        logger.info("Initializing Ensemble Intelligence Provider")
+        logger.info("Purpose: Provide ML intelligence to CAMEL agents")
+        logger.info("Note: NEVER provides direct recommendations!")
         
-        Args:
-            product_kg: Neo4j product knowledge graph instance
-            product_retriever: Product retriever (optional)
-            stylist_agent: CAMEL stylist agent (optional)
-        """
-        logger.info("Initializing EnsembleRecommender with CAMEL 0.2.64 compatibility")
-        self.product_kg = product_kg
-        self.product_retriever = product_retriever
-        self.stylist_agent = stylist_agent
-        self.recommenders = []
-        self.weights = {}
+        # Core components
+        self.router = IntelligenceRouter()
+        self.aggregator = IntelligenceAggregator()
+        self.coordinator = MLSystemCoordinator()
         
-        # Check CAMEL availability
-        if not CAMEL_AVAILABLE:
-            logger.warning("CAMEL-AI not fully available, using fallback implementations")
+        # Tracking
+        self.intelligence_requests = 0
+        self.intelligence_provided = 0
+        self.last_intelligence_time = None
         
-        # Default weights for different recommendation types
-        self.default_weights = {
-            "multi_cluster": 1.0,
-            "hybrid_visual": 1.0,
-            "rfm_apriori": 1.2,  # Higher weight for personalized recommendations
-            "memory_rag": 1.3,    # Higher weight for memory-based recommendations
-            "similar": 0.8,       # Lower weight for basic similarity
-            "popular": 0.6        # Lower weight for popular products
+        # Configuration
+        self.config = {
+            "enable_routing": True,
+            "enable_aggregation": True,
+            "enable_caching": True,
+            "cache_ttl": 60,  # seconds
+            "min_confidence": 0.3
         }
+        
+        # Intelligence cache
+        self.intelligence_cache = OrderedDict()
+        self.max_cache_size = 100
+        
+        logger.info("Ensemble intelligence coordinator ready")
     
-    def add_recommender(self, recommender, weight=1.0, name=None):
+    def add_recommender(
+        self,
+        recommender,
+        weight: float = 1.0,
+        name: Optional[str] = None
+    ) -> bool:
         """
-        Add a recommender to the ensemble.
+        Add an ML recommender that will provide intelligence
         
         Args:
-            recommender: Recommender instance
-            weight: Weight for this recommender (higher = more important)
-            name: Name of the recommender (optional)
+            recommender: ML recommender instance
+            weight: Importance weight
+            name: Name of the recommender
             
         Returns:
-            True if successful, False otherwise
+            Success status
         """
         if recommender is None:
-            logger.warning("Cannot add None as a recommender")
+            logger.warning("Cannot add None recommender")
             return False
-            
-        # Generate name if not provided
+        
         if name is None:
             name = recommender.__class__.__name__
-            
-        # Add to recommenders list
-        self.recommenders.append(recommender)
         
-        # Set weight
-        self.weights[name] = weight
-        
-        logger.info(f"Added recommender: {name} with weight {weight}")
+        self.coordinator.register_ml_system(name, recommender, weight)
         return True
     
-    def get_recommendations(
-        self, 
-        user_id: Optional[str] = None, 
-        session_id: Optional[str] = None, 
-        product_id: Optional[str] = None, 
-        query: Optional[str] = None, 
-        limit: int = 5
-    ) -> List[Dict[str, Any]]:
+    async def provide_intelligence_for_battle(
+        self,
+        query: str,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None,
+        product_id: Optional[str] = None,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Dict[str, Any]:
         """
-        Get ensemble recommendations using weighted voting.
+        Coordinate ML systems to provide intelligence for CAMEL battle agents
+        
+        THIS IS THE ONLY PUBLIC METHOD - WE DON'T PROVIDE RECOMMENDATIONS!
         
         Args:
-            user_id: Optional user ID for personalization
-            session_id: Optional session ID for context
-            product_id: Optional product ID for similar products
-            query: Optional search query to refine recommendations
-            limit: Maximum number of recommendations
+            query: Search query
+            user_id: User ID for behavioral analysis
+            session_id: Session ID for context
+            product_id: Reference product for similarity
+            context: Additional context
             
         Returns:
-            List of recommended products
+            Intelligence dictionary for CAMEL agents
         """
-        logger.info("Getting ensemble recommendations")
+        self.intelligence_requests += 1
+        start_time = time.time()
         
-        if not self.recommenders:
-            logger.warning("No recommenders available")
+        logger.info(f"Gathering ML intelligence for: '{query[:50] if query else 'general'}...'")
+        
+        # Check cache if enabled
+        if self.config["enable_caching"]:
+            cache_key = self._create_cache_key(
+                query, user_id, session_id, product_id
+            )
             
-            # Fallback to basic product retrieval
-            if product_id:
-                return self._get_fallback_similar_products(product_id, limit)
-            elif query and self.product_retriever:
-                return self._get_fallback_query_products(query, limit)
-            elif hasattr(self.product_kg, 'get_popular_products'):
-                return self._get_fallback_popular_products(limit)
-            else:
-                return []
+            if cache_key in self.intelligence_cache:
+                cached = self.intelligence_cache[cache_key]
+                # Check if cache is still valid
+                if (datetime.now() - cached["timestamp"]).seconds < self.config["cache_ttl"]:
+                    logger.info("Using cached intelligence")
+                    return cached["intelligence"]
         
-        # Collect recommendations from all recommenders
-        all_recommendations = []
-        
-        for recommender in self.recommenders:
-            recommendations = []
-            recommender_name = recommender.__class__.__name__
-            recommender_weight = self.weights.get(recommender_name, 1.0)
-            
-            try:
-                recommendations = self._get_recommendations_from_recommender(
-                    recommender, user_id, session_id, product_id, query, limit
-                )
-                
-                # Add recommendations with weight
-                if recommendations:
-                    logger.info(f"Got {len(recommendations)} recommendations from {recommender_name}")
-                    
-                    all_recommendations.append({
-                        'recommender': recommender_name,
-                        'weight': recommender_weight,
-                        'recommendations': recommendations
-                    })
-            except Exception as e:
-                logger.error(f"Error getting recommendations from {recommender_name}: {e}")
-        
-        # Add basic product retrieval if needed
-        if product_id and (not all_recommendations or len(all_recommendations) < 2):
-            try:
-                similar_products = self._get_fallback_similar_products(product_id, limit)
-                
-                if similar_products:
-                    logger.info(f"Got {len(similar_products)} similar products")
-                    
-                    all_recommendations.append({
-                        'recommender': 'similar',
-                        'weight': self.default_weights.get('similar', 0.8),
-                        'recommendations': similar_products
-                    })
-            except Exception as e:
-                logger.error(f"Error getting similar products: {e}")
-        
-        # Add popular products if needed
-        if not all_recommendations or len(all_recommendations) < 2:
-            try:
-                popular_products = self._get_fallback_popular_products(limit)
-                
-                if popular_products:
-                    logger.info(f"Got {len(popular_products)} popular products")
-                    
-                    all_recommendations.append({
-                        'recommender': 'popular',
-                        'weight': self.default_weights.get('popular', 0.6),
-                        'recommendations': popular_products
-                    })
-            except Exception as e:
-                logger.error(f"Error getting popular products: {e}")
-        
-        # If still no recommendations, return empty list
-        if not all_recommendations:
-            logger.warning("No recommendations available")
-            return []
-        
-        # Calculate weighted votes
-        product_votes = {}
-        
-        for recommender_data in all_recommendations:
-            weight = recommender_data['weight']
-            
-            for i, product in enumerate(recommender_data['recommendations']):
-                # Get product ID
-                product_id = product.get('id')
-                if not product_id:
-                    continue
-                    
-                # Position-based weight (earlier = better)
-                position_weight = 1.0 - (i / (limit * 2))
-                
-                # Initialize if not exists
-                if product_id not in product_votes:
-                    product_votes[product_id] = {
-                        'product': product,
-                        'score': 0.0,
-                        'sources': []
-                    }
-                
-                # Add weighted vote
-                vote_weight = weight * position_weight
-                product_votes[product_id]['score'] += vote_weight
-                product_votes[product_id]['sources'].append(recommender_data['recommender'])
-        
-        # Sort by score
-        sorted_products = sorted(
-            product_votes.values(), 
-            key=lambda x: x['score'], 
-            reverse=True
+        # Gather intelligence from all ML systems
+        packets = await self.coordinator.gather_intelligence(
+            query, user_id, session_id, product_id, context
         )
         
-        # Get top recommendations
-        top_recommendations = []
+        # Route intelligence packets to appropriate agents
+        if self.config["enable_routing"]:
+            for packet in packets:
+                packet.target_agent = self.router.route_intelligence(
+                    packet.source,
+                    packet.intelligence_type,
+                    packet.data
+                )
         
-        for item in sorted_products[:limit]:
-            product = item['product']
-            
-            # Add recommendation sources and score
-            product['recommendation_score'] = item['score']
-            product['recommendation_sources'] = item['sources']
-            
-            top_recommendations.append(product)
+        # Add to aggregator if enabled
+        if self.config["enable_aggregation"]:
+            for packet in packets:
+                self.aggregator.add_intelligence(packet)
         
-        # If we have a stylist agent, let it filter and explain the recommendations
-        if self.stylist_agent and top_recommendations and CAMEL_AVAILABLE:
-            try:
-                # Add explanations to the recommendations
-                self._add_stylist_explanations(top_recommendations, user_id, query, product_id)
-            except Exception as e:
-                logger.error(f"Error adding stylist explanations: {e}")
+        # Build final intelligence structure
+        intelligence = self._build_intelligence_structure(packets)
         
-        logger.info(f"Found {len(top_recommendations)} ensemble recommendations")
-        return top_recommendations
-    
-    def _get_recommendations_from_recommender(
-        self, 
-        recommender, 
-        user_id, 
-        session_id, 
-        product_id, 
-        query, 
-        limit
-    ) -> List[Dict[str, Any]]:
-        """
-        Get recommendations from a specific recommender with error handling.
+        # Update tracking
+        elapsed = time.time() - start_time
+        self.last_intelligence_time = elapsed
         
-        Args:
-            recommender: Recommender instance
-            user_id: User ID
-            session_id: Session ID
-            product_id: Product ID
-            query: Query string
-            limit: Limit
+        if intelligence["metadata"]["sources"]:
+            self.intelligence_provided += 1
+        
+        # Cache if enabled
+        if self.config["enable_caching"] and cache_key:
+            self._cache_intelligence(cache_key, intelligence)
+        
+        # Log summary
+        self._log_intelligence_summary(intelligence, elapsed)
+        
+        return intelligence
+    
+    def _build_intelligence_structure(
+        self,
+        packets: List[IntelligencePacket]
+    ) -> Dict[str, Any]:
+        """Build the final intelligence structure for battle agents"""
+        intelligence = {
+            "cypher_intel": {},
+            "vibe_intel": {},
+            "shared_intel": {},
+            "metadata": {
+                "timestamp": datetime.now().isoformat(),
+                "sources": [],
+                "packet_count": len(packets),
+                "confidence_scores": {},
+                "routing_distribution": Counter()
+            }
+        }
+        
+        # Filter by minimum confidence
+        packets = [
+            p for p in packets
+            if p.confidence >= self.config["min_confidence"]
+        ]
+        
+        # Organize packets by target agent
+        for packet in packets:
+            target = packet.target_agent
+            source = packet.source
+            intel_type = packet.intelligence_type
             
-        Returns:
-            List of recommendations
-        """
-        try:
-            # Call appropriate method based on parameters
-            if product_id is not None and hasattr(recommender, 'get_similar_products'):
-                return recommender.get_similar_products(product_id, limit)
-                
-            elif product_id is not None and hasattr(recommender, 'get_visual_recommendations'):
-                return recommender.get_visual_recommendations(product_id, limit)
-                
-            elif product_id is not None and hasattr(recommender, 'get_recommendations'):
-                # Check if method accepts product_id parameter
-                import inspect
-                sig = inspect.signature(recommender.get_recommendations)
-                if 'product_id' in sig.parameters:
-                    return recommender.get_recommendations(product_id=product_id, limit=limit)
-                
-            elif user_id is not None and hasattr(recommender, 'get_personalized_recommendations'):
-                return recommender.get_personalized_recommendations(user_id, query=query, limit=limit)
-                
-            elif user_id is not None and hasattr(recommender, 'get_recommendations'):
-                # Check if method accepts user_id parameter
-                import inspect
-                sig = inspect.signature(recommender.get_recommendations)
-                if 'user_id' in sig.parameters:
-                    return recommender.get_recommendations(user_id=user_id, limit=limit)
-                
-            elif query is not None and hasattr(recommender, 'search_by_natural_language'):
-                return recommender.search_by_natural_language(query, limit)
-                
-            elif query is not None and hasattr(recommender, 'search_products'):
-                return recommender.search_products(query, limit)
-                
-            elif hasattr(recommender, 'get_recommendations'):
-                # Generic recommendation method
-                return recommender.get_recommendations(limit=limit)
-                
-            return []
+            # Add to appropriate section
+            if target == "cypher":
+                if source not in intelligence["cypher_intel"]:
+                    intelligence["cypher_intel"][source] = {}
+                intelligence["cypher_intel"][source][intel_type] = packet.data
             
-        except Exception as e:
-            logger.error(f"Error calling recommender method: {e}")
-            return []
+            elif target == "vibe":
+                if source not in intelligence["vibe_intel"]:
+                    intelligence["vibe_intel"][source] = {}
+                intelligence["vibe_intel"][source][intel_type] = packet.data
+            
+            else:  # shared
+                if source not in intelligence["shared_intel"]:
+                    intelligence["shared_intel"][source] = {}
+                intelligence["shared_intel"][source][intel_type] = packet.data
+            
+            # Update metadata
+            if source not in intelligence["metadata"]["sources"]:
+                intelligence["metadata"]["sources"].append(source)
+            
+            intelligence["metadata"]["confidence_scores"][source] = max(
+                intelligence["metadata"]["confidence_scores"].get(source, 0),
+                packet.confidence
+            )
+            
+            intelligence["metadata"]["routing_distribution"][target] += 1
+        
+        # Calculate overall confidence
+        if intelligence["metadata"]["confidence_scores"]:
+            intelligence["metadata"]["overall_confidence"] = sum(
+                intelligence["metadata"]["confidence_scores"].values()
+            ) / len(intelligence["metadata"]["confidence_scores"])
+        else:
+            intelligence["metadata"]["overall_confidence"] = 0.0
+        
+        # Add aggregated insights if available
+        if self.config["enable_aggregation"]:
+            aggregated = self.aggregator.aggregate_recent()
+            intelligence["metadata"]["aggregated_insights"] = {
+                target: len(packets)
+                for target, packets in aggregated.items()
+            }
+        
+        return intelligence
     
-    def _get_fallback_similar_products(self, product_id: str, limit: int) -> List[Dict[str, Any]]:
-        """Get similar products as fallback"""
-        try:
-            if hasattr(self.product_kg, 'get_similar_products'):
-                return self.product_kg.get_similar_products(product_id, limit)
-        except Exception as e:
-            logger.error(f"Error getting fallback similar products: {e}")
-        return []
+    def _create_cache_key(
+        self,
+        query: str,
+        user_id: Optional[str],
+        session_id: Optional[str],
+        product_id: Optional[str]
+    ) -> str:
+        """Create cache key for intelligence"""
+        key_parts = [
+            query or "",
+            user_id or "",
+            session_id or "",
+            product_id or ""
+        ]
+        
+        key_string = ":".join(key_parts)
+        return hashlib.md5(key_string.encode()).hexdigest()
     
-    def _get_fallback_query_products(self, query: str, limit: int) -> List[Dict[str, Any]]:
-        """Get query-based products as fallback"""
-        try:
-            if self.product_retriever and hasattr(self.product_retriever, 'search_by_natural_language'):
-                return self.product_retriever.search_by_natural_language(query, limit)
-        except Exception as e:
-            logger.error(f"Error getting fallback query products: {e}")
-        return []
-    
-    def _get_fallback_popular_products(self, limit: int) -> List[Dict[str, Any]]:
-        """Get popular products as fallback"""
-        try:
-            if hasattr(self.product_kg, 'get_popular_products'):
-                return self.product_kg.get_popular_products(limit)
-        except Exception as e:
-            logger.error(f"Error getting fallback popular products: {e}")
-        return []
-    
-    def _add_stylist_explanations(
-        self, 
-        recommendations: List[Dict[str, Any]], 
-        user_id: Optional[str] = None, 
-        query: Optional[str] = None, 
-        reference_product_id: Optional[str] = None
+    def _cache_intelligence(
+        self,
+        cache_key: str,
+        intelligence: Dict[str, Any]
     ):
-        """
-        Add stylist explanations to recommendations.
+        """Cache intelligence with timestamp"""
+        self.intelligence_cache[cache_key] = {
+            "intelligence": intelligence,
+            "timestamp": datetime.now()
+        }
         
-        FIXED: Uses CompatibilityLayer for message creation.
-        
-        Args:
-            recommendations: List of recommendations to explain
-            user_id: Optional user ID for personalization
-            query: Optional search query that led to these recommendations
-            reference_product_id: Optional reference product ID
-        """
-        if not self.stylist_agent or not recommendations or not CAMEL_AVAILABLE:
-            return
-            
-        try:
-            # Create a prompt for the stylist agent
-            prompt = "As a fashion stylist, explain why these products would be perfect recommendations"
-            
-            if user_id:
-                prompt += f" for user {user_id}"
-                
-            if query:
-                prompt += f" who is looking for {query}"
-                
-            if reference_product_id:
-                try:
-                    reference_product = self.product_kg.get_product(reference_product_id)
-                    if reference_product:
-                        prompt += f" based on their interest in {reference_product.get('title')}"
-                except Exception as e:
-                    logger.warning(f"Could not get reference product details: {e}")
-            
-            prompt += ":\n\n"
-            
-            # Add products to the prompt
-            for i, product in enumerate(recommendations):
-                prompt += f"{i+1}. {product.get('title')} - ${product.get('price', 0)}"
-                
-                if product.get('categories'):
-                    prompt += f" - Categories: {', '.join(product.get('categories'))}"
-                    
-                prompt += f"\n{product.get('description', '')}\n\n"
-            
-            prompt += "For each recommendation, explain:\n"
-            prompt += "1. Why it's a good recommendation based on the context\n"
-            prompt += "2. How it complements other recommendations\n"
-            prompt += "3. Specific styling tips for wearing or using this item\n\n"
-            prompt += "Keep your explanations conversational, personable, and focused on the stylistic aspects."
-            
-            # Get stylist response using CompatibilityLayer
-            try:
-                if CompatibilityLayer:
-                    user_message = CompatibilityLayer.create_user_message(
-                        content=prompt,
-                        role_name="User"
-                    )
-                    
-                    if user_message and hasattr(self.stylist_agent, 'step'):
-                        response = self.stylist_agent.step(user_message)
-                        explanations = response.msg.content if hasattr(response, 'msg') else str(response)
-                        
-                        # Process explanations
-                        self._process_explanations(recommendations, explanations)
-                    else:
-                        logger.warning("Could not create user message or stylist agent step failed")
-                else:
-                    logger.warning("CompatibilityLayer not available for stylist explanations")
-                    
-            except Exception as e:
-                logger.error(f"Error getting stylist explanations: {e}")
-                
-        except Exception as e:
-            logger.error(f"Error adding stylist explanations: {e}")
+        # Maintain cache size
+        if len(self.intelligence_cache) > self.max_cache_size:
+            # Remove oldest entry
+            self.intelligence_cache.popitem(last=False)
     
-    def _process_explanations(self, recommendations: List[Dict[str, Any]], explanations: str):
-        """
-        Process and add stylist explanations to recommendations.
+    def _log_intelligence_summary(
+        self,
+        intelligence: Dict[str, Any],
+        elapsed_time: float
+    ):
+        """Log summary of gathered intelligence"""
+        cypher_count = len(intelligence["cypher_intel"])
+        vibe_count = len(intelligence["vibe_intel"])
+        shared_count = len(intelligence["shared_intel"])
+        confidence = intelligence["metadata"].get("overall_confidence", 0)
+        sources = intelligence["metadata"].get("sources", [])
         
-        Args:
-            recommendations: List of recommendations to add explanations to
-            explanations: Stylist explanations text
-        """
-        if not explanations or not recommendations:
-            return
-            
-        try:
-            # Split explanations by recommendation number
-            lines = explanations.split('\n')
-            current_rec_index = -1
-            current_explanation = []
-            
-            for line in lines:
-                # Check if line starts with a number followed by period or bracket
-                if line.strip() and (
-                    line.strip()[0].isdigit() and 
-                    len(line.strip()) > 1 and 
-                    (line.strip()[1] == '.' or line.strip()[1] == ')')
-                ):
-                    # Save previous explanation if any
-                    if current_rec_index >= 0 and current_rec_index < len(recommendations) and current_explanation:
-                        explanation_text = '\n'.join(current_explanation).strip()
-                        if explanation_text:
-                            recommendations[current_rec_index]['stylist_explanation'] = explanation_text
-                    
-                    # Start new explanation
-                    try:
-                        # Extract recommendation number
-                        num_str = line.strip()[0]
-                        current_rec_index = int(num_str) - 1
-                        current_explanation = [line.strip()]
-                    except (ValueError, IndexError):
-                        # Not a valid recommendation number
-                        current_explanation.append(line)
-                else:
-                    # Continue current explanation
-                    current_explanation.append(line)
-            
-            # Save last explanation
-            if current_rec_index >= 0 and current_rec_index < len(recommendations) and current_explanation:
-                explanation_text = '\n'.join(current_explanation).strip()
-                if explanation_text:
-                    recommendations[current_rec_index]['stylist_explanation'] = explanation_text
-            
-            # If we couldn't parse individual explanations, add the whole text to all recommendations
-            if not any('stylist_explanation' in rec for rec in recommendations):
-                for recommendation in recommendations:
-                    recommendation['stylist_explanation'] = explanations
-                    
-        except Exception as e:
-            logger.error(f"Error processing stylist explanations: {e}")
-            # Add raw explanations to all recommendations
-            for recommendation in recommendations:
-                recommendation['stylist_explanation'] = explanations
+        logger.info(
+            f"Intelligence gathered in {elapsed_time:.2f}s: "
+            f"CypherBot={cypher_count}, VibeBot={vibe_count}, "
+            f"Shared={shared_count}, Confidence={confidence:.2f}"
+        )
+        
+        if sources:
+            logger.info(f"Sources: {', '.join(sources)}")
+    
+    def get_stats(self) -> Dict[str, Any]:
+        """Get comprehensive statistics"""
+        return {
+            "requests": {
+                "total": self.intelligence_requests,
+                "successful": self.intelligence_provided,
+                "success_rate": (
+                    self.intelligence_provided / self.intelligence_requests * 100
+                    if self.intelligence_requests > 0 else 0
+                )
+            },
+            "performance": {
+                "last_response_time": self.last_intelligence_time,
+                "cache_size": len(self.intelligence_cache),
+                "cache_enabled": self.config["enable_caching"]
+            },
+            "ml_systems": self.coordinator.get_system_stats(),
+            "routing": {
+                "enabled": self.config["enable_routing"],
+                "rules": self.router.routing_rules
+            },
+            "aggregation": {
+                "enabled": self.config["enable_aggregation"],
+                "buffer_size": len(self.aggregator.intelligence_buffer),
+                "confidence_scores": self.aggregator.get_confidence_scores()
+            },
+            "configuration": self.config,
+            "provides_recommendations": False,  # NEVER!
+            "provides_intelligence": True  # ALWAYS!
+        }
+    
+    def update_config(self, config_updates: Dict[str, Any]):
+        """Update configuration"""
+        self.config.update(config_updates)
+        logger.info(f"Configuration updated: {config_updates}")
+    
+    def clear_cache(self):
+        """Clear intelligence cache"""
+        self.intelligence_cache.clear()
+        logger.info("Intelligence cache cleared")

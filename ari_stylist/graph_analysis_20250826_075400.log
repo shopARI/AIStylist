@@ -1,0 +1,30 @@
+2025-08-26 07:54:00,876 - __main__ - INFO - Config file analyzer_config.yaml not found, using defaults
+2025-08-26 07:54:01,165 - __main__ - INFO - Connected to bolt://0.0.0.0:17687
+2025-08-26 07:54:01,167 - __main__ - INFO - ============================================================
+2025-08-26 07:54:01,168 - __main__ - INFO - NEO4J DIAGNOSTIC ANALYSIS
+2025-08-26 07:54:01,168 - __main__ - INFO - ============================================================
+2025-08-26 07:54:01,168 - __main__ - INFO - Discovering schema...
+2025-08-26 07:54:25,891 - __main__ - ERROR - Fatal error: Object of type DateTime is not JSON serializable
+Traceback (most recent call last):
+  File "/home/leo/AIStylist/ari_stylist/neo4j_graph_analyzer_new_graph.py", line 951, in run
+    self.schema = self.discover_schema()
+  File "/home/leo/AIStylist/ari_stylist/neo4j_graph_analyzer_new_graph.py", line 811, in discover_schema
+    self.cache.set(self.connection.uri, schema, self.config.write_lock_timeout)
+  File "/home/leo/AIStylist/ari_stylist/neo4j_graph_analyzer_new_graph.py", line 316, in set
+    json.dump(data, f, indent=2)
+  File "/opt/conda/lib/python3.10/json/__init__.py", line 179, in dump
+    for chunk in iterable:
+  File "/opt/conda/lib/python3.10/json/encoder.py", line 431, in _iterencode
+    yield from _iterencode_dict(o, _current_indent_level)
+  File "/opt/conda/lib/python3.10/json/encoder.py", line 405, in _iterencode_dict
+    yield from chunks
+  File "/opt/conda/lib/python3.10/json/encoder.py", line 325, in _iterencode_list
+    yield from chunks
+  File "/opt/conda/lib/python3.10/json/encoder.py", line 405, in _iterencode_dict
+    yield from chunks
+  File "/opt/conda/lib/python3.10/json/encoder.py", line 438, in _iterencode
+    o = _default(o)
+  File "/opt/conda/lib/python3.10/json/encoder.py", line 179, in default
+    raise TypeError(f'Object of type {o.__class__.__name__} '
+TypeError: Object of type DateTime is not JSON serializable
+2025-08-26 07:54:25,893 - __main__ - INFO - Closed connection to bolt://0.0.0.0:17687

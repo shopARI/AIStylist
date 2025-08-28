@@ -6,7 +6,7 @@ Frequency, Monetary) analysis with association rule mining using the Apriori
 algorithm for personalized fashion recommendations.
 Compatible with CAMEL-AI 0.2.59+.
 
-MIGRATED: Now uses AgentFactory instead of AsyncCAMELService for CAMEL 0.2.59+ compatibility.
+Now uses AgentFactory instead of AsyncCAMELService for CAMEL 0.2.59+ compatibility.
 """
 
 import logging
@@ -16,7 +16,7 @@ import asyncio
 from typing import List, Dict, Any, Optional, Tuple, Set
 from collections import defaultdict
 
-# MIGRATED: Import AgentFactory instead of AsyncCAMELService
+# Import AgentFactory instead of AsyncCAMELService
 from agent_factory import get_agent_factory
 
 try:
@@ -29,7 +29,7 @@ except ImportError:
     MLXTEND_AVAILABLE = False
     logging.warning("mlxtend not installed. Please install with: pip install mlxtend pandas")
 
-# MIGRATED: Updated imports for CAMEL 0.2.59+
+# Updated imports for CAMEL 0.2.59+
 from camel_imports import (
     ChatAgent,
     AgentMemory,
@@ -45,7 +45,7 @@ class RFMAprioriRecommenderAsync:
     Implements an asynchronous recommendation system that combines RFM (Recency, Frequency,
     Monetary) analysis with association rule mining using the Apriori algorithm.
     
-    MIGRATED: Now uses AgentFactory for CAMEL 0.2.59+ compatibility.
+    Now uses AgentFactory for CAMEL 0.2.59+ compatibility.
     """
     
     def __init__(
@@ -87,7 +87,7 @@ class RFMAprioriRecommenderAsync:
         # Memory for tracking user preferences
         self.memory = None
         
-        # MIGRATED: Use AgentFactory instead of AsyncCAMELService
+        # Use AgentFactory instead of AsyncCAMELService
         self.agent_factory = get_agent_factory()
         
         # Lock for transaction access
@@ -760,5 +760,6 @@ class RFMAprioriRecommenderAsync:
     
     async def close(self):
         """Clean up resources"""
-        # MIGRATED: Clean up AgentFactory resources
+        # Clean up AgentFactory resources
         await self.agent_factory.cleanup()
+        

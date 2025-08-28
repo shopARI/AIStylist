@@ -5,7 +5,7 @@ This module implements a recommendation system that combines content-based
 and visual similarity approaches for fashion recommendations.
 Compatible with CAMEL-AI 0.2.64.
 
-MIGRATED: Uses PyTorch instead of TensorFlow for better performance.
+Uses PyTorch instead of TensorFlow for better performance.
 """
 
 import logging
@@ -25,14 +25,14 @@ try:
     import numpy as np
     PYTORCH_AVAILABLE = True
     logger = logging.getLogger("hybrid_visual_recommender")
-    logger.info("✅ PyTorch available for visual similarity")
+    logger.info("PyTorch available for visual similarity")
 except ImportError:
     PYTORCH_AVAILABLE = False
     logger = logging.getLogger("hybrid_visual_recommender")
     logger.warning("PyTorch not installed. Visual similarity will be limited.")
     logger.info("Install with: pip install torch torchvision pillow")
 
-# FIXED: Use centralized imports with error handling
+# Use centralized imports with error handling
 from camel_imports import (
     CAMEL_AVAILABLE,
     AutoRetriever,
@@ -51,7 +51,7 @@ class HybridVisualRecommender:
     Implements a hybrid recommendation system combining content-based filtering
     and visual similarity for fashion recommendations using PyTorch.
     
-    MIGRATED: Uses PyTorch instead of TensorFlow for better performance and efficiency.
+    Uses PyTorch instead of TensorFlow for better performance and efficiency.
     """
     
     def __init__(
@@ -78,7 +78,7 @@ class HybridVisualRecommender:
         if not CAMEL_AVAILABLE:
             logger.warning("CAMEL-AI not fully available, using fallback implementations")
         
-        # FIXED: Initialize embedding model with error handling
+        # Initialize embedding model with error handling
         try:
             if CAMEL_AVAILABLE and OpenAIEmbedding and EmbeddingModelType:
                 self.embedding_model = embedding_model or OpenAIEmbedding(
@@ -93,7 +93,7 @@ class HybridVisualRecommender:
             self.embedding_model = None
             logger.warning("Text embeddings not available")
         
-        # FIXED: Initialize CAMEL retriever for text-based search with error handling
+        # Initialize CAMEL retriever for text-based search with error handling
         try:
             if (CAMEL_AVAILABLE and AutoRetriever and StorageType and 
                 self.embedding_model):
@@ -341,7 +341,7 @@ class HybridVisualRecommender:
                     }
                 }
                 
-                # FIXED: Index the document with error handling
+                # Index the document with error handling
                 try:
                     if hasattr(self.auto_retriever, 'add_document'):
                         self.auto_retriever.add_document(document)
@@ -446,7 +446,7 @@ class HybridVisualRecommender:
                 
                 query = f"{title} {categories} {tags}"
                 
-                # FIXED: Search similar products with error handling
+                # Search similar products with error handling
                 try:
                     if hasattr(self.auto_retriever, 'search'):
                         results = self.auto_retriever.search(

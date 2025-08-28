@@ -1,463 +1,146 @@
-"""
-Dependency Injection Container
-Manages service creation and lifecycle for the AI Fashion System
-"""
-
 import logging
-from typing import Dict, Any, Optional, Type, TypeVar, Callable
-from dataclasses import dataclass, field
-from enum import Enum
-import asyncio
-from contextlib import asynccontextmanager
+from dataclasses import asdict #
+from typing import Dict, Any, Optional
 
-from config.settings import Settings, get_settings
+from dependency_injector import containers, providers
+
+from config.settings import Settings
+
+# Import all services and agents
+from services.user.knowledge_graph import UserKnowledgeGraphService
+from services.product.retriever import ProductRetrieverService
+from services.data.hybrid_store import HybridDataStore
+from services.cache.battle_cache import BattleCache
+from services.memory.fallback_manager import MemoryFallbackManager
+from services.conversation_handler import ConversationHandler
+from services.application import ApplicationService # We will create this new service
+
+# Battle System
+from services.battle.orchestrator import BattleOrchestrator
+from services.battle.executor import BattleExecutor
+from services.battle.optimizer import BattleOptimizer
+from services.battle.metrics import BattleMetrics
+
+# Agents
+from agents.factory import get_agent_factory
+from agents.cypher_bot import CypherBotAgent
+from agents.vibe_bot import VibeBotAgent
+from agents.judge import JudgeAriAgent
 
 logger = logging.getLogger("di.container")
 
-# Type variable for generic service types
-T = TypeVar('T')
-
-# =============================================================================
-# SERVICE LIFECYCLE
-# =============================================================================
-
-class ServiceLifecycle(Enum):
-    """Service lifecycle management strategies."""
-    SINGLETON = "singleton"  # One instance for entire app lifetime
-    SCOPED = "scoped"  # One instance per request/scope
-    TRANSIENT = "transient"  # New instance every time
-
-# =============================================================================
-# SERVICE DESCRIPTOR
-# =============================================================================
-
-@dataclass
-class ServiceDescriptor:
-    """Describes a service registration."""
-    service_type: Type
-    factory: Callable
-    lifecycle: ServiceLifecycle
-    dependencies: List[str] = field(default_factory=list)
-    initialized: bool = False
-    instance: Optional[Any] = None
-
-# =============================================================================
-# DEPENDENCY INJECTION CONTAINER
-# =============================================================================
-
-class DIContainer:
+class DIContainer(containers.DeclarativeContainer):
     """
-    Dependency injection container for managing service lifecycle.
-    Supports singleton, scoped, and transient services.
+    Dependency Injection container for the entire application.
+    Uses the dependency-injector library for a robust and standard implementation.
     """
-    
-    def __init__(self, settings: Optional[Settings] = None):
-        """
-        Initialize DI container.
-        
-        Args:
-            settings: Application settings (uses global if None)
-        """
-        self.settings = settings or get_settings()
-        self._services: Dict[str, ServiceDescriptor] = {}
-        self._scoped_instances: Dict[str, Any] = {}
-        self._initialization_lock = asyncio.Lock()
-        
-        logger.info("Dependency injection container initialized")
-    
-    # =========================================================================
-    # REGISTRATION
-    # =========================================================================
-    
-    def register_singleton(
-        self,
-        service_type: Type[T],
-        factory: Optional[Callable[..., T]] = None,
-        name: Optional[str] = None,
-        dependencies: Optional[List[str]] = None
-    ) -> None:
-        """
-        Register a singleton service.
-        
-        Args:
-            service_type: Service class type
-            factory: Optional factory function
-            name: Optional service name (uses type name if None)
-            dependencies: Optional list of dependency names
-        """
-        self._register(
-            service_type=service_type,
-            factory=factory or service_type,
-            lifecycle=ServiceLifecycle.SINGLETON,
-            name=name,
-            dependencies=dependencies
-        )
-    
-    def register_scoped(
-        self,
-        service_type: Type[T],
-        factory: Optional[Callable[..., T]] = None,
-        name: Optional[str] = None,
-        dependencies: Optional[List[str]] = None
-    ) -> None:
-        """
-        Register a scoped service.
-        
-        Args:
-            service_type: Service class type
-            factory: Optional factory function
-            name: Optional service name
-            dependencies: Optional list of dependency names
-        """
-        self._register(
-            service_type=service_type,
-            factory=factory or service_type,
-            lifecycle=ServiceLifecycle.SCOPED,
-            name=name,
-            dependencies=dependencies
-        )
-    
-    def register_transient(
-        self,
-        service_type: Type[T],
-        factory: Optional[Callable[..., T]] = None,
-        name: Optional[str] = None,
-        dependencies: Optional[List[str]] = None
-    ) -> None:
-        """
-        Register a transient service.
-        
-        Args:
-            service_type: Service class type
-            factory: Optional factory function
-            name: Optional service name
-            dependencies: Optional list of dependency names
-        """
-        self._register(
-            service_type=service_type,
-            factory=factory or service_type,
-            lifecycle=ServiceLifecycle.TRANSIENT,
-            name=name,
-            dependencies=dependencies
-        )
-    
-    def _register(
-        self,
-        service_type: Type,
-        factory: Callable,
-        lifecycle: ServiceLifecycle,
-        name: Optional[str],
-        dependencies: Optional[List[str]]
-    ) -> None:
-        """Internal registration method."""
-        service_name = name or service_type.__name__
-        
-        if service_name in self._services:
-            logger.warning(f"Service '{service_name}' already registered, overwriting")
-        
-        self._services[service_name] = ServiceDescriptor(
-            service_type=service_type,
-            factory=factory,
-            lifecycle=lifecycle,
-            dependencies=dependencies or []
-        )
-        
-        logger.debug(f"Registered {lifecycle.value} service: {service_name}")
-    
-    # =========================================================================
-    # RESOLUTION
-    # =========================================================================
-    
-    async def get(self, service_name: str) -> Any:
-        """
-        Get a service instance.
-        
-        Args:
-            service_name: Name of the service
-            
-        Returns:
-            Service instance
-            
-        Raises:
-            KeyError: Service not registered
-            RuntimeError: Circular dependency or initialization error
-        """
-        if service_name not in self._services:
-            raise KeyError(f"Service '{service_name}' not registered")
-        
-        descriptor = self._services[service_name]
-        
-        # Handle based on lifecycle
-        if descriptor.lifecycle == ServiceLifecycle.SINGLETON:
-            return await self._get_singleton(service_name, descriptor)
-        elif descriptor.lifecycle == ServiceLifecycle.SCOPED:
-            return await self._get_scoped(service_name, descriptor)
-        else:  # TRANSIENT
-            return await self._create_instance(descriptor)
-    
-    async def _get_singleton(
-        self,
-        service_name: str,
-        descriptor: ServiceDescriptor
-    ) -> Any:
-        """Get or create singleton instance."""
-        if not descriptor.initialized:
-            async with self._initialization_lock:
-                # Double-check after acquiring lock
-                if not descriptor.initialized:
-                    descriptor.instance = await self._create_instance(descriptor)
-                    descriptor.initialized = True
-                    logger.debug(f"Created singleton: {service_name}")
-        
-        return descriptor.instance
-    
-    async def _get_scoped(
-        self,
-        service_name: str,
-        descriptor: ServiceDescriptor
-    ) -> Any:
-        """Get or create scoped instance."""
-        if service_name not in self._scoped_instances:
-            self._scoped_instances[service_name] = await self._create_instance(descriptor)
-            logger.debug(f"Created scoped instance: {service_name}")
-        
-        return self._scoped_instances[service_name]
-    
-    async def _create_instance(self, descriptor: ServiceDescriptor) -> Any:
-        """Create a new service instance."""
-        # Resolve dependencies
-        dependencies = {}
-        for dep_name in descriptor.dependencies:
-            dependencies[dep_name] = await self.get(dep_name)
-        
-        # Create instance
-        factory = descriptor.factory
-        
-        # Check if factory is async
-        if asyncio.iscoroutinefunction(factory):
-            instance = await factory(**dependencies, settings=self.settings)
-        else:
-            instance = factory(**dependencies, settings=self.settings)
-        
-        return instance
-    
-    # =========================================================================
-    # SCOPE MANAGEMENT
-    # =========================================================================
-    
-    @asynccontextmanager
-    async def create_scope(self):
-        """
-        Create a new scope for scoped services.
-        
-        Usage:
-            async with container.create_scope():
-                service = await container.get("ScopedService")
-        """
-        # Clear scoped instances at start
-        self._scoped_instances.clear()
-        
-        try:
-            yield self
-        finally:
-            # Cleanup scoped instances
-            for name, instance in self._scoped_instances.items():
-                if hasattr(instance, 'cleanup'):
-                    try:
-                        if asyncio.iscoroutinefunction(instance.cleanup):
-                            await instance.cleanup()
-                        else:
-                            instance.cleanup()
-                    except Exception as e:
-                        logger.error(f"Error cleaning up scoped service '{name}': {e}")
-            
-            self._scoped_instances.clear()
-    
-    # =========================================================================
-    # LIFECYCLE MANAGEMENT
-    # =========================================================================
-    
-    async def initialize_all(self) -> None:
-        """Initialize all singleton services."""
-        for name, descriptor in self._services.items():
-            if descriptor.lifecycle == ServiceLifecycle.SINGLETON:
-                await self.get(name)
-        
-        logger.info("All singleton services initialized")
-    
-    async def cleanup(self) -> None:
-        """Cleanup all services."""
-        # Cleanup singletons
-        for name, descriptor in self._services.items():
-            if descriptor.lifecycle == ServiceLifecycle.SINGLETON and descriptor.instance:
-                if hasattr(descriptor.instance, 'cleanup'):
-                    try:
-                        if asyncio.iscoroutinefunction(descriptor.instance.cleanup):
-                            await descriptor.instance.cleanup()
-                        else:
-                            descriptor.instance.cleanup()
-                        logger.debug(f"Cleaned up singleton: {name}")
-                    except Exception as e:
-                        logger.error(f"Error cleaning up singleton '{name}': {e}")
-        
-        # Clear all instances
-        self._scoped_instances.clear()
-        for descriptor in self._services.values():
-            descriptor.instance = None
-            descriptor.initialized = False
-        
-        logger.info("All services cleaned up")
+    settings = providers.Singleton(Settings)
 
-# =============================================================================
-# SERVICE REGISTRATION HELPERS
-# =============================================================================
-
-def register_core_services(container: DIContainer) -> None:
-    """
-    Register core system services.
-    
-    Args:
-        container: DI container
-    """
-    from services.connection.manager import ConnectionManager
-    from services.cache.battle_cache import BattleCache
-    
-    # Register connection managers
-    container.register_singleton(
-        ConnectionManager,
-        name="Neo4jConnection"
-    )
-    container.register_singleton(
-        ConnectionManager,
-        name="QdrantConnection"
+    # --- Core Infrastructure ---
+    # This is the CORRECT version
+    user_kg_service = providers.Singleton(
+        UserKnowledgeGraphService,
+        url=settings.provided.neo4j.url,
+        username=settings.provided.neo4j.username,
+        password=settings.provided.neo4j.password
     )
     
-    # Register battle cache
-    container.register_singleton(
-        BattleCache,
-        name="BattleCache"
+    product_retriever_service = providers.Singleton(
+        ProductRetrieverService,
+        collection_name=settings.provided.qdrant.collection_name
     )
-    
-    logger.info("Core services registered")
 
-def register_battle_services(container: DIContainer) -> None:
-    """
-    Register battle system services.
-    
-    Args:
-        container: DI container
-    """
-    # from services.battle.orchestrator import BattleOrchestrator
-    # from services.battle.executor import BattleExecutor
-    # from services.battle.optimizer import BattleOptimizer
-    # from services.battle.metrics import BattleMetrics
-    from services.battle import BattleOrchestrator, BattleExecutor, BattleOptimizer, BattleMetrics
-    
-    # Register battle components
-    container.register_singleton(
-        BattleOrchestrator,
-        name="BattleOrchestrator",
-        dependencies=["Neo4jConnection", "QdrantConnection", "BattleCache"]
+    hybrid_data_store = providers.Singleton(
+        HybridDataStore,
+        neo4j_client=user_kg_service,
+        qdrant_client=product_retriever_service
     )
-    
-    container.register_scoped(
-        BattleExecutor,
-        name="BattleExecutor"
-    )
-    
-    container.register_singleton(
-        BattleOptimizer,
-        name="BattleOptimizer"
-    )
-    
-    container.register_singleton(
-        BattleMetrics,
-        name="BattleMetrics"
-    )
-    
-    logger.info("Battle services registered")
 
-def register_agent_services(container: DIContainer) -> None:
-    """
-    Register agent services.
-    
-    Args:
-        container: DI container
-    """
-    from agents import CypherBotAgent, VibeBotAgent, JudgeAriAgent
-    
-    # Register agents as scoped (per-request)
-    container.register_scoped(
+    battle_cache = providers.Singleton(
+        BattleCache
+    )
+
+    # --- Agents (Scoped per request/battle) ---
+    cypher_bot_agent = providers.Factory(
         CypherBotAgent,
-        name="CypherBot",
-        dependencies=["Neo4jConnection"]
+        neo4j_client=user_kg_service
     )
-    
-    container.register_scoped(
+
+    vibe_bot_agent = providers.Factory(
         VibeBotAgent,
-        name="VibeBot",
-        dependencies=["QdrantConnection"]
+        qdrant_client=product_retriever_service
     )
+
+    judge_agent = providers.Factory(JudgeAriAgent)
+
+    agent_factory = providers.Resource(get_agent_factory)
     
-    container.register_scoped(
-        JudgeAriAgent,
-        name="JudgeAri"
+    # --- Battle System (wired with agents) ---
+    battle_metrics = providers.Singleton(BattleMetrics)
+    
+    battle_optimizer = providers.Singleton(BattleOptimizer)
+
+    battle_executor = providers.Singleton(
+        BattleExecutor,
+        cypher_bot=cypher_bot_agent,
+        vibe_bot=vibe_bot_agent,
+        judge=judge_agent
     )
-    
-    logger.info("Agent services registered")
 
-# =============================================================================
-# GLOBAL CONTAINER
-# =============================================================================
+    battle_orchestrator = providers.Singleton(
+        BattleOrchestrator,
+        executor=battle_executor,
+        cache=battle_cache,
+        optimizer=battle_optimizer,
+        metrics=battle_metrics,
+        settings=providers.Factory(asdict, settings.provided.battle)
+    )
 
-# Global container instance
-_container: Optional[DIContainer] = None
+    # --- Top-Level Application Services ---
+    fallback_memory_manager = providers.Singleton(
+        MemoryFallbackManager
+    )
 
-def get_container() -> DIContainer:
-    """
-    Get the global DI container.
-    
-    Returns:
-        DIContainer instance
-    """
-    global _container
-    if _container is None:
-        _container = DIContainer()
-        
-        # Register all services
-        register_core_services(_container)
-        register_battle_services(_container)
-        register_agent_services(_container)
-        
-        logger.info("Global DI container initialized with all services")
-    
-    return _container
+    conversation_handler = providers.Singleton(
+        ConversationHandler,
+        agent_factory=agent_factory,
+        memory_manager=fallback_memory_manager,
+        neo4j_service=user_kg_service,
+        qdrant_service=product_retriever_service
+    )
+
+    # --- Main Application Service ---
+    application_service = providers.Singleton(
+        ApplicationService,
+        conversation_handler=conversation_handler,
+        battle_orchestrator=battle_orchestrator,
+        user_kg_service=user_kg_service
+    )
 
 async def initialize_container() -> DIContainer:
     """
-    Initialize the global container and all singleton services.
-    
-    Returns:
-        Initialized DIContainer
+    Initializes the container and all its dependent services.
+    This should be called during application startup.
     """
-    container = get_container()
-    await container.initialize_all()
+    logger.info("Initializing DI container and services...")
+    container = DIContainer()
+    container.wire(modules=[
+        "main", 
+        "services.application"
+    ])
+    
+    # Asynchronously initialize services that require it
+    await container.user_kg_service().initialize()
+    await container.product_retriever_service().initialize()
+    logger.info("Container and core services initialized.")
     return container
 
-# =============================================================================
-# EXPORTS
-# =============================================================================
-
-__all__ = [
-    # Classes
-    'DIContainer',
-    'ServiceLifecycle',
-    'ServiceDescriptor',
-    
-    # Functions
-    'get_container',
-    'initialize_container',
-    'register_core_services',
-    'register_battle_services',
-    'register_agent_services'
-]
+async def cleanup_container(container: DIContainer):
+    """
+    Cleans up resources used by services in the container.
+    This should be called during application shutdown.
+    """
+    logger.info("Cleaning up container resources...")
+    await container.user_kg_service().close()
+    await container.product_retriever_service().close()
+    logger.info("Container cleanup complete.")
