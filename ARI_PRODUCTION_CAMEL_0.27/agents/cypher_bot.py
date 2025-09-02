@@ -78,19 +78,28 @@ class CypherBotAgent:
             logger.warning("No filters provided, returning empty list")
             return []
         
-        # Collect all search terms
+        # Sanitize filters again to prevent injection
+        from utils.security import InputValidator
+        safe_filters = InputValidator.sanitize_filters(filters) if hasattr(InputValidator, 'sanitize_filters') else filters
+        
+        # Collect all search terms with additional validation
         search_terms = []
         
-        if "category" in filters:
-            search_terms.append(filters["category"])
-            logger.debug(f"Added category term: {filters['category']}")
+        if "category" in safe_filters:
+            term = str(safe_filters["category"])[:50]  # Limit length
+            search_terms.append(term)
+            logger.debug(f"Added category term: {term}")
         
-        if "colors" in filters:
-            search_terms.extend(filters["colors"])
-            logger.debug(f"Added color terms: {filters['colors']}")
+        if "colors" in safe_filters:
+            colors = safe_filters["colors"]
+            if isinstance(colors, list):
+                for color in colors[:5]:  # Limit number of colors
+                    color_str = str(color)[:30]  # Limit length
+                    search_terms.append(color_str)
+                    logger.debug(f"Added color term: {color_str}")
         
         if not search_terms:
-            logger.warning("No search terms extracted from filters")
+            logger.warning("No valid search terms extracted from filters")
             return []
         
         # Search in title and description for ALL terms
@@ -139,50 +148,3 @@ class CypherBotAgent:
             logger.error(f"!!! Neo4j query failed: {e}", exc_info=True)
             return []
 
-    async def _filtered_search(self, filters: Optional[Dict[str, Any]], limit: int) -> List[Dict[str, Any]]:
-        if not filters:
-            return []
-        
-        search_terms = []
-        if "category" in filters:
-            search_terms.append(filters["category"])
-        if "colors" in filters:
-            search_terms.extend(filters["colors"])
-        
-        if not search_terms:
-            return []
-        
-        # Fix: Use exact word matching, not substring
-        # In cypher_bot.py, update the regex pattern:
-        cypher_query = """
-        MATCH (p:Product)
-        WHERE p.is_fashion = true
-        AND (
-            toLower(p.product_type) IN [x in $search_terms | toLower(x)]
-            OR ALL(term IN $search_terms WHERE 
-                p.title =~ '(?i)(^|\\\\s)' + term + '(\\\\s|$)'
-            )
-        )
-        RETURN p
-        LIMIT $limit
-        """
-        
-        params = {
-            "search_terms": search_terms,
-            "limit": limit
-        }
-        
-        logger.debug(f"CypherBot query with terms: {search_terms}")
-        
-        try:
-            results = await self.neo4j.query(cypher_query, params)
-            products = []
-            for record in results:
-                # Extract the product node from the record
-                product_data = dict(record['p']) if 'p' in record else dict(record)
-                products.append(product_data)
-            logger.info(f"CypherBot found {len(products)} products")
-            return products
-        except Exception as e:
-            logger.error(f"Neo4j query failed: {e}", exc_info=True)
-            return []
