@@ -1,7 +1,6 @@
 import logging
 import asyncio
 import uuid
-import os
 from typing import Optional, Dict, Any, List
 from contextlib import asynccontextmanager
 
@@ -50,9 +49,9 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8080").split(","),
+    allow_origins=["*"],
     allow_credentials=True,
-    allow_methods=["GET", "POST", "PUT", "DELETE"],
+    allow_methods=["*"],
     allow_headers=["*"],
 )
 

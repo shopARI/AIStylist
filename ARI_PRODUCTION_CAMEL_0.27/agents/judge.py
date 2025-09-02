@@ -8,7 +8,6 @@ import json
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from collections import Counter
-from threading import RLock 
 logger = logging.getLogger("agents.judge")
 
 # Import from our new CAMEL 0.2.70 module
@@ -465,15 +464,6 @@ Respond with strategy and reasoning."""
         
         return ", ".join(summaries)
     
-    # def _count_consensus(
-    #     self,
-    #     cypher_results: List[Dict[str, Any]],
-    #     vibe_results: List[Dict[str, Any]]
-    # ) -> int:
-    #     """Count products both agents found."""
-    #     cypher_ids = {p.get('id') for p in cypher_results if p.get('id')}
-    #     vibe_ids = {p.get('id') for p in vibe_results if p.get('id')}
-    #     return len(cypher_ids & vibe_ids)
     
     def _count_consensus(
         self,

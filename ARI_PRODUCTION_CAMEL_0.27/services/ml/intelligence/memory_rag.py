@@ -68,12 +68,15 @@ class MemoryRAGIntelligence:
                 
                 logger.info("Memory initialized for RAG intelligence")
                 
-                # Try to import memory manager
+                # Try to import memory manager  
                 try:
                     from services.memory.manager import MemoryManager
                     self.memory_manager = MemoryManager(self.product_kg)
                 except ImportError:
                     logger.warning("MemoryManager not available")
+                except Exception as e:
+                    logger.warning(f"MemoryManager initialization failed: {e}")
+                    self.memory_manager = None
                     
             except Exception as e:
                 logger.error(f"Error initializing memory: {e}")
@@ -347,21 +350,35 @@ class MemoryRAGIntelligence:
             return []
         
         try:
-            # Use memory manager if available
-            if self.memory_manager and hasattr(self.memory_manager, 'get_context'):
-                context, _ = await self.memory_manager.get_context(self.memory, query)
-                return context
+            # Skip memory manager - using direct CAMEL memory access only
+            # The memory manager causes OpenAI API format errors
+            # if self.memory_manager and hasattr(self.memory_manager, 'get_context'):
             
             # Fallback to direct memory access
             if hasattr(self.memory, 'get_context'):
-                context, _ = await asyncio.to_thread(self.memory.get_context)
+                # CAMEL memory.get_context() returns (openai_messages, token_count)
+                openai_messages, _ = await asyncio.to_thread(self.memory.get_context)
+                
+                # Convert OpenAI messages to our memory context format
+                context = []
+                for msg in openai_messages:
+                    context.append({
+                        'content': msg.get('content', ''),
+                        'role': msg.get('role', 'user'),
+                        'timestamp': datetime.now().isoformat()
+                    })
                 return context
             
             return []
             
         except Exception as e:
-            logger.error(f"Error getting memory context: {e}")
-            return []
+            # Check if it's the OpenAI API format error
+            if "'$.input' is invalid" in str(e):
+                logger.warning(f"OpenAI API format error in memory context, returning empty context: {e}")
+                return []
+            else:
+                logger.error(f"Error getting memory context: {e}")
+                return []
     
     def _extract_memory_information(
         self,

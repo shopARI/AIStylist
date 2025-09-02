@@ -33,6 +33,43 @@ STANDARD_TO_FASHION_FIELD_MAP = {v: k for k, v in FASHION_TO_STANDARD_FIELD_MAP.
 # Required fields for valid product
 REQUIRED_PRODUCT_FIELDS = ["id", "title", "price"]
 
+
+def validate_product_uuid(product: Dict[str, Any]) -> bool:
+    """
+    Validate that product has UUID format ID.
+    Essential for new 6M node graph consistency.
+    """
+    if not isinstance(product, dict):
+        return False
+    
+    product_id = product.get('id')
+    if not product_id:
+        logger.warning("Product missing required 'id' field")
+        return False
+    
+    try:
+        uuid.UUID(str(product_id))
+        return True
+    except ValueError:
+        logger.warning(f"Product ID is not UUID format: {product_id}")
+        return False
+
+
+def ensure_uuid_consistency(products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """
+    Filter products to ensure only UUID-based IDs are returned.
+    Critical for maintaining consistency with new 6M node graph.
+    """
+    valid_products = []
+    for product in products:
+        if validate_product_uuid(product):
+            valid_products.append(product)
+    
+    if len(valid_products) < len(products):
+        logger.info(f"Filtered {len(products) - len(valid_products)} products with non-UUID IDs")
+    
+    return valid_products
+
 # Default values for missing fields
 DEFAULT_FIELD_VALUES = {
     "description": "",

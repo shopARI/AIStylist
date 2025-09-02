@@ -446,7 +446,7 @@ class ConnectionManager:
                 if pool:
                     # Perform health check
                     try:
-                        conn = await asyncio.wait_for(pool.acquire(), timeout=5.0)
+                        conn = await asyncio.wait_for(pool.acquire(), timeout=15.0)
                         await pool.release(conn)
                         logger.debug(f"Health check passed for pool '{pool_name}'")
                     except asyncio.TimeoutError:

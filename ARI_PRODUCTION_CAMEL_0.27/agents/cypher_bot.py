@@ -1,14 +1,14 @@
 import logging
-import json
 import asyncio
 from typing import Dict, List, Any, Optional
 
 logger = logging.getLogger("agents.cypher_bot")
 
-from lib.camel.v070 import create_battle_agent, create_user_message, CAMEL_AVAILABLE
+from lib.camel.v070 import create_battle_agent, CAMEL_AVAILABLE
 from config.prompts import CYPHERBOT_PROMPT
+from services.nlp.parameter_extractor import ParameterExtractor
 
-DEFAULT_QUERY_TIMEOUT = 30.0
+DEFAULT_QUERY_TIMEOUT = 120.0  # Extended for 20-30M node graph traversals
 
 class CypherBotAgent:
     """
@@ -20,13 +20,14 @@ class CypherBotAgent:
         self.neo4j = neo4j_client
         self.name = "CypherBot"
         self.query_timeout = kwargs.get("query_timeout", DEFAULT_QUERY_TIMEOUT)
+        self.parameter_extractor = ParameterExtractor()
 
         if not CAMEL_AVAILABLE:
             raise RuntimeError("CAMEL 0.2.70+ is required for CypherBot")
         
         try:
             self.agent = create_battle_agent(name=self.name, system_message=CYPHERBOT_PROMPT)
-            logger.info(f"{self.name} initialized")
+            logger.info(f"{self.name} initialized with parameter extraction")
         except Exception as e:
             logger.error(f"Failed to initialize {self.name}: {e}")
             raise RuntimeError(f"CypherBot initialization failed: {e}") from e
@@ -45,6 +46,24 @@ class CypherBotAgent:
         
         logger.debug(f">>> {self.name}.search() START")
         logger.info(f"{self.name} searching with query='{query[:50]}...', filters={filters}")
+        
+        # Extract parameters from natural language query if no filters provided
+        if not filters and query:
+            logger.debug(f"No filters provided, extracting from query: '{query}'")
+            extracted_params = self.parameter_extractor.extract_parameters(query)
+            
+            # Convert extracted parameters to filter format
+            filters = {}
+            if extracted_params.get('categories'):
+                filters['category'] = extracted_params['categories'][0]  # Use first category
+            if extracted_params.get('colors'):
+                filters['colors'] = extracted_params['colors']
+            if extracted_params.get('brands'):  # Check if brands exist
+                filters['brand'] = extracted_params['brands'][0]
+            if extracted_params.get('occasions'):
+                filters['occasion'] = extracted_params['occasions'][0]  # Pass occasion for fallback
+                
+            logger.info(f"Extracted filters from query: {filters}")
         
         try:
             logger.debug(f"Starting filtered_search with timeout={self.query_timeout}s")
@@ -78,46 +97,69 @@ class CypherBotAgent:
             logger.warning("No filters provided, returning empty list")
             return []
         
-        # Sanitize filters again to prevent injection
-        from utils.security import InputValidator
-        safe_filters = InputValidator.sanitize_filters(filters) if hasattr(InputValidator, 'sanitize_filters') else filters
-        
-        # Collect all search terms with additional validation
+        # Collect all search terms
         search_terms = []
         
-        if "category" in safe_filters:
-            term = str(safe_filters["category"])[:50]  # Limit length
-            search_terms.append(term)
-            logger.debug(f"Added category term: {term}")
+        if "category" in filters:
+            search_terms.append(filters["category"])
+            logger.debug(f"Added category term: {filters['category']}")
         
-        if "colors" in safe_filters:
-            colors = safe_filters["colors"]
-            if isinstance(colors, list):
-                for color in colors[:5]:  # Limit number of colors
-                    color_str = str(color)[:30]  # Limit length
-                    search_terms.append(color_str)
-                    logger.debug(f"Added color term: {color_str}")
+        if "colors" in filters:
+            search_terms.extend(filters["colors"])
+            logger.debug(f"Added color terms: {filters['colors']}")
+        
+        # FALLBACK: If no search terms but we have occasion, use professional terms
+        if not search_terms and "occasion" in filters:
+            occasion = filters["occasion"].lower()
+            if "interview" in occasion or "work" in occasion or "business" in occasion:
+                search_terms = ["suit", "shirt", "blazer", "dress", "professional"]
+                logger.info(f"Using professional fallback terms for {occasion}: {search_terms}")
+            elif "wedding" in occasion:
+                search_terms = ["dress", "formal", "elegant", "gown"]
+                logger.info(f"Using wedding fallback terms: {search_terms}")
         
         if not search_terms:
-            logger.warning("No valid search terms extracted from filters")
+            logger.warning("No search terms extracted from filters")
             return []
         
-        # Search in title and description for ALL terms
-        cypher_query = """
-        MATCH (p:Product)
-        WHERE p.is_fashion = true
-        AND ALL(term IN $search_terms WHERE 
-            toLower(p.title) CONTAINS toLower(term) OR 
-            toLower(p.description) CONTAINS toLower(term)
-        )
-        RETURN p
-        LIMIT $limit
-        """
-        
+        # Initialize params first
         params = {
             "search_terms": search_terms,
             "limit": limit
         }
+        
+        # PERFORMANCE OPTIMIZED: Skip quality filters for now since properties don't exist
+        # Use STARTS WITH for single terms when possible to improve performance  
+        if len(search_terms) == 1 and len(search_terms[0]) >= 3:
+            # Single term optimization: use STARTS WITH on title for better performance
+            cypher_query = """
+            MATCH (p:Product)
+            WHERE p.id IS NOT NULL
+            AND (
+                toLower(p.title) STARTS WITH toLower($first_term)
+                OR toLower(p.title) CONTAINS (' ' + toLower($first_term))
+                OR toLower(p.description) CONTAINS toLower($first_term)
+            )
+            RETURN p
+            LIMIT $limit
+            """
+            params["first_term"] = search_terms[0]
+        else:
+            # Multi-term: limit search scope first, then filter
+            cypher_query = """
+            MATCH (p:Product)
+            WHERE p.id IS NOT NULL
+            AND ANY(term IN $search_terms WHERE 
+                toLower(p.title) CONTAINS toLower(term)
+            )
+            WITH p
+            WHERE ALL(term IN $search_terms WHERE 
+                toLower(p.title) CONTAINS toLower(term) OR 
+                toLower(p.description) CONTAINS toLower(term)
+            )
+            RETURN p
+            LIMIT $limit
+            """
         
         logger.info(f"Executing Cypher query with terms: {search_terms}")
         logger.debug(f"Query params: {params}")
@@ -135,9 +177,15 @@ class CypherBotAgent:
                 for i, record in enumerate(results):
                     # Extract the product node from the record
                     product_data = dict(record['p']) if 'p' in record else dict(record)
-                    products.append(product_data)
-                    if i < 3:  # Log first 3 products
-                        logger.debug(f"  Product {i}: {product_data.get('title', 'NO_TITLE')[:30]}")
+                    
+                    # Add product directly - new graph guarantees p.id is UUID format
+                    product_id = product_data.get('id')
+                    if product_id:
+                        products.append(product_data)
+                        if i < 3:  # Log first 3 products
+                            logger.debug(f"  Product {i}: {product_data.get('title', 'NO_TITLE')[:30]}")
+                    else:
+                        logger.warning("Skipping product without ID")
             else:
                 logger.warning("Neo4j query returned None or empty results")
             

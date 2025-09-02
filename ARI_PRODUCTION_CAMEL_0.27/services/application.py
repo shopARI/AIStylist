@@ -1,8 +1,9 @@
 import logging
 import time
-from typing import Optional, Dict, Any, List, Tuple
+from typing import Optional, Dict, Any, List, Tuple, Union
 
 from pydantic import BaseModel, Field
+from fastapi import BackgroundTasks
 
 # Import NLP and other services
 from services.nlp.intent_detector import IntentDetector
@@ -10,6 +11,9 @@ from services.nlp.parameter_extractor import ParameterExtractor
 from services.conversation_handler import ConversationHandler
 from services.battle.orchestrator import BattleOrchestrator
 from services.user.knowledge_graph import UserKnowledgeGraphService
+from services.ml.intelligence.coordinator import IntelligenceCoordinator
+from services.memory import get_session_store
+from services.cache.redis_client import RedisService, FallbackRedisService
 
 logger = logging.getLogger("services.application")
 
@@ -36,7 +40,9 @@ class ApplicationService:
         self,
         conversation_handler: ConversationHandler,
         battle_orchestrator: BattleOrchestrator,
-        user_kg_service: UserKnowledgeGraphService
+        user_kg_service: UserKnowledgeGraphService,
+        intelligence_coordinator: IntelligenceCoordinator,
+        redis_client: Union[RedisService, FallbackRedisService]
     ):
         """
         Initializes the service with all its required dependencies,
@@ -45,33 +51,56 @@ class ApplicationService:
         self.conversation_handler = conversation_handler
         self.battle_orchestrator = battle_orchestrator
         self.user_kg_service = user_kg_service
+        self.intelligence_coordinator = intelligence_coordinator
+        self.redis_client = redis_client
         
         # NLP tools can be instantiated here as they are lightweight
         self.intent_detector = IntentDetector()
         self.parameter_extractor = ParameterExtractor()
-        
-        # In-memory session tracking
-        self.active_sessions: Dict[str, Dict[str, Any]] = {}
 
     async def process_message(
         self,
         session_id: str,
         message: str,
-        user_id: Optional[str] = None
+        user_id: Optional[str] = None,
+        background_tasks: Optional[BackgroundTasks] = None
     ) -> ChatResponse:
         """
         Main entry point for processing a user's message.
         """
         start_time = time.time()
         
-        # Ensure session exists
-        if session_id not in self.active_sessions:
-            self.active_sessions[session_id] = {"history": []}
+        # Ensure session exists in Redis
+        session_key = f"session:{session_id}"
+        session_data = await self.redis_client.get_json(session_key)
+        if session_data is None:
+            session_data = {"history": [], "created_at": time.time(), "user_id": user_id}
+            await self.redis_client.set_json(session_key, session_data, ttl=86400)  # 24 hour TTL
             
         try:
-            # 1. Detect intent and extract parameters using the correct methods
-            intent_result = await self.intent_detector.detect_intent(message)
-            params = self.parameter_extractor.extract_parameters(message)
+            # 1. Get session memory context
+            session_store = get_session_store()
+            session_context = session_store.get_session_context(session_id, user_id or "anonymous")
+            conversation_summary = session_store.get_conversation_summary(session_id, user_id or "anonymous")
+            
+            # Enhance message with memory context if available
+            enhanced_message = message
+            if conversation_summary:
+                enhanced_message = f"{conversation_summary} | Current request: {message}"
+                logger.info(f"Enhanced message with memory context: {len(conversation_summary)} chars")
+            
+            # 2. Detect intent and extract parameters using enhanced message
+            intent_result = await self.intent_detector.detect_intent(enhanced_message)
+            params = self.parameter_extractor.extract_parameters(enhanced_message)
+            
+            # Merge with stored preferences
+            stored_preferences = session_store.get_user_preferences(session_id, user_id or "anonymous")
+            if stored_preferences:
+                # Merge stored preferences with current extraction
+                for key, value in stored_preferences.items():
+                    if key not in params or not params[key]:
+                        params[key] = value
+                logger.info(f"Merged stored preferences: {stored_preferences}")
             
             intent = intent_result.primary_intent
             score = intent_result.confidence
@@ -85,9 +114,10 @@ class ApplicationService:
             # Note: The IntentResult returns an enum, not a string. We compare to the enum type.
             # Assuming your models.types.SearchIntent is the enum used.
             from models.types import SearchIntent
-            if intent in [SearchIntent.BROWSE, SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, SearchIntent.BRAND]:
+            if intent in [SearchIntent.BROWSE, SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, SearchIntent.BRAND, 
+                         SearchIntent.INSPIRATION, SearchIntent.OUTFIT, SearchIntent.GIFT]:
                 response_text, metadata = await self._handle_product_search(
-                    message, params, user_context
+                    message, params, user_context, background_tasks
                 )
             else:
                 response_text, metadata = await self._handle_general_conversation(
@@ -97,12 +127,38 @@ class ApplicationService:
             processing_time = time.time() - start_time
             metadata["processing_time_seconds"] = round(processing_time, 2)
 
-            return ChatResponse(
+            # Create response immediately for faster user experience
+            chat_response = ChatResponse(
                 response=response_text,
                 products=metadata.get("products", []),
                 session_id=session_id,
                 metadata=metadata
             )
+
+            # 4. Store conversation in memory for future context (background task)
+            if background_tasks:
+                background_tasks.add_task(
+                    self._store_session_context,
+                    session_id,
+                    user_id or "anonymous",
+                    message,
+                    response_text,
+                    metadata.get("products", []),
+                    params
+                )
+            else:
+                # Fallback for non-HTTP contexts (like WebSocket)
+                session_store = get_session_store()
+                session_store.update_session_context(
+                    session_id=session_id,
+                    user_id=user_id or "anonymous", 
+                    message=message,
+                    response=response_text,
+                    products=metadata.get("products", []),
+                    extracted_preferences=params
+                )
+
+            return chat_response
 
         except Exception as e:
             logger.error(f"Error processing message for session {session_id}: {e}", exc_info=True)
@@ -116,20 +172,33 @@ class ApplicationService:
         self,
         message: str,
         params: Dict[str, Any],
-        user_context: Dict[str, Any]
+        user_context: Dict[str, Any],
+        background_tasks: Optional[BackgroundTasks] = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Orchestrates the battle system to find and recommend products.
+        Enhanced with ML intelligence for better recommendations.
         """
         logger.info(f"Handling product search for query: '{message}'")
+        
+        # Generate ML intelligence for the battle agents
+        ml_intelligence = None
+        try:
+            ml_intelligence = await self._generate_ml_intelligence(
+                message, params, user_context
+            )
+            logger.info(f"Generated ML intelligence with {len(ml_intelligence)} intelligence packets")
+        except Exception as e:
+            logger.warning(f"ML intelligence generation failed: {e}, continuing without")
         
         battle_results = await self.battle_orchestrator.execute_battle(
             query=message,
             filters=params,
-            user_context=user_context
+            user_context=user_context,
+            ml_intelligence=ml_intelligence
         )
 
-        products = battle_results.get("final_products", [])
+        products = battle_results.get("products", [])
         response_text = self._generate_product_response(products, message)
         
         metadata = {
@@ -140,6 +209,50 @@ class ApplicationService:
         }
         
         return response_text, metadata
+
+    async def _generate_ml_intelligence(
+        self,
+        message: str,
+        params: Dict[str, Any], 
+        user_context: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Generate ML intelligence packets for the battle agents.
+        
+        Returns:
+            Dictionary with intelligence for CypherBot and VibeBot
+        """
+        try:
+            # Gather intelligence from ML coordinator
+            intelligence_packets = await self.intelligence_coordinator.gather_intelligence(
+                query=message,
+                user_id=user_context.get('user_id'),
+                context={
+                    'occasion': params.get('occasion'),
+                    'categories': params.get('categories', []),
+                    'colors': params.get('colors', []),
+                    'styles': params.get('styles', []),
+                    'user_preferences': user_context.get('preferences', {}),
+                    'user_segments': user_context.get('segments', [])
+                }
+            )
+            
+            # The coordinator already returns structured intelligence
+            ml_intelligence = {
+                'cypher_intel': intelligence_packets.get('cypher_intel', {}),
+                'vibe_intel': intelligence_packets.get('vibe_intel', {}),
+                'shared_intel': intelligence_packets.get('shared_intel', {})
+            }
+            
+            logger.debug(f"ML Intelligence routing: CypherBot={len(ml_intelligence['cypher_intel']) if isinstance(ml_intelligence['cypher_intel'], dict) else 0}, "
+                        f"VibeBot={len(ml_intelligence['vibe_intel']) if isinstance(ml_intelligence['vibe_intel'], dict) else 0}, "
+                        f"Shared={len(ml_intelligence['shared_intel']) if isinstance(ml_intelligence['shared_intel'], dict) else 0}")
+            
+            return ml_intelligence
+            
+        except Exception as e:
+            logger.error(f"Error generating ML intelligence: {e}", exc_info=True)
+            return {}
 
     async def _handle_general_conversation(
         self,
@@ -190,3 +303,30 @@ class ApplicationService:
             response += f"\n... and {count - 3} more."
 
         return response
+
+    def _store_session_context(
+        self,
+        session_id: str,
+        user_id: str,
+        message: str,
+        response: str,
+        products: List[Dict],
+        extracted_preferences: Dict[str, Any]
+    ):
+        """
+        Background task to store session context without blocking response.
+        """
+        try:
+            from services.memory import get_session_store
+            session_store = get_session_store()
+            session_store.update_session_context(
+                session_id=session_id,
+                user_id=user_id,
+                message=message,
+                response=response,
+                products=products,
+                extracted_preferences=extracted_preferences
+            )
+            logger.info(f"Stored conversation context for session {session_id}")
+        except Exception as e:
+            logger.error(f"Failed to store session context for {session_id}: {e}")

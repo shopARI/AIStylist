@@ -104,18 +104,21 @@ class IntelligenceCoordinator:
     
 
     def _create_neo4j_pool(self, user_kg):
-            """Create Neo4j connection pool"""
-            # If user_kg has a driver, use it
-            if hasattr(user_kg, 'driver'):
-                return user_kg.driver
-            # Otherwise create new pool
-            return AsyncGraphDatabase.driver(
-                user_kg.uri,
-                auth=(user_kg.user, user_kg.password),
-                max_connection_pool_size=50,
-                connection_acquisition_timeout=30.0,
-                max_connection_lifetime=3600
-            )
+        """Reuse existing Neo4j connection pool - DO NOT create duplicate pools"""
+        # ALWAYS reuse existing driver to prevent connection bloat
+        if hasattr(user_kg, 'driver') and user_kg.driver is not None:
+            return user_kg.driver
+        else:
+            logger.warning("User KG service has no active driver - this may cause failures")
+            return None
+                
+    def _create_qdrant_pool(self, product_retriever):
+        """Create Qdrant connection pool"""
+        # Return the existing Qdrant client from product retriever
+        if hasattr(product_retriever, 'client'):
+            return product_retriever.client
+        # If no client available, return None - ML systems will handle gracefully
+        return None
 
     @asynccontextmanager
     async def get_neo4j_session(self) -> AsyncContextManager[AsyncSession]:

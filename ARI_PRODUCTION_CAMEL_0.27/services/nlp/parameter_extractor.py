@@ -30,7 +30,7 @@ class ParameterExtractor:
         self.occasions = ["wedding", "party", "work", "casual", "formal", "date", "dinner", "beach", "gala", "cocktail", "interview", "brunch", "vacation", "travel", "gym", "workout", "meeting", "conference", "birthday", "anniversary", "graduation", "prom", "homecoming", "festival", "concert", "clubbing", "office", "business"]
         self.colors = ["red", "blue", "green", "black", "white", "yellow", "purple", "orange", "pink", "brown", "gray", "grey", "navy", "teal", "maroon", "beige", "turquoise", "gold", "silver", "cream", "burgundy", "coral", "mint", "olive", "rust", "sage", "lavender", "peach", "emerald", "crimson", "indigo", "khaki", "tan", "ivory", "charcoal", "rose", "wine", "forest"]
         self.materials = ["cotton", "silk", "wool", "polyester", "linen", "leather", "denim", "suede", "velvet", "cashmere", "satin", "nylon", "chiffon", "lace", "tweed", "jersey", "modal", "bamboo", "rayon", "spandex", "lycra", "mesh", "sequin", "fleece", "corduroy", "canvas", "georgette", "crepe", "taffeta"]
-        self.categories = ["dress", "shirt", "pants", "jeans", "skirt", "blouse", "sweater", "jacket", "coat", "suit", "blazer", "t-shirt", "hoodie", "shorts", "swimwear", "activewear", "shoes", "boots", "sneakers", "accessories", "jewelry", "necklace", "bracelet", "earrings", "ring", "watch", "scarf", "hat", "gown", "outfit", "cardigan", "vest", "leggings", "jumpsuit", "romper", "tank", "camisole", "tunic", "kimono", "poncho", "trench", "parka", "bomber", "duster", "cape", "shawl"]
+        self.categories = ["dress", "shirt", "pants", "jeans", "skirt", "blouse", "sweater", "jacket", "coat", "suit", "blazer", "t-shirt", "hoodie", "shorts", "swimwear", "activewear", "athletic", "sportswear", "workout", "gym", "shoes", "boots", "sneakers", "accessories", "jewelry", "necklace", "bracelet", "earrings", "ring", "watch", "scarf", "hat", "gown", "outfit", "cardigan", "vest", "leggings", "jumpsuit", "romper", "tank", "camisole", "tunic", "kimono", "poncho", "trench", "parka", "bomber", "duster", "cape", "shawl"]
         self.styles = ["classic", "modern", "vintage", "boho", "minimalist", "chic", "elegant", "edgy", "preppy", "streetwear", "athleisure", "romantic", "gothic", "punk", "grunge", "retro", "glamorous", "sophisticated", "trendy", "timeless", "bold", "feminine", "masculine", "androgynous", "casual", "professional", "luxe", "indie", "hipster", "nautical", "western", "ethnic"]
         self.seasons = ["spring", "summer", "fall", "autumn", "winter"]
         self.sizes = ["xs", "s", "m", "l", "xl", "xxl", "xxxl", "petite", "plus", "tall", "regular", "0", "2", "4", "6", "8", "10", "12", "14", "16", "18", "20"]
@@ -118,11 +118,31 @@ class ParameterExtractor:
         return params
 
     def _extract_items(self, text: str, vocabulary: List[str]) -> List[str]:
-        """Extract items from text that match vocabulary"""
+        """Extract items from text that match vocabulary, with typo correction"""
         found_items = []
+        
+        # Common typos mapping
+        typo_corrections = {
+            "shrt": "shirt",
+            "shrts": "shirts", 
+            "pnts": "pants",
+            "jens": "jeans",
+            "drss": "dress",
+            "sheos": "shoes",
+            "jackt": "jacket",
+            "swetr": "sweater"
+        }
+        
+        # Correct common typos first
+        corrected_text = text
+        for typo, correction in typo_corrections.items():
+            corrected_text = re.sub(r'\b' + re.escape(typo) + r'\b', correction, corrected_text)
+        
+        # Extract items from corrected text
         for item in vocabulary:
-            if re.search(r'\b' + re.escape(item) + r'\b', text):
+            if re.search(r'\b' + re.escape(item) + r'\b', corrected_text):
                 found_items.append(item)
+        
         return found_items
 
     def _extract_size(self, text: str) -> Optional[str]:

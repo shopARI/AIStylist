@@ -146,10 +146,15 @@ class VibeBotAgent:
             products = []
             for i, product in enumerate(results):
                 if isinstance(product, dict):
-                    product['vibe_reason'] = "Semantic similarity match"
-                    products.append(product)
-                    if i < 3:  # Log first 3
-                        logger.debug(f"  Product {i}: {product.get('title', 'NO_TITLE')[:30]}")
+                    # New graph guarantees p.id is UUID format
+                    product_id = product.get('id')
+                    if product_id:
+                        product['vibe_reason'] = "Semantic similarity match"
+                        products.append(product)
+                        if i < 3:  # Log first 3
+                            logger.debug(f"  Product {i}: {product.get('title', 'NO_TITLE')[:30]}")
+                    else:
+                        logger.warning("Skipping product without ID from Qdrant")
             
             logger.debug(f"<<< _semantic_search returning {len(products)} products")
             return products
@@ -290,35 +295,6 @@ Respond with the strategy name and brief explanation."""
         
         return unique_results[:limit]
     
-    async def _semantic_search(self, query: str, limit: int, filters: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
-        try:
-            # Enhance query with filter terms instead of using metadata filters
-            enhanced_query = query
-            if filters:
-                if 'category' in filters:
-                    enhanced_query = f"{filters['category']} {enhanced_query}"
-                if 'colors' in filters:
-                    enhanced_query = f"{' '.join(filters['colors'])} {enhanced_query}"
-            
-            # Don't pass filters - they reference non-existent fields
-            results = await self.qdrant.search_by_natural_language(
-                query=enhanced_query,
-                limit=limit,
-                filters=None  # <-- Critical: Set to None
-            )
-            
-            products = []
-            for product in results:
-                if isinstance(product, dict):
-                    product['vibe_reason'] = "Semantic similarity match"
-                    products.append(product)
-            
-            return products
-            
-        except Exception as e:
-            logger.error(f"Semantic search failed: {e}")
-            return []
-    
     async def _visual_similarity_search(
         self,
         query: str,
@@ -347,9 +323,9 @@ Respond with the strategy name and brief explanation."""
                 
                 products = []
                 for product in results:
-                    if isinstance(product, dict):
-                        product['vibe_reason'] = "Visual similarity to reference"
-                        products.append(product)
+                    # New graph guarantees p.id is UUID format
+                    product['vibe_reason'] = "Visual similarity to reference"
+                    products.append(product)
                 
                 return products
             else:
@@ -398,9 +374,9 @@ Respond with the strategy name and brief explanation."""
                 
                 products = []
                 for product in results:
-                    if isinstance(product, dict):
-                        product['vibe_reason'] = f"Color match: {', '.join(colors[:2])}"
-                        products.append(product)
+                    # New graph guarantees p.id is UUID format
+                    product['vibe_reason'] = f"Color match: {', '.join(colors[:2])}"
+                    products.append(product)
                 
                 return products
             else:
@@ -442,9 +418,9 @@ Respond with the strategy name and brief explanation."""
             
             products = []
             for product in results:
-                if isinstance(product, dict):
-                    product['vibe_reason'] = "Style and trend match"
-                    products.append(product)
+                # New graph guarantees p.id is UUID format
+                product['vibe_reason'] = "Style and trend match"
+                products.append(product)
             
             return products
             
@@ -471,9 +447,9 @@ Respond with the strategy name and brief explanation."""
             
             products = []
             for product in results:
-                if isinstance(product, dict):
-                    product['vibe_reason'] = "Aesthetic match"
-                    products.append(product)
+                # New graph guarantees p.id is UUID format
+                product['vibe_reason'] = "Aesthetic match"
+                products.append(product)
             
             return products
             

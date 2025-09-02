@@ -6,7 +6,7 @@ Adapted for CAMEL 0.2.7
 
 import logging
 import asyncio
-import json 
+import json
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 
@@ -111,18 +111,22 @@ Be confident in your graph-based approach."""
                     logger.warning("Neo4j client doesn't support query method")
                     results = []
                 
-                # Process results
+                # Process results - new graph guarantees p.id is UUID format
                 for record in results[:limit]:
-                    product = {
-                        "id": record.get("product_id"),
-                        "title": record.get("title", "Unknown"),
-                        "price": record.get("price", 0),
-                        "category": record.get("category"),
-                        "score": record.get("score", 0.5),
-                        "source": "cypher",
-                        "graph_connections": record.get("connections", 0)
-                    }
-                    products.append(product)
+                    product_id = record.get("product_id")
+                    if product_id:
+                        product = {
+                            "id": product_id,
+                            "title": record.get("title", "Unknown"),
+                            "price": record.get("price", 0),
+                            "category": record.get("category"),
+                            "score": record.get("score", 0.5),
+                            "source": "cypher",
+                            "graph_connections": record.get("connections", 0)
+                        }
+                        products.append(product)
+                    else:
+                        logger.warning("Skipping product without ID")
             
             # If no Neo4j results, generate warning
             if not products:

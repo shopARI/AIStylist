@@ -8,11 +8,12 @@ import os
 import logging
 import json
 import asyncio
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Union
 import numpy as np
 from datetime import datetime
 import uuid
-from collections import OrderedDict
+
+from services.cache.redis_client import RedisService, FallbackRedisService
 
 logger = logging.getLogger("services.product.retriever")
 
@@ -54,7 +55,8 @@ class ProductRetrieverService:
         embedding_cache_size: int = 1000,
         query_timeout: float = 90.0,
         max_retry_attempts: int = 3,
-        retry_delay: float = 1.0
+        retry_delay: float = 1.0,
+        redis_client: Optional[Union[RedisService, FallbackRedisService]] = None
     ):
         """
         Initialize the product retriever with enhanced configuration.
@@ -90,10 +92,11 @@ class ProductRetrieverService:
         # Initialize clients
         self.openai_client = OpenAI()
         self.client = None
+        self.redis_client = redis_client
         
-        # LRU cache for embeddings
-        self.embedding_cache = OrderedDict()
+        # Embedding cache configuration (now Redis-based)
         self.embedding_cache_size = embedding_cache_size
+        self.cache_ttl = 3600  # 1 hour TTL for embeddings
         
         # Statistics
         self.stats = {
@@ -115,6 +118,8 @@ class ProductRetrieverService:
                     self.client = QdrantClient(
                         url=self.qdrant_url,
                         api_key=self.qdrant_api_key,
+                        timeout=120.0,  # Extended timeout for 7.4M vector searches
+                        prefer_grpc=False  # HTTP is more reliable for large operations
                     )
                     
                     # Test connection
@@ -181,12 +186,13 @@ class ProductRetrieverService:
         Returns:
             Embedding vector or None
         """
-        # Check cache
-        if text in self.embedding_cache:
-            self.stats["cache_hits"] += 1
-            # Move to end (LRU)
-            self.embedding_cache.move_to_end(text)
-            return self.embedding_cache[text]
+        # Check Redis cache first
+        if self.redis_client:
+            cache_key = f"embedding:{hash(text)}"
+            cached_embedding = await self.redis_client.get_json(cache_key)
+            if cached_embedding:
+                self.stats["cache_hits"] += 1
+                return cached_embedding
         
         self.stats["cache_misses"] += 1
         
@@ -207,7 +213,7 @@ class ProductRetrieverService:
                 self.stats["embeddings_generated"] += 1
                 
                 # Add to cache
-                self._add_to_embedding_cache(text, embedding)
+                await self._add_to_embedding_cache(text, embedding)
                 
                 return embedding
                 
@@ -229,14 +235,12 @@ class ProductRetrieverService:
         #     logger.error(f"Error getting embedding: {e}")
         #     raise RuntimeError(f"Failed to get embedding: {e}")
     
-    def _add_to_embedding_cache(self, text: str, embedding: List[float]):
-        """Add embedding to cache with LRU eviction."""
-        # Check cache size
-        if len(self.embedding_cache) >= self.embedding_cache_size:
-            # Remove oldest (first item)
-            self.embedding_cache.popitem(last=False)
-        
-        self.embedding_cache[text] = embedding
+    async def _add_to_embedding_cache(self, text: str, embedding: List[float]):
+        """Add embedding to Redis cache."""
+        if self.redis_client:
+            cache_key = f"embedding:{hash(text)}"
+            await self.redis_client.set_json(cache_key, embedding, ttl=self.cache_ttl)
+        # Note: Redis handles LRU eviction automatically with maxmemory policies
     
 
     async def get_embeddings_batch(self, texts: List[str], batch_size: int = 100) -> List[Optional[List[float]]]:
@@ -256,15 +260,18 @@ class ProductRetrieverService:
         
         # Check cache first
         for i, text in enumerate(texts):
-            if text in self.embedding_cache:
-                self.stats["cache_hits"] += 1
-                self.embedding_cache.move_to_end(text)
-                embeddings.append(self.embedding_cache[text])
-            else:
-                self.stats["cache_misses"] += 1
-                embeddings.append(None)
-                uncached_texts.append(text)
-                uncached_indices.append(i)
+            if self.redis_client:
+                cache_key = f"embedding:{hash(text)}"
+                cached_embedding = await self.redis_client.get_json(cache_key)
+                if cached_embedding:
+                    self.stats["cache_hits"] += 1
+                    embeddings.append(cached_embedding)
+                    continue
+            
+            self.stats["cache_misses"] += 1
+            embeddings.append(None)
+            uncached_texts.append(text)
+            uncached_indices.append(i)
         
         # Process uncached texts in batches
         for i in range(0, len(uncached_texts), batch_size):
@@ -290,7 +297,7 @@ class ProductRetrieverService:
                         original_text = batch[idx]
                         
                         embeddings[original_idx] = embedding
-                        self._add_to_embedding_cache(original_text, embedding)
+                        await self._add_to_embedding_cache(original_text, embedding)
                         self.stats["embeddings_generated"] += 1
                     
                     break  # Success, exit retry loop
@@ -975,6 +982,6 @@ class ProductRetrieverService:
                 self.stats["queries_executed"] / total_queries * 100
                 if total_queries > 0 else 0
             ),
-            "cache_size": len(self.embedding_cache),
+            "cache_type": "Redis" if self.redis_client else "None",
             "cache_max_size": self.embedding_cache_size
         }

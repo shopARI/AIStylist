@@ -74,6 +74,26 @@ class QdrantConfig:
         return bool(self.url)
 
 @dataclass
+class RedisConfig:
+    """Redis cache configuration for production scaling."""
+    url: Optional[str] = None
+    host: str = "localhost"
+    port: int = 6379
+    password: Optional[str] = None
+    db: int = 0
+    max_connections: int = 100
+    socket_timeout: float = 5.0
+    socket_connect_timeout: float = 5.0
+    retry_on_timeout: bool = True
+    health_check_interval: int = 30
+    decode_responses: bool = True
+    
+    @property
+    def is_remote(self) -> bool:
+        """Check if using remote Redis."""
+        return bool(self.url)
+
+@dataclass
 class OpenAIConfig:
     """OpenAI API configuration."""
     api_key: str
@@ -106,7 +126,7 @@ class BattleConfig:
     cache_strategy: CacheStrategy = CacheStrategy.LRU
     cache_cleanup_interval: int = 60
     max_concurrent_battles: int = 5
-    default_timeout: float = 30.0
+    default_timeout: float = 120.0  # Increased for large Neo4j datasets
     prefetch_multiplier: int = 2
     quality_threshold: float = 0.5
     enable_auto_recovery: bool = True
@@ -206,6 +226,7 @@ class Settings:
         # Load all configurations
         self.neo4j = self._load_neo4j_config()
         self.qdrant = self._load_qdrant_config()
+        self.redis = self._load_redis_config()
         self.openai = self._load_openai_config()
         self.camel = self._load_camel_config()
         self.battle = self._load_battle_config()
@@ -238,7 +259,7 @@ class Settings:
             username=os.getenv("NEO4J_USERNAME", "neo4j"),
             password=os.getenv("NEO4J_PASSWORD", ""),
             database=os.getenv("NEO4J_DATABASE", "neo4j"),
-            max_connection_pool_size=int(os.getenv("NEO4J_MAX_CONNECTION_POOL_SIZE", "50")),
+            max_connection_pool_size=int(os.getenv("NEO4J_MAX_POOL_SIZE", "100")),
             connection_timeout=int(os.getenv("NEO4J_CONNECTION_TIMEOUT", "30")),
             query_timeout=float(os.getenv("NEO4J_QUERY_TIMEOUT", "30.0")),
             max_query_timeout=float(os.getenv("MAX_QUERY_TIMEOUT", "60.0")),
@@ -257,6 +278,22 @@ class Settings:
             use_grpc=os.getenv("QDRANT_USE_GRPC", "true").lower() == "true",
             timeout=float(os.getenv("QDRANT_TIMEOUT", "30.0")),
             enable_connection_pooling=os.getenv("QDRANT_ENABLE_POOLING", "true").lower() == "true"
+        )
+    
+    def _load_redis_config(self) -> RedisConfig:
+        """Load Redis configuration."""
+        return RedisConfig(
+            url=os.getenv("REDIS_URL"),
+            host=os.getenv("REDIS_HOST", "localhost"),
+            port=int(os.getenv("REDIS_PORT", "6379")),
+            password=os.getenv("REDIS_PASSWORD"),
+            db=int(os.getenv("REDIS_DB", "0")),
+            max_connections=int(os.getenv("REDIS_MAX_CONNECTIONS", "100")),
+            socket_timeout=float(os.getenv("REDIS_SOCKET_TIMEOUT", "5.0")),
+            socket_connect_timeout=float(os.getenv("REDIS_CONNECT_TIMEOUT", "5.0")),
+            retry_on_timeout=os.getenv("REDIS_RETRY_ON_TIMEOUT", "true").lower() == "true",
+            health_check_interval=int(os.getenv("REDIS_HEALTH_CHECK_INTERVAL", "30")),
+            decode_responses=os.getenv("REDIS_DECODE_RESPONSES", "true").lower() == "true"
         )
     
     def _load_openai_config(self) -> OpenAIConfig:
@@ -300,7 +337,7 @@ class Settings:
             cache_strategy=cache_strategy,
             cache_cleanup_interval=int(os.getenv("CACHE_CLEANUP_INTERVAL", "60")),
             max_concurrent_battles=int(os.getenv("MAX_CONCURRENT_BATTLES", "5")),
-            default_timeout=float(os.getenv("BATTLE_TIMEOUT", "30.0")),
+            default_timeout=float(os.getenv("BATTLE_TIMEOUT", "120.0")),
             prefetch_multiplier=int(os.getenv("PREFETCH_MULTIPLIER", "2")),
             quality_threshold=float(os.getenv("QUALITY_THRESHOLD", "0.5")),
             enable_auto_recovery=os.getenv("ENABLE_AUTO_RECOVERY", "true").lower() == "true",
@@ -407,6 +444,7 @@ class Settings:
             "log_level": self.log_level.value,
             "neo4j": self.neo4j.__dict__,
             "qdrant": self.qdrant.__dict__,
+            "redis": {k: v for k, v in self.redis.__dict__.items() if k != "password"},
             "openai": {k: v for k, v in self.openai.__dict__.items() if k != "api_key"},
             "camel": self.camel.__dict__,
             "battle": {**self.battle.__dict__, "cache_strategy": self.battle.cache_strategy.value},
@@ -567,6 +605,7 @@ __all__ = [
     # Config dataclasses
     'Neo4jConfig',
     'QdrantConfig',
+    'RedisConfig',
     'OpenAIConfig',
     'CamelConfig',
     'BattleConfig',

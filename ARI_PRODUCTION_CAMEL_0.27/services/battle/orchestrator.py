@@ -3,12 +3,13 @@ import asyncio
 import time
 import hashlib
 import json
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Union
 
 from services.battle.optimizer import BattleOptimizer
 from services.battle.executor import BattleExecutor
 from services.battle.metrics import BattleMetrics
 from services.cache.battle_cache import BattleCache
+from services.cache.redis_client import RedisService, FallbackRedisService
 
 logger = logging.getLogger("services.battle.orchestrator")
 
@@ -24,7 +25,8 @@ class BattleOrchestrator:
         cache: Optional[BattleCache] = None,
         optimizer: Optional[BattleOptimizer] = None,
         metrics: Optional[BattleMetrics] = None,
-        settings: Dict[str, Any] = None
+        settings: Dict[str, Any] = None,
+        redis_client: Optional[Union[RedisService, FallbackRedisService]] = None
     ):
         """
         Initializes the battle orchestrator with injected components.
@@ -35,21 +37,23 @@ class BattleOrchestrator:
         self.cache = cache
         self.optimizer = optimizer
         self.metrics = metrics
+        self.redis_client = redis_client
         
         self.config = {
             "default_limit": 5,
-            "default_timeout": 30.0,
+            "default_timeout": 120.0,  # Increased for large Neo4j datasets with ML intelligence
             "prefetch_multiplier": 2,
             "quality_threshold": 0.5,
-            "max_concurrent_battles": 5,
+            "max_concurrent_battles": 50,  # Increased from 5 for production scale
         }
         if settings:
             self.config.update(settings)
 
         self.battle_semaphore = asyncio.Semaphore(self.config["max_concurrent_battles"])
         
-        self.active_battles = set()
-        self.total_battles_executed = 0
+        # Redis keys for distributed state
+        self.active_battles_key = "battles:active"
+        self.battle_counter_key = "battles:counter"
 
         logger.info("Battle Orchestrator initialized successfully")
 
@@ -67,9 +71,12 @@ class BattleOrchestrator:
         Executes a battle between agents.
         """
         async with self.battle_semaphore:
-            battle_id = f"battle_{self.total_battles_executed}_{time.time()}"
-            self.active_battles.add(battle_id)
-            self.total_battles_executed += 1
+            # Get and increment battle counter in Redis
+            battle_count = await self._increment_battle_counter()
+            battle_id = f"battle_{battle_count}_{time.time()}"
+            
+            # Track active battle in Redis
+            await self._add_active_battle(battle_id)
             
             try:
                 return await self._execute_battle_internal(
@@ -83,7 +90,8 @@ class BattleOrchestrator:
                     battle_id=battle_id
                 )
             finally:
-                self.active_battles.discard(battle_id)
+                # Remove from active battles in Redis
+                await self._remove_active_battle(battle_id)
 
     async def _execute_battle_internal(
         self,
@@ -196,9 +204,12 @@ class BattleOrchestrator:
 
     async def get_stats(self) -> Dict[str, Any]:
         """Gets orchestrator statistics."""
+        total_battles = await self._get_battle_counter()
+        active_battles = await self._get_active_battles()
+        
         stats = {
-            "total_battles": self.total_battles_executed,
-            "active_battles": len(self.active_battles),
+            "total_battles": total_battles,
+            "active_battles": len(active_battles),
             "config": self.config
         }
         if self.cache:
@@ -206,3 +217,67 @@ class BattleOrchestrator:
         if self.metrics:
             stats["metrics"] = self.metrics.get_summary()
         return stats
+    
+    # ==================== REDIS HELPER METHODS ====================
+    
+    async def _increment_battle_counter(self) -> int:
+        """Increment and return battle counter in Redis."""
+        if self.redis_client:
+            try:
+                # Use Redis INCR for atomic increment
+                counter_key = self.battle_counter_key
+                counter = await self.redis_client.client.incr(counter_key)
+                return counter
+            except Exception as e:
+                logger.error(f"Failed to increment battle counter: {e}")
+                return int(time.time())  # Fallback to timestamp
+        else:
+            # Fallback for no Redis
+            return int(time.time())
+    
+    async def _get_battle_counter(self) -> int:
+        """Get current battle counter from Redis."""
+        if self.redis_client:
+            try:
+                counter = await self.redis_client.get(self.battle_counter_key)
+                return int(counter) if counter else 0
+            except Exception as e:
+                logger.error(f"Failed to get battle counter: {e}")
+                return 0
+        return 0
+    
+    async def _add_active_battle(self, battle_id: str) -> bool:
+        """Add battle to active battles set in Redis."""
+        if self.redis_client:
+            try:
+                # Use Redis SET add operation
+                result = await self.redis_client.client.sadd(self.active_battles_key, battle_id)
+                # Set TTL for cleanup (battles shouldn't run longer than 1 hour)
+                await self.redis_client.client.expire(self.active_battles_key, 3600)
+                return bool(result)
+            except Exception as e:
+                logger.error(f"Failed to add active battle {battle_id}: {e}")
+                return False
+        return True
+    
+    async def _remove_active_battle(self, battle_id: str) -> bool:
+        """Remove battle from active battles set in Redis."""
+        if self.redis_client:
+            try:
+                result = await self.redis_client.client.srem(self.active_battles_key, battle_id)
+                return bool(result)
+            except Exception as e:
+                logger.error(f"Failed to remove active battle {battle_id}: {e}")
+                return False
+        return True
+    
+    async def _get_active_battles(self) -> List[str]:
+        """Get all active battles from Redis."""
+        if self.redis_client:
+            try:
+                battles = await self.redis_client.client.smembers(self.active_battles_key)
+                return list(battles) if battles else []
+            except Exception as e:
+                logger.error(f"Failed to get active battles: {e}")
+                return []
+        return []

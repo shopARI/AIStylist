@@ -11,9 +11,14 @@ from services.user.knowledge_graph import UserKnowledgeGraphService
 from services.product.retriever import ProductRetrieverService
 from services.data.hybrid_store import HybridDataStore
 from services.cache.battle_cache import BattleCache
-from services.memory.fallback_manager import MemoryFallbackManager
+from services.cache.redis_client import create_redis_service
 from services.conversation_handler import ConversationHandler
-from services.application import ApplicationService # We will create this new service
+from services.application import ApplicationService
+
+# ML Intelligence Systems
+from services.ml.intelligence import create_intelligence_system
+# Memory Systems  
+from services.memory import create_memory_setup_function
 
 # Battle System
 from services.battle.orchestrator import BattleOrchestrator
@@ -37,6 +42,22 @@ class DIContainer(containers.DeclarativeContainer):
     settings = providers.Singleton(Settings)
 
     # --- Core Infrastructure ---
+    # Redis client for production scaling (defined early for dependencies)
+    redis_client = providers.Singleton(
+        create_redis_service,
+        url=settings.provided.redis.url,
+        host=settings.provided.redis.host,
+        port=settings.provided.redis.port,
+        password=settings.provided.redis.password,
+        db=settings.provided.redis.db,
+        max_connections=settings.provided.redis.max_connections,
+        socket_timeout=settings.provided.redis.socket_timeout,
+        socket_connect_timeout=settings.provided.redis.socket_connect_timeout,
+        retry_on_timeout=settings.provided.redis.retry_on_timeout,
+        health_check_interval=settings.provided.redis.health_check_interval,
+        decode_responses=settings.provided.redis.decode_responses
+    )
+
     # This is the CORRECT version
     user_kg_service = providers.Singleton(
         UserKnowledgeGraphService,
@@ -47,7 +68,8 @@ class DIContainer(containers.DeclarativeContainer):
     
     product_retriever_service = providers.Singleton(
         ProductRetrieverService,
-        collection_name=settings.provided.qdrant.collection_name
+        collection_name=settings.provided.qdrant.collection_name,
+        redis_client=redis_client
     )
 
     hybrid_data_store = providers.Singleton(
@@ -55,6 +77,7 @@ class DIContainer(containers.DeclarativeContainer):
         neo4j_client=user_kg_service,
         qdrant_client=product_retriever_service
     )
+
 
     battle_cache = providers.Singleton(
         BattleCache
@@ -93,20 +116,32 @@ class DIContainer(containers.DeclarativeContainer):
         cache=battle_cache,
         optimizer=battle_optimizer,
         metrics=battle_metrics,
-        settings=providers.Factory(asdict, settings.provided.battle)
+        settings=providers.Factory(asdict, settings.provided.battle),
+        redis_client=redis_client
+    )
+
+    # --- ML Intelligence System ---
+    intelligence_coordinator = providers.Singleton(
+        create_intelligence_system,
+        data_store=hybrid_data_store,
+        user_kg=user_kg_service,
+        product_retriever=product_retriever_service,
+        memory_setup_func=create_memory_setup_function(),  # ✅ MEMORY ENABLED!
+        config={
+            "enable_clustering": True,
+            "enable_visual": True, 
+            "enable_behavioral": True,
+            "enable_memory_rag": True
+        }
     )
 
     # --- Top-Level Application Services ---
-    fallback_memory_manager = providers.Singleton(
-        MemoryFallbackManager
-    )
-
     conversation_handler = providers.Singleton(
         ConversationHandler,
         agent_factory=agent_factory,
-        memory_manager=fallback_memory_manager,
         neo4j_service=user_kg_service,
-        qdrant_service=product_retriever_service
+        qdrant_service=product_retriever_service,
+        redis_client=redis_client
     )
 
     # --- Main Application Service ---
@@ -114,15 +149,25 @@ class DIContainer(containers.DeclarativeContainer):
         ApplicationService,
         conversation_handler=conversation_handler,
         battle_orchestrator=battle_orchestrator,
-        user_kg_service=user_kg_service
+        user_kg_service=user_kg_service,
+        intelligence_coordinator=intelligence_coordinator,
+        redis_client=redis_client
     )
 
 async def initialize_container() -> DIContainer:
     """
     Initializes the container and all its dependent services.
     This should be called during application startup.
+    
+    SWE Requirement: Immediate failure if critical databases unavailable.
     """
     logger.info("Initializing DI container and services...")
+    
+    # Pre-flight check: Verify all critical databases BEFORE starting services
+    from di.preflight_check import preflight_database_check
+    settings = Settings()  # Create settings instance for pre-flight check
+    await preflight_database_check(settings)
+    
     container = DIContainer()
     container.wire(modules=[
         "main", 
@@ -130,8 +175,10 @@ async def initialize_container() -> DIContainer:
     ])
     
     # Asynchronously initialize services that require it
+    # (Databases already verified in pre-flight check)
     await container.user_kg_service().initialize()
     await container.product_retriever_service().initialize()
+    await container.redis_client().initialize()
     logger.info("Container and core services initialized.")
     return container
 
@@ -143,4 +190,14 @@ async def cleanup_container(container: DIContainer):
     logger.info("Cleaning up container resources...")
     await container.user_kg_service().close()
     await container.product_retriever_service().close()
+    await container.redis_client().close()
+    
+    # Cleanup hybrid data store
+    try:
+        hybrid_store = container.hybrid_data_store()
+        if hasattr(hybrid_store, 'close'):
+            await hybrid_store.close()
+    except Exception as e:
+        logger.error(f"Error cleaning up hybrid data store: {e}")
+    
     logger.info("Container cleanup complete.")

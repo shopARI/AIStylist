@@ -8,12 +8,14 @@ import logging
 import asyncio
 import json
 import uuid
-from typing import Dict, List, Any, Optional, Tuple
+from typing import Dict, List, Any, Optional, Tuple, Union
 from datetime import datetime, timedelta
 from enum import Enum
 from dataclasses import dataclass, field
 from collections import defaultdict, deque
 import hashlib
+
+from services.cache.redis_client import RedisService, FallbackRedisService
 
 logger = logging.getLogger("services.conversation.handler")
 
@@ -396,8 +398,8 @@ class ConversationHandler:
         self,
         neo4j_service: Optional[Any] = None,
         qdrant_service: Optional[Any] = None,
-        memory_manager: Optional[Any] = None,
         agent_factory: Optional[Any] = None,
+        redis_client: Optional[Union[RedisService, FallbackRedisService]] = None,
         enable_persistence: bool = True,
         persistence_interval: int = 300,
         enable_optimization: bool = True,
@@ -410,7 +412,6 @@ class ConversationHandler:
         Args:
             neo4j_service: Neo4j service for persistence
             qdrant_service: Qdrant service (unused but kept for compatibility)
-            memory_manager: Memory manager
             agent_factory: Agent factory for creating agents
             enable_persistence: Enable background persistence
             persistence_interval: Persistence interval in seconds
@@ -420,14 +421,15 @@ class ConversationHandler:
         """
         self.neo4j_service = neo4j_service
         self.qdrant_service = qdrant_service
-        self.memory_manager = memory_manager
         self.agent_factory = agent_factory
+        self.redis_client = redis_client
         self.max_history_length = max_history_length
         
-        # Session management
-        self.sessions: Dict[str, ConversationContext] = {}
-        self.conversations: Dict[str, List[Message]] = {}
-        self.interactions: Dict[str, List[ProductInteraction]] = defaultdict(list)
+        # Redis keys for distributed storage
+        self.sessions_key_prefix = "conversation:session:"
+        self.conversations_key_prefix = "conversation:messages:"
+        self.interactions_key_prefix = "conversation:interactions:"
+        self.default_ttl = 86400 * 7  # 7 days TTL
         
         # Persistence worker
         self.persistence_worker = None
@@ -695,16 +697,20 @@ class ConversationHandler:
         except Exception as e:
             logger.error(f"Error optimizing session memory: {e}")
     
-    def get_or_create_session(
+    async def get_or_create_session(
         self,
         session_id: str,
         user_id: Optional[str] = None
     ) -> ConversationContext:
-        """Get or create session context."""
-        if session_id in self.sessions:
-            context = self.sessions[session_id]
+        """Get or create session context from Redis."""
+        # Try to get from Redis first
+        context = await self._get_session_from_redis(session_id)
+        
+        if context:
+            # Update user_id if provided and missing
             if user_id and not context.user_id:
                 context.user_id = user_id
+                await self._save_session_to_redis(session_id, context)
             return context
         
         # Create new session
@@ -714,8 +720,9 @@ class ConversationHandler:
             state=ConversationState.NEW
         )
         
-        self.sessions[session_id] = context
-        self.conversations[session_id] = []
+        # Save to Redis
+        await self._save_session_to_redis(session_id, context)
+        await self._save_conversations_to_redis(session_id, [])  # Initialize empty conversations
         self.stats["total_sessions"] += 1
         
         logger.info(f"Created session: {session_id}")
@@ -1001,19 +1008,26 @@ class ConversationHandler:
         
         return None
     
-    def get_stats(self) -> Dict[str, Any]:
+    async def get_stats(self) -> Dict[str, Any]:
         """Get comprehensive handler statistics."""
+        # Get active session count from Redis
+        active_sessions_count = 0
+        if self.redis_client:
+            try:
+                # Count sessions by scanning for session keys
+                session_keys = await self.redis_client.keys(f"{self.sessions_key_prefix}*")
+                active_sessions_count = len(session_keys)
+            except Exception as e:
+                logger.error(f"Error getting active sessions count: {e}")
+        
         return {
-            "active_sessions": len(self.sessions),
+            "active_sessions": active_sessions_count,
             "total_sessions": self.stats["total_sessions"],
             "total_messages": self.stats["total_messages"],
             "total_interactions": self.stats["total_interactions"],
             "persistence_count": self.stats["persistence_count"],
             "optimization_count": self.stats["optimization_count"],
-            "state_distribution": {
-                state.value: sum(1 for ctx in self.sessions.values() if ctx.state == state)
-                for state in ConversationState
-            },
+            "redis_storage": bool(self.redis_client),
             "avg_messages_per_session": (
                 self.stats["total_messages"] / self.stats["total_sessions"]
                 if self.stats["total_sessions"] > 0 else 0
@@ -1043,6 +1057,153 @@ class ConversationHandler:
         if sessions_to_remove:
             logger.info(f"Cleaned up {len(sessions_to_remove)} old sessions")
     
+    # ==================== REDIS HELPER METHODS ====================
+    
+    async def _get_session_from_redis(self, session_id: str) -> Optional[ConversationContext]:
+        """Get session context from Redis."""
+        if not self.redis_client:
+            return None
+        
+        try:
+            session_key = f"{self.sessions_key_prefix}{session_id}"
+            session_data = await self.redis_client.get_json(session_key)
+            
+            if session_data:
+                # Convert back to ConversationContext
+                context = ConversationContext(
+                    session_id=session_data['session_id'],
+                    user_id=session_data.get('user_id'),
+                    state=ConversationState(session_data['state']),
+                    current_intent=session_data.get('current_intent'),
+                    current_products=session_data.get('current_products', []),
+                    preferences=session_data.get('preferences', {}),
+                    metadata=session_data.get('metadata', {}),
+                    created_at=datetime.fromisoformat(session_data['created_at']),
+                    updated_at=datetime.fromisoformat(session_data['updated_at']),
+                    last_persistence=datetime.fromisoformat(session_data.get('last_persistence', session_data['updated_at'])),
+                    message_count=session_data.get('message_count', 0),
+                    interaction_count=session_data.get('interaction_count', 0)
+                )
+                return context
+        except Exception as e:
+            logger.error(f"Error getting session {session_id} from Redis: {e}")
+        
+        return None
+    
+    async def _save_session_to_redis(self, session_id: str, context: ConversationContext) -> bool:
+        """Save session context to Redis."""
+        if not self.redis_client:
+            return False
+        
+        try:
+            session_key = f"{self.sessions_key_prefix}{session_id}"
+            session_data = {
+                'session_id': context.session_id,
+                'user_id': context.user_id,
+                'state': context.state.value,
+                'current_intent': context.current_intent,
+                'current_products': context.current_products,
+                'preferences': context.preferences,
+                'metadata': context.metadata,
+                'created_at': context.created_at.isoformat(),
+                'updated_at': context.updated_at.isoformat(),
+                'last_persistence': context.last_persistence.isoformat(),
+                'message_count': context.message_count,
+                'interaction_count': context.interaction_count
+            }
+            
+            return await self.redis_client.set_json(session_key, session_data, ttl=self.default_ttl)
+        except Exception as e:
+            logger.error(f"Error saving session {session_id} to Redis: {e}")
+            return False
+    
+    async def _get_conversations_from_redis(self, session_id: str) -> List[Message]:
+        """Get conversation messages from Redis."""
+        if not self.redis_client:
+            return []
+        
+        try:
+            conv_key = f"{self.conversations_key_prefix}{session_id}"
+            messages_data = await self.redis_client.get_json(conv_key)
+            
+            if messages_data and isinstance(messages_data, list):
+                messages = []
+                for msg_data in messages_data:
+                    message = Message(
+                        role=MessageRole(msg_data['role']),
+                        content=msg_data['content'],
+                        timestamp=datetime.fromisoformat(msg_data['timestamp']),
+                        metadata=msg_data.get('metadata'),
+                        message_id=msg_data['id']
+                    )
+                    messages.append(message)
+                return messages
+        except Exception as e:
+            logger.error(f"Error getting conversations for {session_id} from Redis: {e}")
+        
+        return []
+    
+    async def _save_conversations_to_redis(self, session_id: str, messages: List[Message]) -> bool:
+        """Save conversation messages to Redis."""
+        if not self.redis_client:
+            return False
+        
+        try:
+            conv_key = f"{self.conversations_key_prefix}{session_id}"
+            messages_data = [msg.to_dict() for msg in messages]
+            
+            return await self.redis_client.set_json(conv_key, messages_data, ttl=self.default_ttl)
+        except Exception as e:
+            logger.error(f"Error saving conversations for {session_id} to Redis: {e}")
+            return False
+    
+    async def _get_interactions_from_redis(self, session_id: str) -> List[ProductInteraction]:
+        """Get product interactions from Redis."""
+        if not self.redis_client:
+            return []
+        
+        try:
+            int_key = f"{self.interactions_key_prefix}{session_id}"
+            interactions_data = await self.redis_client.get_json(int_key)
+            
+            if interactions_data and isinstance(interactions_data, list):
+                interactions = []
+                for int_data in interactions_data:
+                    interaction = ProductInteraction(
+                        product_id=int_data['product_id'],
+                        interaction_type=int_data['interaction_type'],
+                        timestamp=datetime.fromisoformat(int_data['timestamp']),
+                        metadata=int_data.get('metadata')
+                    )
+                    interactions.append(interaction)
+                return interactions
+        except Exception as e:
+            logger.error(f"Error getting interactions for {session_id} from Redis: {e}")
+        
+        return []
+    
+    async def _save_interactions_to_redis(self, session_id: str, interactions: List[ProductInteraction]) -> bool:
+        """Save product interactions to Redis."""
+        if not self.redis_client:
+            return False
+        
+        try:
+            int_key = f"{self.interactions_key_prefix}{session_id}"
+            interactions_data = []
+            
+            for interaction in interactions:
+                interactions_data.append({
+                    'product_id': interaction.product_id,
+                    'interaction_type': interaction.interaction_type,
+                    'timestamp': interaction.timestamp.isoformat(),
+                    'metadata': interaction.metadata
+                })
+            
+            return await self.redis_client.set_json(int_key, interactions_data, ttl=self.default_ttl)
+        except Exception as e:
+            logger.error(f"Error saving interactions for {session_id} to Redis: {e}")
+            return False
+
     async def shutdown(self):
         """Graceful shutdown with persistence."""
         logger.info("Shutting down ConversationHandler")
