@@ -5,7 +5,7 @@ import os
 from typing import Optional, Dict, Any, List
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 from dependency_injector.wiring import inject, Provide
@@ -37,8 +37,8 @@ async def lifespan(app: FastAPI):
 # --- API Models ---
 class ChatMessage(BaseModel):
     message: str = Field(..., max_length=2000)
-    session_id: Optional[str] = None
-    user_id: Optional[str] = None
+    session_id: str = Field(..., description="Required session identifier for conversation continuity")
+    user_id: str = Field(..., description="Required user identifier for personalization")
 
 # --- FastAPI App ---
 app = FastAPI(
@@ -65,22 +65,28 @@ async def root():
 @inject
 async def chat_with_ari(
     chat_message: ChatMessage,
+    background_tasks: BackgroundTasks,
     app_service: ApplicationService = Depends(Provide[DIContainer.application_service])
 ):
     """
     Main chat endpoint to interact with Ari.
     The ApplicationService is automatically injected by the DI container.
     """
-    session_id = chat_message.session_id or str(uuid.uuid4())
     try:
         response = await app_service.process_message(
-            session_id=session_id,
+            session_id=chat_message.session_id,
             message=chat_message.message,
-            user_id=chat_message.user_id
+            user_id=chat_message.user_id,
+            background_tasks=background_tasks
         )
         return response
     except Exception as e:
-        logger.error(f"Chat endpoint error: {e}", exc_info=True)
+        # Move detailed error logging to background to reduce response time
+        background_tasks.add_task(
+            logger.error,
+            f"Chat endpoint error: {e}",
+            exc_info=True
+        )
         raise HTTPException(
             status_code=500,
             detail="An internal error occurred. Please try again."
@@ -100,6 +106,10 @@ async def websocket_endpoint(
             data = await websocket.receive_json()
             message = data.get("message", "")
             user_id = data.get("user_id")
+            
+            if not user_id:
+                await websocket.send_json({"error": "user_id is required"})
+                continue
 
             response = await app_service.process_message(
                 session_id=session_id,
