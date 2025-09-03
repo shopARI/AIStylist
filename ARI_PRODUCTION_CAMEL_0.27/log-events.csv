@@ -1,0 +1,873 @@
+timestamp,message
+1756872910147,/opt/ml/code/entrypoint.sh 
+1756872910148,Number of CPUs:
+1756872910148,2
+1756872910148,Available storage space:
+1756872910151,Filesystem      Size  Used Avail Use% Mounted on
+1756872910151,overlay          30G   21G  7.1G  75% /
+1756872910151,tmpfs            64M     0   64M   0% /dev
+1756872910151,shm             3.8G     0  3.8G   0% /dev/shm
+1756872910151,tmpfs           3.8G     0  3.8G   0% /sys/fs/cgroup
+1756872910151,/dev/nvme1n1     30G   21G  7.1G  75% /etc/hosts
+1756872910151,/dev/nvme0n1p1  4.9G  2.1G  2.7G  44% /managed-agents/execute-command/amazon-ssm-agent
+1756872910151,tmpfs           3.8G     0  3.8G   0% /proc/acpi
+1756872910151,tmpfs           3.8G     0  3.8G   0% /sys/firmware
+1756872910960,[2025-09-03 00:15:10 -0400] [15] [INFO] Starting gunicorn 23.0.0
+1756872910961,[2025-09-03 00:15:10 -0400] [15] [INFO] Listening at: http://0.0.0.0:8080 (15)
+1756872910961,[2025-09-03 00:15:10 -0400] [15] [INFO] Using worker: uvicorn.workers.UvicornWorker
+1756872910964,[2025-09-03 00:15:10 -0400] [22] [INFO] Booting worker with pid: 22
+1756872911062,[2025-09-03 00:15:11 -0400] [23] [INFO] Booting worker with pid: 23
+1756872935371,"2025-09-03 00:15:35,371 - camel_v070 - WARNING - Storage components not available"
+1756872935371,"2025-09-03 00:15:35,371 - camel_v070 - WARNING - Storage components not available"
+1756872935383,✅ All 4 critical prompts validated✅ All 4 critical prompts validated
+1756872935406,"/opt/ml/code/main.py:89: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/"
+1756872935406,"  @validator(""message"")"
+1756872935406,"/opt/ml/code/main.py:89: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/"
+1756872935406,"  @validator(""message"")"
+1756872935406,"/opt/ml/code/main.py:107: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/"
+1756872935406,"  @validator(""session_id"", ""user_id"")"
+1756872935406,"/opt/ml/code/main.py:107: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/"
+1756872935406,"  @validator(""session_id"", ""user_id"")"
+1756872935466,[2025-09-03 00:15:35 -0400] [23] [INFO] Started server process [23]
+1756872935466,[2025-09-03 00:15:35 -0400] [22] [INFO] Started server process [22]
+1756872935467,[2025-09-03 00:15:35 -0400] [22] [INFO] Waiting for application startup.
+1756872935467,[2025-09-03 00:15:35 -0400] [23] [INFO] Waiting for application startup.
+1756872935845,Connecting to rediss://ari-redis-serverless-production-umki2b.serverless.use1.cache.amazonaws.com:6379
+1756872935855,Connecting to rediss://ari-redis-serverless-production-umki2b.serverless.use1.cache.amazonaws.com:6379
+1756872936136,[2025-09-03 00:15:36 -0400] [23] [INFO] Application startup complete.
+1756872936137,"10.0.3.182:2796 - ""GET /health HTTP/1.1"" 200"
+1756872936138,"10.0.5.91:64370 - ""GET /health HTTP/1.1"" 200"
+1756872936139,[2025-09-03 00:15:36 -0400] [22] [INFO] Application startup complete.
+1756872949008,"10.0.3.182:39188 - ""GET /health HTTP/1.1"" 200"
+1756872949049,"10.0.5.91:30690 - ""GET /health HTTP/1.1"" 200"
+1756872979038,"10.0.3.182:62608 - ""GET /health HTTP/1.1"" 200"
+1756872979054,"10.0.5.91:46180 - ""GET /health HTTP/1.1"" 200"
+1756873009043,"10.0.3.182:23122 - ""GET /health HTTP/1.1"" 200"
+1756873009061,"10.0.5.91:16728 - ""GET /health HTTP/1.1"" 200"
+1756873020923,"10.0.4.95:48008 - ""GET /health HTTP/1.1"" 200"
+1756873039064,"10.0.3.182:3930 - ""GET /health HTTP/1.1"" 200"
+1756873039091,"10.0.5.91:12498 - ""GET /health HTTP/1.1"" 200"
+1756873050926,"10.0.4.95:14796 - ""GET /health HTTP/1.1"" 200"
+1756873069070,"10.0.3.182:15664 - ""GET /health HTTP/1.1"" 200"
+1756873069122,"10.0.5.91:4286 - ""GET /health HTTP/1.1"" 200"
+1756873080954,"10.0.4.95:14862 - ""GET /health HTTP/1.1"" 200"
+1756873099087,"10.0.3.182:19546 - ""GET /health HTTP/1.1"" 200"
+1756873099153,"10.0.5.91:61630 - ""GET /health HTTP/1.1"" 200"
+1756873110971,"10.0.4.95:55408 - ""GET /health HTTP/1.1"" 200"
+1756873129099,"10.0.3.182:53258 - ""GET /health HTTP/1.1"" 200"
+1756873129171,"10.0.5.91:17712 - ""GET /health HTTP/1.1"" 200"
+1756873140971,"10.0.4.95:18660 - ""GET /health HTTP/1.1"" 200"
+1756873159129,"10.0.3.182:59632 - ""GET /health HTTP/1.1"" 200"
+1756873159176,"10.0.5.91:10584 - ""GET /health HTTP/1.1"" 200"
+1756873171002,"10.0.4.95:34222 - ""GET /health HTTP/1.1"" 200"
+1756873189146,"10.0.3.182:24248 - ""GET /health HTTP/1.1"" 200"
+1756873189184,"10.0.5.91:14828 - ""GET /health HTTP/1.1"" 200"
+1756873201030,"10.0.4.95:62708 - ""GET /health HTTP/1.1"" 200"
+1756873219177,"10.0.3.182:8324 - ""GET /health HTTP/1.1"" 200"
+1756873219199,"10.0.5.91:57230 - ""GET /health HTTP/1.1"" 200"
+1756873231058,"10.0.4.95:16528 - ""GET /health HTTP/1.1"" 200"
+1756873249189,"10.0.3.182:7622 - ""GET /health HTTP/1.1"" 200"
+1756873249211,"10.0.5.91:32984 - ""GET /health HTTP/1.1"" 200"
+1756873261086,"10.0.4.95:31756 - ""GET /health HTTP/1.1"" 200"
+1756873279203,"10.0.3.182:41430 - ""GET /health HTTP/1.1"" 200"
+1756873279240,"10.0.5.91:43054 - ""GET /health HTTP/1.1"" 200"
+1756873291114,"10.0.4.95:53308 - ""GET /health HTTP/1.1"" 200"
+1756873309219,"10.0.3.182:28262 - ""GET /health HTTP/1.1"" 200"
+1756873309249,"10.0.5.91:9782 - ""GET /health HTTP/1.1"" 200"
+1756873321121,"10.0.4.95:13312 - ""GET /health HTTP/1.1"" 200"
+1756873339250,"10.0.3.182:43772 - ""GET /health HTTP/1.1"" 200"
+1756873339251,"10.0.5.91:18778 - ""GET /health HTTP/1.1"" 200"
+1756873340705,"/usr/local/lib/python3.10/site-packages/torchvision/models/_utils.py:208: UserWarning: The parameter 'pretrained' is deprecated since 0.13 and may be removed in the future, please use 'weights' instead."
+1756873340705,  warnings.warn(
+1756873340705,/usr/local/lib/python3.10/site-packages/torchvision/models/_utils.py:223: UserWarning: Arguments other than a weight enum or `None` for 'weights' are deprecated since 0.13 and may be removed in the future. The current behavior is equivalent to passing `weights=ResNet50_Weights.IMAGENET1K_V1`. You can also use `weights=ResNet50_Weights.DEFAULT` to get the most up-to-date weights.
+1756873340705,  warnings.warn(msg)
+1756873341042,"Downloading: ""https://download.pytorch.org/models/resnet50-0676ba61.pth"" to /root/.cache/torch/hub/checkpoints/resnet50-0676ba61.pth"
+1756873341563,"  0%|          | 0.00/97.8M [00:00<?, ?B/s] 14%|█▍        | 14.1M/97.8M [00:00<00:00, 147MB/s] 33%|███▎      | 32.5M/97.8M [00:00<00:00, 174MB/s] 55%|█████▍    | 53.8M/97.8M [00:00<00:00, 196MB/s] 77%|███████▋  | 75.4M/97.8M [00:00<00:00, 207MB/s] 99%|█████████▉| 97.2M/97.8M [00:00<00:00, 215MB/s]100%|██████████| 97.8M/97.8M [00:00<00:00, 203MB/s]"
+1756873341719,"2025-09-03 00:22:21,719 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: HAS_PREFERENCE)} {position: line: 3, column: 46, offset: 76} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873341719,"2025-09-03 00:22:21,719 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: gender)} {position: line: 21, column: 19, offset: 990} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873341719,"2025-09-03 00:22:21,719 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: BELONGS_TO)} {position: line: 4, column: 34, offset: 145} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873341719,"2025-09-03 00:22:21,719 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: confidence)} {position: line: 8, column: 80, offset: 415} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873341720,"2025-09-03 00:22:21,719 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: lifetime_value)} {position: line: 22, column: 19, offset: 1026} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873341720,"2025-09-03 00:22:21,720 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: age_group)} {position: line: 20, column: 19, offset: 948} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873341720,"2025-09-03 00:22:21,720 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: profile)} {position: line: 25, column: 23, offset: 1137} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873341720,"2025-09-03 00:22:21,720 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: HAS_STYLE)} {position: line: 5, column: 34, offset: 209} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873341720,"2025-09-03 00:22:21,720 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: location)} {position: line: 19, column: 19, offset: 908} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873341737,/usr/local/lib/python3.10/site-packages/camel/memories/blocks/chat_history_block.py:73: UserWarning: The `ChatHistoryMemory` is empty.
+1756873341737,"  warnings.warn(""The `ChatHistoryMemory` is empty."")"
+1756873341790,"2025-09-03 00:22:21,790 - intelligence.behavioral - WARNING - No interactions found in Neo4j"
+1756873342515,"2025-09-03 00:22:22,515 - intelligence.memory_rag - WARNING - OpenAI API format error in memory context, returning empty context: Error code: 400 - {'error': {'message': ""'$.input' is invalid. Please check the API reference: https://platform.openai.com/docs/api-reference."", 'type': 'invalid_request_error', 'param': None, 'code': None}}"
+1756873344467,"2025-09-03 00:22:24,467 - agents.cypher_bot - WARNING - No filters provided, returning empty list"
+1756873351148,"10.0.4.95:16788 - ""GET /health HTTP/1.1"" 200"
+1756873351667,"10.0.4.95:36102 - ""POST /chat HTTP/1.1"" 200"
+1756873369274,"10.0.3.182:62028 - ""GET /health HTTP/1.1"" 200"
+1756873369281,"10.0.5.91:54992 - ""GET /health HTTP/1.1"" 200"
+1756873381155,"10.0.4.95:8180 - ""GET /health HTTP/1.1"" 200"
+1756873399279,"10.0.3.182:63252 - ""GET /health HTTP/1.1"" 200"
+1756873399296,"10.0.5.91:63576 - ""GET /health HTTP/1.1"" 200"
+1756873411188,"10.0.4.95:32206 - ""GET /health HTTP/1.1"" 200"
+1756873429307,"10.0.3.182:38744 - ""GET /health HTTP/1.1"" 200"
+1756873429308,"10.0.5.91:19494 - ""GET /health HTTP/1.1"" 200"
+1756873441215,"10.0.4.95:39922 - ""GET /health HTTP/1.1"" 200"
+1756873459337,"10.0.5.91:9750 - ""GET /health HTTP/1.1"" 200"
+1756873459337,"10.0.3.182:17776 - ""GET /health HTTP/1.1"" 200"
+1756873471242,"10.0.4.95:42032 - ""GET /health HTTP/1.1"" 200"
+1756873480633,"2025-09-03 00:24:40,633 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: HAS_PREFERENCE)} {position: line: 3, column: 46, offset: 76} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873480633,"2025-09-03 00:24:40,633 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: gender)} {position: line: 21, column: 19, offset: 990} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873480634,"2025-09-03 00:24:40,633 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: BELONGS_TO)} {position: line: 4, column: 34, offset: 145} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873480634,"2025-09-03 00:24:40,633 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: confidence)} {position: line: 8, column: 80, offset: 415} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873480634,"2025-09-03 00:24:40,634 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: lifetime_value)} {position: line: 22, column: 19, offset: 1026} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873480634,"2025-09-03 00:24:40,634 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: age_group)} {position: line: 20, column: 19, offset: 948} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873480634,"2025-09-03 00:24:40,634 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: profile)} {position: line: 25, column: 23, offset: 1137} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873480634,"2025-09-03 00:24:40,634 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: HAS_STYLE)} {position: line: 5, column: 34, offset: 209} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873480634,"2025-09-03 00:24:40,634 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: location)} {position: line: 19, column: 19, offset: 908} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873480635,"10.0.3.182:46310 - ""POST /chat HTTP/1.1"" 200"
+1756873489361,"10.0.3.182:7450 - ""GET /health HTTP/1.1"" 200"
+1756873489367,"10.0.5.91:36680 - ""GET /health HTTP/1.1"" 200"
+1756873501263,"10.0.4.95:34340 - ""GET /health HTTP/1.1"" 200"
+1756873508518,"2025-09-03 00:25:08,518 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: HAS_PREFERENCE)} {position: line: 3, column: 46, offset: 76} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873508518,"2025-09-03 00:25:08,518 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: gender)} {position: line: 21, column: 19, offset: 990} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873508518,"2025-09-03 00:25:08,518 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: BELONGS_TO)} {position: line: 4, column: 34, offset: 145} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873508518,"2025-09-03 00:25:08,518 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: confidence)} {position: line: 8, column: 80, offset: 415} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873508518,"2025-09-03 00:25:08,518 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: lifetime_value)} {position: line: 22, column: 19, offset: 1026} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873508520,"2025-09-03 00:25:08,518 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: age_group)} {position: line: 20, column: 19, offset: 948} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873508520,"2025-09-03 00:25:08,519 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: profile)} {position: line: 25, column: 23, offset: 1137} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873508520,"2025-09-03 00:25:08,519 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownRelationshipTypeWarning} {category: UNRECOGNIZED} {title: The provided relationship type is not in the database.} {description: One of the relationship types in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing relationship type is: HAS_STYLE)} {position: line: 5, column: 34, offset: 209} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873508520,"2025-09-03 00:25:08,519 - neo4j.notifications - WARNING - Received notification from DBMS server: {severity: WARNING} {code: Neo.ClientNotification.Statement.UnknownPropertyKeyWarning} {category: UNRECOGNIZED} {title: The provided property key is not in the database} {description: One of the property names in your query is not available in the database, make sure you didn't misspell it or that the label is available when you run this statement in your application (the missing property name is: location)} {position: line: 19, column: 19, offset: 908} for query: ""
+            MATCH (u:User {id: $user_id})
+            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
+            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            WITH u,
+                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
+                 collect(DISTINCT seg.name) as segments,
+                 style,
+                 count(DISTINCT i) as total_interactions,
+                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+            RETURN
+                u.id as id,
+                u.created_at as created_at,
+                u.last_active as last_active,
+                u.email as email,
+                u.name as name,
+                u.location as location,
+                u.age_group as age_group,
+                u.gender as gender,
+                u.lifetime_value as lifetime_value,
+                preferences,
+                segments,
+                style.profile as style_profile,
+                total_interactions,
+                total_purchases
+            """
+1756873508520,"10.0.4.95:35684 - ""POST /chat HTTP/1.1"" 200"
+1756873519373,"10.0.5.91:7450 - ""GET /health HTTP/1.1"" 200"
+1756873519380,"10.0.3.182:41404 - ""GET /health HTTP/1.1"" 200"
+1756873531290,"10.0.4.95:6904 - ""GET /health HTTP/1.1"" 200"
+1756873549389,"10.0.5.91:11286 - ""GET /health HTTP/1.1"" 200"
+1756873549411,"10.0.3.182:24946 - ""GET /health HTTP/1.1"" 200"
+1756873561318,"10.0.4.95:52438 - ""GET /health HTTP/1.1"" 200"
+1756873579402,"10.0.5.91:27178 - ""GET /health HTTP/1.1"" 200"
+1756873579442,"10.0.3.182:7696 - ""GET /health HTTP/1.1"" 200"
