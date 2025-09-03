@@ -143,66 +143,36 @@ class CypherBotAgent:
         category_filter = filters.get("category") if filters else None
         
         if len(search_terms) == 1 and len(search_terms[0]) >= 3:
-            # Single term optimization with optional category filtering
+            # FAST single term query - minimal string operations
             if category_filter:
                 cypher_query = """
                 MATCH (p:Product)
                 WHERE p.id IS NOT NULL
-                AND (
-                    toLower(p.category) = toLower($category_filter)
-                    OR toLower(p.subcategory) = toLower($category_filter) 
-                    OR ANY(cat IN p.categories WHERE toLower(cat) = toLower($category_filter))
-                )
-                AND (
-                    toLower(p.title) STARTS WITH toLower($first_term)
-                    OR toLower(p.title) CONTAINS (' ' + toLower($first_term))
-                    OR (toLower(p.title) CONTAINS toLower($first_term) AND size(p.title) < 100)
-                )
+                AND (p.category = $category_filter OR p.subcategory = $category_filter)
+                AND p.title CONTAINS $first_term
                 RETURN p
-                ORDER BY 
-                    CASE WHEN toLower(p.title) STARTS WITH toLower($first_term) THEN 1 ELSE 2 END,
-                    CASE WHEN toLower(p.category) = toLower($category_filter) THEN 1 ELSE 2 END
                 LIMIT $limit
                 """
                 params["first_term"] = search_terms[0]
                 params["category_filter"] = category_filter
             else:
                 cypher_query = """
-                MATCH (p:Product)
+                MATCH (p:Product)  
                 WHERE p.id IS NOT NULL
-                AND (
-                    toLower(p.title) STARTS WITH toLower($first_term)
-                    OR toLower(p.title) CONTAINS (' ' + toLower($first_term))
-                    OR (toLower(p.title) CONTAINS toLower($first_term) AND size(p.title) < 100)
-                )
+                AND p.title CONTAINS $first_term
                 RETURN p
-                ORDER BY CASE WHEN toLower(p.title) STARTS WITH toLower($first_term) THEN 1 ELSE 2 END
                 LIMIT $limit
                 """
                 params["first_term"] = search_terms[0]
         else:
-            # Multi-term with enhanced category filtering
+            # FAST multi-term query - simplified logic
             if category_filter:
                 cypher_query = """
                 MATCH (p:Product)
                 WHERE p.id IS NOT NULL
-                AND (
-                    toLower(p.category) = toLower($category_filter)
-                    OR toLower(p.subcategory) = toLower($category_filter)
-                    OR ANY(cat IN p.categories WHERE toLower(cat) = toLower($category_filter))
-                )
-                AND ANY(term IN $search_terms WHERE 
-                    toLower(p.title) CONTAINS toLower(term)
-                )
-                WITH p
-                WHERE ALL(term IN $search_terms WHERE 
-                    toLower(p.title) CONTAINS toLower(term) OR 
-                    (toLower(p.description) CONTAINS toLower(term) AND size(p.description) < 200)
-                )
+                AND (p.category = $category_filter OR p.subcategory = $category_filter)
+                AND ALL(term IN $search_terms WHERE p.title CONTAINS term)
                 RETURN p
-                ORDER BY 
-                    CASE WHEN toLower(p.category) = toLower($category_filter) THEN 1 ELSE 2 END,
-                    size([term IN $search_terms WHERE toLower(p.title) CONTAINS toLower(term)]) DESC
                 LIMIT $limit
                 """
                 params["category_filter"] = category_filter
@@ -210,16 +180,8 @@ class CypherBotAgent:
                 cypher_query = """
                 MATCH (p:Product)
                 WHERE p.id IS NOT NULL
-                AND ANY(term IN $search_terms WHERE 
-                    toLower(p.title) CONTAINS toLower(term)
-                )
-                WITH p
-                WHERE ALL(term IN $search_terms WHERE 
-                    toLower(p.title) CONTAINS toLower(term) OR 
-                    (toLower(p.description) CONTAINS toLower(term) AND size(p.description) < 200)
-                )
+                AND ALL(term IN $search_terms WHERE p.title CONTAINS term)
                 RETURN p
-                ORDER BY size([term IN $search_terms WHERE toLower(p.title) CONTAINS toLower(term)]) DESC
                 LIMIT $limit
                 """
         
