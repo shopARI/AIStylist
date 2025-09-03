@@ -116,6 +116,46 @@ app.add_middleware(
 async def root():
     return {"message": "ARI Fashion AI System is operational."}
 
+async def check_redis_health(redis_client) -> bool:
+    """Check if Redis is accessible."""
+    try:
+        if hasattr(redis_client, 'ping'):
+            # Handle both sync and async ping methods
+            ping_result = redis_client.ping()
+            if asyncio.iscoroutine(ping_result):
+                await ping_result
+            return True
+        else:
+            # For FallbackRedisService, just return True
+            return True
+    except Exception as e:
+        logger.warning(f"Redis health check failed: {e}")
+        return False
+
+async def check_neo4j_health(neo4j_service) -> bool:
+    """Check if Neo4j is accessible."""
+    try:
+        if hasattr(neo4j_service, 'run_query'):
+            # Simple test query
+            await neo4j_service.run_query("RETURN 1 as test_connection")
+            return True
+        return False
+    except Exception as e:
+        logger.warning(f"Neo4j health check failed: {e}")
+        return False
+
+async def check_qdrant_health(qdrant_service) -> bool:
+    """Check if Qdrant is accessible."""
+    try:
+        if hasattr(qdrant_service, 'client') and qdrant_service.client:
+            # Try to get collections info
+            collections = await asyncio.to_thread(qdrant_service.client.get_collections)
+            return True
+        return False
+    except Exception as e:
+        logger.warning(f"Qdrant health check failed: {e}")
+        return False
+
 @app.get("/health")
 async def health_check():
     """Basic health check endpoint."""
@@ -149,12 +189,30 @@ async def detailed_health_check(request: Request):
         "load_average": psutil.getloadavg() if hasattr(psutil, 'getloadavg') else None
     }
     
+    # Get services from DI container for health checks
+    container = app.state.container
+    try:
+        redis_client = await container.redis_client()
+        neo4j_service = await container.user_kg_service()
+        qdrant_service = await container.product_retriever_service()
+        
+        # Run actual health checks
+        redis_healthy = await check_redis_health(redis_client)
+        neo4j_healthy = await check_neo4j_health(neo4j_service)
+        qdrant_healthy = await check_qdrant_health(qdrant_service)
+        
+    except Exception as e:
+        logger.error(f"Error accessing services for health check: {e}")
+        redis_healthy = False
+        neo4j_healthy = False
+        qdrant_healthy = False
+    
     # Service health checks
     health_checks = {
         "memory_service": memory_service.is_memory_healthy(),
-        "redis_available": True,  # TODO: Add actual Redis health check
-        "neo4j_available": True,  # TODO: Add actual Neo4j health check
-        "qdrant_available": True   # TODO: Add actual Qdrant health check
+        "redis_available": redis_healthy,
+        "neo4j_available": neo4j_healthy,
+        "qdrant_available": qdrant_healthy
     }
     
     overall_status = "healthy" if all(health_checks.values()) else "degraded"
