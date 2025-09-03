@@ -81,6 +81,14 @@ test_*.py
 debug_*.py
 *_debug.py
 
+# Development tools and chat interfaces (local only)
+chat_terminal.py
+chat.py
+CHAT_INTERFACE.md
+*_terminal.py
+interactive_*.py
+demo_*.py
+
 # Web interface development files (not for production)
 web_interface_dev/
 streamlit_*.py
