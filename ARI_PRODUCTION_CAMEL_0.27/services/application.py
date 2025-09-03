@@ -117,34 +117,15 @@ class ApplicationService:
                 session_id, message, user_id
             )
             
-            # ENHANCED SMART ROUTING: Better detection of general topics vs product search
+            # SIMPLIFIED SMART ROUTING: LLM-first approach, only route to products when confident
             
-            # Detect general knowledge/conversation topics that should bypass product search
-            general_topic_indicators = [
-                "quantum", "physics", "science", "mathematics", "history", "geography", "biology",
-                "chemistry", "philosophy", "literature", "music", "art history", "politics",
-                "economics", "technology", "computer", "programming", "how does", "why does",
-                "what causes", "theory of", "explain the concept", "what happens when",
-                "how do you feel", "what's your day like", "tell me about yourself",
-                "weather", "news", "current events", "sports", "movies", "books",
-                "entanglement", "relativity", "evolution", "democracy", "capitalism",
-                "superposition", "super-position", "principle", "this like", "is this mroe like",
-                "similar to", "reminds me of", "like the", "analogous to"
-            ]
-            
-            greeting_indicators = ["hey how", "how are you", "what's up", "good morning", "good afternoon"]
-            
-            is_general_topic = any(indicator in message.lower() for indicator in general_topic_indicators)
-            is_greeting = any(indicator in message.lower() for indicator in greeting_indicators)
-            
-            # Product search logic - more restrictive to avoid false positives
+            # Only search products when there's high-confidence shopping intent
+            # Default to conversation for everything else
             should_search_products = (
-                not is_general_topic and  # Don't search for general knowledge topics
-                not is_greeting and       # Don't search for greetings
-                (conversation_response_type == "search" or 
-                 (intent in [SearchIntent.BROWSE, SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, 
-                            SearchIntent.BRAND, SearchIntent.INSPIRATION, SearchIntent.OUTFIT, SearchIntent.GIFT] 
-                  and score > 0.6))  # Only if LLM is confident about product intent
+                conversation_response_type == "search" or 
+                (intent in [SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, 
+                           SearchIntent.BRAND, SearchIntent.OUTFIT] 
+                 and score > 0.8)  # Higher threshold - only very confident shopping requests
             )
             
             if should_search_products:
@@ -158,7 +139,7 @@ class ApplicationService:
                     self.conversation_handler.update_product_context(session_id, [p.get('id') for p in metadata["products"] if p.get('id')])
             else:
                 # Use conversation handler response (now LLM-powered for general topics)
-                logger.info(f"Routing to conversation - Response type: {conversation_response_type}, Greeting: {is_greeting}")
+                logger.info(f"Routing to conversation - Response type: {conversation_response_type}")
                 response_text = conversation_metadata.get("response", "I'm here to help you find amazing fashion pieces!")
                 metadata = {
                     "intent": conversation_response_type,

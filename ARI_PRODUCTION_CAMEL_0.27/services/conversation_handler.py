@@ -877,35 +877,16 @@ class ConversationHandler:
         """Detect if message is a meta-question related to fashion/shopping context."""
         message_lower = message.lower()
         
-        # Fashion/shopping related keywords to check context
-        fashion_context_keywords = [
-            "fashion", "style", "clothing", "outfit", "dress", "shirt", "pants", "shoes",
-            "size", "color", "brand", "shop", "buy", "purchase", "wear", "look",
-            "trend", "material", "fabric", "design", "preference", "like", "budget",
-            "what did i buy", "what have we looked at", "my style preferences", "what clothes",
-            "fashion advice", "style suggestions", "outfit recommendations"
+        # Only classify as meta-question if it's about specific fashion history/preferences
+        fashion_meta_patterns = [
+            "what did i buy", "what have we looked at", "my style preferences", 
+            "what clothes did i", "what outfits", "my fashion history"
         ]
         
-        # Exclude obvious general knowledge questions that aren't about fashion/shopping
-        general_knowledge_patterns = [
-            "quantum", "physics", "science", "mathematics", "history", "geography", "biology",
-            "chemistry", "philosophy", "literature", "music", "art history", "politics",
-            "economics", "technology", "computer", "programming", "how does", "why does",
-            "what causes", "theory of", "explain the concept", "what happens when",
-            "how do you feel", "what's your day like", "tell me about yourself",
-            "weather", "news", "current events", "sports", "movies", "books",
-            "superposition", "super-position", "principle", "this like", "is this mroe like",
-            "similar to", "reminds me of", "like the", "analogous to"
-        ]
+        # Check if this is a fashion-specific meta question
+        is_fashion_meta = any(pattern in message_lower for pattern in fashion_meta_patterns)
         
-        # Check if message is general knowledge (not fashion-related)
-        is_general_knowledge = any(pattern in message_lower for pattern in general_knowledge_patterns)
-        
-        # Check if message has fashion context
-        has_fashion_context = any(keyword in message_lower for keyword in fashion_context_keywords)
-        
-        # Only classify as meta-question if it's clearly fashion/shopping related AND not general knowledge
-        if has_fashion_context and not is_general_knowledge:
+        if is_fashion_meta:
             for meta_type, patterns in self.meta_patterns.items():
                 for pattern in patterns:
                     if pattern in message_lower:
@@ -1037,31 +1018,15 @@ class ConversationHandler:
             "looking for", "need a", "want a", "show me", "find me"
         ]
         
-        # Exclude general knowledge/scientific questions that mention fashion terms
-        general_knowledge_patterns = [
-            "quantum", "physics", "science", "mathematics", "history", "geography", "biology",
-            "chemistry", "philosophy", "literature", "music", "art history", "politics",
-            "economics", "technology", "computer", "programming", "how does", "why does",
-            "what causes", "theory of", "explain the concept", "what happens when",
-            "superposition", "super-position", "principle", "this like", "is this mroe like",
-            "similar to", "reminds me of", "like the", "analogous to"
+        # Simple check: only transition to shopping states for very clear shopping requests
+        explicit_shopping_phrases = [
+            "looking for", "need a", "want a", "show me", "find me", "buy", "purchase", "shop for"
         ]
         
-        # Additional check: exclude general conversational phrases about colors/preferences
-        general_conversation_phrases = [
-            "favorite color", "what's your favorite", "do you like", "what do you think",
-            "tell me about", "explain", "how do", "what is", "why is"
-        ]
-        
-        # Check if this is a general knowledge question (not shopping)
-        is_general_knowledge = any(pattern in message_lower for pattern in general_knowledge_patterns)
-        
-        # Only check for shopping state transitions if message has shopping context
-        # but exclude general conversation and general knowledge topics
+        # Only check for shopping state transitions for explicit shopping requests
         has_shopping_context = (
-            not is_general_knowledge and  # Don't treat scientific/philosophical questions as shopping
             any(keyword in message_lower for keyword in shopping_context_keywords) and
-            not any(phrase in message_lower for phrase in general_conversation_phrases)
+            any(phrase in message_lower for phrase in explicit_shopping_phrases)
         )
         
         if has_shopping_context:
