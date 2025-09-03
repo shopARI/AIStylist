@@ -981,11 +981,27 @@ class ConversationHandler:
         return f"I can help you {', '.join(capabilities)}. What would you like to explore?"
     
     def _is_greeting(self, message: str) -> bool:
-        """Check if message is a greeting."""
+        """Check if message is a simple greeting without substantial content."""
         greetings = ["hi", "hello", "hey", "good morning", "good afternoon", "good evening", "greetings"]
         message_lower = message.lower().strip()
         
-        return any(message_lower.startswith(g) for g in greetings)
+        # Check if it starts with a greeting
+        starts_with_greeting = any(message_lower.startswith(g) for g in greetings)
+        
+        if not starts_with_greeting:
+            return False
+        
+        # If the message is long (>20 chars) or has substantial content, it's not just a greeting
+        if len(message.strip()) > 20:
+            return False
+        
+        # Check for simple greeting patterns
+        simple_greeting_patterns = [
+            "hi", "hello", "hey", "hey there", "hello there", "hi there",
+            "good morning", "good afternoon", "good evening", "greetings"
+        ]
+        
+        return any(message_lower == pattern or message_lower == pattern + "!" for pattern in simple_greeting_patterns)
     
     def _is_goodbye(self, message: str) -> bool:
         """Check if message is a goodbye."""
