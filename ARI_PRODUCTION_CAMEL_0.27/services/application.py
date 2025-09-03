@@ -127,7 +127,9 @@ class ApplicationService:
                 "what causes", "theory of", "explain the concept", "what happens when",
                 "how do you feel", "what's your day like", "tell me about yourself",
                 "weather", "news", "current events", "sports", "movies", "books",
-                "entanglement", "relativity", "evolution", "democracy", "capitalism"
+                "entanglement", "relativity", "evolution", "democracy", "capitalism",
+                "superposition", "super-position", "principle", "this like", "is this mroe like",
+                "similar to", "reminds me of", "like the", "analogous to"
             ]
             
             greeting_indicators = ["hey how", "how are you", "what's up", "good morning", "good afternoon"]

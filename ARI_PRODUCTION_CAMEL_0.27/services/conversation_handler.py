@@ -893,7 +893,9 @@ class ConversationHandler:
             "economics", "technology", "computer", "programming", "how does", "why does",
             "what causes", "theory of", "explain the concept", "what happens when",
             "how do you feel", "what's your day like", "tell me about yourself",
-            "weather", "news", "current events", "sports", "movies", "books"
+            "weather", "news", "current events", "sports", "movies", "books",
+            "superposition", "super-position", "principle", "this like", "is this mroe like",
+            "similar to", "reminds me of", "like the", "analogous to"
         ]
         
         # Check if message is general knowledge (not fashion-related)
