@@ -133,28 +133,56 @@ class VibeBotAgent:
             logger.debug(f"Calling Qdrant with enhanced_query: '{enhanced_query[:50]}...'")
             search_start = asyncio.get_event_loop().time()
             
-            # Don't pass filters - they reference non-existent fields
+            # ENHANCED: Use category-based filtering when available
+            qdrant_filters = None
+            if filters and 'category' in filters:
+                # Try to use category filtering - fall back gracefully if fields don't exist
+                try:
+                    qdrant_filters = {
+                        "must": [
+                            {
+                                "key": "category",
+                                "match": {
+                                    "value": filters['category']
+                                }
+                            }
+                        ]
+                    }
+                    logger.debug(f"Using Qdrant category filter: {filters['category']}")
+                except Exception as e:
+                    logger.debug(f"Category filtering not available, using text-only search: {e}")
+                    qdrant_filters = None
+            
             results = await self.qdrant.search_by_natural_language(
                 query=enhanced_query,
                 limit=limit,
-                filters=None  # Critical: Set to None
+                filters=qdrant_filters  # Use category filters when available
             )
             
             search_time = asyncio.get_event_loop().time() - search_start
             logger.debug(f"Qdrant search returned in {search_time:.2f}s with {len(results)} results")
             
             products = []
+            filtered_count = 0
             for i, product in enumerate(results):
                 if isinstance(product, dict):
                     # New graph guarantees p.id is UUID format
                     product_id = product.get('id')
                     if product_id:
-                        product['vibe_reason'] = "Semantic similarity match"
-                        products.append(product)
-                        if i < 3:  # Log first 3
-                            logger.debug(f"  Product {i}: {product.get('title', 'NO_TITLE')[:30]}")
+                        # ENHANCED: Add category validation post-processing
+                        if self._validate_product_category(product, filters):
+                            product['vibe_reason'] = "Semantic similarity match"
+                            products.append(product)
+                            if len(products) <= 3:  # Log first 3 accepted products
+                                logger.debug(f"  Product {len(products)}: {product.get('title', 'NO_TITLE')[:30]}")
+                        else:
+                            filtered_count += 1
+                            logger.debug(f"  Filtered out: {product.get('title', 'NO_TITLE')[:30]} - wrong category")
                     else:
                         logger.warning("Skipping product without ID from Qdrant")
+            
+            if filtered_count > 0:
+                logger.info(f"Category validation filtered out {filtered_count} irrelevant products")
             
             logger.debug(f"<<< _semantic_search returning {len(products)} products")
             return products
@@ -552,6 +580,78 @@ Respond with the strategy name and brief explanation."""
         unique.sort(key=lambda x: x.get('relevance_score', 0), reverse=True)
         
         return unique
+    
+    def _validate_product_category(
+        self,
+        product: Dict[str, Any],
+        filters: Optional[Dict[str, Any]]
+    ) -> bool:
+        """
+        Validate that a product matches the requested category.
+        
+        Args:
+            product: Product data
+            filters: Search filters including category
+            
+        Returns:
+            True if product matches category or no category filter
+        """
+        if not filters or 'category' not in filters:
+            return True  # No category filter, accept all products
+        
+        requested_category = filters['category'].lower()
+        
+        # Check multiple product category fields
+        product_categories = []
+        
+        # Check main category field
+        if product.get('category'):
+            product_categories.append(product['category'].lower())
+        
+        # Check subcategory field
+        if product.get('subcategory'):
+            product_categories.append(product['subcategory'].lower())
+        
+        # Check categories array
+        if product.get('categories') and isinstance(product['categories'], list):
+            product_categories.extend([cat.lower() for cat in product['categories'] if cat])
+        
+        # Check if any product category matches the requested category
+        if requested_category in product_categories:
+            return True
+        
+        # ENHANCED: Check for category relationships and synonyms
+        category_mappings = {
+            'shirt': ['shirt', 'blouse', 'top', 't-shirt', 'tee', 'tank', 'polo'],
+            'pants': ['pants', 'jeans', 'trousers', 'chinos', 'slacks'],
+            'dress': ['dress', 'gown', 'frock', 'sundress', 'maxi', 'midi'],
+            'shoes': ['shoes', 'boots', 'sneakers', 'heels', 'flats', 'sandals'],
+            'jacket': ['jacket', 'blazer', 'coat', 'outerwear'],
+            'shorts': ['shorts', 'short', 'bermuda'],
+            'top': ['top', 'shirt', 'blouse', 'tee', 'tank', 'camisole']
+        }
+        
+        # Check if requested category has known synonyms
+        if requested_category in category_mappings:
+            for synonym in category_mappings[requested_category]:
+                if synonym in product_categories:
+                    return True
+        
+        # Check reverse mapping (product category has synonyms that match request)
+        for category, synonyms in category_mappings.items():
+            if requested_category in synonyms:
+                for product_cat in product_categories:
+                    if product_cat in synonyms:
+                        return True
+        
+        # Last resort: check title for category indicators (less reliable)
+        title = product.get('title', '').lower()
+        title_indicators = category_mappings.get(requested_category, [requested_category])
+        for indicator in title_indicators:
+            if indicator in title and len(indicator) > 3:  # Avoid short matches
+                return True
+        
+        return False
     
     def _update_stats(
         self,

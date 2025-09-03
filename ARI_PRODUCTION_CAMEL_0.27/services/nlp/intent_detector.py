@@ -64,7 +64,11 @@ class IntentDetector:
                 r"want (?:a |an )?(\w+)",
                 r"find me (?:a |an )?(\w+)",
                 r"search for (?:a |an )?(\w+)",
-                r"where can i find"
+                r"where can i find",
+                r"i'd like (?:a |an )?(\w+)",
+                r"could you (?:help me )?find",
+                r"recommend (?:some |a |an )?(\w+)",
+                r"suggest (?:some |a |an )?(\w+)"
             ],
             SearchIntent.INSPIRATION: [
                 r"inspire me",
@@ -126,10 +130,16 @@ class IntentDetector:
             QueryType.GREETING: [
                 r"^(hi|hello|hey|good morning|good afternoon|good evening)",
                 r"^how are you",
-                r"^what'?s up"
+                r"^what'?s up",
+                r"^hey\s+how'?s?\s+your\s+day",
+                r"^how'?s?\s+(your|the)\s+day",
+                r"^how'?s?\s+it\s+going",
+                r"^what'?s?\s+happening",
+                r"^how\s+have\s+you\s+been"
             ],
             QueryType.QUESTION: [
-                r"^(what|when|where|who|why|how|can you|do you)",
+                r"^(what|when|where|who|why|how) (?!.*(?:find|show|recommend|suggest|have|do you have))",
+                r"^(can you|do you) (?!.*(?:find|show|recommend|suggest|have))",
                 r"\?$"
             ],
             QueryType.COMMAND: [
@@ -243,11 +253,18 @@ class IntentDetector:
                 if re.search(pattern, query, re.IGNORECASE):
                     return query_type
         
-        # Default based on content
-        if any(word in query for word in ["find", "search", "looking", "need", "want"]):
+        # Default based on content with better detection
+        product_indicators = ["find", "search", "looking", "need", "want", "show", "recommend", "suggest", "help me find"]
+        conversational_indicators = ["how are you", "tell me about", "what do you think", "i think", "in my opinion"]
+        
+        if any(word in query for word in product_indicators):
             return QueryType.SEARCH
-        elif len(query.split()) > 10:
+        elif any(phrase in query for phrase in conversational_indicators):
             return QueryType.CONVERSATION
+        elif len(query.split()) > 15:  # Very long queries are likely conversational
+            return QueryType.CONVERSATION
+        elif any(category in query for categories in self.category_keywords.values() for category in categories):
+            return QueryType.SEARCH  # Mentions clothing categories
         else:
             return QueryType.RECOMMENDATION
     

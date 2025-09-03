@@ -109,6 +109,9 @@ class MemoryRAGIntelligence:
             return None
         
         # Check cache
+        if session_id is None:
+            logger.warning(f"session_id is None in get_relevant_context, using 'default'. user_id={user_id}, query={query[:50] if query else None}")
+            session_id = "default"
         cache_key = f"{user_id}:{session_id}:{query}"
         if cache_key in self.memory_cache:
             cached = self.memory_cache[cache_key]
@@ -352,34 +355,68 @@ class MemoryRAGIntelligence:
             return []
         
         try:
-            # Skip memory manager - using direct CAMEL memory access only
-            # The memory manager causes OpenAI API format errors
-            # if self.memory_manager and hasattr(self.memory_manager, 'get_context'):
-            
-            # Fallback to direct memory access
-            if hasattr(self.memory, 'get_context'):
-                # CAMEL memory.get_context() returns (openai_messages, token_count)
-                openai_messages, _ = await asyncio.to_thread(self.memory.get_context)
+            # Use memory manager when available (simpler and safer)
+            if self.memory_manager and hasattr(self.memory_manager, 'get_session_context'):
+                session_context = self.memory_manager.get_session_context(
+                    session_id or "default",
+                    user_id or "anonymous"
+                )
                 
-                # Convert OpenAI messages to our memory context format
+                # Convert to our memory context format
                 context = []
-                for msg in openai_messages:
+                for msg in session_context.get("conversation_history", []):
                     context.append({
-                        'content': msg.get('content', ''),
-                        'role': msg.get('role', 'user'),
-                        'timestamp': datetime.now().isoformat()
+                        'content': msg.get('user', ''),
+                        'role': 'user',
+                        'timestamp': msg.get('timestamp', datetime.now().isoformat())
                     })
-                return context
+                    if msg.get('assistant'):
+                        context.append({
+                            'content': msg.get('assistant', ''),
+                            'role': 'assistant', 
+                            'timestamp': msg.get('timestamp', datetime.now().isoformat())
+                        })
+                
+                return context[-20:]  # Return last 20 messages
+            
+            # Fallback to direct memory access (with safety checks)
+            elif hasattr(self.memory, 'get_context'):
+                try:
+                    # CAMEL memory.get_context() - call synchronously first
+                    result = self.memory.get_context()
+                    if isinstance(result, tuple) and len(result) >= 2:
+                        openai_messages, _ = result
+                    else:
+                        openai_messages = result
+                    
+                    # Safety check for empty memory
+                    if not openai_messages:
+                        return []
+                    
+                    # Convert OpenAI messages to our memory context format
+                    context = []
+                    for msg in openai_messages:
+                        if isinstance(msg, dict):
+                            context.append({
+                                'content': msg.get('content', ''),
+                                'role': msg.get('role', 'user'),
+                                'timestamp': datetime.now().isoformat()
+                            })
+                    return context
+                except Exception as memory_error:
+                    # Log memory-specific error but continue
+                    logger.info(f"CAMEL memory access failed (expected for empty memory): {memory_error}")
+                    return []
             
             return []
             
         except Exception as e:
-            # Check if it's the OpenAI API format error
-            if "'$.input' is invalid" in str(e):
-                logger.warning(f"OpenAI API format error in memory context, returning empty context: {e}")
+            # More specific error handling
+            if "'$.input' is invalid" in str(e) or "invalid_request_error" in str(e):
+                logger.info(f"OpenAI API format issue in memory context (expected for new sessions): {e}")
                 return []
             else:
-                logger.error(f"Error getting memory context: {e}")
+                logger.error(f"Unexpected error getting memory context: {e}")
                 return []
     
     def _extract_memory_information(

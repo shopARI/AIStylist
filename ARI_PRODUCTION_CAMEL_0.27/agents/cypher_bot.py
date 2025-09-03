@@ -94,8 +94,18 @@ class CypherBotAgent:
         logger.debug(f">>> _filtered_search START: filters={filters}, limit={limit}")
         
         if not filters:
-            logger.warning("No filters provided, returning empty list")
+            logger.info("No specific filters provided, performing general search")
+            # For conversational queries without specific filters, return empty results
+            # This prevents "no items found" message for greetings like "how are you?"
             return []
+        
+        # Convert plural filter keys to singular for compatibility
+        if 'occasions' in filters and filters['occasions']:
+            filters['occasion'] = filters['occasions'][0] if isinstance(filters['occasions'], list) else filters['occasions']
+            logger.debug(f"Converted occasions to occasion: {filters['occasion']}")
+        if 'categories' in filters and filters['categories']:
+            filters['category'] = filters['categories'][0] if isinstance(filters['categories'], list) else filters['categories']
+            logger.debug(f"Converted categories to category: {filters['category']}")
         
         # Collect all search terms
         search_terms = []
@@ -128,38 +138,90 @@ class CypherBotAgent:
             "limit": limit
         }
         
-        # PERFORMANCE OPTIMIZED: Skip quality filters for now since properties don't exist
-        # Use STARTS WITH for single terms when possible to improve performance  
+        # ENHANCED: Add explicit category filtering for better precision
+        # Check if we have a specific category filter
+        category_filter = filters.get("category") if filters else None
+        
         if len(search_terms) == 1 and len(search_terms[0]) >= 3:
-            # Single term optimization: use STARTS WITH on title for better performance
-            cypher_query = """
-            MATCH (p:Product)
-            WHERE p.id IS NOT NULL
-            AND (
-                toLower(p.title) STARTS WITH toLower($first_term)
-                OR toLower(p.title) CONTAINS (' ' + toLower($first_term))
-                OR toLower(p.description) CONTAINS toLower($first_term)
-            )
-            RETURN p
-            LIMIT $limit
-            """
-            params["first_term"] = search_terms[0]
+            # Single term optimization with optional category filtering
+            if category_filter:
+                cypher_query = """
+                MATCH (p:Product)
+                WHERE p.id IS NOT NULL
+                AND (
+                    toLower(p.category) = toLower($category_filter)
+                    OR toLower(p.subcategory) = toLower($category_filter) 
+                    OR ANY(cat IN p.categories WHERE toLower(cat) = toLower($category_filter))
+                )
+                AND (
+                    toLower(p.title) STARTS WITH toLower($first_term)
+                    OR toLower(p.title) CONTAINS (' ' + toLower($first_term))
+                    OR (toLower(p.title) CONTAINS toLower($first_term) AND size(p.title) < 100)
+                )
+                RETURN p
+                ORDER BY 
+                    CASE WHEN toLower(p.title) STARTS WITH toLower($first_term) THEN 1 ELSE 2 END,
+                    CASE WHEN toLower(p.category) = toLower($category_filter) THEN 1 ELSE 2 END
+                LIMIT $limit
+                """
+                params["first_term"] = search_terms[0]
+                params["category_filter"] = category_filter
+            else:
+                cypher_query = """
+                MATCH (p:Product)
+                WHERE p.id IS NOT NULL
+                AND (
+                    toLower(p.title) STARTS WITH toLower($first_term)
+                    OR toLower(p.title) CONTAINS (' ' + toLower($first_term))
+                    OR (toLower(p.title) CONTAINS toLower($first_term) AND size(p.title) < 100)
+                )
+                RETURN p
+                ORDER BY CASE WHEN toLower(p.title) STARTS WITH toLower($first_term) THEN 1 ELSE 2 END
+                LIMIT $limit
+                """
+                params["first_term"] = search_terms[0]
         else:
-            # Multi-term: limit search scope first, then filter
-            cypher_query = """
-            MATCH (p:Product)
-            WHERE p.id IS NOT NULL
-            AND ANY(term IN $search_terms WHERE 
-                toLower(p.title) CONTAINS toLower(term)
-            )
-            WITH p
-            WHERE ALL(term IN $search_terms WHERE 
-                toLower(p.title) CONTAINS toLower(term) OR 
-                toLower(p.description) CONTAINS toLower(term)
-            )
-            RETURN p
-            LIMIT $limit
-            """
+            # Multi-term with enhanced category filtering
+            if category_filter:
+                cypher_query = """
+                MATCH (p:Product)
+                WHERE p.id IS NOT NULL
+                AND (
+                    toLower(p.category) = toLower($category_filter)
+                    OR toLower(p.subcategory) = toLower($category_filter)
+                    OR ANY(cat IN p.categories WHERE toLower(cat) = toLower($category_filter))
+                )
+                AND ANY(term IN $search_terms WHERE 
+                    toLower(p.title) CONTAINS toLower(term)
+                )
+                WITH p
+                WHERE ALL(term IN $search_terms WHERE 
+                    toLower(p.title) CONTAINS toLower(term) OR 
+                    (toLower(p.description) CONTAINS toLower(term) AND size(p.description) < 200)
+                )
+                RETURN p
+                ORDER BY 
+                    CASE WHEN toLower(p.category) = toLower($category_filter) THEN 1 ELSE 2 END,
+                    size([term IN $search_terms WHERE toLower(p.title) CONTAINS toLower(term)]) DESC
+                LIMIT $limit
+                """
+                params["category_filter"] = category_filter
+            else:
+                cypher_query = """
+                MATCH (p:Product)
+                WHERE p.id IS NOT NULL
+                AND ANY(term IN $search_terms WHERE 
+                    toLower(p.title) CONTAINS toLower(term)
+                )
+                WITH p
+                WHERE ALL(term IN $search_terms WHERE 
+                    toLower(p.title) CONTAINS toLower(term) OR 
+                    (toLower(p.description) CONTAINS toLower(term) AND size(p.description) < 200)
+                )
+                RETURN p
+                ORDER BY size([term IN $search_terms WHERE toLower(p.title) CONTAINS toLower(term)]) DESC
+                LIMIT $limit
+                """
         
         logger.info(f"Executing Cypher query with terms: {search_terms}")
         logger.debug(f"Query params: {params}")
@@ -172,6 +234,7 @@ class CypherBotAgent:
             logger.debug(f"neo4j.query() returned in {query_time:.2f}s")
             
             products = []
+            filtered_count = 0
             if results:
                 logger.debug(f"Processing {len(results)} Neo4j records")
                 for i, record in enumerate(results):
@@ -181,11 +244,19 @@ class CypherBotAgent:
                     # Add product directly - new graph guarantees p.id is UUID format
                     product_id = product_data.get('id')
                     if product_id:
-                        products.append(product_data)
-                        if i < 3:  # Log first 3 products
-                            logger.debug(f"  Product {i}: {product_data.get('title', 'NO_TITLE')[:30]}")
+                        # ENHANCED: Add category validation post-processing
+                        if self._validate_product_category(product_data, filters):
+                            products.append(product_data)
+                            if len(products) <= 3:  # Log first 3 accepted products
+                                logger.debug(f"  Product {len(products)}: {product_data.get('title', 'NO_TITLE')[:30]}")
+                        else:
+                            filtered_count += 1
+                            logger.debug(f"  Filtered out: {product_data.get('title', 'NO_TITLE')[:30]} - wrong category")
                     else:
                         logger.warning("Skipping product without ID")
+                        
+                if filtered_count > 0:
+                    logger.info(f"Category validation filtered out {filtered_count} irrelevant products")
             else:
                 logger.warning("Neo4j query returned None or empty results")
             
@@ -195,4 +266,76 @@ class CypherBotAgent:
         except Exception as e:
             logger.error(f"!!! Neo4j query failed: {e}", exc_info=True)
             return []
+
+    def _validate_product_category(
+        self,
+        product: Dict[str, Any],
+        filters: Optional[Dict[str, Any]]
+    ) -> bool:
+        """
+        Validate that a product matches the requested category.
+        
+        Args:
+            product: Product data
+            filters: Search filters including category
+            
+        Returns:
+            True if product matches category or no category filter
+        """
+        if not filters or 'category' not in filters:
+            return True  # No category filter, accept all products
+        
+        requested_category = filters['category'].lower()
+        
+        # Check multiple product category fields
+        product_categories = []
+        
+        # Check main category field
+        if product.get('category'):
+            product_categories.append(product['category'].lower())
+        
+        # Check subcategory field
+        if product.get('subcategory'):
+            product_categories.append(product['subcategory'].lower())
+        
+        # Check categories array
+        if product.get('categories') and isinstance(product['categories'], list):
+            product_categories.extend([cat.lower() for cat in product['categories'] if cat])
+        
+        # Check if any product category matches the requested category
+        if requested_category in product_categories:
+            return True
+        
+        # ENHANCED: Check for category relationships and synonyms
+        category_mappings = {
+            'shirt': ['shirt', 'blouse', 'top', 't-shirt', 'tee', 'tank', 'polo'],
+            'pants': ['pants', 'jeans', 'trousers', 'chinos', 'slacks'],
+            'dress': ['dress', 'gown', 'frock', 'sundress', 'maxi', 'midi'],
+            'shoes': ['shoes', 'boots', 'sneakers', 'heels', 'flats', 'sandals'],
+            'jacket': ['jacket', 'blazer', 'coat', 'outerwear'],
+            'shorts': ['shorts', 'short', 'bermuda'],
+            'top': ['top', 'shirt', 'blouse', 'tee', 'tank', 'camisole']
+        }
+        
+        # Check if requested category has known synonyms
+        if requested_category in category_mappings:
+            for synonym in category_mappings[requested_category]:
+                if synonym in product_categories:
+                    return True
+        
+        # Check reverse mapping (product category has synonyms that match request)
+        for category, synonyms in category_mappings.items():
+            if requested_category in synonyms:
+                for product_cat in product_categories:
+                    if product_cat in synonyms:
+                        return True
+        
+        # Last resort: check title for category indicators (less reliable)
+        title = product.get('title', '').lower()
+        title_indicators = category_mappings.get(requested_category, [requested_category])
+        for indicator in title_indicators:
+            if indicator in title and len(indicator) > 3:  # Avoid short matches
+                return True
+        
+        return False
 

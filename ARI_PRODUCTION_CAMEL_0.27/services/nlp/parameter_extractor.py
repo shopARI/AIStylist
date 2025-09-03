@@ -118,7 +118,7 @@ class ParameterExtractor:
         return params
 
     def _extract_items(self, text: str, vocabulary: List[str]) -> List[str]:
-        """Extract items from text that match vocabulary, with typo correction"""
+        """Extract items from text that match vocabulary, with typo correction and plural handling"""
         found_items = []
         
         # Common typos mapping
@@ -133,10 +133,52 @@ class ParameterExtractor:
             "swetr": "sweater"
         }
         
+        # ENHANCED: Plural to singular mapping for better category detection
+        plural_corrections = {
+            "shirts": "shirt",
+            "pants": "pants",  # pants is already plural
+            "jeans": "jeans",  # jeans is already plural
+            "dresses": "dress",
+            "tops": "top",
+            "sweaters": "sweater",
+            "jackets": "jacket",
+            "blazers": "blazer",
+            "skirts": "skirt",
+            "shorts": "shorts",  # shorts is already plural
+            "boots": "boots",   # boots can be plural
+            "shoes": "shoes",   # shoes is already plural
+            "tees": "tee",
+            "tanks": "tank",
+            "hoodies": "hoodie"
+        }
+        
         # Correct common typos first
         corrected_text = text
         for typo, correction in typo_corrections.items():
             corrected_text = re.sub(r'\b' + re.escape(typo) + r'\b', correction, corrected_text)
+        
+        # ENHANCED: Handle plurals by converting to singulars for better matching
+        for plural, singular in plural_corrections.items():
+            corrected_text = re.sub(r'\b' + re.escape(plural) + r'\b', singular, corrected_text)
+        
+        # ENHANCED: Handle common variations and synonyms
+        variations = {
+            "t-shirt": "shirt",
+            "tshirt": "shirt", 
+            "tee": "shirt",
+            "tank top": "tank",
+            "tanktop": "tank",
+            "polo": "shirt",
+            "button-up": "shirt",
+            "button up": "shirt",
+            "blouse": "blouse",  # Keep blouse separate
+            "top": "top",
+            "athletic wear": "activewear",
+            "workout": "activewear"
+        }
+        
+        for variation, canonical in variations.items():
+            corrected_text = re.sub(r'\b' + re.escape(variation) + r'\b', canonical, corrected_text)
         
         # Extract items from corrected text
         for item in vocabulary:

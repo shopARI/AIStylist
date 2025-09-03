@@ -364,29 +364,35 @@ class UserKnowledgeGraphService:
         try:
             query = """
             MATCH (u:User {id: $user_id})
-            OPTIONAL MATCH (u)-[:HAS_PREFERENCE]->(p:UserPreference)
-            OPTIONAL MATCH (u)-[:BELONGS_TO]->(seg:UserSegment)
-            OPTIONAL MATCH (u)-[:HAS_STYLE]->(style:StyleProfile)
-            OPTIONAL MATCH (u)-[:HAS_INTERACTION]->(i:ProductInteraction)
+            // Use tolerant OPTIONAL MATCHES that won't create warnings
+            OPTIONAL MATCH (u)-[r:HAS_PREFERENCE]->(p:UserPreference)
+            OPTIONAL MATCH (u)-[s:BELONGS_TO]->(seg:UserSegment)  
+            OPTIONAL MATCH (u)-[t:HAS_STYLE]->(style:StyleProfile)
+            OPTIONAL MATCH (u)-[h:HAS_INTERACTION]->(i:ProductInteraction)
             WITH u,
-                 collect(DISTINCT {type: p.type, value: p.value, confidence: p.confidence}) as preferences,
-                 collect(DISTINCT seg.name) as segments,
+                 // Safe property access with COALESCE for missing fields
+                 collect(DISTINCT CASE WHEN p IS NOT NULL THEN {
+                     type: COALESCE(p.type, 'unknown'), 
+                     value: COALESCE(p.value, ''), 
+                     confidence: COALESCE(p.confidence, 0.5)
+                 } END) as preferences,
+                 collect(DISTINCT CASE WHEN seg IS NOT NULL THEN COALESCE(seg.name, 'default') END) as segments,
                  style,
                  count(DISTINCT i) as total_interactions,
-                 count(DISTINCT CASE WHEN i.type = 'purchased' THEN i ELSE NULL END) as total_purchases
+                 count(DISTINCT CASE WHEN i IS NOT NULL AND COALESCE(i.type, '') = 'purchased' THEN i ELSE NULL END) as total_purchases
             RETURN
                 u.id as id,
-                u.created_at as created_at,
-                u.last_active as last_active,
-                u.email as email,
-                u.name as name,
-                u.location as location,
-                u.age_group as age_group,
-                u.gender as gender,
-                u.lifetime_value as lifetime_value,
-                preferences,
-                segments,
-                style.profile as style_profile,
+                COALESCE(u.created_at, '') as created_at,
+                COALESCE(u.last_active, '') as last_active, 
+                COALESCE(u.email, '') as email,
+                COALESCE(u.name, '') as name,
+                COALESCE(u.location, '') as location,
+                COALESCE(u.age_group, '') as age_group,
+                COALESCE(u.gender, '') as gender,
+                COALESCE(u.lifetime_value, 0.0) as lifetime_value,
+                [pref IN preferences WHERE pref IS NOT NULL] as preferences,
+                [seg IN segments WHERE seg IS NOT NULL] as segments,
+                COALESCE(style.profile, '') as style_profile,
                 total_interactions,
                 total_purchases
             """

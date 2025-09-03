@@ -138,8 +138,14 @@ class ApplicationService:
                 # Product search requested
                 logger.info(f"Routing to product search - Intent: {intent.name}, Score: {score:.2f}")
                 response_text, metadata = await self._handle_product_search(
-                    message, params, user_context, background_tasks
+                    message, params, user_context, background_tasks, session_id
                 )
+                # Add LLM intent metadata to product search results
+                metadata.update({
+                    "llm_intent": intent.name,
+                    "llm_confidence": score,
+                    "llm_method": hybrid_result.detection_method
+                })
                 # Update conversation context with products
                 if metadata.get("products"):
                     self.conversation_handler.update_product_context(session_id, [p.get('id') for p in metadata["products"] if p.get('id')])
@@ -205,7 +211,8 @@ class ApplicationService:
         message: str,
         params: Dict[str, Any],
         user_context: Dict[str, Any],
-        background_tasks: Optional[BackgroundTasks] = None
+        background_tasks: Optional[BackgroundTasks] = None,
+        session_id: Optional[str] = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Orchestrates the battle system to find and recommend products.
@@ -217,7 +224,7 @@ class ApplicationService:
         ml_intelligence = None
         try:
             ml_intelligence = await self._generate_ml_intelligence(
-                message, params, user_context
+                message, params, user_context, session_id
             )
             logger.info(f"Generated ML intelligence with {len(ml_intelligence)} intelligence packets")
         except Exception as e:
@@ -246,7 +253,8 @@ class ApplicationService:
         self,
         message: str,
         params: Dict[str, Any], 
-        user_context: Dict[str, Any]
+        user_context: Dict[str, Any],
+        session_id: Optional[str] = None
     ) -> Dict[str, Any]:
         """
         Generate ML intelligence packets for the battle agents.
@@ -259,6 +267,7 @@ class ApplicationService:
             intelligence_packets = await self.intelligence_coordinator.gather_intelligence(
                 query=message,
                 user_id=user_context.get('user_id'),
+                session_id=session_id,
                 context={
                     'occasion': params.get('occasion'),
                     'categories': params.get('categories', []),

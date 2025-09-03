@@ -419,7 +419,7 @@ class ProductRetrieverService:
         query: str,
         limit: int = 10,
         filters: Optional[Dict[str, Any]] = None,
-        score_threshold: float = 0.3
+        score_threshold: float = 0.1
     ) -> List[Dict[str, Any]]:
         """
         Search products using natural language query.
