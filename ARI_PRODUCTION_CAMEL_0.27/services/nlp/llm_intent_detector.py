@@ -88,6 +88,15 @@ AVAILABLE INTENTS:
 - BRAND: Customer is interested in specific brands
 - SALE: Customer is looking for deals and discounts
 
+SPECIAL CASES - Fashion Analogies & Philosophical Discussions:
+When customers use fashion items in analogies, metaphors, or philosophical discussions, you can still suggest products if there's an opportunity to connect their concepts to actual style choices. Look for:
+- Fashion items mentioned in metaphors ("solid state towards that blazer")
+- Philosophical discussions using fashion concepts
+- Analogies where fashion represents ideas or states of being
+- Conversations where fashion items could enhance their self-expression
+
+For these cases, use INSPIRATION intent with moderate confidence (0.6-0.8) to offer thoughtful product suggestions that connect to their conceptual thinking.
+
 EXTRACTION TASKS:
 1. Identify the PRIMARY INTENT from the options above
 2. Extract specific parameters:
@@ -125,7 +134,14 @@ IMPORTANT RULES:
 - Consider context and implied needs
 - Only include parameters that are clearly mentioned or strongly implied
 - Use empty arrays/objects for missing information
-- Confidence should reflect how certain you are about the intent (0.0-1.0)"""
+- Confidence should reflect how certain you are about the intent (0.0-1.0)
+
+EXAMPLE ANALOGICAL/PHILOSOPHICAL CASES:
+- "does talking to you bring me towards a solid state with that blazer?" → INSPIRATION intent (0.7 confidence), categories: ["blazer"], reasoning: "Customer using physics analogy but showing interest in blazer acquisition - opportunity to suggest blazers that could represent their desired 'solid state' or confidence"
+- "clothes obsession is like quantum superposition" → INSPIRATION intent (0.6 confidence), reasoning: "Philosophical discussion about fashion psychology - opportunity to suggest pieces that align with their style personality"
+- "just conversing about fashion" → LOW confidence on any product intent, let conversation mode handle it
+
+The key is finding the sweet spot where fashion items are mentioned with enough context to offer meaningful product connections."""
 
         return create_agent(
             system_message=system_message,
