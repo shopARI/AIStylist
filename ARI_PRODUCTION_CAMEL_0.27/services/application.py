@@ -5,8 +5,8 @@ from typing import Optional, Dict, Any, List, Tuple, Union
 from pydantic import BaseModel, Field
 from fastapi import BackgroundTasks
 
-# Import NLP and other services
-from services.nlp.intent_detector import IntentDetector
+# Import NLP and other services - USE LLM/HYBRID INTENT DETECTION
+from services.nlp.hybrid_intent_detector import HybridIntentDetector, DetectionStrategy, get_hybrid_intent_detector
 from services.nlp.parameter_extractor import ParameterExtractor
 from services.conversation_handler import ConversationHandler
 from services.battle.orchestrator import BattleOrchestrator
@@ -54,8 +54,8 @@ class ApplicationService:
         self.intelligence_coordinator = intelligence_coordinator
         self.redis_client = redis_client
         
-        # NLP tools can be instantiated here as they are lightweight
-        self.intent_detector = IntentDetector()
+        # NLP tools - USE HYBRID LLM INTENT DETECTION
+        self.intent_detector = get_hybrid_intent_detector(strategy=DetectionStrategy.LLM_FIRST)
         self.parameter_extractor = ParameterExtractor()
 
     async def process_message(
@@ -89,9 +89,11 @@ class ApplicationService:
                 enhanced_message = f"{conversation_summary} | Current request: {message}"
                 logger.info(f"Enhanced message with memory context: {len(conversation_summary)} chars")
             
-            # 2. Detect intent and extract parameters using enhanced message
-            intent_result = await self.intent_detector.detect_intent(enhanced_message)
-            params = self.parameter_extractor.extract_parameters(enhanced_message)
+            # 2. Detect intent and extract parameters using LLM/HYBRID - enhanced message
+            hybrid_result = await self.intent_detector.detect_intent_and_extract(enhanced_message)
+            intent = hybrid_result.primary_intent
+            score = hybrid_result.confidence
+            params = hybrid_result.extracted_parameters
             
             # Merge with stored preferences
             stored_preferences = session_store.get_user_preferences(session_id, user_id or "anonymous")
@@ -102,27 +104,52 @@ class ApplicationService:
                         params[key] = value
                 logger.info(f"Merged stored preferences: {stored_preferences}")
             
-            intent = intent_result.primary_intent
-            score = intent_result.confidence
-            
-            logger.info(f"Intent: {intent.name} (Score: {score:.2f}), Params: {params}")
+            logger.info(f"LLM Intent: {intent.name} (Score: {score:.2f}, Method: {hybrid_result.detection_method}), Params: {params}")
 
             # 2. Get user context
             user_context = await self._get_user_context(user_id)
 
-            # 3. Route based on intent
-            # Note: The IntentResult returns an enum, not a string. We compare to the enum type.
-            # Assuming your models.types.SearchIntent is the enum used.
+            # 3. Route based on intent and conversation flow
             from models.types import SearchIntent
-            if intent in [SearchIntent.BROWSE, SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, SearchIntent.BRAND, 
-                         SearchIntent.INSPIRATION, SearchIntent.OUTFIT, SearchIntent.GIFT]:
+            
+            # First check conversation handler for conversation flow
+            conversation_response_type, conversation_metadata = await self.conversation_handler.handle_message(
+                session_id, message, user_id
+            )
+            
+            # SMART ROUTING: Use LLM intent + conversation context for better decisions
+            should_search_products = (
+                conversation_response_type == "search" or 
+                (intent in [SearchIntent.BROWSE, SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, 
+                           SearchIntent.BRAND, SearchIntent.INSPIRATION, SearchIntent.OUTFIT, SearchIntent.GIFT] 
+                 and score > 0.6)  # Only if LLM is confident about product intent
+            )
+            
+            # Additional check: Don't search for obvious greetings even if LLM says product
+            greeting_indicators = ["hey how", "how are you", "what's up", "good morning", "good afternoon"]
+            is_greeting = any(indicator in message.lower() for indicator in greeting_indicators)
+            
+            if should_search_products and not is_greeting:
+                # Product search requested
+                logger.info(f"Routing to product search - Intent: {intent.name}, Score: {score:.2f}")
                 response_text, metadata = await self._handle_product_search(
                     message, params, user_context, background_tasks
                 )
+                # Update conversation context with products
+                if metadata.get("products"):
+                    self.conversation_handler.update_product_context(session_id, [p.get('id') for p in metadata["products"] if p.get('id')])
             else:
-                response_text, metadata = await self._handle_general_conversation(
-                    message, session_id
-                )
+                # Use conversation handler response (now LLM-powered for general topics)
+                logger.info(f"Routing to conversation - Response type: {conversation_response_type}, Greeting: {is_greeting}")
+                response_text = conversation_metadata.get("response", "I'm here to help you find amazing fashion pieces!")
+                metadata = {
+                    "intent": conversation_response_type,
+                    "conversation_state": conversation_metadata.get("state"),
+                    "conversation_metadata": conversation_metadata,
+                    "llm_intent": intent.name,
+                    "llm_confidence": score,
+                    "llm_method": hybrid_result.detection_method
+                }
 
             processing_time = time.time() - start_time
             metadata["processing_time_seconds"] = round(processing_time, 2)
@@ -254,20 +281,6 @@ class ApplicationService:
             logger.error(f"Error generating ML intelligence: {e}", exc_info=True)
             return {}
 
-    async def _handle_general_conversation(
-        self,
-        message: str,
-        session_id: str
-    ) -> Tuple[str, Dict[str, Any]]:
-        """
-        Handles non-product related conversational turns.
-        """
-        logger.info(f"Handling general conversation for session: {session_id}")
-        
-        response_text = await self.conversation_handler.get_response(session_id, message)
-        metadata = {"intent": "conversation"}
-        
-        return response_text, metadata
 
     async def _get_user_context(self, user_id: Optional[str]) -> Dict[str, Any]:
         """

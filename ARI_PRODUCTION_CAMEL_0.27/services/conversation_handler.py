@@ -14,7 +14,9 @@ from enum import Enum
 from dataclasses import dataclass, field
 from collections import defaultdict, deque
 import hashlib
+import os
 
+from openai import AsyncOpenAI
 from services.cache.redis_client import RedisService, FallbackRedisService
 
 logger = logging.getLogger("services.conversation.handler")
@@ -487,6 +489,9 @@ class ConversationHandler:
         self.conversations = {}  # In-memory conversation cache  
         self.interactions = defaultdict(list)  # In-memory interactions cache
         
+        # Initialize OpenAI client for conversational responses
+        self.openai_client = AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
+        
         # Statistics
         self.stats = {
             "total_sessions": 0,
@@ -666,7 +671,9 @@ class ConversationHandler:
         elif context.state == ConversationState.BROWSING:
             return ("browse", {"preferences": context.preferences})
         else:
-            return ("conversation", {"state": context.state.value})
+            # Generate LLM-based conversational response
+            conversational_response = await self.generate_conversational_response(session_id, message, user_id)
+            return ("conversation", {"state": context.state.value, "response": conversational_response})
     
     async def _add_message(self, session_id: str, message: Message):
         """Add message to conversation with optimization."""
@@ -867,13 +874,25 @@ class ConversationHandler:
     
     # Include all meta-question handling methods from original...
     def _detect_meta_question(self, message: str) -> Optional[str]:
-        """Detect if message is a meta-question."""
+        """Detect if message is a meta-question related to fashion/shopping context."""
         message_lower = message.lower()
         
-        for meta_type, patterns in self.meta_patterns.items():
-            for pattern in patterns:
-                if pattern in message_lower:
-                    return meta_type
+        # Fashion/shopping related keywords to check context
+        fashion_context_keywords = [
+            "fashion", "style", "clothing", "outfit", "dress", "shirt", "pants", "shoes",
+            "size", "color", "brand", "shop", "buy", "purchase", "wear", "look",
+            "trend", "material", "fabric", "design", "preference", "like", "budget"
+        ]
+        
+        # Check if message has fashion context
+        has_fashion_context = any(keyword in message_lower for keyword in fashion_context_keywords)
+        
+        # Only classify as meta-question if it's fashion/shopping related
+        if has_fashion_context:
+            for meta_type, patterns in self.meta_patterns.items():
+                for pattern in patterns:
+                    if pattern in message_lower:
+                        return meta_type
         
         return None
     
@@ -994,37 +1013,113 @@ class ConversationHandler:
         """Determine state transition based on message."""
         message_lower = message.lower()
         
-        # Keywords for state detection
-        search_keywords = ["looking for", "search", "find", "need", "want", "show me"]
-        browse_keywords = ["browse", "explore", "what do you have", "options"]
-        compare_keywords = ["compare", "versus", "vs", "better", "difference", "which"]
-        decide_keywords = ["i'll take", "buy", "purchase", "get this", "want this", "order"]
-        feedback_keywords = ["love it", "hate it", "perfect", "not what", "exactly", "amazing"]
+        # Fashion/shopping context keywords (more specific to actual shopping intent)
+        shopping_context_keywords = [
+            "dress", "shirt", "pants", "shoes", "clothing", "outfit", "fashion", "style", 
+            "buy", "purchase", "shop", "wear", "size", "brand", "collection", "item", "product",
+            "looking for", "need a", "want a", "show me", "find me"
+        ]
         
-        current_state = context.state
+        # Additional check: exclude general conversational phrases about colors/preferences
+        general_conversation_phrases = [
+            "favorite color", "what's your favorite", "do you like", "what do you think",
+            "tell me about", "explain", "how do", "what is", "why is"
+        ]
         
-        # Check for state transitions
-        if any(keyword in message_lower for keyword in search_keywords):
-            if ConversationState.SEARCHING in self.state_transitions.get(current_state, []):
-                return ConversationState.SEARCHING
+        # Only check for shopping state transitions if message has shopping context
+        # but exclude general conversation about preferences/colors
+        has_shopping_context = (
+            any(keyword in message_lower for keyword in shopping_context_keywords) and
+            not any(phrase in message_lower for phrase in general_conversation_phrases)
+        )
         
-        elif any(keyword in message_lower for keyword in browse_keywords):
-            if ConversationState.BROWSING in self.state_transitions.get(current_state, []):
-                return ConversationState.BROWSING
+        if has_shopping_context:
+            # Keywords for state detection (more specific)
+            search_keywords = ["looking for", "search", "find", "need", "want", "show me"]
+            browse_keywords = ["browse", "explore", "what do you have", "options"]
+            compare_keywords = ["compare", "versus", "vs", "better", "difference", "which"]
+            decide_keywords = ["i'll take", "buy", "purchase", "get this", "want this", "order"]
+            feedback_keywords = ["love it", "hate it", "perfect", "not what", "exactly", "amazing"]
+            
+            current_state = context.state
+            
+            # Check for state transitions
+            if any(keyword in message_lower for keyword in search_keywords):
+                if ConversationState.SEARCHING in self.state_transitions.get(current_state, []):
+                    return ConversationState.SEARCHING
+            
+            elif any(keyword in message_lower for keyword in browse_keywords):
+                if ConversationState.BROWSING in self.state_transitions.get(current_state, []):
+                    return ConversationState.BROWSING
+            
+            elif any(keyword in message_lower for keyword in compare_keywords):
+                if ConversationState.COMPARING in self.state_transitions.get(current_state, []):
+                    return ConversationState.COMPARING
+            
+            elif any(keyword in message_lower for keyword in decide_keywords):
+                if ConversationState.DECIDING in self.state_transitions.get(current_state, []):
+                    return ConversationState.DECIDING
+            
+            elif any(keyword in message_lower for keyword in feedback_keywords):
+                if ConversationState.FEEDBACK in self.state_transitions.get(current_state, []):
+                    return ConversationState.FEEDBACK
         
-        elif any(keyword in message_lower for keyword in compare_keywords):
-            if ConversationState.COMPARING in self.state_transitions.get(current_state, []):
-                return ConversationState.COMPARING
-        
-        elif any(keyword in message_lower for keyword in decide_keywords):
-            if ConversationState.DECIDING in self.state_transitions.get(current_state, []):
-                return ConversationState.DECIDING
-        
-        elif any(keyword in message_lower for keyword in feedback_keywords):
-            if ConversationState.FEEDBACK in self.state_transitions.get(current_state, []):
-                return ConversationState.FEEDBACK
-        
+        # No shopping context or state transition detected
         return None
+    
+    async def generate_conversational_response(
+        self,
+        session_id: str,
+        message: str,
+        user_id: Optional[str] = None
+    ) -> str:
+        """Generate LLM-based conversational response for general topics."""
+        try:
+            # Get conversation history for context
+            conversation_history = self.conversations.get(session_id, [])
+            
+            # Build conversation context - only include last 5 exchanges to stay within token limits
+            messages = [
+                {
+                    "role": "system",
+                    "content": """You are Ari, a friendly and knowledgeable fashion stylist AI. You can discuss any topic that users bring up, not just fashion. Be helpful, informative, and conversational. 
+
+When users ask about non-fashion topics (like science, philosophy, general knowledge, etc.), engage naturally and provide helpful information while maintaining your warm personality.
+
+Keep responses concise and friendly. If the conversation naturally flows back to fashion or style, you can mention your expertise in that area, but don't force it."""
+                }
+            ]
+            
+            # Add recent conversation history for context
+            for msg in conversation_history[-5:]:  # Last 5 messages for context
+                if msg.role == MessageRole.USER:
+                    messages.append({"role": "user", "content": msg.content})
+                elif msg.role == MessageRole.ASSISTANT:
+                    messages.append({"role": "assistant", "content": msg.content})
+            
+            # Add current message
+            messages.append({"role": "user", "content": message})
+            
+            # Generate response using OpenAI
+            response = await self.openai_client.chat.completions.create(
+                model="gpt-3.5-turbo",
+                messages=messages,
+                max_tokens=300,
+                temperature=0.7,
+                timeout=30
+            )
+            
+            generated_response = response.choices[0].message.content.strip()
+            
+            # Log for debugging
+            logger.info(f"Generated conversational response for topic in message: '{message[:50]}...'")
+            
+            return generated_response
+            
+        except Exception as e:
+            logger.error(f"Error generating conversational response: {e}")
+            # Fallback to friendly default
+            return "I'm here to help with any questions you have! Whether it's about fashion, style, or just chatting about life, I'm happy to talk. What's on your mind?"
     
     async def get_stats(self) -> Dict[str, Any]:
         """Get comprehensive handler statistics."""
