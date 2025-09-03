@@ -39,7 +39,7 @@ class DIContainer(containers.DeclarativeContainer):
     Dependency Injection container for the entire application.
     Uses the dependency-injector library for a robust and standard implementation.
     """
-    settings = providers.Singleton(Settings)
+    settings = providers.Singleton(Settings, env_file=".env")
 
     # --- Core Infrastructure ---
     # Redis client for production scaling (defined early for dependencies)
@@ -165,7 +165,7 @@ async def initialize_container() -> DIContainer:
     
     # Pre-flight check: Verify all critical databases BEFORE starting services
     from di.preflight_check import preflight_database_check
-    settings = Settings()  # Create settings instance for pre-flight check
+    settings = Settings(env_file=".env")  # Create settings instance for pre-flight check
     await preflight_database_check(settings)
     
     container = DIContainer()
