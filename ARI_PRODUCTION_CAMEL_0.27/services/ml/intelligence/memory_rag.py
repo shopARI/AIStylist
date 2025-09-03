@@ -68,14 +68,16 @@ class MemoryRAGIntelligence:
                 
                 logger.info("Memory initialized for RAG intelligence")
                 
-                # Try to import memory manager  
+                # Try to import memory manager (fallback to simple implementation)
                 try:
-                    from services.memory.manager import MemoryManager
-                    self.memory_manager = MemoryManager(self.product_kg)
+                    from services.memory.setup import get_session_store
+                    self.memory_manager = get_session_store()
+                    logger.info("Using SessionMemoryStore as MemoryManager")
                 except ImportError:
-                    logger.warning("MemoryManager not available")
+                    logger.info("MemoryManager not available - using basic memory")
+                    self.memory_manager = None
                 except Exception as e:
-                    logger.warning(f"MemoryManager initialization failed: {e}")
+                    logger.info(f"MemoryManager initialization skipped: {e}")
                     self.memory_manager = None
                     
             except Exception as e:

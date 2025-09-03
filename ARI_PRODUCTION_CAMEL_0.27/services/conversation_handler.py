@@ -482,6 +482,11 @@ class ConversationHandler:
             ConversationState.FEEDBACK: [ConversationState.SEARCHING, ConversationState.ENDED]
         }
         
+        # CRITICAL: Initialize missing attributes that are used throughout the class
+        self.sessions = {}  # In-memory session cache
+        self.conversations = {}  # In-memory conversation cache  
+        self.interactions = defaultdict(list)  # In-memory interactions cache
+        
         # Statistics
         self.stats = {
             "total_sessions": 0,
@@ -665,6 +670,7 @@ class ConversationHandler:
     
     async def _add_message(self, session_id: str, message: Message):
         """Add message to conversation with optimization."""
+        # Ensure conversations is initialized for this session
         if session_id not in self.conversations:
             self.conversations[session_id] = []
         
@@ -673,6 +679,10 @@ class ConversationHandler:
         # Trim if too long
         if len(self.conversations[session_id]) > self.max_history_length:
             self.conversations[session_id] = self.conversations[session_id][-self.max_history_length:]
+        
+        # Async save to Redis in background if available
+        if self.redis_client:
+            asyncio.create_task(self._save_conversations_to_redis(session_id, self.conversations[session_id]))
     
     async def _optimize_session_memory(self, session_id: str):
         """Optimize session memory."""
@@ -697,20 +707,18 @@ class ConversationHandler:
         except Exception as e:
             logger.error(f"Error optimizing session memory: {e}")
     
-    async def get_or_create_session(
+    def get_or_create_session(
         self,
         session_id: str,
         user_id: Optional[str] = None
     ) -> ConversationContext:
-        """Get or create session context from Redis."""
-        # Try to get from Redis first
-        context = await self._get_session_from_redis(session_id)
-        
-        if context:
+        """Get or create session context (synchronous for better compatibility)."""
+        # Check in-memory cache first
+        if session_id in self.sessions:
+            context = self.sessions[session_id]
             # Update user_id if provided and missing
             if user_id and not context.user_id:
                 context.user_id = user_id
-                await self._save_session_to_redis(session_id, context)
             return context
         
         # Create new session
@@ -720,11 +728,17 @@ class ConversationHandler:
             state=ConversationState.NEW
         )
         
-        # Save to Redis
-        await self._save_session_to_redis(session_id, context)
-        await self._save_conversations_to_redis(session_id, [])  # Initialize empty conversations
-        self.stats["total_sessions"] += 1
+        # Store in memory and initialize related structures
+        self.sessions[session_id] = context
+        self.conversations[session_id] = []
+        self.interactions[session_id] = []
         
+        # Async save to Redis in background if available
+        if self.redis_client:
+            asyncio.create_task(self._save_session_to_redis(session_id, context))
+            asyncio.create_task(self._save_conversations_to_redis(session_id, []))
+        
+        self.stats["total_sessions"] += 1
         logger.info(f"Created session: {session_id}")
         return context
     
@@ -749,6 +763,10 @@ class ConversationHandler:
             interaction_type=interaction_type,
             metadata=metadata
         )
+        
+        # Ensure interactions is initialized for this session
+        if session_id not in self.interactions:
+            self.interactions[session_id] = []
         
         self.interactions[session_id].append(interaction)
         
