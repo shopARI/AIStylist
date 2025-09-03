@@ -120,7 +120,7 @@ class MemoryRAGIntelligence:
         
         try:
             # Get memory context
-            memory_context = await self._get_memory_context(query)
+            memory_context = await self._get_memory_context(query, user_id, session_id)
             
             if not memory_context:
                 return None
@@ -348,7 +348,9 @@ class MemoryRAGIntelligence:
     
     async def _get_memory_context(
         self,
-        query: Optional[str] = None
+        query: Optional[str] = None,
+        user_id: Optional[str] = None,
+        session_id: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """Get context from memory system."""
         if not self.memory:
