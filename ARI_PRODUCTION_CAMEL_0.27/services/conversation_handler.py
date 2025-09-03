@@ -640,7 +640,7 @@ class ConversationHandler:
         if context.needs_persistence() and self.persistence_worker:
             asyncio.create_task(self._persist_session(session_id, context))
         
-        # Check for meta-questions
+        # Check for meta-questions (only fashion-related)
         meta_type = self._detect_meta_question(message)
         if meta_type:
             response = await self._handle_meta_question(session_id, message, meta_type)
@@ -881,14 +881,29 @@ class ConversationHandler:
         fashion_context_keywords = [
             "fashion", "style", "clothing", "outfit", "dress", "shirt", "pants", "shoes",
             "size", "color", "brand", "shop", "buy", "purchase", "wear", "look",
-            "trend", "material", "fabric", "design", "preference", "like", "budget"
+            "trend", "material", "fabric", "design", "preference", "like", "budget",
+            "what did i buy", "what have we looked at", "my style preferences", "what clothes",
+            "fashion advice", "style suggestions", "outfit recommendations"
         ]
+        
+        # Exclude obvious general knowledge questions that aren't about fashion/shopping
+        general_knowledge_patterns = [
+            "quantum", "physics", "science", "mathematics", "history", "geography", "biology",
+            "chemistry", "philosophy", "literature", "music", "art history", "politics",
+            "economics", "technology", "computer", "programming", "how does", "why does",
+            "what causes", "theory of", "explain the concept", "what happens when",
+            "how do you feel", "what's your day like", "tell me about yourself",
+            "weather", "news", "current events", "sports", "movies", "books"
+        ]
+        
+        # Check if message is general knowledge (not fashion-related)
+        is_general_knowledge = any(pattern in message_lower for pattern in general_knowledge_patterns)
         
         # Check if message has fashion context
         has_fashion_context = any(keyword in message_lower for keyword in fashion_context_keywords)
         
-        # Only classify as meta-question if it's fashion/shopping related
-        if has_fashion_context:
+        # Only classify as meta-question if it's clearly fashion/shopping related AND not general knowledge
+        if has_fashion_context and not is_general_knowledge:
             for meta_type, patterns in self.meta_patterns.items():
                 for pattern in patterns:
                     if pattern in message_lower:

@@ -117,19 +117,35 @@ class ApplicationService:
                 session_id, message, user_id
             )
             
-            # SMART ROUTING: Use LLM intent + conversation context for better decisions
-            should_search_products = (
-                conversation_response_type == "search" or 
-                (intent in [SearchIntent.BROWSE, SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, 
-                           SearchIntent.BRAND, SearchIntent.INSPIRATION, SearchIntent.OUTFIT, SearchIntent.GIFT] 
-                 and score > 0.6)  # Only if LLM is confident about product intent
-            )
+            # ENHANCED SMART ROUTING: Better detection of general topics vs product search
             
-            # Additional check: Don't search for obvious greetings even if LLM says product
+            # Detect general knowledge/conversation topics that should bypass product search
+            general_topic_indicators = [
+                "quantum", "physics", "science", "mathematics", "history", "geography", "biology",
+                "chemistry", "philosophy", "literature", "music", "art history", "politics",
+                "economics", "technology", "computer", "programming", "how does", "why does",
+                "what causes", "theory of", "explain the concept", "what happens when",
+                "how do you feel", "what's your day like", "tell me about yourself",
+                "weather", "news", "current events", "sports", "movies", "books",
+                "entanglement", "relativity", "evolution", "democracy", "capitalism"
+            ]
+            
             greeting_indicators = ["hey how", "how are you", "what's up", "good morning", "good afternoon"]
+            
+            is_general_topic = any(indicator in message.lower() for indicator in general_topic_indicators)
             is_greeting = any(indicator in message.lower() for indicator in greeting_indicators)
             
-            if should_search_products and not is_greeting:
+            # Product search logic - more restrictive to avoid false positives
+            should_search_products = (
+                not is_general_topic and  # Don't search for general knowledge topics
+                not is_greeting and       # Don't search for greetings
+                (conversation_response_type == "search" or 
+                 (intent in [SearchIntent.BROWSE, SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, 
+                            SearchIntent.BRAND, SearchIntent.INSPIRATION, SearchIntent.OUTFIT, SearchIntent.GIFT] 
+                  and score > 0.6))  # Only if LLM is confident about product intent
+            )
+            
+            if should_search_products:
                 # Product search requested
                 logger.info(f"Routing to product search - Intent: {intent.name}, Score: {score:.2f}")
                 response_text, metadata = await self._handle_product_search(
