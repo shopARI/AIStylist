@@ -126,11 +126,14 @@ class ApplicationService:
                 (intent in [SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, 
                            SearchIntent.BRAND, SearchIntent.OUTFIT, SearchIntent.BROWSE] 
                  and score > 0.7) or  # Standard threshold for clear product intents
-                # Explicit product request phrases
-                any(phrase in message.lower() for phrase in [
+                # Explicit product request phrases (but exclude philosophical/metaphorical questions)
+                (any(phrase in message.lower() for phrase in [
                     "i need", "recommend", "show me", "find me", "looking for",
                     "want to buy", "need to buy", "actual product", "what products"
-                ])
+                ]) and not any(indicator in message.lower() for indicator in [
+                    "bring me towards", "solid state", "quantum", "wondering if", "does that",
+                    "philosophy", "metaphor", "like the", "similar to", "reminds me"
+                ]))
             )
             
             if should_search_products:
