@@ -148,7 +148,7 @@ class CypherBotAgent:
                 cypher_query = """
                 MATCH (p:Product)
                 WHERE p.id IS NOT NULL
-                AND (p.category = $category_filter OR p.subcategory = $category_filter)
+                AND (p.category CONTAINS $category_filter OR p.title CONTAINS $category_filter)
                 AND p.title CONTAINS $first_term
                 RETURN p
                 LIMIT $limit
@@ -170,7 +170,7 @@ class CypherBotAgent:
                 cypher_query = """
                 MATCH (p:Product)
                 WHERE p.id IS NOT NULL
-                AND (p.category = $category_filter OR p.subcategory = $category_filter)
+                AND (p.category CONTAINS $category_filter OR p.title CONTAINS $category_filter)
                 AND ALL(term IN $search_terms WHERE p.title CONTAINS term)
                 RETURN p
                 LIMIT $limit
