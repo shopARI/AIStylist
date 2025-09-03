@@ -95,14 +95,21 @@ class ApplicationService:
             score = hybrid_result.confidence
             params = hybrid_result.extracted_parameters
             
-            # Merge with stored preferences
+            # Merge with stored preferences - but don't override explicit current requests
             stored_preferences = session_store.get_user_preferences(session_id, user_id or "anonymous")
             if stored_preferences:
-                # Merge stored preferences with current extraction
+                # Only merge stored preferences if current extraction is empty for that key
+                # AND the current message doesn't explicitly mention conflicting values
                 for key, value in stored_preferences.items():
                     if key not in params or not params[key]:
+                        # Special handling for colors - don't merge if current message mentions any color
+                        if key == "colors" and any(color in message.lower() for color in [
+                            "red", "blue", "green", "yellow", "black", "white", "pink", "purple", 
+                            "orange", "brown", "gray", "grey", "navy", "beige", "gold", "silver"
+                        ]):
+                            continue  # Skip merging stored color if current message has explicit color
                         params[key] = value
-                logger.info(f"Merged stored preferences: {stored_preferences}")
+                logger.info(f"Merged stored preferences (excluding conflicts): {stored_preferences}")
             
             logger.info(f"LLM Intent: {intent.name} (Score: {score:.2f}, Method: {hybrid_result.detection_method}), Params: {params}")
 
@@ -127,11 +134,14 @@ class ApplicationService:
                            SearchIntent.BRAND, SearchIntent.OUTFIT, SearchIntent.BROWSE] 
                  and score > 0.7) or  # Standard threshold for explicit product intents
                 (intent == SearchIntent.INSPIRATION and score > 0.8) or  # RAISED threshold to reduce false positives
-                # More specific product request phrases to avoid false matches
-                any(phrase in message.lower() for phrase in [
+                # Only trigger on explicit product request phrases - exclude general conversation
+                (any(phrase in message.lower() for phrase in [
                     "i need a", "i need some", "recommend me", "show me some", "find me a", "looking for a",
                     "want to buy", "need to buy", "show me products", "what products", "actual product"
-                ])
+                ]) and not any(non_shopping in message.lower() for non_shopping in [
+                    "news", "said", "happened", "hear", "see what", "did you", "what do you think", 
+                    "opinion", "politics", "trump", "biden", "government", "media", "report"
+                ]))
             )
             
             if should_search_products:
