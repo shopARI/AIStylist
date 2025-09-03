@@ -134,13 +134,34 @@ class ApplicationService:
                            SearchIntent.BRAND, SearchIntent.OUTFIT, SearchIntent.BROWSE] 
                  and score > 0.7) or  # Standard threshold for explicit product intents
                 (intent == SearchIntent.INSPIRATION and score > 0.8) or  # RAISED threshold to reduce false positives
-                # Only trigger on explicit product request phrases - exclude general conversation
+                # Only trigger on explicit product request phrases - exclude obvious non-shopping contexts
                 (any(phrase in message.lower() for phrase in [
                     "i need a", "i need some", "recommend me", "show me some", "find me a", "looking for a",
                     "want to buy", "need to buy", "show me products", "what products", "actual product"
-                ]) and not any(non_shopping in message.lower() for non_shopping in [
-                    "news", "said", "happened", "hear", "see what", "did you", "what do you think", 
-                    "opinion", "politics", "trump", "biden", "government", "media", "report"
+                ]) and not any(non_shopping_pattern in message.lower() for non_shopping_pattern in [
+                    # News/Media patterns
+                    "in the news", "breaking news", "headlines", "reporter said", "news report",
+                    "media says", "press conference", "journalist", "broadcasting",
+                    
+                    # Question patterns about events/opinions  
+                    "did you see", "did you hear", "what happened", "what do you think", "your opinion",
+                    "do you believe", "what's your view", "how do you feel about", "thoughts on",
+                    
+                    # Academic/Professional contexts
+                    "study shows", "research found", "according to", "scientist says", "doctor says",
+                    "professor", "university", "academic", "clinical trial", "peer review",
+                    
+                    # Political context (general, not specific people)
+                    "election results", "congress voted", "senate", "political party", "campaign", 
+                    "government policy", "legislation", "ballot", "polling data", "voter",
+                    
+                    # Personal life/relationships
+                    "my friend said", "my family", "relationship advice", "dating tips", "marriage",
+                    "personal life", "life advice", "friendship", "social situation",
+                    
+                    # General conversation starters
+                    "tell me about", "explain", "discuss", "talk about", "curious about",
+                    "wondering", "question about", "help me understand"
                 ]))
             )
             
