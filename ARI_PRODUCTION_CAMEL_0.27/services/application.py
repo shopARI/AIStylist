@@ -126,11 +126,11 @@ class ApplicationService:
                 (intent in [SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, 
                            SearchIntent.BRAND, SearchIntent.OUTFIT, SearchIntent.BROWSE] 
                  and score > 0.7) or  # Standard threshold for explicit product intents
-                (intent == SearchIntent.INSPIRATION and score > 0.5) or  # Even lower threshold for natural conversational bridges
-                # Explicit product request phrases
+                (intent == SearchIntent.INSPIRATION and score > 0.8) or  # RAISED threshold to reduce false positives
+                # More specific product request phrases to avoid false matches
                 any(phrase in message.lower() for phrase in [
-                    "i need", "recommend", "show me", "find me", "looking for",
-                    "want to buy", "need to buy", "actual product", "what products"
+                    "i need a", "i need some", "recommend me", "show me some", "find me a", "looking for a",
+                    "want to buy", "need to buy", "show me products", "what products", "actual product"
                 ])
             )
             
