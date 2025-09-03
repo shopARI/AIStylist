@@ -119,13 +119,18 @@ class ApplicationService:
             
             # SIMPLIFIED SMART ROUTING: LLM-first approach, only route to products when confident
             
-            # Only search products when there's high-confidence shopping intent
+            # Only search products when there's clear shopping intent
             # Default to conversation for everything else
             should_search_products = (
                 conversation_response_type == "search" or 
                 (intent in [SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, 
-                           SearchIntent.BRAND, SearchIntent.OUTFIT] 
-                 and score > 0.8)  # Higher threshold - only very confident shopping requests
+                           SearchIntent.BRAND, SearchIntent.OUTFIT, SearchIntent.BROWSE] 
+                 and score > 0.7) or  # Standard threshold for clear product intents
+                # Explicit product request phrases
+                any(phrase in message.lower() for phrase in [
+                    "i need", "recommend", "show me", "find me", "looking for",
+                    "want to buy", "need to buy", "actual product", "what products"
+                ])
             )
             
             if should_search_products:
