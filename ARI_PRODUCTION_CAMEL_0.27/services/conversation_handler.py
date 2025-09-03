@@ -1037,15 +1037,29 @@ class ConversationHandler:
             "looking for", "need a", "want a", "show me", "find me"
         ]
         
+        # Exclude general knowledge/scientific questions that mention fashion terms
+        general_knowledge_patterns = [
+            "quantum", "physics", "science", "mathematics", "history", "geography", "biology",
+            "chemistry", "philosophy", "literature", "music", "art history", "politics",
+            "economics", "technology", "computer", "programming", "how does", "why does",
+            "what causes", "theory of", "explain the concept", "what happens when",
+            "superposition", "super-position", "principle", "this like", "is this mroe like",
+            "similar to", "reminds me of", "like the", "analogous to"
+        ]
+        
         # Additional check: exclude general conversational phrases about colors/preferences
         general_conversation_phrases = [
             "favorite color", "what's your favorite", "do you like", "what do you think",
             "tell me about", "explain", "how do", "what is", "why is"
         ]
         
+        # Check if this is a general knowledge question (not shopping)
+        is_general_knowledge = any(pattern in message_lower for pattern in general_knowledge_patterns)
+        
         # Only check for shopping state transitions if message has shopping context
-        # but exclude general conversation about preferences/colors
+        # but exclude general conversation and general knowledge topics
         has_shopping_context = (
+            not is_general_knowledge and  # Don't treat scientific/philosophical questions as shopping
             any(keyword in message_lower for keyword in shopping_context_keywords) and
             not any(phrase in message_lower for phrase in general_conversation_phrases)
         )
