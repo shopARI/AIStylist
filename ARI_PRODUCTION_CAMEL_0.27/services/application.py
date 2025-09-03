@@ -124,8 +124,9 @@ class ApplicationService:
             should_search_products = (
                 conversation_response_type == "search" or 
                 (intent in [SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, 
-                           SearchIntent.BRAND, SearchIntent.OUTFIT, SearchIntent.BROWSE, SearchIntent.INSPIRATION] 
-                 and score > 0.6) or  # Lower threshold for inspiration/analogical cases
+                           SearchIntent.BRAND, SearchIntent.OUTFIT, SearchIntent.BROWSE] 
+                 and score > 0.7) or  # Standard threshold for explicit product intents
+                (intent == SearchIntent.INSPIRATION and score > 0.5) or  # Even lower threshold for natural conversational bridges
                 # Explicit product request phrases
                 any(phrase in message.lower() for phrase in [
                     "i need", "recommend", "show me", "find me", "looking for",
