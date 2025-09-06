@@ -1,0 +1,11 @@
+{
+  "timestamp": "2025-09-04T08:42:31.232119",
+  "batch_count": 900,
+  "total_processed": 4500000,
+  "progress_percent": 70.12836920061763,
+  "statistics": {
+    "colors_found": 3980050,
+    "brands_found": 4480051,
+    "styles_found": 3283382
+  }
+}

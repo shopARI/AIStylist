@@ -23,9 +23,9 @@ class QdrantVectorAnalyzer:
         os.makedirs(self.output_dir, exist_ok=True)
         
         # Qdrant connection details from .env
-        self.qdrant_url = "https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io"
-        self.qdrant_api_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.zz1R7TKuAT4A0dX-M-oZbgX9sYT-x6bwT1EMPGKZ6Jg"
-        self.collection_name = "fashion_products"
+        self.qdrant_url = self.db_config.qdrant_url
+        self.qdrant_api_key = self.db_config.qdrant_api_key
+        self.collection_name = self.db_config.collection_name
     
     def connect_to_qdrant(self) -> Optional[QdrantClient]:
         """Connect to Qdrant cloud instance"""

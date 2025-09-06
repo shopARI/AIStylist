@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from config import get_database_config, get_ai_config, get_system_config
 """
 Investigate ID Mismatch Between Neo4j and Qdrant
 Deep dive into the ID format and matching issues
@@ -14,11 +15,11 @@ def investigate_id_formats():
     # Neo4j connection
     neo4j_url = "bolt://0.0.0.0:17687"
     neo4j_user = "neo4j"
-    neo4j_password = "6D%q@jbYmstkK2i3oW5z6B6outew9m93"
+    neo4j_password = self.db_config.neo4j_password
     
     # Qdrant connection
     qdrant_url = "https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io"
-    qdrant_api_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.zz1R7TKuAT4A0dX-M-oZbgX9sYT-x6bwT1EMPGKZ6Jg"
+    qdrant_api_key = self.db_config.qdrant_api_key
     collection_name = "fashion_products"
     
     # Connect to Neo4j

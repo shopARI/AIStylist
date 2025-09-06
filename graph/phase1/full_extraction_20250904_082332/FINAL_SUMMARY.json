@@ -1,0 +1,23 @@
+{
+  "extraction_info": {
+    "start_time": "2025-09-04T08:23:32.890178",
+    "end_time": "2025-09-04T08:50:24.118832",
+    "total_time_seconds": 1611.2286138534546,
+    "total_time_hours": 0.44756350384818183,
+    "total_database_products": 6416804,
+    "processed_products": 6416804,
+    "batches_completed": 1284,
+    "batch_size": 5000
+  },
+  "final_statistics": {
+    "colors_found": 5517766,
+    "brands_found": 6395267,
+    "styles_found": 4813486,
+    "success_rates": {
+      "colors": "86.0%",
+      "brands": "99.7%",
+      "styles": "75.0%"
+    },
+    "processing_rate": "3983 products/second"
+  }
+}

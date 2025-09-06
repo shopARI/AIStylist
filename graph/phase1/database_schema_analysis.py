@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from config import get_database_config, get_ai_config, get_system_config
 """
 Database Schema Deep Dive Analysis
 Analyzes Neo4j production database schema for optimization opportunities
@@ -21,9 +22,10 @@ class DatabaseSchemaAnalyzer:
         os.makedirs(self.output_dir, exist_ok=True)
         
         # Connection details (read-only)
-        self.neo4j_url = "bolt://0.0.0.0:17687"
-        self.neo4j_user = "neo4j"
-        self.neo4j_password = "6D%q@jbYmstkK2i3oW5z6B6outew9m93"
+        self.db_config = get_database_config()
+        self.neo4j_url = self.db_config.neo4j_url
+        self.neo4j_user = self.db_config.neo4j_user
+        self.neo4j_password = self.db_config.neo4j_password
     
     def connect_to_database(self):
         """Connect to production Neo4j database (read-only)"""

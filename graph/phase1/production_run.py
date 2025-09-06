@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from config import get_database_config, get_ai_config, get_system_config
 """
 Production Run Script for Phase 1 Data Extraction
 Processes ALL 6.4M products safely (read-only)
@@ -43,9 +44,10 @@ class ProductionExtractor:
         self.start_time = None
         
         # Database connection
-        self.neo4j_url = "bolt://0.0.0.0:17687"
-        self.neo4j_user = "neo4j" 
-        self.neo4j_password = "6D%q@jbYmstkK2i3oW5z6B6outew9m93"
+        self.db_config = get_database_config()
+        self.neo4j_url = self.db_config.neo4j_url
+        self.neo4j_user = self.db_config.neo4j_user 
+        self.neo4j_password = self.db_config.neo4j_password
         
         self.db_reader = None
         self.pipeline = None

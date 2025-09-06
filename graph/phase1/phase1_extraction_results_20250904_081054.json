@@ -1,0 +1,2249 @@
+{
+  "extraction_info": {
+    "timestamp": "20250904_081054",
+    "sample_size": 100,
+    "total_database_products": 6416804,
+    "processed_products": 100
+  },
+  "statistics": {
+    "colors_found": 75,
+    "brands_found": 100,
+    "styles_found": 68,
+    "success_rates": {
+      "colors": "75.0%",
+      "brands": "100.0%",
+      "styles": "68.0%"
+    }
+  },
+  "results": [
+    {
+      "product_id": "d363f1b4-7fb8-4e05-b2ee-f190e473c4b1",
+      "title": "Journee Collection Women's Tru Comfort Foam Kinsley Sneaker",
+      "price": 49.99,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "white"
+        ],
+        "brands": [
+          "Journee",
+          "Women's"
+        ],
+        "styles": [
+          "casual",
+          "athletic",
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "3c5561bb-6476-4b14-8775-b0ba6365e5a7",
+      "title": "Button Up Cardigan",
+      "price": 36.0,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "gray",
+          "silver"
+        ],
+        "brands": [
+          "Button",
+          "Cardigan"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "4dfc8a6e-35b1-43bb-9051-bed600e4a420",
+      "title": "Theory Turtleneck Sweater",
+      "price": 205.0,
+      "extracted_metadata": {
+        "colors": [
+          "white",
+          "gray"
+        ],
+        "brands": [
+          "Theory",
+          "Turtleneck"
+        ],
+        "styles": [
+          "formal",
+          "minimalist"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "c5817af8-763f-432a-a9da-c5a0c5e84736",
+      "title": "Suzy Levian Cubic Zirconia Sterling Silver Dangle Drop Earrings",
+      "price": 321.0,
+      "extracted_metadata": {
+        "colors": [
+          "white",
+          "gray",
+          "silver"
+        ],
+        "brands": [
+          "Suzy",
+          "Levian"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "bb8f4712-2467-40a9-86b7-0b98f843cd70",
+      "title": "Floral Fever Velvet Pants",
+      "price": 43.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Floral",
+          "Fever"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "1b247261-3410-4081-a551-96b0185d9cc8",
+      "title": "Numbra Womens Faux Leather Pointed Toe Mid-Calf Boots",
+      "price": 36.99,
+      "extracted_metadata": {
+        "colors": [
+          "red"
+        ],
+        "brands": [
+          "Numbra",
+          "Womens"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "8f5edc67-0572-4292-93d0-6e6c968a29aa",
+      "title": "Birkenstock Gizeh Birko-Flor Sandal",
+      "price": 89.98,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Birkenstock",
+          "Gizeh"
+        ],
+        "styles": [
+          "trendy"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "9b9d7e0f-92f4-4275-9bf3-3fc3b8c200ac",
+      "title": "Lisa Marie Fernandez Zani Zebra-Print Mini Dress",
+      "price": 137.0,
+      "extracted_metadata": {
+        "colors": [
+          "brown",
+          "gray"
+        ],
+        "brands": [
+          "Lisa",
+          "Marie"
+        ],
+        "styles": [
+          "formal",
+          "trendy"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "e6476a63-f801-4479-bc49-c13dca498084",
+      "title": "Men's Rival Distance Sneaker",
+      "price": 55.0,
+      "extracted_metadata": {
+        "colors": [
+          "blue",
+          "green",
+          "brown",
+          "white"
+        ],
+        "brands": [
+          "Nike",
+          "Men's"
+        ],
+        "styles": [
+          "athletic",
+          "trendy"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "411a10d8-eea5-4c01-aacd-8bec9284f8d6",
+      "title": "SCHUTZ Elliot Leather Flat",
+      "price": 85.98,
+      "extracted_metadata": {
+        "colors": [
+          "black"
+        ],
+        "brands": [
+          "SCHUTZ",
+          "Elliot"
+        ],
+        "styles": [
+          "casual",
+          "formal",
+          "trendy"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "75bf4fb3-7e69-4a9e-a16f-6811e2bc4389",
+      "title": "Fun",
+      "price": 95.0,
+      "extracted_metadata": {
+        "colors": [
+          "blue",
+          "white",
+          "gray"
+        ],
+        "brands": [
+          "Fun"
+        ],
+        "styles": [
+          "formal",
+          "minimalist"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "7b21e4ef-ff44-423c-ab70-47fe81de8ef3",
+      "title": "Esmeralda Wool-Blend Jacket",
+      "price": 52.49,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Esmeralda",
+          "Wool-Blend"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "08530e9c-0e3f-4c8e-aceb-90342a5776d0",
+      "title": "Plus Womens Embellished Long Evening Dress",
+      "price": 337.99,
+      "extracted_metadata": {
+        "colors": [
+          "red"
+        ],
+        "brands": [
+          "Plus",
+          "Womens"
+        ],
+        "styles": [
+          "formal",
+          "business"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "3d24ebe1-41a7-4599-a6df-a7c8202e7f1e",
+      "title": "A. L.C. Mitchell Down Jacket",
+      "price": 206.98,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "brown"
+        ],
+        "brands": [
+          "L.C.",
+          "Mitchell"
+        ],
+        "styles": [
+          "trendy",
+          "minimalist"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "e4b19f48-2005-495c-b1b3-9e1d4bd38141",
+      "title": "Riviera Open Toe Clog",
+      "price": 198.0,
+      "extracted_metadata": {
+        "colors": [
+          "black"
+        ],
+        "brands": [
+          "Riviera",
+          "Open"
+        ],
+        "styles": [
+          "casual",
+          "formal",
+          "trendy"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "f03f582a-b2a5-47bb-808f-1142fa4c5276",
+      "title": "Juniors Womens Satin Halter Mini Dress",
+      "price": 19.99,
+      "extracted_metadata": {
+        "colors": [
+          "red"
+        ],
+        "brands": [
+          "Juniors",
+          "Womens"
+        ],
+        "styles": [
+          "formal"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "21ec38ca-8cca-4395-b467-9b12ed781e0a",
+      "title": "Island Goddess Side Shirred Hipster Bottom",
+      "price": 38.0,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "brown",
+          "black",
+          "gray"
+        ],
+        "brands": [
+          "Island",
+          "Goddess"
+        ],
+        "styles": [
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "74fc6671-ddfd-4b96-8e83-9a777f246595",
+      "title": "Mini Skirt",
+      "price": 30.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Mini",
+          "Skirt"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "bbe90d89-dd46-4fd7-b82e-17e4bddf9a49",
+      "title": "Silvia Rufino Dress",
+      "price": 69.98,
+      "extracted_metadata": {
+        "colors": [
+          "blue",
+          "gray"
+        ],
+        "brands": [
+          "Silvia",
+          "Rufino"
+        ],
+        "styles": [
+          "casual",
+          "formal"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "a9e09178-eac4-4475-ac6a-a2b79ab69325",
+      "title": "Francesca Long Sleeve Shirt",
+      "price": 48.0,
+      "extracted_metadata": {
+        "colors": [
+          "brown"
+        ],
+        "brands": [
+          "Francesca",
+          "Long"
+        ],
+        "styles": [
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "d5bc90a4-b92c-4603-9154-ea1d4db23349",
+      "title": "Bella Bliss Boys Khaki Green Romper",
+      "price": 22.4,
+      "extracted_metadata": {
+        "colors": [
+          "green"
+        ],
+        "brands": [
+          "Bella",
+          "Bliss"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "0e6c1274-43fd-4895-bf3e-35e96102d208",
+      "title": "Cotton Dominican Republic Flag Bandana",
+      "price": 10.24,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Cotton",
+          "Dominican"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "b29b6330-b3ba-4356-9f12-2211725842b2",
+      "title": "Mock Neck Long Sleeve Knit Sweater",
+      "price": 54.0,
+      "extracted_metadata": {
+        "colors": [
+          "blue",
+          "gray"
+        ],
+        "brands": [
+          "Mock",
+          "Neck"
+        ],
+        "styles": [
+          "casual",
+          "formal",
+          "trendy"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "5505c5d2-158c-4425-aa3c-17330d8bd75f",
+      "title": "FASHNZFAB Waist Elastic Band Ponte Pants",
+      "price": 16.8,
+      "extracted_metadata": {
+        "colors": [
+          "pink",
+          "gray"
+        ],
+        "brands": [
+          "FASHNZFAB",
+          "Waist"
+        ],
+        "styles": [
+          "casual",
+          "formal",
+          "athletic"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "6dcc817d-650a-49b6-99ab-956e3c50a951",
+      "title": "Bali Women's Skimp Skamp Brief",
+      "price": 7.7,
+      "extracted_metadata": {
+        "colors": [
+          "red"
+        ],
+        "brands": [
+          "Bali",
+          "Women's"
+        ],
+        "styles": [
+          "minimalist"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "df0ac2b2-a225-4ca0-950b-09fe39b2dc15",
+      "title": "Very J Woven Cropped Top & Waist Tie Shorts Set",
+      "price": 41.0,
+      "extracted_metadata": {
+        "colors": [
+          "gray"
+        ],
+        "brands": [
+          "Very",
+          "Woven"
+        ],
+        "styles": [
+          "casual",
+          "formal"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "cfd306d9-4b1e-496c-abf3-7059053de9c4",
+      "title": "Women's Firenze Earrings",
+      "price": 45.0,
+      "extracted_metadata": {
+        "colors": [
+          "silver"
+        ],
+        "brands": [
+          "Women's",
+          "Firenze"
+        ],
+        "styles": [
+          "formal",
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "00dc8e24-f847-414a-927b-41a01352ce69",
+      "title": "Ciara by Revlon for Women - 2.3 oz EDT Spray",
+      "price": 20.94,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Ciara",
+          "Revlon"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "6f3dfdd6-1bcf-4241-8dc6-70337dd7c52c",
+      "title": "Sorento Summer Ursula Womens Metallic Side Tie Bikini Swim Bottom",
+      "price": 16.99,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "silver"
+        ],
+        "brands": [
+          "Sorento",
+          "Summer"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "37990402-ac11-474a-944b-b415c0e8bba2",
+      "title": "Honeydew 2pc Good Times Shortie Set",
+      "price": 25.98,
+      "extracted_metadata": {
+        "colors": [
+          "gray"
+        ],
+        "brands": [
+          "Honeydew",
+          "Good"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "92d8e6d8-99a5-4974-ad58-5b3da1a0f899",
+      "title": "New Bouquet Coming Soon Linen Dress",
+      "price": 106.0,
+      "extracted_metadata": {
+        "colors": [
+          "gray"
+        ],
+        "brands": [
+          "New",
+          "Bouquet"
+        ],
+        "styles": [
+          "casual",
+          "formal"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "7079659d-cf90-4172-b464-e0f5c5738e14",
+      "title": "Suzy Levian Cubic Zirconia Sterling Silver 7 inch Tennis Bracelet",
+      "price": 247.0,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "yellow",
+          "pink",
+          "white",
+          "gray",
+          "gold",
+          "silver"
+        ],
+        "brands": [
+          "Suzy",
+          "Levian"
+        ],
+        "styles": [
+          "casual",
+          "business"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "9a90e9ac-0117-4881-8df1-ea983bfbfb1e",
+      "title": "Beachwear Long Trousers",
+      "price": 304.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Beachwear",
+          "Long"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "79d4e34e-dbb3-41e9-9d36-4d5dff6cd45c",
+      "title": "Shazam Movie Whats Inside Adult Crewneck Sweatshirt",
+      "price": 38.99,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Shazam",
+          "Movie"
+        ],
+        "styles": [
+          "casual",
+          "trendy"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "c4c5da32-886c-49d3-a8bf-dcfe2e87d3a0",
+      "title": "Matilda Cropped Cardigan Sweater",
+      "price": 131.0,
+      "extracted_metadata": {
+        "colors": [
+          "brown",
+          "white",
+          "gray"
+        ],
+        "brands": [
+          "Matilda",
+          "Cropped"
+        ],
+        "styles": [
+          "formal",
+          "trendy",
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "d55d9cff-9bfc-49fd-9ce1-457dcd267c24",
+      "title": "Rg 14k Gold Plated with Diamond Cubic Zirconia Textured Geometric Square Bangle Bracelet",
+      "price": 159.99,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "yellow",
+          "gold"
+        ],
+        "brands": [
+          "Gold",
+          "Plated"
+        ],
+        "styles": [
+          "trendy",
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "fbbf71de-efa1-4605-a4c5-4d77067f2d85",
+      "title": "2pcs Combo Blumarine Innamorata by Blumarine Parfums Body Lotion 3.4 oz Women",
+      "price": 25.46,
+      "extracted_metadata": {
+        "colors": [
+          "gray"
+        ],
+        "brands": [
+          "Combo",
+          "Blumarine"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "4b305565-264f-471b-8a5e-5f9ead589a26",
+      "title": "Kate Hoops",
+      "price": 22.5,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Kate",
+          "Hoops"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "62a7ec08-5911-415a-a21e-03ecf70fc6fd",
+      "title": "4-Way Cross Necklace",
+      "price": 42.0,
+      "extracted_metadata": {
+        "colors": [
+          "gray",
+          "silver"
+        ],
+        "brands": [
+          "Cross",
+          "Necklace"
+        ],
+        "styles": [
+          "formal"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "22baaf39-386b-4221-8c58-98056679cf57",
+      "title": "Extra Large Paperclip Bracelet",
+      "price": 1373.6,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "green",
+          "yellow",
+          "gold"
+        ],
+        "brands": [
+          "Extra",
+          "Large"
+        ],
+        "styles": [
+          "minimalist"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "7149c805-d106-4b30-a5d9-608655e4a631",
+      "title": "Carolines Treasures CJ1050-YSCM Letter Y Chevron Black & Gold Compact Mirror, 3 x 0.3 x 2.75 in.",
+      "price": 13.46,
+      "extracted_metadata": {
+        "colors": [
+          "yellow",
+          "brown",
+          "black",
+          "gray",
+          "gold",
+          "silver"
+        ],
+        "brands": [
+          "Carolines",
+          "Treasures"
+        ],
+        "styles": [
+          "business"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "2185161c-378f-43b1-acfb-b4ee52a9fa09",
+      "title": "Spotted Shirt",
+      "price": 694.43,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Spotted",
+          "Shirt"
+        ],
+        "styles": [
+          "casual",
+          "trendy"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "e60bfa80-f23c-4b3f-815d-2b0dc1277393",
+      "title": "Chloe Womens Crop Denim Capri Jeans",
+      "price": 44.99,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "blue",
+          "brown"
+        ],
+        "brands": [
+          "Chloe",
+          "Womens"
+        ],
+        "styles": [
+          "casual",
+          "business"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "4b15c3cd-463c-49c6-8d44-bead6d155798",
+      "title": "Naomi V Neck Dress",
+      "price": 90.0,
+      "extracted_metadata": {
+        "colors": [
+          "gray"
+        ],
+        "brands": [
+          "Naomi",
+          "Neck"
+        ],
+        "styles": [
+          "formal"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "6176bb71-134e-43ec-82f5-584dfaf0a5d9",
+      "title": "Savoie Crossbody",
+      "price": 114.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Savoie",
+          "Crossbody"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "634c6e0d-4d5c-434c-bbde-1ec5c4c9f59f",
+      "title": "Ross-Simons Mother-Of-Pearl, 7-7.5mm Cultured Pearl and . Peridot Shell Pendant",
+      "price": 895.0,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "green",
+          "yellow",
+          "white",
+          "gold"
+        ],
+        "brands": [
+          "Ross-Simons",
+          "Mother-Of-Pearl,"
+        ],
+        "styles": [
+          "bohemian"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "7b4054cd-6286-4443-8f0b-74f6fb8ea7fe",
+      "title": "Women's Heart Trucker Hat",
+      "price": 28.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Women's",
+          "Heart"
+        ],
+        "styles": [
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "907337bc-108a-4d36-a9b3-88c5313bd5c4",
+      "title": "Nature Strong Nail Lacquer - Big Bloom Energy by OPI for Women - 0.5 oz Nail Polish",
+      "price": 17.94,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Nature",
+          "Strong"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "3ad79ae5-f3ed-4a89-98c8-5b42284afef4",
+      "title": "Moira Gown",
+      "price": 168.0,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "black"
+        ],
+        "brands": [
+          "Moira",
+          "Gown"
+        ],
+        "styles": [
+          "formal",
+          "vintage",
+          "minimalist"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "1c706631-98ab-4a2d-a07b-0dd88e022f8c",
+      "title": "Womens Flared Fitness Yoga Pants",
+      "price": 41.99,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "brown"
+        ],
+        "brands": [
+          "Womens",
+          "Flared"
+        ],
+        "styles": [
+          "business"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "59b0edcf-6014-400d-97f1-cb72f462c8df",
+      "title": "Round Neck Long Sleeve Sweatshirt",
+      "price": 40.88,
+      "extracted_metadata": {
+        "colors": [
+          "gray"
+        ],
+        "brands": [
+          "Round",
+          "Neck"
+        ],
+        "styles": [
+          "casual",
+          "athletic",
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "c08a2771-a221-4bac-9d87-b19aea43798a",
+      "title": "Lily Kim Maxi Dress",
+      "price": 129.98,
+      "extracted_metadata": {
+        "colors": [
+          "blue",
+          "gray"
+        ],
+        "brands": [
+          "Lily",
+          "Kim"
+        ],
+        "styles": [
+          "casual",
+          "formal",
+          "minimalist"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "9b8cfbe9-926f-4cbb-98cd-d04b64392538",
+      "title": "Girlfriend Womens Tummy Slimming Denim Skinny Jeans",
+      "price": 52.99,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "blue",
+          "brown"
+        ],
+        "brands": [
+          "Girlfriend",
+          "Womens"
+        ],
+        "styles": [
+          "casual",
+          "business"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "25f6137b-f1ca-4d98-a489-a25975393425",
+      "title": "Women's Revival Sandals",
+      "price": 112.0,
+      "extracted_metadata": {
+        "colors": [
+          "green",
+          "brown"
+        ],
+        "brands": [
+          "Women's",
+          "Revival"
+        ],
+        "styles": [
+          "formal",
+          "business",
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "259910d9-7ab7-4c12-b0e4-113f6132eb16",
+      "title": "Soho Scoop Linen Cotton Vest",
+      "price": 86.0,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "black",
+          "gray"
+        ],
+        "brands": [
+          "Soho",
+          "Scoop"
+        ],
+        "styles": [
+          "formal"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "c3bd1964-bb88-4d9f-9eef-7bf3954b7192",
+      "title": "Campus Sutra Men Full Sleeve Checkered Casual Shirt",
+      "price": 50.99,
+      "extracted_metadata": {
+        "colors": [
+          "red"
+        ],
+        "brands": [
+          "Campus",
+          "Sutra"
+        ],
+        "styles": [
+          "casual",
+          "business",
+          "trendy"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "5f4e096e-2eb8-43e6-88dd-c36fff578065",
+      "title": "Monico Top",
+      "price": 39.0,
+      "extracted_metadata": {
+        "colors": [
+          "black",
+          "gray"
+        ],
+        "brands": [
+          "Monico",
+          "Top"
+        ],
+        "styles": [
+          "casual"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "f1d4a6a6-89ef-4609-a193-505b130fddd8",
+      "title": "Womens Embellished Ankle Strap",
+      "price": 23.99,
+      "extracted_metadata": {
+        "colors": [
+          "red"
+        ],
+        "brands": [
+          "Womens",
+          "Embellished"
+        ],
+        "styles": [
+          "business"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "f46ef67b-a421-4de8-a440-5db60b685744",
+      "title": "Rose Gold-Tone Mesh Analog Watch",
+      "price": 109.99,
+      "extracted_metadata": {
+        "colors": [
+          "yellow",
+          "pink",
+          "brown",
+          "gold"
+        ],
+        "brands": [
+          "Rose",
+          "Gold-Tone"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "de876c19-f89b-4ab1-9893-c3017ee40a74",
+      "title": "Printed Flare Dress",
+      "price": 52.0,
+      "extracted_metadata": {
+        "colors": [
+          "pink",
+          "brown",
+          "gray"
+        ],
+        "brands": [
+          "Printed",
+          "Flare"
+        ],
+        "styles": [
+          "formal",
+          "minimalist"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "fc6a5fa7-4d1c-4799-8e73-1d53d27a9457",
+      "title": "Asymmetric Ruche Midi Dress",
+      "price": 52.0,
+      "extracted_metadata": {
+        "colors": [
+          "blue"
+        ],
+        "brands": [
+          "Asymmetric",
+          "Ruche"
+        ],
+        "styles": [
+          "formal"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "b958ef12-8597-47d8-acff-bd4d44aebbea",
+      "title": "Tabara Womens Metallic Double Zipper Ankle Boots",
+      "price": 26.99,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "silver"
+        ],
+        "brands": [
+          "Tabara",
+          "Womens"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "98404da0-e021-4e73-909c-75ec3b777748",
+      "title": "Women's Braiden Dress",
+      "price": 151.0,
+      "extracted_metadata": {
+        "colors": [
+          "gray"
+        ],
+        "brands": [
+          "Women's",
+          "Braiden"
+        ],
+        "styles": [
+          "casual",
+          "formal",
+          "trendy"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "d61228e2-038a-4d21-995c-cc22e5293ae9",
+      "title": "Richardson Rouge Wide Set Mesh Cap",
+      "price": 21.99,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "brown"
+        ],
+        "brands": [
+          "Richardson",
+          "Rouge"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "a80a4ede-f624-4c60-ad41-29ddfbb7d55d",
+      "title": "Linen Dress",
+      "price": 33.0,
+      "extracted_metadata": {
+        "colors": [
+          "blue"
+        ],
+        "brands": [
+          "Linen",
+          "Dress"
+        ],
+        "styles": [
+          "formal"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "6aebfd10-955b-425a-884e-3b973b701007",
+      "title": "Lardini Elegant Polyethylene Women's Dress",
+      "price": 212.0,
+      "extracted_metadata": {
+        "colors": [
+          "black"
+        ],
+        "brands": [
+          "Lardini",
+          "Elegant"
+        ],
+        "styles": [
+          "formal",
+          "trendy",
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "b654199d-ef7b-4534-9fac-9066c88f0461",
+      "title": "SERGIO LEVANTESI T-Strap Block Heels Pumps Leather Women's Shoes (Pre-Owned)",
+      "price": 185.0,
+      "extracted_metadata": {
+        "colors": [
+          "brown"
+        ],
+        "brands": [
+          "SERGIO",
+          "LEVANTESI"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "cc411c63-0d4f-4b71-b2cd-58f99dd0803f",
+      "title": "Tiffany 925 Band Ring (Pre-Owned)",
+      "price": 227.0,
+      "extracted_metadata": {
+        "colors": [
+          "gray",
+          "silver"
+        ],
+        "brands": [
+          "Tiffany",
+          "Band"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "c28384db-af0a-4cea-9194-5fca525afefa",
+      "title": "Salvatore Ferragamo SUNGLASSES SF1075SLB-216-59-17-140 NON-POLARIZED",
+      "price": 164.6,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Salvatore",
+          "Ferragamo"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "4d855857-ffc8-46c6-9d48-0f89c9620cfe",
+      "title": "Ganni Faulkner Ruffled Floral-Print Dress",
+      "price": 153.0,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "blue"
+        ],
+        "brands": [
+          "Ganni",
+          "Faulkner"
+        ],
+        "styles": [
+          "casual",
+          "formal"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "e50c42aa-f5e6-40f1-9133-baa8dfd23e4a",
+      "title": "Women's Hilary Sandals",
+      "price": 83.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Women's",
+          "Hilary"
+        ],
+        "styles": [
+          "formal",
+          "business",
+          "bohemian"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "b94ecfa4-0780-4f9d-a6ab-c708396c4160",
+      "title": "Clive Waffle Knit Tee",
+      "price": 45.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Clive",
+          "Waffle"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "ad42f74c-797a-49e9-b0bb-c551fc27c353",
+      "title": "Heritor Automatic Calder Bracelet Watch w/Date - Silver/Black-Blue",
+      "price": 120.6,
+      "extracted_metadata": {
+        "colors": [
+          "blue",
+          "purple",
+          "brown",
+          "black",
+          "gray",
+          "silver"
+        ],
+        "brands": [
+          "Heritor",
+          "Automatic"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "3b336c08-59eb-4785-b2d8-6b830ed682be",
+      "title": "Front Yoked Tiered Dress",
+      "price": 88.0,
+      "extracted_metadata": {
+        "colors": [
+          "red"
+        ],
+        "brands": [
+          "Front",
+          "Yoked"
+        ],
+        "styles": [
+          "formal",
+          "bohemian"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "86917e30-0f49-409d-a096-b95c727886aa",
+      "title": "Sequin High Waisted Skirt 21",
+      "price": 59.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Sequin",
+          "High"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "e6aa0621-ce3f-48d6-8a6b-f3fc307cb92d",
+      "title": "Embellished Sweetheart Neck Evening Gown",
+      "price": 290.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Embellished",
+          "Sweetheart"
+        ],
+        "styles": [
+          "formal"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "196da4fb-8b9b-4c2d-b4a3-e7efa1ef6e21",
+      "title": "Daniela Top",
+      "price": 94.0,
+      "extracted_metadata": {
+        "colors": [
+          "gray"
+        ],
+        "brands": [
+          "Daniela",
+          "Top"
+        ],
+        "styles": [
+          "casual",
+          "vintage",
+          "bohemian"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "0e7e2be3-8a5c-4213-8bc6-39650ffd2d24",
+      "title": "Novels Studded Platform Jogger Sneakers",
+      "price": 47.99,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Novels",
+          "Studded"
+        ],
+        "styles": [
+          "athletic"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "bf0eba85-e780-476a-8e0f-4259abc3032f",
+      "title": "A/O Lug Nylon Mens Mixed Media Nylon Boat Shoes",
+      "price": 32.99,
+      "extracted_metadata": {
+        "colors": [
+          "red"
+        ],
+        "brands": [
+          "A/O",
+          "Lug"
+        ],
+        "styles": [
+          "business"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "ff2f97b9-6c67-41ac-b77d-72fe4234ee00",
+      "title": "Clive Womens Suede Athletic Fit Knee-High Boots",
+      "price": 106.99,
+      "extracted_metadata": {
+        "colors": [
+          "red"
+        ],
+        "brands": [
+          "Clive",
+          "Womens"
+        ],
+        "styles": [
+          "athletic",
+          "business"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "198615d1-d790-4899-9c2d-3e0f1eb6a114",
+      "title": "Women's Trainer Sneakers",
+      "price": 84.0,
+      "extracted_metadata": {
+        "colors": [
+          "gray",
+          "silver"
+        ],
+        "brands": [
+          "Women's",
+          "Trainer"
+        ],
+        "styles": [
+          "athletic",
+          "trendy"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "da474346-4488-4e94-8884-5714894b106f",
+      "title": "Ella Womens Slit Denim Denim Shorts",
+      "price": 33.99,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "blue",
+          "brown"
+        ],
+        "brands": [
+          "Ella",
+          "Womens"
+        ],
+        "styles": [
+          "business"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "ae3bf8d6-3851-497a-8430-676cf74458de",
+      "title": "Eliza Flutter Sleeveless Blouse",
+      "price": 51.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Eliza",
+          "Flutter"
+        ],
+        "styles": [
+          "casual",
+          "vintage",
+          "minimalist"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "5404607f-4156-48a9-b133-a51fb59f74fe",
+      "title": "Timberland clear Men Men's Sunglasses",
+      "price": 174.0,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "green"
+        ],
+        "brands": [
+          "Timberland",
+          "Men's"
+        ],
+        "styles": [
+          "athletic"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "f2c94869-c452-437a-84e7-25b8b683dbbb",
+      "title": "Blinkee LED Daisy Flowers Cat Animal Ears Headband",
+      "price": 17.15,
+      "extracted_metadata": {
+        "colors": [
+          "white"
+        ],
+        "brands": [
+          "Blinkee",
+          "LED"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "6445d093-8899-4ddf-b576-e27c484aa8bc",
+      "title": "Versace Men's 53mm Tropical Full Yellow Sunglasses",
+      "price": 144.99,
+      "extracted_metadata": {
+        "colors": [
+          "yellow",
+          "brown",
+          "gray"
+        ],
+        "brands": [
+          "Versace",
+          "Men's"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "b72f66b3-e88f-4f3a-956d-af7ca5c9ae84",
+      "title": "Wool Midi Dress",
+      "price": 562.83,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Wool",
+          "Midi"
+        ],
+        "styles": [
+          "formal",
+          "minimalist"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "f26a4b20-a925-4a79-9c68-80db95b108a0",
+      "title": "Linen Knit Scoop Tank Top",
+      "price": 59.0,
+      "extracted_metadata": {
+        "colors": [
+          "brown",
+          "gray"
+        ],
+        "brands": [
+          "Linen",
+          "Knit"
+        ],
+        "styles": [
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "c0777af3-dd7b-4740-8eb9-e505ea7650d7",
+      "title": "Billie Long Sleeve Tee",
+      "price": 37.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Billie",
+          "Long"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "abb5ed9f-96eb-4810-8ff1-4f78b371ea44",
+      "title": "Herno Men's Coats blue",
+      "price": 592.0,
+      "extracted_metadata": {
+        "colors": [
+          "blue"
+        ],
+        "brands": [
+          "Herno",
+          "Men's"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "7a9ab9c9-e206-437b-ad01-de1119f1b972",
+      "title": "Women's Sabrina Sandals",
+      "price": 76.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Women's",
+          "Sabrina"
+        ],
+        "styles": [
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "860de391-e464-45f6-b8ba-cec9095c16cc",
+      "title": "Women's Cotton Black and White Floral Scroll Handkerchief",
+      "price": 15.94,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "black",
+          "white",
+          "gray"
+        ],
+        "brands": [
+          "Women's",
+          "Cotton"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "3e45fa1a-41d2-4595-892f-d38ee8cf16f2",
+      "title": "Matilde Voile Dress",
+      "price": 137.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Matilde",
+          "Voile"
+        ],
+        "styles": [
+          "formal"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "fe2f522e-fef9-49f8-b94d-4138a2612705",
+      "title": "Lifestride Daring I1845F1-020 Boots Women's 9.5 Gray Knee High Block Heel KHD702",
+      "price": 104.0,
+      "extracted_metadata": {
+        "colors": [
+          "gray"
+        ],
+        "brands": [
+          "Lifestride",
+          "Daring"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "1094727d-573c-447f-a4a8-017bd6d17c7a",
+      "title": "Short Sleeve Button Down Shirt Beige And Sage Plaid",
+      "price": 34.4,
+      "extracted_metadata": {
+        "colors": [
+          "brown"
+        ],
+        "brands": [
+          "Short",
+          "Sleeve"
+        ],
+        "styles": [
+          "vintage"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "d061619d-1909-4e1c-ba6e-6a51849f3d30",
+      "title": "Ross-Simons Baguette Diamond Hoop Earrings",
+      "price": 149.0,
+      "extracted_metadata": {
+        "colors": [
+          "gray",
+          "silver"
+        ],
+        "brands": [
+          "Ross-Simons",
+          "Baguette"
+        ],
+        "styles": [
+          "vintage",
+          "bohemian"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "d38af564-1d02-403a-9df2-5d50f7579a45",
+      "title": "Adelee Top",
+      "price": 92.0,
+      "extracted_metadata": {
+        "colors": [],
+        "brands": [
+          "Adelee",
+          "Top"
+        ],
+        "styles": [
+          "casual",
+          "minimalist"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.0,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "9612ce71-327a-42c8-9658-f21dcc656007",
+      "title": "Oceanaut Men's Red dial Watch",
+      "price": 223.75,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "brown",
+          "black",
+          "silver"
+        ],
+        "brands": [
+          "Oceanaut",
+          "Men's"
+        ],
+        "styles": []
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.0
+      }
+    },
+    {
+      "product_id": "e158509e-076e-4e65-9b79-28ecca760441",
+      "title": "NIC+ZOE Plus Ponte Zip Jacket",
+      "price": 69.98,
+      "extracted_metadata": {
+        "colors": [
+          "gray"
+        ],
+        "brands": [
+          "NIC+ZOE",
+          "Plus"
+        ],
+        "styles": [
+          "casual",
+          "formal",
+          "business"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    },
+    {
+      "product_id": "a0fb79a5-0ae3-45f5-bef7-fa2aeacd2d52",
+      "title": "ANNA KAY Marsha Blouse",
+      "price": 69.98,
+      "extracted_metadata": {
+        "colors": [
+          "red",
+          "blue",
+          "gray"
+        ],
+        "brands": [
+          "ANNA",
+          "KAY"
+        ],
+        "styles": [
+          "casual",
+          "formal",
+          "trendy"
+        ]
+      },
+      "confidence_scores": {
+        "colors": 0.8,
+        "brands": 0.9,
+        "styles": 0.7
+      }
+    }
+  ]
+}

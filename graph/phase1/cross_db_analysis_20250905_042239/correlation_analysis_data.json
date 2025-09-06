@@ -1,0 +1,149 @@
+{
+  "analysis_timestamp": "2025-09-05T04:22:46.379087",
+  "neo4j_data": {
+    "sample_size": 3000,
+    "total_products": 6416804
+  },
+  "qdrant_data": {
+    "sample_size": 3000,
+    "total_vectors": 6182557
+  },
+  "overlap_analysis": {
+    "neo4j_sample_size": 3000,
+    "qdrant_sample_size": 3000,
+    "direct_id_overlap": 2,
+    "neo4j_only": 2998,
+    "qdrant_only": 2998,
+    "overlapping_products": [
+      {
+        "id": "0006a7ec-3416-4e6f-9e71-cf58a6db8559",
+        "neo4j_title": "Luke 1977 Mens The Butchers Pencil Slim Fit Smart ...",
+        "qdrant_title": "Luke 1977 Mens The Butchers Pencil Slim Fit Smart ...",
+        "title_match": true,
+        "neo4j_price": 35.0,
+        "qdrant_price": 35.0
+      },
+      {
+        "id": "000e0242-9731-45c3-baa7-aa7ea43c34ac",
+        "neo4j_title": "Honeydew Intimates Star Seeker Brushed Jersey Loun...",
+        "qdrant_title": "Honeydew Intimates Star Seeker Brushed Jersey Loun...",
+        "title_match": true,
+        "neo4j_price": 59.0,
+        "qdrant_price": 59.0
+      }
+    ],
+    "missing_from_qdrant": [
+      {
+        "id": "057ed8c6-fa12-43c9-8be2-574425dfbda7",
+        "title": "Tahari ASL Women's Linen Shacket, Ivory, 2"
+      },
+      {
+        "id": "87951a67-7c1c-4547-ac10-a66eb090a265",
+        "title": "Cutter & Buck Men's MLB ed Cincinnati Reds Advanta"
+      },
+      {
+        "id": "1841d556-10e1-4c59-aef4-3a88287b32f2",
+        "title": "2.5mm Traditional Court Heavy Polished Chamfered E"
+      },
+      {
+        "id": "7cc58e9a-77b9-4bca-b6c8-195931bc35a2",
+        "title": "Everyday the Label Womens Full Size Wide Strap Tan"
+      },
+      {
+        "id": "8c5dc208-fd4b-490f-b99f-4354dd2f0787",
+        "title": "Rip Curl Aots Ty Williams Hoodie Black L Man"
+      }
+    ],
+    "missing_from_neo4j": [
+      {
+        "id": "0008074a-d0a1-4975-bb46-c86f04ab7736",
+        "title": "Grimey Burn In Flames Long Sleeve T-shirt Green 3X"
+      },
+      {
+        "id": "00131419-702c-4f19-9422-7cfd5e3fa89a",
+        "title": "BOSS Hugo Boss Destena Tweed Shift Dress"
+      },
+      {
+        "id": "0018c604-1596-4f31-b953-4e4809a465ad",
+        "title": "Infinite Crisis Ic Super Adult Heather Tee / T-Shi"
+      },
+      {
+        "id": "0006fe27-189b-48f9-bf4c-ad14f6ee51cd",
+        "title": "LifeStride Zinfandel Women's Boots Black : 6.5 M ("
+      },
+      {
+        "id": "0014cc51-b1d1-4faf-adbb-0bf52e406e3a",
+        "title": "Ariat Hybrid Rancher Stretch Fit Western Boot Wome"
+      }
+    ]
+  },
+  "similarity_analysis": {
+    "neo4j_unique_titles": 2997,
+    "qdrant_unique_titles": 2996,
+    "content_matches": 8,
+    "match_examples": [
+      {
+        "title": "kruze by enzo",
+        "neo4j_id": "fa45c09c-16e0-4a03-b6d6-3399c4c7a37f",
+        "qdrant_id": "000883db-531a-4e9e-9bd7-2d670c9b2277",
+        "id_match": false
+      },
+      {
+        "title": "honeydew intimates star seeker brushed jersey loun...",
+        "neo4j_id": "000e0242-9731-45c3-baa7-aa7ea43c34ac",
+        "qdrant_id": "000e0242-9731-45c3-baa7-aa7ea43c34ac",
+        "id_match": true
+      },
+      {
+        "title": "women's moccasins",
+        "neo4j_id": "3ef7f92f-0c17-4f38-9a9c-d245340c3558",
+        "qdrant_id": "001b1ce6-cdeb-40cd-9a06-4b8f1ac568fc",
+        "id_match": false
+      },
+      {
+        "title": "luke 1977 mens the butchers pencil slim fit smart ...",
+        "neo4j_id": "0006a7ec-3416-4e6f-9e71-cf58a6db8559",
+        "qdrant_id": "0006a7ec-3416-4e6f-9e71-cf58a6db8559",
+        "id_match": true
+      },
+      {
+        "title": "enzo",
+        "neo4j_id": "1ac6aff4-553a-4c16-8147-d6f9b298abb6",
+        "qdrant_id": "000dc9ed-bc79-481c-9094-cb7c9686d439",
+        "id_match": false
+      },
+      {
+        "title": "comfort colors garment-dyed heavyweight t-shirt",
+        "neo4j_id": "189ebdf5-c9c0-4c2f-a454-d2d4d8ff037e",
+        "qdrant_id": "000104ce-ceb3-4d10-90e9-821b406f36b6",
+        "id_match": false
+      },
+      {
+        "title": "over",
+        "neo4j_id": "b22563e3-2b4a-481d-8eda-17d483e78ca5",
+        "qdrant_id": "00164616-21ec-4b4d-aa63-7aed2afd4f51",
+        "id_match": false
+      },
+      {
+        "title": "m & o youth gold soft touch t-shirt",
+        "neo4j_id": "6c260e1a-e792-4fdd-a05c-8f824727d919",
+        "qdrant_id": "00151cad-70c7-49e2-8f6d-47b203ae1e5c",
+        "id_match": false
+      }
+    ]
+  },
+  "quality_analysis": {
+    "complete_products": {
+      "count": 2,
+      "avg_vector_norm": 0.9999999735628546,
+      "std_vector_norm": 8.800231759975574e-08
+    },
+    "incomplete_products": [],
+    "vector_quality_stats": {
+      "total_analyzed": 2,
+      "avg_completeness": 3.0,
+      "avg_vector_norm": 0.9999999735628546,
+      "correlation_sample_size": 2
+    }
+  }
+}

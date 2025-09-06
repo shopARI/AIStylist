@@ -1,0 +1,88 @@
+{
+  "validation_timestamp": "2025-09-05T04:41:26.528264",
+  "product_validation": {
+    "total_tested": 500,
+    "existing_products": 500,
+    "missing_products": 0,
+    "sample_existing_ids": [
+      "d363f1b4-7fb8-4e05-b2ee-f190e473c4b1",
+      "3c5561bb-6476-4b14-8775-b0ba6365e5a7",
+      "4dfc8a6e-35b1-43bb-9051-bed600e4a420",
+      "c5817af8-763f-432a-a9da-c5a0c5e84736",
+      "bb8f4712-2467-40a9-86b7-0b98f843cd70"
+    ],
+    "sample_missing_ids": []
+  },
+  "batch_testing": {
+    "batch_sizes_tested": [
+      100,
+      500,
+      1000,
+      2000
+    ],
+    "performance_metrics": {
+      "100": {
+        "execution_time_seconds": 0.124781,
+        "products_processed": 100,
+        "products_per_second": 801.4040599129675
+      },
+      "500": {
+        "execution_time_seconds": 0.123884,
+        "products_processed": 500,
+        "products_per_second": 4036.0337089535374
+      },
+      "1000": {
+        "execution_time_seconds": 0.124167,
+        "products_processed": 1000,
+        "products_per_second": 8053.669654578109
+      },
+      "2000": {
+        "execution_time_seconds": 0.123766,
+        "products_processed": 2000,
+        "products_per_second": 16159.52684905386
+      }
+    },
+    "memory_estimates": {},
+    "recommendations": [
+      "Optimal batch size: 2000 (best throughput: 16160 products/sec)",
+      "Estimated time for 16.7M relationships: 0.5 hours",
+      "Monitor memory usage during actual execution",
+      "Consider batching by relationship type (colors, brands, styles separately)"
+    ]
+  },
+  "script_validation": {
+    "node_creation_valid": true,
+    "relationship_creation_valid": true,
+    "index_creation_valid": true,
+    "validation_errors": [],
+    "script_readiness": {
+      "ready_for_execution": true,
+      "critical_errors": 0
+    }
+  },
+  "time_estimates": {
+    "total_relationships": 16700000,
+    "batch_estimates": {},
+    "phase_breakdown": {
+      "color_relationships": {
+        "relationships": 5500000,
+        "estimated_seconds": 34.03565,
+        "estimated_hours": 0.009454347222222222,
+        "recommended_batch_size": 2000
+      },
+      "brand_relationships": {
+        "relationships": 6400000,
+        "estimated_seconds": 39.60512,
+        "estimated_hours": 0.011001422222222222,
+        "recommended_batch_size": 2000
+      },
+      "style_relationships": {
+        "relationships": 4800000,
+        "estimated_seconds": 29.703839999999996,
+        "estimated_hours": 0.008251066666666666,
+        "recommended_batch_size": 2000
+      }
+    },
+    "total_estimated_time": 0.028706836111111113
+  }
+}

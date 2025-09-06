@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from config import get_database_config, get_ai_config, get_system_config
 """
 Full Production Batched Extraction - 6.4M Products
 Uses the reliable simple extractor in batches
@@ -14,7 +15,7 @@ def connect_to_database():
     """Connect to production Neo4j database"""
     neo4j_url = "bolt://0.0.0.0:17687"
     neo4j_user = "neo4j"
-    neo4j_password = "6D%q@jbYmstkK2i3oW5z6B6outew9m93"
+    neo4j_password = self.db_config.neo4j_password
     return GraphDatabase.driver(neo4j_url, auth=(neo4j_user, neo4j_password))
 
 def extract_metadata_batch(products):

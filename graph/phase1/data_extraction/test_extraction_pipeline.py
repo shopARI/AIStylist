@@ -1,3 +1,4 @@
+from config import get_database_config, get_ai_config, get_system_config
 """
 Test the complete data extraction pipeline
 Phase 1: Read-only testing of all extractors on real database sample
@@ -35,7 +36,7 @@ async def test_extraction_pipeline():
     # Database connection from environment
     neo4j_url = "bolt://0.0.0.0:17687"
     neo4j_user = "neo4j" 
-    neo4j_password = "6D%q@jbYmstkK2i3oW5z6B6outew9m93"
+    neo4j_password = self.db_config.neo4j_password
     
     # Initialize database reader
     db_reader = None

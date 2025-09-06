@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+from config import get_database_config, get_ai_config, get_system_config
 """
 Cross-Database Correlation Analysis
 Analyzes consistency and correlation between Neo4j and Qdrant databases
@@ -24,14 +25,15 @@ class CrossDatabaseAnalyzer:
         os.makedirs(self.output_dir, exist_ok=True)
         
         # Neo4j connection details
-        self.neo4j_url = "bolt://0.0.0.0:17687"
-        self.neo4j_user = "neo4j"
-        self.neo4j_password = "6D%q@jbYmstkK2i3oW5z6B6outew9m93"
+        self.db_config = get_database_config()
+        self.neo4j_url = self.db_config.neo4j_url
+        self.neo4j_user = self.db_config.neo4j_user
+        self.neo4j_password = self.db_config.neo4j_password
         
         # Qdrant connection details
-        self.qdrant_url = "https://9ac8ffa1-c5b7-47e2-a832-3ce559f42042.us-east4-0.gcp.cloud.qdrant.io"
-        self.qdrant_api_key = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJhY2Nlc3MiOiJtIn0.zz1R7TKuAT4A0dX-M-oZbgX9sYT-x6bwT1EMPGKZ6Jg"
-        self.collection_name = "fashion_products"
+        self.qdrant_url = self.db_config.qdrant_url
+        self.qdrant_api_key = self.db_config.qdrant_api_key
+        self.collection_name = self.db_config.collection_name
     
     def connect_databases(self) -> Tuple[Optional[GraphDatabase.driver], Optional[QdrantClient]]:
         """Connect to both Neo4j and Qdrant databases"""
