@@ -1,0 +1,230 @@
+[
+  {
+    "product_id": "d363f1b4-7fb8-4e05-b2ee-f190e473c4b1",
+    "colors": [
+      "red",
+      "white"
+    ],
+    "brands": [
+      "Everyday"
+    ],
+    "styles": [
+      "casual",
+      "vintage",
+      "minimalist"
+    ],
+    "categories": [],
+    "materials": [],
+    "sizes": [],
+    "seasons": [],
+    "occasions": [],
+    "confidence_scores": {
+      "color_extraction": 0.6,
+      "brand_extraction": 0.95,
+      "style_classification": 0.6
+    }
+  },
+  {
+    "product_id": "3c5561bb-6476-4b14-8775-b0ba6365e5a7",
+    "colors": [
+      "red",
+      "gray"
+    ],
+    "brands": [
+      "None"
+    ],
+    "styles": [
+      "casual"
+    ],
+    "categories": [],
+    "materials": [],
+    "sizes": [],
+    "seasons": [],
+    "occasions": [],
+    "confidence_scores": {
+      "color_extraction": 0.6,
+      "brand_extraction": 0.8,
+      "style_classification": 0.3
+    }
+  },
+  {
+    "product_id": "4dfc8a6e-35b1-43bb-9051-bed600e4a420",
+    "colors": [
+      "white"
+    ],
+    "brands": [
+      "Theory"
+    ],
+    "styles": [
+      "formal",
+      "minimalist",
+      "romantic"
+    ],
+    "categories": [],
+    "materials": [],
+    "sizes": [],
+    "seasons": [],
+    "occasions": [],
+    "confidence_scores": {
+      "color_extraction": 0.6,
+      "brand_extraction": 0.95,
+      "style_classification": 0.6
+    }
+  },
+  {
+    "product_id": "c5817af8-763f-432a-a9da-c5a0c5e84736",
+    "colors": [
+      "white",
+      "gray"
+    ],
+    "brands": [
+      "White"
+    ],
+    "styles": [
+      "casual"
+    ],
+    "categories": [],
+    "materials": [],
+    "sizes": [],
+    "seasons": [],
+    "occasions": [],
+    "confidence_scores": {
+      "color_extraction": 0.6,
+      "brand_extraction": 0.95,
+      "style_classification": 0.3
+    }
+  },
+  {
+    "product_id": "bb8f4712-2467-40a9-86b7-0b98f843cd70",
+    "colors": [],
+    "brands": [
+      "Pull"
+    ],
+    "styles": [
+      "glamorous"
+    ],
+    "categories": [],
+    "materials": [],
+    "sizes": [],
+    "seasons": [],
+    "occasions": [],
+    "confidence_scores": {
+      "color_extraction": 0.0,
+      "brand_extraction": 0.95,
+      "style_classification": 0.6
+    }
+  },
+  {
+    "product_id": "1b247261-3410-4081-a551-96b0185d9cc8",
+    "colors": [
+      "red"
+    ],
+    "brands": [],
+    "styles": [
+      "casual"
+    ],
+    "categories": [],
+    "materials": [],
+    "sizes": [],
+    "seasons": [],
+    "occasions": [],
+    "confidence_scores": {
+      "color_extraction": 0.6,
+      "brand_extraction": 0.95,
+      "style_classification": 0.3
+    }
+  },
+  {
+    "product_id": "8f5edc67-0572-4292-93d0-6e6c968a29aa",
+    "colors": [
+      "orange"
+    ],
+    "brands": [
+      "None"
+    ],
+    "styles": [
+      "trendy"
+    ],
+    "categories": [],
+    "materials": [],
+    "sizes": [],
+    "seasons": [],
+    "occasions": [],
+    "confidence_scores": {
+      "color_extraction": 0.6,
+      "brand_extraction": 0.8,
+      "style_classification": 0.6
+    }
+  },
+  {
+    "product_id": "9b9d7e0f-92f4-4275-9bf3-3fc3b8c200ac",
+    "colors": [
+      "brown"
+    ],
+    "brands": [
+      "None"
+    ],
+    "styles": [
+      "formal",
+      "glamorous"
+    ],
+    "categories": [],
+    "materials": [],
+    "sizes": [],
+    "seasons": [],
+    "occasions": [],
+    "confidence_scores": {
+      "color_extraction": 0.6,
+      "brand_extraction": 0.8,
+      "style_classification": 0.6
+    }
+  },
+  {
+    "product_id": "e6476a63-f801-4479-bc49-c13dca498084",
+    "colors": [
+      "blue",
+      "white",
+      "green"
+    ],
+    "brands": [
+      "Men's"
+    ],
+    "styles": [
+      "trendy"
+    ],
+    "categories": [],
+    "materials": [],
+    "sizes": [],
+    "seasons": [],
+    "occasions": [],
+    "confidence_scores": {
+      "color_extraction": 0.6,
+      "brand_extraction": 0.95,
+      "style_classification": 0.6
+    }
+  },
+  {
+    "product_id": "411a10d8-eea5-4c01-aacd-8bec9284f8d6",
+    "colors": [
+      "black"
+    ],
+    "brands": [
+      "None"
+    ],
+    "styles": [
+      "formal",
+      "casual",
+      "trendy"
+    ],
+    "categories": [],
+    "materials": [],
+    "sizes": [],
+    "seasons": [],
+    "occasions": [],
+    "confidence_scores": {
+      "color_extraction": 0.6,
+      "brand_extraction": 0.8,
+      "style_classification": 0.6
+    }
+  }
+]
