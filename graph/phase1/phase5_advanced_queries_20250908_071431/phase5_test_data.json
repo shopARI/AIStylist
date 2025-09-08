@@ -1,0 +1,149 @@
+{
+  "timestamp": "2025-09-08T07:14:31.210963",
+  "query_performance": {
+    "Multi-Filter Search": {
+      "execution_time_ms": 229.00080680847168,
+      "result_count": 7,
+      "status": "success"
+    },
+    "Color Complement Recommendations": {
+      "execution_time_ms": 180.1443099975586,
+      "result_count": 5,
+      "status": "success"
+    },
+    "Style Compatibility": {
+      "execution_time_ms": 131.31380081176758,
+      "result_count": 4,
+      "status": "success"
+    },
+    "Occasion-Based Discovery": {
+      "execution_time_ms": 132.68280029296875,
+      "result_count": 4,
+      "status": "success"
+    },
+    "Price Tier Analysis": {
+      "execution_time_ms": 2310.1701736450195,
+      "result_count": 10,
+      "status": "success"
+    },
+    "Outfit Builder": {
+      "execution_time_ms": 745.7230091094971,
+      "result_count": 3,
+      "status": "success"
+    },
+    "Popular Combinations": {
+      "execution_time_ms": 100.64911842346191,
+      "result_count": 10,
+      "status": "success"
+    },
+    "Semantic Text Search": {
+      "execution_time_ms": 213.4726047515869,
+      "result_count": 15,
+      "status": "success"
+    }
+  },
+  "use_cases": [
+    {
+      "name": "Complete Outfit Builder",
+      "description": "Find matching products that complement each other",
+      "results": 2
+    },
+    {
+      "name": "Wedding Guest Shopping",
+      "description": "Find formal, elegant products suitable for weddings",
+      "results": 5
+    },
+    {
+      "name": "Color-Coordinated Wardrobe",
+      "description": "Find products that complement a blue wardrobe",
+      "results": 5
+    },
+    {
+      "name": "Fashion Trend Analysis",
+      "description": "Identify popular color-style combinations",
+      "results": 5
+    }
+  ],
+  "validation_tests": {
+    "multi_dimensional_filtering": true,
+    "semantic_recommendations": true,
+    "occasion_based_discovery": true,
+    "outfit_building": true,
+    "trend_analysis": true,
+    "color_harmony": true,
+    "style_compatibility": true,
+    "price_tier_filtering": true
+  },
+  "api_documentation": {
+    "fashion_graph_api": {
+      "version": "1.0",
+      "description": "Advanced fashion product search and recommendation API",
+      "endpoints": {
+        "/search/products": {
+          "description": "Multi-dimensional product search",
+          "parameters": [
+            "colors",
+            "styles",
+            "min_price",
+            "max_price",
+            "limit"
+          ],
+          "query": "color_style_price_filter"
+        },
+        "/recommendations/color": {
+          "description": "Color-based product recommendations",
+          "parameters": [
+            "color",
+            "min_price",
+            "max_price",
+            "limit"
+          ],
+          "query": "color_complement_products"
+        },
+        "/recommendations/style": {
+          "description": "Style compatibility recommendations",
+          "parameters": [
+            "style",
+            "min_price",
+            "max_price",
+            "limit"
+          ],
+          "query": "style_compatible_products"
+        },
+        "/search/occasion": {
+          "description": "Occasion-appropriate product discovery",
+          "parameters": [
+            "occasion",
+            "min_price",
+            "max_price",
+            "limit"
+          ],
+          "query": "occasion_appropriate_products"
+        },
+        "/outfits/build": {
+          "description": "Intelligent outfit building",
+          "parameters": [
+            "max_budget",
+            "limit"
+          ],
+          "query": "outfit_builder"
+        },
+        "/analytics/trends": {
+          "description": "Popular color-style combinations",
+          "parameters": [
+            "limit"
+          ],
+          "query": "popular_combinations"
+        },
+        "/search/semantic": {
+          "description": "Semantic text-based search",
+          "parameters": [
+            "search_term",
+            "limit"
+          ],
+          "query": "semantic_text_search"
+        }
+      }
+    }
+  }
+}

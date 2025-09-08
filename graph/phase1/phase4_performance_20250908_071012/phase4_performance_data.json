@@ -1,0 +1,59 @@
+{
+  "timestamp": "2025-09-08T07:10:12.059458",
+  "performance_benchmarks": {
+    "Color Filter Query": {
+      "avg_time_ms": 2.837975819905599,
+      "category": "filtering",
+      "result_count": 16
+    },
+    "Style Filter Query": {
+      "avg_time_ms": 2.662022908528646,
+      "category": "filtering",
+      "result_count": 12
+    },
+    "Price Range Query": {
+      "avg_time_ms": 3864.9191856384277,
+      "category": "range",
+      "result_count": 3912252
+    },
+    "Complex Multi-Filter": {
+      "avg_time_ms": 2.730210622151693,
+      "category": "complex",
+      "result_count": 2
+    },
+    "Color Complement Query": {
+      "avg_time_ms": 2.2545655568440757,
+      "category": "semantic",
+      "result_count": 3
+    },
+    "Style Compatibility Query": {
+      "avg_time_ms": 3.9899349212646484,
+      "category": "semantic",
+      "result_count": 1
+    }
+  },
+  "validation_results": {
+    "total_indexes": 13,
+    "queries_using_indexes": 0,
+    "total_queries_tested": 3
+  },
+  "system_metrics": {
+    "memory_usage": {
+      "description": "HeapMemoryUsage",
+      "value": {
+        "description": "java.lang.management.MemoryUsage",
+        "properties": {
+          "max": 4123000832,
+          "committed": 1593835520,
+          "init": 257949696,
+          "used": 1014296192
+        }
+      }
+    },
+    "database_size": {
+      "total_nodes": 6458070,
+      "total_relationships": 135,
+      "estimated_size_mb": 6458.205
+    }
+  }
+}
