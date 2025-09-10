@@ -33,7 +33,16 @@ class BattleOrchestrator:
         """
         logger.info("Initializing Battle Orchestrator")
         
-        self.executor = executor
+        # Replace with VerboseExecutor for mind visibility
+        from services.battle.verbose_executor import VerboseBattleExecutor
+        if not isinstance(executor, VerboseBattleExecutor):
+            self.executor = VerboseBattleExecutor(
+                cypher_bot=executor.cypher_bot,
+                vibe_bot=executor.vibe_bot,
+                judge=executor.judge
+            )
+        else:
+            self.executor = executor
         self.cache = cache
         self.optimizer = optimizer
         self.metrics = metrics

@@ -12,9 +12,10 @@ from datetime import datetime
 
 # CAMEL 0.2.7 imports
 from camel.agents import ChatAgent
-from camel.configs import ChatGPTConfig
+from camel.models import ModelFactory
 from camel.messages import BaseMessage
-from camel.memory import LongTermMemory, ChatHistoryMemory
+from camel.memories import ChatHistoryMemory
+from camel.types import ModelType, ModelPlatformType
 
 
 logger = logging.getLogger("battle_agents")
@@ -31,19 +32,23 @@ class CypherBotAgent:
         self.neo4j_client = neo4j_client
         self.model_type = model_type
         
-        # Create CAMEL 0.2.7 agent
+        # Create CAMEL 0.2.7 agent with ModelFactory
+        model = ModelFactory.create(
+            model_platform=ModelPlatformType.DEFAULT,
+            model_type=ModelType.GPT_4O_MINI,
+            model_config_dict={
+                "temperature": 0.7,
+                "max_tokens": 1000
+            }
+        )
+        
         self.agent = ChatAgent(
             system_message=self._get_system_message(),
-            model_config=ChatGPTConfig(
-                model=model_type,
-                temperature=0.7,
-                max_tokens=1000
-            ),
-            function_calling_enabled=True,
-            memory=LongTermMemory(
-                chat_memory=ChatHistoryMemory(window_size=10)
-            )
+            model=model
         )
+        
+        # Initialize memory separately
+        self.memory = ChatHistoryMemory(message_window_size=10)
         
         logger.info(f"CypherBot initialized with model: {model_type}")
     
@@ -230,18 +235,23 @@ class VibeBotAgent:
         self.qdrant_client = qdrant_client
         self.model_type = model_type
         
-        # Create CAMEL 0.2.7 agent
+        # Create CAMEL 0.2.7 agent with ModelFactory
+        model = ModelFactory.create(
+            model_platform=ModelPlatformType.DEFAULT,
+            model_type=ModelType.GPT_4O_MINI,
+            model_config_dict={
+                "temperature": 0.8,  # Slightly more creative
+                "max_tokens": 1000
+            }
+        )
+        
         self.agent = ChatAgent(
             system_message=self._get_system_message(),
-            model_config=ChatGPTConfig(
-                model=model_type,
-                temperature=0.8,  # Slightly more creative
-                max_tokens=1000
-            ),
-            function_calling_enabled=True,
-            memory=LongTermMemory(
-                chat_memory=ChatHistoryMemory(window_size=10)
-            )
+            model=model
+        )
+        
+        # Initialize memory separately
+        self.memory = ChatHistoryMemory(message_window_size=10)
         )
         
         logger.info(f"VibeBot initialized with model: {model_type}")
@@ -379,19 +389,23 @@ class JudgeAriAgent:
         """Initialize Judge Ari"""
         self.model_type = model_type
 
-        # Create CAMEL 0.2.7 agent with Ari's personality
+        # Create CAMEL 0.2.7 agent with ModelFactory
+        model = ModelFactory.create(
+            model_platform=ModelPlatformType.DEFAULT,
+            model_type=ModelType.GPT_4O_MINI,
+            model_config_dict={
+                "temperature": 0.6,  # Balanced for fair judgment
+                "max_tokens": 1500
+            }
+        )
+        
         self.agent = ChatAgent(
             system_message=self._get_system_message(),
-            model_config=ChatGPTConfig(
-                model=model_type,
-                temperature=0.6,  # Balanced for fair judgment
-                max_tokens=1500
-            ),
-            function_calling_enabled=True,
-            memory=LongTermMemory(
-                chat_memory=ChatHistoryMemory(window_size=20)
-            )
+            model=model
         )
+        
+        # Initialize memory separately
+        self.memory = ChatHistoryMemory(message_window_size=20)
 
         logger.info(f"Judge Ari initialized with model: {model_type}")
 

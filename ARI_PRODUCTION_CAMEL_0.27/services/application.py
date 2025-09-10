@@ -13,6 +13,7 @@ from services.battle.orchestrator import BattleOrchestrator
 from services.user.knowledge_graph import UserKnowledgeGraphService
 from services.ml.intelligence.coordinator import IntelligenceCoordinator
 from services.memory import get_session_store
+from services.memory.session_memory import get_enhanced_session_memory
 from services.cache.redis_client import RedisService, FallbackRedisService
 
 logger = logging.getLogger("services.application")
@@ -54,6 +55,9 @@ class ApplicationService:
         self.intelligence_coordinator = intelligence_coordinator
         self.redis_client = redis_client
         
+        # Enhanced session memory with persistence
+        self.session_memory = get_enhanced_session_memory(redis_client)
+        
         # NLP tools - USE HYBRID LLM INTENT DETECTION
         self.intent_detector = get_hybrid_intent_detector(strategy=DetectionStrategy.LLM_FIRST)
         self.parameter_extractor = ParameterExtractor()
@@ -78,16 +82,15 @@ class ApplicationService:
             await self.redis_client.set_json(session_key, session_data, ttl=86400)  # 24 hour TTL
             
         try:
-            # 1. Get session memory context
-            session_store = get_session_store()
-            session_context = session_store.get_session_context(session_id, user_id or "anonymous")
-            conversation_summary = session_store.get_conversation_summary(session_id, user_id or "anonymous")
+            # 1. Get enhanced session memory context
+            session_context = await self.session_memory.get_session_context(session_id, context_turns=5)
+            stored_preferences = await self.session_memory.get_user_preferences(session_id, user_id)
             
             # Enhance message with memory context if available
             enhanced_message = message
-            if conversation_summary:
-                enhanced_message = f"{conversation_summary} | Current request: {message}"
-                logger.info(f"Enhanced message with memory context: {len(conversation_summary)} chars")
+            if session_context:
+                enhanced_message = f"{session_context} | Current request: {message}"
+                logger.info(f"Enhanced message with session memory context: {len(session_context)} chars")
             
             # 2. Detect intent and extract parameters using LLM/HYBRID - enhanced message
             hybrid_result = await self.intent_detector.detect_intent_and_extract(enhanced_message)
@@ -95,8 +98,7 @@ class ApplicationService:
             score = hybrid_result.confidence
             params = hybrid_result.extracted_parameters
             
-            # Merge with stored preferences - but don't override explicit current requests
-            stored_preferences = session_store.get_user_preferences(session_id, user_id or "anonymous")
+            # Merge with stored preferences from enhanced session memory
             if stored_preferences:
                 # Only merge stored preferences if current extraction is empty for that key
                 # AND the current message doesn't explicitly mention conflicting values
@@ -109,7 +111,7 @@ class ApplicationService:
                         ]):
                             continue  # Skip merging stored color if current message has explicit color
                         params[key] = value
-                logger.info(f"Merged stored preferences (excluding conflicts): {stored_preferences}")
+                logger.info(f"Merged stored preferences from session memory: {stored_preferences}")
             
             logger.info(f"LLM Intent: {intent.name} (Score: {score:.2f}, Method: {hybrid_result.detection_method}), Params: {params}")
 
@@ -204,27 +206,28 @@ class ApplicationService:
                 metadata=metadata
             )
 
-            # 4. Store conversation in memory for future context (background task)
+            # 4. Store conversation in enhanced session memory (background task)
             if background_tasks:
                 background_tasks.add_task(
-                    self._store_session_context,
+                    self._store_enhanced_session_context,
                     session_id,
                     user_id or "anonymous",
                     message,
                     response_text,
-                    metadata.get("products", []),
-                    params
+                    intent.name if hasattr(intent, 'name') else str(intent),
+                    len(metadata.get("products", [])),
+                    metadata
                 )
             else:
-                # Fallback for non-HTTP contexts (like WebSocket)
-                session_store = get_session_store()
-                session_store.update_session_context(
+                # Store immediately for non-HTTP contexts
+                await self.session_memory.store_conversation(
                     session_id=session_id,
                     user_id=user_id or "anonymous", 
-                    message=message,
-                    response=response_text,
-                    products=metadata.get("products", []),
-                    extracted_preferences=params
+                    user_message=message,
+                    assistant_response=response_text,
+                    intent=intent.name if hasattr(intent, 'name') else str(intent),
+                    products_found=len(metadata.get("products", [])),
+                    metadata=metadata
                 )
 
             return chat_response
@@ -362,29 +365,29 @@ class ApplicationService:
 
         return response
 
-    def _store_session_context(
+    async def _store_enhanced_session_context(
         self,
         session_id: str,
         user_id: str,
         message: str,
         response: str,
-        products: List[Dict],
-        extracted_preferences: Dict[str, Any]
+        intent: str,
+        products_found: int,
+        metadata: Dict[str, Any]
     ):
         """
-        Background task to store session context without blocking response.
+        Background task to store enhanced session context without blocking response.
         """
         try:
-            from services.memory import get_session_store
-            session_store = get_session_store()
-            session_store.update_session_context(
+            await self.session_memory.store_conversation(
                 session_id=session_id,
                 user_id=user_id,
-                message=message,
-                response=response,
-                products=products,
-                extracted_preferences=extracted_preferences
+                user_message=message,
+                assistant_response=response,
+                intent=intent,
+                products_found=products_found,
+                metadata=metadata
             )
-            logger.info(f"Stored conversation context for session {session_id}")
+            logger.info(f"Stored enhanced conversation context for session {session_id}")
         except Exception as e:
-            logger.error(f"Failed to store session context for {session_id}: {e}")
+            logger.error(f"Failed to store enhanced session context for {session_id}: {e}")

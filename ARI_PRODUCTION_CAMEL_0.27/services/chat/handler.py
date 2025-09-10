@@ -293,13 +293,14 @@ class ConversationHandler:
         """Handle memory-related question."""
         if self.memory_agent:
             # Use CAMEL agent for memory questions
-            from lib.camel.v070.compatibility import AsyncAgentWrapper
+            # Use CAMEL 0.2.7 direct agent calls
             
-            wrapper = AsyncAgentWrapper(self.memory_agent)
-            response = await wrapper.step(message)
-            
-            if response.success:
-                return response.content
+            try:
+                response = self.memory_agent.step(message)
+                if response:
+                    return response.msg.content if hasattr(response, 'msg') else str(response)
+            except Exception as e:
+                logger.error(f"Memory agent error: {e}")
         
         # Fallback response
         history = self.conversations.get(session_id, [])

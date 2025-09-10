@@ -1,6 +1,6 @@
 """
 Battle Agents Package
-Clean CAMEL 0.2.70 implementation for fashion recommendation battles
+Modernized CAMEL 0.2.7 implementation with RolePlay and memory for fashion recommendation battles
 """
 
 import logging
@@ -11,22 +11,22 @@ logger = logging.getLogger("agents")
 # Import agent implementations
 from .cypher_bot import CypherBotAgent
 from .vibe_bot import VibeBotAgent
+from .judge import JudgeAriAgent
 
 # Version info
-__version__ = "1.0.0"
+__version__ = "2.0.0"  # Updated for CAMEL 0.2.7
 __author__ = "ARI Fashion System"
 
 # Check CAMEL availability
 try:
-    from lib.camel.v070 import CAMEL_AVAILABLE, CAMEL_VERSION
-    if CAMEL_AVAILABLE:
-        logger.info(f"Agents package initialized with CAMEL {CAMEL_VERSION}")
-    else:
-        logger.error("CAMEL not available - agents will not function")
-        raise RuntimeError("CAMEL 0.2.70+ is required for agents package")
+    import camel
+    CAMEL_VERSION = "0.2.7"
+    CAMEL_AVAILABLE = True
+    logger.info(f"Agents package initialized with CAMEL {CAMEL_VERSION}")
 except ImportError as e:
-    logger.error(f"Failed to import CAMEL integration: {e}")
-    raise RuntimeError("CAMEL integration module not found") from e
+    logger.error(f"CAMEL 0.2.7 not available: {e}")
+    CAMEL_AVAILABLE = False
+    CAMEL_VERSION = None
 
 # Agent registry for dynamic creation
 AGENT_REGISTRY = {
@@ -34,6 +34,8 @@ AGENT_REGISTRY = {
     "cypherbot": CypherBotAgent,
     "vibe": VibeBotAgent,
     "vibebot": VibeBotAgent,
+    "judge": JudgeAriAgent,
+    "judgeari": JudgeAriAgent,
 }
 
 def create_agent(
@@ -97,11 +99,11 @@ async def health_check() -> dict:
         "errors": []
     }
     
-    try:
-        from lib.camel.v070 import CAMEL_AVAILABLE
-        health["camel_available"] = CAMEL_AVAILABLE
-    except Exception as e:
-        health["errors"].append(f"CAMEL check failed: {e}")
+    health["camel_available"] = CAMEL_AVAILABLE
+    health["camel_version"] = CAMEL_VERSION
+    
+    if not CAMEL_AVAILABLE:
+        health["errors"].append("CAMEL 0.2.7 not available")
         health["status"] = "unhealthy"
     
     # Check which agents can be imported
@@ -120,6 +122,7 @@ __all__ = [
     # Agent classes
     "CypherBotAgent",
     "VibeBotAgent",
+    "JudgeAriAgent",
     
     # Factory and utilities
     "create_agent",
@@ -128,6 +131,8 @@ __all__ = [
     
     # Constants
     "AGENT_REGISTRY",
+    "CAMEL_AVAILABLE", 
+    "CAMEL_VERSION",
     "__version__",
 ]
 

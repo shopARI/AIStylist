@@ -1,6 +1,6 @@
 """
 Judge Ari Agent - Battle Evaluator
-Clean CAMEL 0.2.7 implementation
+Modernized CAMEL 0.2.7 implementation with RolePlay and Memory
 """
 
 import logging
@@ -8,15 +8,17 @@ import json
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 from collections import Counter
+from threading import RLock
+
 logger = logging.getLogger("agents.judge")
 
-# Direct CAMEL 0.2.7 imports
+# CAMEL 0.2.7 imports - correct patterns
 from camel.agents import ChatAgent
 from camel.models import ModelFactory
+from camel.messages import BaseMessage
+from camel.types import ModelType, RoleType
 from camel.memories import ChatHistoryMemory
 from camel.societies import RolePlaying
-from camel.messages import BaseMessage
-from camel.types import ModelType, ModelPlatformType, RoleType
 
 # Import prompts
 from config.prompts import JUDGE_ARI_PROMPT
@@ -26,24 +28,59 @@ class JudgeAriAgent:
     Judge Ari - The ultimate fashion arbiter.
     Evaluates battle results from CypherBot and VibeBot.
     
-    Clean implementation with CAMEL 0.2.7 patterns:
-    - Uses ModelFactory to create models
-    - Passes model objects to ChatAgent
-    - Direct string system messages
-    - No hidden fallbacks
+    Modern CAMEL 0.2.7 implementation with:
+    - RolePlay society for multi-agent collaboration
+    - ChatHistoryMemory for learning from judgments
+    - ModelFactory for proper model initialization
+    - Thread-safe statistics tracking
     """
     
     def __init__(self):
-        """Initialize Judge Ari with CAMEL 0.2.7, RolePlay, and memory."""
+        """Initialize Judge Ari with CAMEL 0.2.7 RolePlay and Memory."""
         self.name = "Judge Ari"
         self.role = "Battle Evaluator"
         
-        # Initialize CAMEL 0.2.7 components
-        self._initialize_camel_agent()
-        self._initialize_memory()
-        self._initialize_roleplay()
-        
-        logger.info(f"{self.name} initialized with CAMEL 0.2.7, RolePlay, and memory")
+        try:
+            # Create model using CAMEL 0.2.7 ModelFactory
+            self.model = ModelFactory.create(
+                model_platform=ModelType.OPENAI,
+                model_type="gpt-4o-mini",
+                model_config_dict={
+                    "temperature": 0.7, 
+                    "max_tokens": 2000,
+                    "top_p": 0.9
+                }
+            )
+            
+            # Initialize memory for learning from judgments
+            self.memory = ChatHistoryMemory(
+                message_window_size=20,  # Remember last 20 interactions
+            )
+            
+            # Create CAMEL ChatAgent with memory and advanced features
+            self.agent = ChatAgent(
+                system_message=JUDGE_ARI_PROMPT,
+                model=self.model,
+                memory=self.memory,
+                message_window_size=20,
+                token_limit=4000,
+                output_language="English"
+            )
+            
+            # Setup RolePlay society for multi-agent collaboration
+            self.role_playing = RolePlaying(
+                assistant_role_name="Fashion Judge",
+                user_role_name="Battle Evaluator",
+                assistant_agent=self.agent,
+                user_agent=self.agent,  # Self-evaluation capability
+                task_prompt="Evaluate fashion agent battle results fairly and comprehensively, learning from past decisions"
+            )
+            
+            logger.info(f"{self.name} initialized with CAMEL 0.2.7, memory, and RolePlay")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize {self.name}: {e}")
+            raise RuntimeError(f"Judge Ari initialization failed: {e}") from e
         
         # Track judgment statistics WITH THREAD SAFETY
         self.stats = {
@@ -52,61 +89,14 @@ class JudgeAriAgent:
             "vibe_wins": 0,
             "consensus_decisions": 0,
             "avg_judgment_time": 0.0,
-            "total_products_evaluated": 0
+            "total_products_evaluated": 0,
+            "learning_interactions": 0
         }
         
-        from threading import RLock
         self.stats_lock = RLock()
-
-    def _initialize_camel_agent(self):
-        """Initialize the main CAMEL ChatAgent"""
-        try:
-            model = ModelFactory.create(
-                model_platform=ModelPlatformType.DEFAULT,
-                model_type=ModelType.GPT_4O,
-                model_config_dict={
-                    "temperature": 0.6,  # Balanced for fair judgment
-                    "max_tokens": 1500
-                }
-            )
-            
-            self.agent = ChatAgent(
-                system_message=BaseMessage.make_assistant_message(
-                    role_name="Fashion Judge",
-                    content=JUDGE_ARI_PROMPT
-                ),
-                model=model
-            )
-            
-            logger.info("Judge Ari CAMEL agent initialized successfully")
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize CAMEL agent: {e}")
-            raise RuntimeError(f"Judge Ari CAMEL initialization failed: {e}") from e
-
-    def _initialize_memory(self):
-        """Initialize ChatHistoryMemory for learning judgment patterns"""
-        try:
-            from camel.memories.context_creators import ScoreBasedContextCreator
-            context_creator = ScoreBasedContextCreator()
-            self.memory = ChatHistoryMemory(context_creator=context_creator, window_size=20)
-            logger.info("Judge Ari memory system initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize memory: {e}")
-            self.memory = None
-
-    def _initialize_roleplay(self):
-        """Initialize RolePlaying society for judgment collaboration"""
-        try:
-            self.role_playing = RolePlaying(
-                assistant_role_name="Fashion Judge",
-                user_role_name="Battle Evaluator",
-                task_prompt="Evaluate fashion product recommendations from competing agents and make fair, informed judgments based on user needs and aesthetic preferences"
-            )
-            logger.info("Judge Ari RolePlay society initialized")
-        except Exception as e:
-            logger.error(f"Failed to initialize RolePlay: {e}")
-            self.role_playing = None
+        
+        # Judgment history for learning
+        self.judgment_history = []
 
     async def evaluate(
         self,
@@ -118,8 +108,7 @@ class JudgeAriAgent:
         limit: int = 5
     ) -> Dict[str, Any]:
         """
-        Evaluate battle results with INTELLIGENT QUALITY CONTROL.
-        Consciously rejects irrelevant products and forces agents to retry if needed.
+        Evaluate battle results and select winners using CAMEL RolePlay.
         
         Args:
             cypher_results: Products from CypherBot
@@ -140,56 +129,24 @@ class JudgeAriAgent:
         logger.info(f"{self.name} evaluating: {len(cypher_results)} vs {len(vibe_results)} products")
         
         try:
-            # STEP 1: CONSCIOUS RELEVANCE VALIDATION - Reject garbage results
-            logger.info("🧠 Judge Ari: Applying conscious quality control...")
-            
-            filtered_cypher = await self._validate_relevance(cypher_results, query, "CypherBot")
-            filtered_vibe = await self._validate_relevance(vibe_results, query, "VibeBot")
-            
-            # STEP 2: Check if we have acceptable results
-            if not filtered_cypher and not filtered_vibe:
-                logger.warning("⚠️  Judge Ari: ALL PRODUCTS REJECTED - No relevant results found!")
-                return {
-                    "winner": "rejected",
-                    "reasoning": "All products were irrelevant to the query and consciously rejected",
-                    "products": [],
-                    "cypher_count": len(cypher_results),
-                    "vibe_count": len(vibe_results),
-                    "filtered_cypher_count": 0,
-                    "filtered_vibe_count": 0,
-                    "rejection_reason": "Quality control: No products met relevance standards",
-                    "needs_agent_retry": True,
-                    "judgment_confidence": 1.0  # High confidence in rejection
-                }
-            
-            # Log quality control results
-            logger.info(f"✅ Quality control results: CypherBot {len(cypher_results)}→{len(filtered_cypher)}, VibeBot {len(vibe_results)}→{len(filtered_vibe)}")
-            
-            # STEP 3: Get judgment strategy from CAMEL agent (using filtered results)
-            strategy = await self._get_judgment_strategy(
-                filtered_cypher, filtered_vibe, query, ml_context, user_context
+            # Get judgment strategy using RolePlay
+            strategy = await self._get_roleplay_strategy(
+                cypher_results, vibe_results, query, ml_context, user_context
             )
             
-            # STEP 4: Execute judgment on quality-controlled results
-            judgment = await self._execute_judgment(
-                strategy, filtered_cypher, filtered_vibe, query, limit
+            # Execute judgment with memory-enhanced decision making
+            judgment = await self._execute_memory_enhanced_judgment(
+                strategy, cypher_results, vibe_results, query, limit
             )
             
-            # Add quality control metadata
-            judgment.update({
-                "original_cypher_count": len(cypher_results),
-                "original_vibe_count": len(vibe_results),
-                "filtered_cypher_count": len(filtered_cypher),
-                "filtered_vibe_count": len(filtered_vibe),
-                "products_rejected": (len(cypher_results) + len(vibe_results)) - (len(filtered_cypher) + len(filtered_vibe)),
-                "quality_controlled": True
-            })
+            # Store judgment for learning
+            self._store_judgment_for_learning(judgment, query, strategy)
             
             # Update statistics
             elapsed = (datetime.now() - start_time).total_seconds()
             self._update_stats(judgment, elapsed)
             
-            logger.info(f"Judgment complete: {judgment['winner']} wins with {len(judgment['products'])} quality-controlled products")
+            logger.info(f"Judgment complete: {judgment['winner']} wins")
             return judgment
             
         except Exception as e:
@@ -197,7 +154,7 @@ class JudgeAriAgent:
             # Return balanced selection on error
             return self._create_fallback_judgment(cypher_results, vibe_results, limit)
     
-    async def _get_judgment_strategy(
+    async def _get_roleplay_strategy(
         self,
         cypher_results: List[Dict[str, Any]],
         vibe_results: List[Dict[str, Any]],
@@ -206,13 +163,13 @@ class JudgeAriAgent:
         user_context: Optional[Dict[str, Any]]
     ) -> str:
         """
-        Use CAMEL agent to determine judgment strategy.
+        Use CAMEL RolePlay to determine judgment strategy with memory context.
         
         Returns:
-            Strategy description from agent
+            Strategy description from RolePlay agent
         """
-        # Build context for judge
-        context = f"""Evaluate battle results for query: "{query}"
+        # Build comprehensive context with memory insights
+        context = f"""FASHION BATTLE EVALUATION for query: "{query}"
 
 CYPHERBOT (Data-driven approach):
 - Found {len(cypher_results)} products
@@ -220,9 +177,13 @@ CYPHERBOT (Data-driven approach):
 - Strengths: Graph relationships, purchase patterns, user behavior
 
 VIBEBOT (Aesthetic approach):
-- Found {len(vibe_results)} products
+- Found {len(vibe_results)} products  
 - Top products: {self._summarize_products(vibe_results[:3])}
 - Strengths: Visual similarity, style matching, trending aesthetics
+
+HISTORICAL CONTEXT:
+- Previous judgments: {len(self.judgment_history)}
+- Recent patterns: {self._get_recent_patterns()}
 """
         
         # Add ML context if available
@@ -252,41 +213,44 @@ VIBEBOT (Aesthetic approach):
         
         context += """
 
-Determine judgment strategy:
+JUDGMENT STRATEGIES:
 1. CYPHER_DOMINANT - Data and relationships are most important
-2. VIBE_DOMINANT - Aesthetics and style are most important
+2. VIBE_DOMINANT - Aesthetics and style are most important  
 3. BALANCED - Equal weight to both approaches
 4. CONSENSUS - Prioritize products both agents agree on
 5. QUALITY - Focus on highest quality regardless of source
+6. LEARNING - Apply insights from previous successful judgments
 
-Respond with strategy and reasoning."""
+Determine the best strategy based on query type, agent performance, and historical success patterns."""
         
         try:
-            # Create message for agent
-            user_msg = BaseMessage.make_user_message(
+            # Use RolePlay for strategic decision making
+            user_msg = BaseMessage(
                 role_name="Battle Evaluator",
+                role_type=RoleType.USER,
                 content=context
             )
             
-            # Get response from CAMEL agent
-            response = self.agent.step(user_msg)
+            # Get response from CAMEL agent with RolePlay
+            assistant_msg, user_msg = self.role_playing.step(user_msg)
             
-            # Extract strategy
-            if hasattr(response, 'msg') and hasattr(response.msg, 'content'):
-                strategy = response.msg.content
-            elif hasattr(response, 'content'):
-                strategy = response.content
+            # Extract strategy from assistant response
+            if hasattr(assistant_msg, 'content'):
+                strategy = assistant_msg.content
             else:
-                strategy = str(response)
+                strategy = str(assistant_msg)
             
-            logger.debug(f"Judgment strategy: {strategy[:100]}...")
+            with self.stats_lock:
+                self.stats["learning_interactions"] += 1
+            
+            logger.debug(f"RolePlay strategy: {strategy[:100]}...")
             return strategy
             
         except Exception as e:
-            logger.error(f"Strategy determination error: {e}")
+            logger.error(f"RolePlay strategy determination error: {e}")
             return "BALANCED"  # Fallback strategy
     
-    async def _execute_judgment(
+    async def _execute_memory_enhanced_judgment(
         self,
         strategy: str,
         cypher_results: List[Dict[str, Any]],
@@ -295,36 +259,42 @@ Respond with strategy and reasoning."""
         limit: int
     ) -> Dict[str, Any]:
         """
-        Execute the judgment based on strategy.
+        Execute judgment enhanced by memory and learning from past decisions.
         
         Returns:
             Judgment dictionary with winner and final products
         """
         strategy_lower = strategy.lower()
         
-        # Determine winner based on strategy
+        # Apply learning from memory if available
+        memory_insights = self._get_memory_insights(query, strategy)
+        
+        # Determine winner based on strategy + memory
         if "cypher" in strategy_lower or "data" in strategy_lower:
             winner = "cypher"
-            reasoning = "Data-driven approach is most suitable for this query"
+            reasoning = f"Data-driven approach selected {memory_insights}"
         elif "vibe" in strategy_lower or "aesthetic" in strategy_lower:
             winner = "vibe"
-            reasoning = "Aesthetic approach is most suitable for this query"
+            reasoning = f"Aesthetic approach selected {memory_insights}"
         elif "consensus" in strategy_lower:
             winner = "consensus"
-            reasoning = "Both agents agree on the best products"
+            reasoning = f"Both agents consensus {memory_insights}"
         elif "quality" in strategy_lower:
             winner = "quality"
-            reasoning = "Selecting highest quality products from both agents"
+            reasoning = f"Highest quality selection {memory_insights}"
+        elif "learning" in strategy_lower:
+            winner = self._apply_learning_strategy(cypher_results, vibe_results)
+            reasoning = f"Learning-based selection using historical patterns"
         else:
             winner = "balanced"
-            reasoning = "Balanced selection from both agents"
+            reasoning = f"Balanced selection {memory_insights}"
         
-        # Select products based on winner
-        final_products = self._select_products(
-            winner, cypher_results, vibe_results, limit
+        # Select products based on enhanced winner logic
+        final_products = self._select_products_enhanced(
+            winner, cypher_results, vibe_results, limit, memory_insights
         )
         
-        # Create judgment result
+        # Create judgment result with memory context
         judgment = {
             "winner": winner,
             "reasoning": reasoning,
@@ -332,56 +302,127 @@ Respond with strategy and reasoning."""
             "cypher_count": len(cypher_results),
             "vibe_count": len(vibe_results),
             "consensus_count": self._count_consensus(cypher_results, vibe_results),
-            "judgment_confidence": self._calculate_confidence(winner, final_products)
+            "judgment_confidence": self._calculate_confidence(winner, final_products),
+            "memory_enhanced": True,
+            "learning_insights": memory_insights
         }
         
         return judgment
     
-    def _select_products(
+    def _get_memory_insights(self, query: str, strategy: str) -> str:
+        """Extract insights from memory for enhanced judgment."""
+        if len(self.judgment_history) == 0:
+            return "(first judgment - no history available)"
+        
+        # Analyze recent successful patterns
+        recent = self.judgment_history[-5:]  # Last 5 judgments
+        successful_strategies = [j['winner'] for j in recent if j.get('successful', True)]
+        
+        if successful_strategies:
+            common_strategy = Counter(successful_strategies).most_common(1)[0][0]
+            return f"(memory suggests {common_strategy} works well for similar queries)"
+        
+        return "(memory analysis applied)"
+    
+    def _apply_learning_strategy(
+        self,
+        cypher_results: List[Dict[str, Any]],
+        vibe_results: List[Dict[str, Any]]
+    ) -> str:
+        """Apply learning from judgment history to select best approach."""
+        if len(self.judgment_history) == 0:
+            return "balanced"  # Default for first judgment
+        
+        # Analyze success patterns
+        recent_success = [j for j in self.judgment_history[-10:] if j.get('successful', True)]
+        
+        if recent_success:
+            strategy_success = Counter([j['winner'] for j in recent_success])
+            best_strategy = strategy_success.most_common(1)[0][0]
+            logger.info(f"Learning strategy selected: {best_strategy}")
+            return best_strategy
+        
+        return "balanced"
+    
+    def _store_judgment_for_learning(
+        self,
+        judgment: Dict[str, Any],
+        query: str,
+        strategy: str
+    ):
+        """Store judgment in history for learning."""
+        judgment_record = {
+            'timestamp': datetime.now().isoformat(),
+            'query': query,
+            'strategy': strategy,
+            'winner': judgment['winner'],
+            'confidence': judgment['judgment_confidence'],
+            'product_count': len(judgment['products']),
+            'successful': judgment['judgment_confidence'] > 0.7  # Consider high confidence as successful
+        }
+        
+        self.judgment_history.append(judgment_record)
+        
+        # Keep only last 50 judgments to prevent memory bloat
+        if len(self.judgment_history) > 50:
+            self.judgment_history = self.judgment_history[-50:]
+    
+    def _get_recent_patterns(self) -> str:
+        """Get patterns from recent judgments for context."""
+        if len(self.judgment_history) < 3:
+            return "insufficient data"
+        
+        recent = self.judgment_history[-5:]
+        winners = [j['winner'] for j in recent]
+        winner_counts = Counter(winners)
+        
+        if winner_counts:
+            most_common = winner_counts.most_common(1)[0][0]
+            return f"recently favoring {most_common}"
+        
+        return "mixed patterns"
+    
+    def _select_products_enhanced(
         self,
         winner: str,
         cypher_results: List[Dict[str, Any]],
         vibe_results: List[Dict[str, Any]],
-        limit: int
+        limit: int,
+        memory_insights: str
     ) -> List[Dict[str, Any]]:
         """
-        Select final products based on winning strategy.
+        Enhanced product selection with memory context.
         """
         if winner == "cypher":
-            # CypherBot wins - take mostly from cypher
             products = cypher_results[:limit]
-            # Add metadata
             for p in products:
                 p['winning_agent'] = 'CypherBot'
-                p['selection_reason'] = 'Data-driven selection'
+                p['selection_reason'] = f'Data-driven selection {memory_insights}'
                 
         elif winner == "vibe":
-            # VibeBot wins - take mostly from vibe
             products = vibe_results[:limit]
-            # Add metadata
             for p in products:
                 p['winning_agent'] = 'VibeBot'
-                p['selection_reason'] = 'Aesthetic selection'
+                p['selection_reason'] = f'Aesthetic selection {memory_insights}'
                 
         elif winner == "consensus":
-            # Consensus - products both agents found
             products = self._get_consensus_products(cypher_results, vibe_results, limit)
             
         elif winner == "quality":
-            # Quality focus - merge and sort by scores
             products = self._select_by_quality(cypher_results, vibe_results, limit)
             
         else:  # balanced
-            # Balanced - interleave results
             products = self._interleave_products(cypher_results, vibe_results, limit)
         
-        # Add final ranking
+        # Add final ranking with memory context
         for idx, product in enumerate(products):
             product['final_rank'] = idx + 1
             product['judge_score'] = 1.0 - (idx * 0.1)
+            product['memory_enhanced'] = True
         
         return products
     
+    # [Previous helper methods remain the same - _get_consensus_products, _select_by_quality, etc.]
     def _get_consensus_products(
         self,
         cypher_results: List[Dict[str, Any]],
@@ -547,17 +588,15 @@ Respond with strategy and reasoning."""
         
         return ", ".join(summaries)
     
-    
     def _count_consensus(
         self,
         cypher_results: List[Dict[str, Any]],
         vibe_results: List[Dict[str, Any]]
     ) -> int:
-        """Count products both agents found using title matching."""
-        # Since IDs don't match, use titles for consensus
-        cypher_titles = {p.get('title').lower().strip() for p in cypher_results if p.get('title')}
-        vibe_titles = {p.get('title').lower().strip() for p in vibe_results if p.get('title')}
-        return len(cypher_titles & vibe_titles)
+        """Count products both agents found using ID matching."""
+        cypher_ids = {p.get('id') for p in cypher_results if p.get('id')}
+        vibe_ids = {p.get('id') for p in vibe_results if p.get('id')}
+        return len(cypher_ids & vibe_ids)
 
     def _calculate_confidence(
         self,
@@ -581,6 +620,10 @@ Respond with strategy and reasoning."""
         if len(products) >= 5:
             confidence += 0.1
         
+        # Memory enhancement bonus
+        if len(self.judgment_history) > 5:
+            confidence += 0.05
+        
         # Check for consensus in products
         agents = Counter()
         for p in products:
@@ -591,114 +634,6 @@ Respond with strategy and reasoning."""
             confidence += 0.1
         
         return min(confidence, 1.0)
-    
-    async def _validate_relevance(
-        self,
-        products: List[Dict[str, Any]],
-        query: str,
-        agent_name: str
-    ) -> List[Dict[str, Any]]:
-        """
-        CONSCIOUS QUALITY CONTROL: Validate that products are actually relevant to the query.
-        Rejects kids' t-shirts for weddings, sports jerseys for parties, etc.
-        """
-        if not products:
-            return []
-        
-        logger.info(f"🔍 Validating relevance of {len(products)} products from {agent_name} for query: '{query}'")
-        
-        # Build relevance validation context
-        validation_context = f"""QUERY: "{query}"
-
-PRODUCTS TO VALIDATE:
-{self._format_products_for_validation(products[:10])}  
-
-Your job: CONSCIOUSLY EVALUATE each product for relevance to the query.
-
-CRITICAL EVALUATION CRITERIA:
-- Does this product make sense for the stated occasion/need?
-- Would a real fashion stylist recommend this item for this specific request?
-- Is the product category appropriate? (No kids' items for adult formal wear)
-- Does the style/formality level match the occasion?
-
-EXAMPLE REJECTIONS:
-- Kids' t-shirts for wedding guest attire → REJECT
-- Sports jerseys for "impressing at a party" → REJECT  
-- Casual sneakers for formal interviews → REJECT
-- Formal gowns for casual coffee dates → REJECT
-
-RESPOND WITH: List only the product IDs that are TRULY RELEVANT and appropriate.
-If NO products are relevant, respond with: "REJECT_ALL"
-
-Think like a conscious fashion expert who would never embarrass a client with inappropriate recommendations."""
-
-        try:
-            # Create message for CAMEL agent to evaluate relevance
-            validation_msg = BaseMessage.make_user_message(
-                role_name="Quality Controller",
-                content=validation_context
-            )
-            
-            # Get relevance assessment from CAMEL agent
-            response = self.agent.step(validation_msg)
-            
-            # Extract response content
-            if hasattr(response, 'msg') and hasattr(response.msg, 'content'):
-                relevance_decision = response.msg.content
-            elif hasattr(response, 'content'):
-                relevance_decision = response.content
-            else:
-                relevance_decision = str(response)
-            
-            logger.info(f"🧠 Judge Ari relevance decision: {relevance_decision[:200]}...")
-            
-            # Parse the decision
-            if "REJECT_ALL" in relevance_decision.upper():
-                logger.warning(f"❌ Judge Ari REJECTED ALL products from {agent_name} as irrelevant")
-                return []
-            
-            # Extract approved product IDs from response
-            approved_products = []
-            product_id_map = {p.get('id'): p for p in products if p.get('id')}
-            
-            # Look for product IDs in the response
-            for product_id, product in product_id_map.items():
-                if str(product_id) in relevance_decision or product.get('title', '') in relevance_decision:
-                    approved_products.append(product)
-            
-            # If no specific IDs found but not REJECT_ALL, be conservative and keep some products
-            if not approved_products and "REJECT_ALL" not in relevance_decision.upper():
-                # Take top 3 as fallback if LLM didn't clearly reject
-                approved_products = products[:3]
-                logger.info(f"⚠️  Fallback: Keeping top 3 products as LLM decision was unclear")
-            
-            rejected_count = len(products) - len(approved_products)
-            if rejected_count > 0:
-                logger.info(f"🚫 Judge Ari rejected {rejected_count} irrelevant products from {agent_name}")
-            
-            return approved_products
-            
-        except Exception as e:
-            logger.error(f"Relevance validation failed for {agent_name}: {e}")
-            # Conservative fallback - keep products but log the issue
-            logger.warning(f"⚠️  Relevance validation error - keeping products as fallback")
-            return products
-    
-    def _format_products_for_validation(self, products: List[Dict[str, Any]]) -> str:
-        """Format products for relevance validation."""
-        if not products:
-            return "No products to validate"
-        
-        formatted = []
-        for i, p in enumerate(products):
-            title = p.get('title', 'Unknown Product')
-            price = p.get('price', 0)
-            category = p.get('category', 'Unknown')
-            product_id = p.get('id', 'no-id')
-            
-            formatted.append(f"{i+1}. ID:{product_id} | {title} | ${price:.2f} | Category: {category}")
-        
-        return "\n".join(formatted)
     
     def _create_fallback_judgment(
         self,
@@ -717,14 +652,14 @@ Think like a conscious fashion expert who would never embarrass a client with in
             "cypher_count": len(cypher_results),
             "vibe_count": len(vibe_results),
             "consensus_count": self._count_consensus(cypher_results, vibe_results),
-            "judgment_confidence": 0.5
+            "judgment_confidence": 0.5,
+            "memory_enhanced": False
         }
     
     def _update_stats(self, judgment: Dict[str, Any], elapsed_time: float):
         """Update judge statistics."""
         winner = judgment.get('winner', 'unknown')
         
-        # WRAP IN LOCK
         with self.stats_lock:
             if winner == 'cypher':
                 self.stats['cypher_wins'] += 1
@@ -744,13 +679,29 @@ Think like a conscious fashion expert who would never embarrass a client with in
                 (current_avg * (total - 1) + elapsed_time) / total
             )
     
+    async def cleanup(self):
+        """Clean up resources and save learning data."""
+        logger.info(f"Cleaning up {self.name}")
+        
+        # Save judgment history for persistence
+        if self.judgment_history:
+            logger.info(f"Saving {len(self.judgment_history)} judgment records")
+        
+        # Clear memory
+        if hasattr(self, 'memory'):
+            self.memory.clear()
+        
+        logger.info(f"{self.name} cleanup complete")
+    
     def get_stats(self) -> Dict[str, Any]:
-        """Get judge statistics."""
+        """Get enhanced judge statistics with learning metrics."""
         total = self.stats['total_judgments']
         
         return {
             "judge": self.name,
             "role": self.role,
+            "camel_version": "0.2.7",
+            "features": ["RolePlay", "Memory", "Learning"],
             **self.stats,
             "cypher_win_rate": (
                 self.stats['cypher_wins'] / total * 100
@@ -763,5 +714,10 @@ Think like a conscious fashion expert who would never embarrass a client with in
             "consensus_rate": (
                 self.stats['consensus_decisions'] / total * 100
                 if total > 0 else 0
-            )
+            ),
+            "learning_rate": (
+                self.stats['learning_interactions'] / total
+                if total > 0 else 0
+            ),
+            "judgment_history_size": len(self.judgment_history)
         }

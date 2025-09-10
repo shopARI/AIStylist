@@ -5,7 +5,8 @@ Configures CAMEL LongtermAgentMemory and session persistence
 
 import logging
 from typing import Dict, Any, Optional
-from lib.camel.v070 import create_memory, LongtermAgentMemory, ModelType
+from camel.memories import ChatHistoryMemory
+from camel.types import ModelType
 
 logger = logging.getLogger("memory.setup")
 
@@ -26,7 +27,7 @@ def create_memory_setup_function():
         model_type: ModelType = ModelType.GPT_4O_MINI,
         enable_vector: bool = True,
         enable_chat_history: bool = True
-    ) -> LongtermAgentMemory:
+    ) -> ChatHistoryMemory:
         """
         Set up memory for a specific agent.
         
@@ -38,17 +39,14 @@ def create_memory_setup_function():
             enable_chat_history: Enable chat history memory
             
         Returns:
-            Configured LongtermAgentMemory instance
+            Configured ChatHistoryMemory instance
         """
         try:
             logger.info(f"Setting up memory for agent: {agent_name}")
             
-            memory = create_memory(
-                token_limit=token_limit,
-                model_type=model_type,
-                enable_vector=enable_vector,
-                enable_chat_history=enable_chat_history
-            )
+            from camel.memories.context_creators import ScoreBasedContextCreator
+            context_creator = ScoreBasedContextCreator()
+            memory = ChatHistoryMemory(context_creator=context_creator, window_size=20)
             
             logger.info(f"Memory configured for {agent_name}: {token_limit} token limit")
             return memory

@@ -10,21 +10,58 @@ from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 import time
 
-from lib.camel.v070 import (
-    create_agent,
-    create_user_message,
-    BaseMessage,
-    ModelType,
-    ModelPlatformType,
-    CAMEL_AVAILABLE,
-    OpenAIEmbedding,
-    EMBEDDINGS_AVAILABLE
-)
+# Direct CAMEL 0.2.7 imports
+from camel.agents import ChatAgent
+from camel.models import ModelFactory
+from camel.messages import BaseMessage
+from camel.types import ModelType, ModelPlatformType
+try:
+    import camel
+    CAMEL_AVAILABLE = True
+    from camel.embeddings import OpenAIEmbedding
+    EMBEDDINGS_AVAILABLE = True
+except ImportError:
+    CAMEL_AVAILABLE = False
+    EMBEDDINGS_AVAILABLE = False
 
 from models.types import SearchIntent
 from services.nlp.fashion_knowledge import FASHION_KNOWLEDGE_BASE, get_relevant_knowledge
 
 logger = logging.getLogger("services.nlm.llm_intent_detector")
+
+def create_agent(system_message: str, model_type=ModelType.GPT_4O_MINI, temperature=0.7, max_tokens=4000):
+    '''Helper to create agents with CAMEL 0.2.7 API'''
+    
+    # Always create model first
+    model = ModelFactory.create(
+        model_platform=ModelPlatformType.OPENAI,
+        model_type=model_type,
+        model_config_dict={
+            "temperature": temperature,
+            "max_tokens": max_tokens
+        }
+    )
+    
+    # Create system message
+    system_msg = BaseMessage.make_assistant_message(
+        role_name="System",
+        content=system_message
+    )
+    
+    # Create agent with model
+    agent = ChatAgent(
+        system_message=system_msg,
+        model=model
+    )
+    
+    return agent
+
+def create_user_message(content: str):
+    '''Helper to create user messages with CAMEL 0.2.7 API'''
+    return BaseMessage.make_user_message(
+        role_name="User",
+        content=content
+    )
 
 @dataclass
 class LLMIntentResult:
@@ -254,13 +291,10 @@ Please analyze this fashion query and extract the structured information as JSON
             # Step 3: Send to LLM agent
             user_message = create_user_message(enhanced_query)
             
-            # Use compatibility bridge to handle different async method names
-            from lib.camel.v070 import CompatibilityBridge
-            async_method = CompatibilityBridge.check_async_method(self.agent)
-            
-            if async_method == 'step_async':
+            # Use CAMEL 0.2.7 agent methods directly
+            if hasattr(self.agent, 'step_async'):
                 response = await self.agent.step_async(user_message)
-            elif async_method == 'astep':
+            elif hasattr(self.agent, 'astep'):
                 response = await self.agent.astep(user_message)
             else:
                 # Fallback to synchronous step

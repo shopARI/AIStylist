@@ -14,7 +14,7 @@ from typing import Dict, Any, List, Optional
 
 # Version info
 __version__ = "1.0.0"
-__camel_version__ = "0.2.70"
+__camel_version__ = "0.2.7"
 
 # Import intelligence components
 from .coordinator import IntelligenceCoordinator

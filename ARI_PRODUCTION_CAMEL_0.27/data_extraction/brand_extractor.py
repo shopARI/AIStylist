@@ -9,13 +9,16 @@ import json
 from typing import Dict, List, Any, Optional, Set
 from dataclasses import dataclass
 
-from lib.camel.v070 import (
-    create_agent,
-    create_user_message,
-    BaseMessage,
-    ModelType,
-    CAMEL_AVAILABLE
-)
+# Direct CAMEL 0.2.7 imports
+from camel.agents import ChatAgent
+from camel.models import ModelFactory
+from camel.messages import BaseMessage
+from camel.types import ModelType, ModelPlatformType
+try:
+    import camel
+    CAMEL_AVAILABLE = True
+except ImportError:
+    CAMEL_AVAILABLE = False
 
 from .extractor_base import BaseExtractor, ProductData
 

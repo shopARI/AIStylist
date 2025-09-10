@@ -10,6 +10,7 @@ Based on enhanced_recommender_manager_async.py patterns.
 import time
 import logging
 import asyncio
+import os
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime
 from collections import defaultdict
@@ -122,9 +123,10 @@ class IntelligenceCoordinator:
 
     @asynccontextmanager
     async def get_neo4j_session(self) -> AsyncContextManager[AsyncSession]:
-        """Get session from pool"""
+        """Get session from pool with database selection"""
         if self.neo4j_pool:
-            async with self.neo4j_pool.session() as session:
+            database = os.getenv("NEO4J_DATABASE", "neo4j")
+            async with self.neo4j_pool.session(database=database) as session:
                 yield session
         else:
             yield None

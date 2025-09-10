@@ -419,7 +419,7 @@ class ProductRetrieverService:
         query: str,
         limit: int = 10,
         filters: Optional[Dict[str, Any]] = None,
-        score_threshold: float = 0.1
+        score_threshold: float = 0.0
     ) -> List[Dict[str, Any]]:
         """
         Search products using natural language query.
@@ -852,12 +852,13 @@ class ProductRetrieverService:
                 "range": range_filter
             })
         
-        if colors:
-            for color in colors:
-                must_conditions.append({
-                    "key": "primary_color",
-                    "match": {"value": color}
-                })
+        # DISABLED: primary_color field doesn't have required index in Qdrant
+        # if colors:
+        #     for color in colors:
+        #         must_conditions.append({
+        #             "key": "primary_color",
+        #             "match": {"value": color}
+        #         })
         
         if tags:
             for tag in tags:
@@ -878,11 +879,12 @@ class ProductRetrieverService:
         """Build Qdrant filter from dictionary."""
         must_conditions = []
         
-        if 'category' in filters:
-            must_conditions.append({
-                "key": "categories",
-                "match": {"any": [filters['category']]}
-            })
+        # DISABLED: categories field doesn't have required index in Qdrant
+        # if 'category' in filters:
+        #     must_conditions.append({
+        #         "key": "categories", 
+        #         "match": {"any": [filters['category']]}
+        #     })
         
         if 'min_price' in filters:
             must_conditions.append({
@@ -896,12 +898,13 @@ class ProductRetrieverService:
                 "range": {"lte": filters['max_price']}
             })
         
-        if 'colors' in filters and isinstance(filters['colors'], list):
-            for color in filters['colors']:
-                must_conditions.append({
-                    "key": "primary_color",
-                    "match": {"value": color}
-                })
+        # DISABLED: primary_color field doesn't have required index in Qdrant
+        # if 'colors' in filters and isinstance(filters['colors'], list):
+        #     for color in filters['colors']:
+        #         must_conditions.append({
+        #             "key": "primary_color", 
+        #             "match": {"value": color}
+        #         })
         
         if 'tags' in filters and isinstance(filters['tags'], list):
             for tag in filters['tags']:

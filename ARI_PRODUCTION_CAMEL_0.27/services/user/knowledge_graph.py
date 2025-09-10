@@ -8,6 +8,7 @@ import logging
 import json
 import datetime
 import asyncio
+import os
 from typing import Dict, List, Any, Optional, Tuple, Set
 import uuid
 import hashlib
@@ -107,7 +108,8 @@ class UserKnowledgeGraphService:
                 )
                 
                 # Test the connection
-                async with self.driver.session() as session:
+                database = os.getenv("NEO4J_DATABASE", "neo4j")
+                async with self.driver.session(database=database) as session:
                     await session.run("RETURN 1")
                 
                 logger.info("Successfully initialized Neo4j driver")
@@ -208,7 +210,8 @@ class UserKnowledgeGraphService:
             Query results
         """
         try:
-            async with self.driver.session() as session:
+            database = os.getenv("NEO4J_DATABASE", "neo4j")
+            async with self.driver.session(database=database) as session:
                 result = await session.run(query_str, params)
                 records = []
                 

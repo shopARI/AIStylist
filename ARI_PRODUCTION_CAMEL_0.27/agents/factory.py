@@ -1,5 +1,5 @@
 """
-Agent Factory for CAMEL 0.2.70
+Agent Factory for CAMEL 0.2.7
 Production implementation with agent pooling, memory management, and cleanup
 """
 
@@ -13,14 +13,16 @@ import weakref
 
 logger = logging.getLogger("agents.factory")
 
-# Import from CAMEL 0.2.70 wrapper
-from lib.camel.v070 import (
-    create_agent,
-    create_stylist_agent,
-    create_memory,
-    CAMEL_AVAILABLE,
-    ModelType
-)
+# Direct CAMEL 0.2.7 imports
+from camel.agents import ChatAgent
+from camel.models import ModelFactory
+from camel.memories import ChatHistoryMemory
+from camel.types import ModelType, ModelPlatformType
+try:
+    import camel
+    CAMEL_AVAILABLE = True
+except ImportError:
+    CAMEL_AVAILABLE = False
 
 # Import prompts from configuration
 from config.prompts import (
@@ -172,7 +174,7 @@ class AgentPool:
 
 class AgentFactory:
     """
-    Production agent factory for CAMEL 0.2.70.
+    Production agent factory for CAMEL 0.2.7.
     Manages agent lifecycle with pooling, memory management, and metrics.
     """
     
@@ -193,7 +195,7 @@ class AgentFactory:
             enable_metrics: Enable metrics collection
         """
         if not CAMEL_AVAILABLE:
-            raise RuntimeError("CAMEL 0.2.70 or higher is required")
+            raise RuntimeError("CAMEL 0.2.7 or higher is required")
         
         self.enable_pooling = enable_pooling
         self.enable_metrics = enable_metrics

@@ -1,6 +1,6 @@
 """
 VibeBot Agent - Qdrant Aesthetic Intelligence
-Clean CAMEL 0.2.70 implementation
+Clean CAMEL 0.2.7 implementation
 """
 
 import logging
@@ -11,13 +11,13 @@ from datetime import datetime
 
 logger = logging.getLogger("agents.vibe_bot")
 
-# Import from our new CAMEL 0.2.70 module
-from lib.camel.v070 import (
-    create_battle_agent,
-    create_user_message,
-    BaseMessage,
-    CAMEL_AVAILABLE
-)
+# Direct CAMEL 0.2.7 imports
+from camel.agents import ChatAgent
+from camel.models import ModelFactory
+from camel.memories import ChatHistoryMemory
+from camel.societies import RolePlaying
+from camel.messages import BaseMessage
+from camel.types import ModelType, ModelPlatformType, RoleType
 
 # Import prompts
 from config.prompts import VIBEBOT_PROMPT
@@ -26,7 +26,7 @@ class VibeBotAgent:
     """
     VibeBot - Aesthetic-driven fashion intelligence using Qdrant.
     
-    Clean implementation with CAMEL 0.2.70 patterns:
+    Clean implementation with CAMEL 0.2.7 patterns:
     - Uses ModelFactory to create models
     - Passes model objects to ChatAgent
     - Direct string system messages
@@ -44,20 +44,12 @@ class VibeBotAgent:
         self.name = "VibeBot"
         self.style = "aesthetic-similarity"
         
-        # Initialize CAMEL agent using 0.2.70 pattern
-        if not CAMEL_AVAILABLE:
-            raise RuntimeError("CAMEL 0.2.70+ is required for VibeBot")
+        # Initialize CAMEL 0.2.7 components
+        self._initialize_camel_agent()
+        self._initialize_memory()
+        self._initialize_roleplay()
         
-        try:
-            self.agent = create_battle_agent(
-                name=self.name,
-                system_message=VIBEBOT_PROMPT
-            )
-            logger.info(f"{self.name} initialized with CAMEL 0.2.70")
-            
-        except Exception as e:
-            logger.error(f"Failed to initialize {self.name}: {e}")
-            raise RuntimeError(f"VibeBot initialization failed: {e}") from e
+        logger.info(f"{self.name} initialized with CAMEL 0.2.7, RolePlay, and aesthetic intelligence")
         
         # Track statistics
         self.stats = {
@@ -67,6 +59,56 @@ class VibeBotAgent:
             "total_products_found": 0,
             "avg_search_time": 0.0
         }
+
+    def _initialize_camel_agent(self):
+        """Initialize the main CAMEL ChatAgent for aesthetic intelligence"""
+        try:
+            model = ModelFactory.create(
+                model_platform=ModelPlatformType.DEFAULT,
+                model_type=ModelType.GPT_4O,
+                model_config_dict={
+                    "temperature": 0.8,  # Higher creativity for aesthetic decisions
+                    "max_tokens": 2000
+                }
+            )
+            
+            self.agent = ChatAgent(
+                system_message=BaseMessage.make_assistant_message(
+                    role_name="Aesthetic Stylist",
+                    content=VIBEBOT_PROMPT
+                ),
+                model=model
+            )
+            
+            logger.info("VibeBot CAMEL agent initialized successfully")
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize CAMEL agent: {e}")
+            raise RuntimeError(f"VibeBot CAMEL initialization failed: {e}") from e
+
+    def _initialize_memory(self):
+        """Initialize ChatHistoryMemory for aesthetic pattern learning"""
+        try:
+            from camel.memories.context_creators import ScoreBasedContextCreator
+            context_creator = ScoreBasedContextCreator()
+            self.memory = ChatHistoryMemory(context_creator=context_creator, window_size=25)
+            logger.info("VibeBot aesthetic memory system initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize memory: {e}")
+            self.memory = None
+
+    def _initialize_roleplay(self):
+        """Initialize RolePlaying society for aesthetic collaboration"""
+        try:
+            self.role_playing = RolePlaying(
+                assistant_role_name="Aesthetic Stylist",
+                user_role_name="Style Analyst",
+                task_prompt="Collaborate on aesthetic fashion analysis, style matching, and visual harmony for optimal product recommendations"
+            )
+            logger.info("VibeBot RolePlay aesthetic society initialized")
+        except Exception as e:
+            logger.error(f"Failed to initialize RolePlay: {e}")
+            self.role_playing = None
     
     async def search(
         self,
@@ -86,6 +128,9 @@ class VibeBotAgent:
         logger.info(f"{self.name} searching: query='{query[:50]}...', filters={filters}")
         
         try:
+            # BATTLE DEBUG: Print when called during battle
+            print(f"   🎯 VibeBot: Called with query='{query[:30]}...', filters={filters is not None}")
+            
             # Get strategy from CAMEL agent
             logger.debug("Getting agent strategy...")
             strategy_start = datetime.now()
@@ -94,6 +139,7 @@ class VibeBotAgent:
             )
             strategy_time = (datetime.now() - strategy_start).total_seconds()
             logger.debug(f"Strategy determined in {strategy_time:.2f}s: {strategy[:100]}...")
+            print(f"   🎯 VibeBot: Strategy: {strategy[:50]}...")
             
             # Execute strategy
             logger.debug("Executing strategy...")
@@ -103,6 +149,7 @@ class VibeBotAgent:
             )
             exec_time = (datetime.now() - exec_start).total_seconds()
             logger.debug(f"Strategy executed in {exec_time:.2f}s, got {len(results)} results")
+            print(f"   🎯 VibeBot: Strategy returned {len(results)} results in {exec_time:.2f}s")
             
             # Update statistics
             elapsed = (datetime.now() - start_time).total_seconds()
@@ -133,30 +180,14 @@ class VibeBotAgent:
             logger.debug(f"Calling Qdrant with enhanced_query: '{enhanced_query[:50]}...'")
             search_start = asyncio.get_event_loop().time()
             
-            # ENHANCED: Use category-based filtering when available
+            # FIXED: Don't use Qdrant filters that may not have indexes - use text enhancement instead
             qdrant_filters = None
-            if filters and 'category' in filters:
-                # Try to use category filtering - fall back gracefully if fields don't exist
-                try:
-                    qdrant_filters = {
-                        "must": [
-                            {
-                                "key": "category",
-                                "match": {
-                                    "value": filters['category']
-                                }
-                            }
-                        ]
-                    }
-                    logger.debug(f"Using Qdrant category filter: {filters['category']}")
-                except Exception as e:
-                    logger.debug(f"Category filtering not available, using text-only search: {e}")
-                    qdrant_filters = None
             
             results = await self.qdrant.search_by_natural_language(
                 query=enhanced_query,
                 limit=limit,
-                filters=qdrant_filters  # Use category filters when available
+                filters=qdrant_filters,  # Use category filters when available
+                score_threshold=0.2  # BALANCED: 20% similarity to find more results while avoiding garbage
             )
             
             search_time = asyncio.get_event_loop().time() - search_start
@@ -255,7 +286,10 @@ Respond with the strategy name and brief explanation."""
         
         try:
             # Create message for agent
-            user_msg = create_user_message(context)
+            user_msg = BaseMessage.make_user_message(
+                role_name="Style Analyst",
+                content=context
+            )
             
             # Get response from CAMEL agent
             response = self.agent.step(user_msg)
@@ -304,7 +338,10 @@ Respond with the strategy name and brief explanation."""
             results.extend(await self._color_based_search(query, limit, filters, ml_intelligence))
         
         if "style" in strategy_lower or "trend" in strategy_lower:
-            results.extend(await self._style_search(enhanced_query, limit, filters))
+            print(f"   🎯 VibeBot: Executing STYLE search with query: '{enhanced_query}'")
+            style_results = await self._style_search(enhanced_query, limit, filters)
+            print(f"   🎯 VibeBot: Style search returned {len(style_results)} results")
+            results.extend(style_results)
         
         # Always include some general results
         if len(results) < limit:
@@ -441,7 +478,8 @@ Respond with the strategy name and brief explanation."""
             results = await self.qdrant.search_by_natural_language(
                 query=enhanced_query,
                 limit=limit,
-                filters=filters
+                filters=filters,
+                score_threshold=0.2  # BALANCED: 20% similarity for style searches
             )
             
             products = []
@@ -454,6 +492,9 @@ Respond with the strategy name and brief explanation."""
             
         except Exception as e:
             logger.error(f"Style search failed: {e}")
+            print(f"   🎯 VibeBot: Style search ERROR: {e}")
+            import traceback
+            traceback.print_exc()
             return []
     
     async def _general_search(
@@ -470,7 +511,8 @@ Respond with the strategy name and brief explanation."""
             results = await self.qdrant.search_by_natural_language(
                 query=query,
                 limit=limit,
-                filters=filters
+                filters=filters,
+                score_threshold=0.2  # BALANCED: 20% similarity for general searches
             )
             
             products = []
