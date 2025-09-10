@@ -182,15 +182,15 @@ class CypherBotAgent:
             search_terms.extend(filters["colors"])
             logger.debug(f"Added color terms: {filters['colors']}")
         
-        # FALLBACK: If no search terms but we have occasion, use professional terms
+        # FALLBACK: If no search terms but we have occasion, use occasion-specific terms
         if not search_terms and "occasion" in filters:
             occasion = filters["occasion"].lower()
-            if "interview" in occasion or "work" in occasion or "business" in occasion:
+            if "wedding" in occasion or "formal" in occasion:
+                search_terms = ["dress", "formal", "elegant", "gown"]
+                logger.info(f"Using wedding fallback terms for {occasion}: {search_terms}")
+            elif "interview" in occasion or "work" in occasion or "business" in occasion or "professional" in occasion:
                 search_terms = ["suit", "shirt", "blazer", "dress", "professional"]
                 logger.info(f"Using professional fallback terms for {occasion}: {search_terms}")
-            elif "wedding" in occasion:
-                search_terms = ["dress", "formal", "elegant", "gown"]
-                logger.info(f"Using wedding fallback terms: {search_terms}")
         
         if not search_terms:
             logger.warning("No search terms extracted from filters")
@@ -214,7 +214,8 @@ class CypherBotAgent:
             base_conditions = ["p.id IS NOT NULL", "p.title CONTAINS $first_term"]
             
             if category_filter:
-                base_conditions.append("(p.category CONTAINS $category_filter OR p.title CONTAINS $category_filter)")
+                # Only use title field since p.category doesn't exist in Neo4j schema
+                base_conditions.append("p.title CONTAINS $category_filter")
                 params["category_filter"] = category_filter
             
             if exclude_sports:
@@ -235,7 +236,8 @@ class CypherBotAgent:
             base_conditions = ["p.id IS NOT NULL", "ALL(term IN $search_terms WHERE p.title CONTAINS term)"]
             
             if category_filter:
-                base_conditions.append("(p.category CONTAINS $category_filter OR p.title CONTAINS $category_filter)")
+                # Only use title field since p.category doesn't exist in Neo4j schema
+                base_conditions.append("p.title CONTAINS $category_filter")
                 params["category_filter"] = category_filter
             
             if exclude_sports:

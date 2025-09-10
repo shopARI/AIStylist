@@ -187,7 +187,7 @@ class VibeBotAgent:
                 query=enhanced_query,
                 limit=limit,
                 filters=qdrant_filters,  # Use category filters when available
-                score_threshold=0.2  # BALANCED: 20% similarity to find more results while avoiding garbage
+                score_threshold=0.0  # EMERGENCY: 0% threshold - embeddings quality is very poor
             )
             
             search_time = asyncio.get_event_loop().time() - search_start
@@ -479,7 +479,7 @@ Respond with the strategy name and brief explanation."""
                 query=enhanced_query,
                 limit=limit,
                 filters=filters,
-                score_threshold=0.2  # BALANCED: 20% similarity for style searches
+                score_threshold=0.0  # EMERGENCY: 0% threshold - embeddings quality is very poor
             )
             
             products = []
@@ -512,7 +512,7 @@ Respond with the strategy name and brief explanation."""
                 query=query,
                 limit=limit,
                 filters=filters,
-                score_threshold=0.2  # BALANCED: 20% similarity for general searches
+                score_threshold=0.0  # EMERGENCY: 0% threshold - embeddings quality is very poor
             )
             
             products = []
