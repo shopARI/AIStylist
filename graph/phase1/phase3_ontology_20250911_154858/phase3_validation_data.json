@@ -1,0 +1,179 @@
+{
+  "timestamp": "2025-09-11T15:48:58.018959",
+  "validation_results": {
+    "color_nodes": 11,
+    "style_nodes": 11,
+    "occasion_nodes": 6,
+    "pricetier_nodes": 3,
+    "complements_relationships": 29,
+    "compatible_with_relationships": 4,
+    "suitable_for_relationships": 7,
+    "has_color_relationships": 142946,
+    "has_style_relationships": 16426
+  },
+  "ontology_structure": {
+    "color_complements": {
+      "red": [
+        "white",
+        "black",
+        "navy",
+        "beige",
+        "gray"
+      ],
+      "blue": [
+        "white",
+        "gray",
+        "beige",
+        "yellow",
+        "orange"
+      ],
+      "black": [
+        "white",
+        "gray",
+        "red",
+        "pink",
+        "gold"
+      ],
+      "white": [
+        "navy",
+        "black",
+        "red",
+        "blue",
+        "green"
+      ],
+      "navy": [
+        "white",
+        "beige",
+        "red",
+        "pink",
+        "gray"
+      ],
+      "gray": [
+        "white",
+        "black",
+        "yellow",
+        "pink",
+        "blue"
+      ],
+      "green": [
+        "white",
+        "beige",
+        "brown",
+        "navy",
+        "gray"
+      ],
+      "brown": [
+        "white",
+        "beige",
+        "green",
+        "orange",
+        "gold"
+      ],
+      "pink": [
+        "white",
+        "gray",
+        "navy",
+        "black",
+        "beige"
+      ],
+      "beige": [
+        "navy",
+        "brown",
+        "white",
+        "black",
+        "green"
+      ],
+      "gold": [
+        "black",
+        "navy",
+        "brown",
+        "white",
+        "red"
+      ]
+    },
+    "style_compatibility": {
+      "casual": [
+        "trendy",
+        "comfortable",
+        "relaxed"
+      ],
+      "formal": [
+        "business",
+        "elegant",
+        "professional"
+      ],
+      "business": [
+        "professional",
+        "formal",
+        "smart"
+      ],
+      "trendy": [
+        "casual",
+        "modern",
+        "fashionable"
+      ],
+      "comfortable": [
+        "casual",
+        "relaxed",
+        "easy"
+      ],
+      "elegant": [
+        "formal",
+        "sophisticated",
+        "refined"
+      ],
+      "professional": [
+        "business",
+        "formal",
+        "smart"
+      ],
+      "relaxed": [
+        "casual",
+        "comfortable",
+        "easy"
+      ],
+      "fashionable": [
+        "trendy",
+        "modern",
+        "stylish"
+      ],
+      "sophisticated": [
+        "elegant",
+        "refined",
+        "formal"
+      ]
+    },
+    "occasion_styles": {
+      "wedding": [
+        "formal",
+        "elegant",
+        "sophisticated"
+      ],
+      "office": [
+        "business",
+        "professional",
+        "formal"
+      ],
+      "casual_day": [
+        "casual",
+        "comfortable",
+        "relaxed"
+      ],
+      "date_night": [
+        "elegant",
+        "trendy",
+        "fashionable"
+      ],
+      "gym": [
+        "comfortable",
+        "athletic",
+        "functional"
+      ],
+      "party": [
+        "trendy",
+        "fashionable",
+        "fun"
+      ]
+    }
+  }
+}

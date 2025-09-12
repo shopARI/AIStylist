@@ -98,8 +98,8 @@ def generate_balanced_enhanced_embeddings(limit: Optional[int] = None):
         print(f"   Style compatibility: {len(style_compatibility_map)} mappings")
         print(f"   Occasion mappings: {len(style_occasions_map)} mappings")
         
-        # Step 4: Process in large optimized batches for maximum speed
-        batch_size = 100  # Increased for faster production run
+        # Step 4: Process in large optimized batches for maximum speed  
+        batch_size = 800   # Optimized for A100 - safely under Qdrant's 33.5MB payload limit
         processed = 0
         
         print(f"\\n🚀 Generating balanced enhanced embeddings...")
