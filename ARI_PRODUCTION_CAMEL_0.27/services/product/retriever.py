@@ -50,7 +50,7 @@ class ProductRetrieverService:
         qdrant_url: Optional[str] = None,
         qdrant_api_key: Optional[str] = None,
         collection_name: Optional[str] = None,
-        embedding_model: str = "text-embedding-3-small",
+        embedding_model: str = "text-embedding-ada-002",
         embedding_timeout: float = 30.0,
         embedding_cache_size: int = 1000,
         query_timeout: float = 90.0,
