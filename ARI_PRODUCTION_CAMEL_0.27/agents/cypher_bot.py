@@ -306,6 +306,7 @@ class CypherBotAgent:
                             # Add CypherBot relevance score based on position and query match
                             query_match_score = self._calculate_relevance_score(product_data, query, len(products))
                             product_data['cypher_score'] = query_match_score
+                            product_data['score'] = query_match_score  # Map to standard score field
                             product_data['agent'] = 'CypherBot'
                             products.append(product_data)
                             if len(products) <= 3:  # Log first 3 accepted products

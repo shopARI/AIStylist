@@ -170,6 +170,15 @@ class VibeBotAgent:
     async def _semantic_search(self, query: str, limit: int, filters: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
         logger.debug(f">>> _semantic_search: query='{query[:50]}...', limit={limit}")
         try:
+            # Convert plural filter keys to singular for compatibility
+            if filters:
+                if 'categories' in filters and filters['categories']:
+                    filters['category'] = filters['categories'][0] if isinstance(filters['categories'], list) else filters['categories']
+                    logger.debug(f"Converted categories to category: {filters['category']}")
+                if 'occasions' in filters and filters['occasions']:
+                    filters['occasion'] = filters['occasions'][0] if isinstance(filters['occasions'], list) else filters['occasions']
+                    logger.debug(f"Converted occasions to occasion: {filters['occasion']}")
+            
             # Enhance query with filter terms instead of using metadata filters
             enhanced_query = query
             if filters:
@@ -190,7 +199,7 @@ class VibeBotAgent:
                 query=enhanced_query,
                 limit=limit,
                 filters=qdrant_filters,  # Use category filters when available
-                score_threshold=0.5  # Balanced threshold - good similarity without being too strict
+                score_threshold=0.3  # Lower threshold for debugging - ensure results are returned
             )
             
             search_time = asyncio.get_event_loop().time() - search_start
@@ -463,7 +472,7 @@ Respond with the strategy name and brief explanation."""
                 query=enhanced_query,
                 limit=limit,
                 filters=filters,
-                score_threshold=0.5  # Balanced threshold - good similarity without being too strict
+                score_threshold=0.3  # Lower threshold for debugging - ensure results are returned
             )
             
             products = []
@@ -496,7 +505,7 @@ Respond with the strategy name and brief explanation."""
                 query=query,
                 limit=limit,
                 filters=filters,
-                score_threshold=0.5  # Balanced threshold - good similarity without being too strict
+                score_threshold=0.3  # Lower threshold for debugging - ensure results are returned
             )
             
             products = []
