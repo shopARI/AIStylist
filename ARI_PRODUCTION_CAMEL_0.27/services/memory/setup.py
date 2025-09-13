@@ -45,7 +45,10 @@ def create_memory_setup_function():
             logger.info(f"Setting up memory for agent: {agent_name}")
             
             from camel.memories.context_creators import ScoreBasedContextCreator
-            context_creator = ScoreBasedContextCreator()
+            from camel.utils.token_counting import OpenAITokenCounter
+            
+            token_counter = OpenAITokenCounter(model=ModelType.GPT_4O)
+            context_creator = ScoreBasedContextCreator(token_counter=token_counter, token_limit=token_limit)
             memory = ChatHistoryMemory(context_creator=context_creator, window_size=20)
             
             logger.info(f"Memory configured for {agent_name}: {token_limit} token limit")

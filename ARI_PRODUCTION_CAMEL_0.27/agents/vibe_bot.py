@@ -90,7 +90,10 @@ class VibeBotAgent:
         """Initialize ChatHistoryMemory for aesthetic pattern learning"""
         try:
             from camel.memories.context_creators import ScoreBasedContextCreator
-            context_creator = ScoreBasedContextCreator()
+            from camel.utils.token_counting import OpenAITokenCounter
+            
+            token_counter = OpenAITokenCounter(model=ModelType.GPT_4O)
+            context_creator = ScoreBasedContextCreator(token_counter=token_counter, token_limit=4000)
             self.memory = ChatHistoryMemory(context_creator=context_creator, window_size=25)
             logger.info("VibeBot aesthetic memory system initialized")
         except Exception as e:
@@ -187,7 +190,7 @@ class VibeBotAgent:
                 query=enhanced_query,
                 limit=limit,
                 filters=qdrant_filters,  # Use category filters when available
-                score_threshold=0.0  # EMERGENCY: 0% threshold - embeddings quality is very poor
+                score_threshold=0.5  # Balanced threshold - good similarity without being too strict
             )
             
             search_time = asyncio.get_event_loop().time() - search_start
@@ -327,26 +330,10 @@ Respond with the strategy name and brief explanation."""
         # Enhance query based on strategy
         enhanced_query = self._enhance_query(query, strategy, ml_intelligence)
         
-        # Execute based on strategy keywords
-        if "semantic" in strategy_lower or "natural" in strategy_lower:
-            results.extend(await self._semantic_search(enhanced_query, limit, filters))
-        
-        if "visual" in strategy_lower or "similar" in strategy_lower:
-            results.extend(await self._visual_similarity_search(query, limit, filters, ml_intelligence))
-        
-        if "color" in strategy_lower:
-            results.extend(await self._color_based_search(query, limit, filters, ml_intelligence))
-        
-        if "style" in strategy_lower or "trend" in strategy_lower:
-            print(f"   🎯 VibeBot: Executing STYLE search with query: '{enhanced_query}'")
-            style_results = await self._style_search(enhanced_query, limit, filters)
-            print(f"   🎯 VibeBot: Style search returned {len(style_results)} results")
-            results.extend(style_results)
-        
-        # Always include some general results
-        if len(results) < limit:
-            general = await self._general_search(query, limit - len(results), filters)
-            results.extend(general)
+        # Use semantic search for all strategies (most reliable approach)
+        print(f"   🎯 VibeBot: Using semantic search for all strategies with query: '{enhanced_query}'")
+        results = await self._semantic_search(enhanced_query, limit, filters)
+        print(f"   🎯 VibeBot: Semantic search returned {len(results)} results")
         
         # Deduplicate and rank
         unique_results = self._deduplicate_and_rank(results, query)
@@ -355,8 +342,9 @@ Respond with the strategy name and brief explanation."""
         for idx, product in enumerate(unique_results[:limit]):
             product['vibe_rank'] = idx + 1
             product['agent'] = self.name
-            product['search_method'] = 'aesthetic_similarity'
+            product['search_method'] = 'semantic_similarity'
             product['vibe_score'] = 1.0 - (idx * 0.1)
+            product['vibe_reason'] = f"Semantic match for {strategy.lower()} strategy"
         
         return unique_results[:limit]
     
@@ -431,19 +419,15 @@ Respond with the strategy name and brief explanation."""
                 colors = [c for c in color_keywords if c in query_lower]
             
             if colors:
-                # Use filter-based search for colors
-                results = await self.qdrant.get_products_by_filter(
-                    colors=colors[:3],
-                    limit=limit
-                )
+                # Use semantic search with color-enhanced query (filter-based search disabled in Qdrant)
+                enhanced_query = f"{query} {' '.join(colors)}"
+                results = await self._semantic_search(enhanced_query, limit, filters)
                 
-                products = []
+                # Add color reasoning to results
                 for product in results:
-                    # New graph guarantees p.id is UUID format
-                    product['vibe_reason'] = f"Color match: {', '.join(colors[:2])}"
-                    products.append(product)
+                    product['vibe_reason'] = f"Semantic color match: {', '.join(colors[:2])}"
                 
-                return products
+                return results
             else:
                 # No colors detected, use general search
                 return await self._general_search(query, limit, filters)
@@ -479,7 +463,7 @@ Respond with the strategy name and brief explanation."""
                 query=enhanced_query,
                 limit=limit,
                 filters=filters,
-                score_threshold=0.0  # EMERGENCY: 0% threshold - embeddings quality is very poor
+                score_threshold=0.5  # Balanced threshold - good similarity without being too strict
             )
             
             products = []
@@ -512,7 +496,7 @@ Respond with the strategy name and brief explanation."""
                 query=query,
                 limit=limit,
                 filters=filters,
-                score_threshold=0.0  # EMERGENCY: 0% threshold - embeddings quality is very poor
+                score_threshold=0.5  # Balanced threshold - good similarity without being too strict
             )
             
             products = []

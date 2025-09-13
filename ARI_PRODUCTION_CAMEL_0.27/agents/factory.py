@@ -275,11 +275,23 @@ class AgentFactory:
         start_time = datetime.now()
         
         try:
-            agent = create_stylist_agent(
-                personality=ARI_STYLIST_PROMPT,
-                memory=memory,
-                temperature=temperature,
-                max_tokens=max_tokens
+            model = ModelFactory.create(
+                model_platform=ModelPlatformType.DEFAULT,
+                model_type=ModelType.GPT_4O,
+                model_config_dict={
+                    "temperature": temperature,
+                    "max_tokens": max_tokens
+                }
+            )
+            
+            from camel.messages import BaseMessage
+            agent = ChatAgent(
+                system_message=BaseMessage.make_assistant_message(
+                    role_name="Fashion Stylist",
+                    content=ARI_STYLIST_PROMPT
+                ),
+                model=model,
+                memory=memory
             )
             
             # Set metadata
@@ -513,12 +525,24 @@ class AgentFactory:
         start_time = datetime.now()
         
         try:
-            agent = create_agent(
-                system_message=system_message,
-                temperature=temperature,
-                max_tokens=max_tokens,
-                tools=tools,
-                memory=memory
+            model = ModelFactory.create(
+                model_platform=ModelPlatformType.DEFAULT,
+                model_type=ModelType.GPT_4O,
+                model_config_dict={
+                    "temperature": temperature,
+                    "max_tokens": max_tokens
+                }
+            )
+            
+            from camel.messages import BaseMessage
+            agent = ChatAgent(
+                system_message=BaseMessage.make_assistant_message(
+                    role_name="AI Assistant",
+                    content=system_message
+                ),
+                model=model,
+                memory=memory,
+                tools=tools
             )
             
             # Set metadata

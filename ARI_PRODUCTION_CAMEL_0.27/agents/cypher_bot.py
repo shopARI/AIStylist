@@ -76,7 +76,10 @@ class CypherBotAgent:
         """Initialize ChatHistoryMemory for learning patterns"""
         try:
             from camel.memories.context_creators import ScoreBasedContextCreator
-            context_creator = ScoreBasedContextCreator()
+            from camel.utils.token_counting import OpenAITokenCounter
+            
+            token_counter = OpenAITokenCounter(model=ModelType.GPT_4O)
+            context_creator = ScoreBasedContextCreator(token_counter=token_counter, token_limit=4000)
             self.memory = ChatHistoryMemory(context_creator=context_creator, window_size=20)
             logger.info("CypherBot memory system initialized")
         except Exception as e:
@@ -198,7 +201,6 @@ class CypherBotAgent:
         
         # Initialize params first
         params = {
-            "search_terms": search_terms,
             "limit": limit
         }
         
@@ -225,15 +227,17 @@ class CypherBotAgent:
             MATCH (p:Product)
             WHERE {' AND '.join(base_conditions)}
             RETURN p
-            ORDER BY 
-                CASE WHEN p.title CONTAINS 'black' AND p.title CONTAINS 'shirt' THEN 0 ELSE 1 END,
-                p.price ASC
+            ORDER BY p.price ASC
             LIMIT $limit
             """
             params["first_term"] = search_terms[0]
         else:
-            # FAST multi-term query with optional sports exclusion
-            base_conditions = ["p.id IS NOT NULL", "ALL(term IN $search_terms WHERE p.title CONTAINS term)"]
+            # FAST multi-term query with optional sports exclusion - Fixed syntax
+            base_conditions = ["p.id IS NOT NULL"]
+            # Add individual CONTAINS conditions for each search term
+            for i, term in enumerate(search_terms):
+                base_conditions.append(f"p.title CONTAINS $term_{i}")
+                params[f"term_{i}"] = term
             
             if category_filter:
                 # Only use title field since p.category doesn't exist in Neo4j schema
@@ -247,9 +251,7 @@ class CypherBotAgent:
             MATCH (p:Product)
             WHERE {' AND '.join(base_conditions)}
             RETURN p
-            ORDER BY 
-                CASE WHEN p.title CONTAINS 'black' AND p.title CONTAINS 'shirt' THEN 0 ELSE 1 END,
-                p.price ASC
+            ORDER BY p.price ASC
             LIMIT $limit
             """
         

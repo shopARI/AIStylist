@@ -85,6 +85,7 @@ try:
     import torch
     import torchvision.models as models
     import torchvision.transforms as transforms
+    from torchvision.models import ResNet50_Weights, ResNet101_Weights, EfficientNet_B0_Weights, ViT_B_16_Weights
     from PIL import Image
     import numpy as np
     PYTORCH_AVAILABLE = True
@@ -374,44 +375,44 @@ class VisualIntelligence:
         with self.gpu_manager.managed_execution():
             if self.model_name == 'resnet50':
                 # ResNet50 - good balance of speed and accuracy (default)
-                self.image_model = models.resnet50(pretrained=True)
+                self.image_model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
                 self.image_model = torch.nn.Sequential(*list(self.image_model.children())[:-1])
                 self.embedding_dim = 2048
                 
             elif self.model_name == 'resnet101':
                 # ResNet101 - higher accuracy, slower
-                self.image_model = models.resnet101(pretrained=True)
+                self.image_model = models.resnet101(weights=ResNet101_Weights.DEFAULT)
                 self.image_model = torch.nn.Sequential(*list(self.image_model.children())[:-1])
                 self.embedding_dim = 2048
                 
             elif self.model_name == 'efficientnet_b0':
                 # EfficientNet - best efficiency
                 try:
-                    self.image_model = models.efficientnet_b0(pretrained=True)
+                    self.image_model = models.efficientnet_b0(weights=EfficientNet_B0_Weights.DEFAULT)
                     self.image_model.classifier = torch.nn.Identity()
                     self.embedding_dim = 1280
                 except AttributeError:
                     # Fallback to ResNet50 if EfficientNet not available
                     logger.warning("EfficientNet not available, falling back to ResNet50")
-                    self.image_model = models.resnet50(pretrained=True)
+                    self.image_model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
                     self.image_model = torch.nn.Sequential(*list(self.image_model.children())[:-1])
                     self.embedding_dim = 2048
                     
             elif self.model_name == 'vit_b_16':
                 # Vision Transformer - state of the art
                 try:
-                    self.image_model = models.vit_b_16(pretrained=True)
+                    self.image_model = models.vit_b_16(weights=ViT_B_16_Weights.DEFAULT)
                     self.image_model.heads = torch.nn.Identity()
                     self.embedding_dim = 768
                 except AttributeError:
                     logger.warning("ViT not available, falling back to ResNet50")
-                    self.image_model = models.resnet50(pretrained=True)
+                    self.image_model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
                     self.image_model = torch.nn.Sequential(*list(self.image_model.children())[:-1])
                     self.embedding_dim = 2048
             else:
                 # Default to ResNet50
                 logger.warning(f"Unknown model {self.model_name}, using ResNet50")
-                self.image_model = models.resnet50(pretrained=True)
+                self.image_model = models.resnet50(weights=ResNet50_Weights.DEFAULT)
                 self.image_model = torch.nn.Sequential(*list(self.image_model.children())[:-1])
                 self.embedding_dim = 2048
             

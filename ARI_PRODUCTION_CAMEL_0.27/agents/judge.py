@@ -88,7 +88,10 @@ class JudgeAriAgent:
         """Initialize ChatHistoryMemory for learning judgment patterns"""
         try:
             from camel.memories.context_creators import ScoreBasedContextCreator
-            context_creator = ScoreBasedContextCreator()
+            from camel.utils.token_counting import OpenAITokenCounter
+            
+            token_counter = OpenAITokenCounter(model=ModelType.GPT_4O)
+            context_creator = ScoreBasedContextCreator(token_counter=token_counter, token_limit=4000)
             self.memory = ChatHistoryMemory(context_creator=context_creator, window_size=20)
             logger.info("Judge Ari memory system initialized")
         except Exception as e:

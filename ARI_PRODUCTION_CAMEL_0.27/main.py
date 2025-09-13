@@ -7,7 +7,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, HTTPException, Depends, WebSocket, WebSocketDisconnect, BackgroundTasks, Request
 from fastapi.responses import Response
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel, Field, field_validator
 import time
 from slowapi import Limiter, _rate_limit_exceeded_handler
 from slowapi.util import get_remote_address
@@ -69,7 +69,8 @@ class ChatMessage(BaseModel):
     session_id: str = Field(..., max_length=MAX_SESSION_ID_LENGTH, description="Required session identifier for conversation continuity")
     user_id: str = Field(..., max_length=MAX_USER_ID_LENGTH, description="Required user identifier for personalization")
     
-    @validator('message')
+    @field_validator('message')
+    @classmethod
     def validate_message_content(cls, v):
         if not v.strip():
             raise ValueError("Message cannot be empty")
@@ -80,7 +81,8 @@ class ChatMessage(BaseModel):
             raise ValueError("Message contains potentially dangerous content")
         return v.strip()
     
-    @validator('session_id', 'user_id')
+    @field_validator('session_id', 'user_id')
+    @classmethod
     def validate_ids(cls, v):
         if not v.strip():
             raise ValueError("ID cannot be empty")
