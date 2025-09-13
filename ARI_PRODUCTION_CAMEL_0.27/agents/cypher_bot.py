@@ -156,6 +156,31 @@ class CypherBotAgent:
         except Exception as e:
             logger.error(f"!!! {self.name} search failed: {e}", exc_info=True)
             return []
+    
+    def _calculate_relevance_score(self, product_data: Dict[str, Any], query: str, position: int) -> float:
+        """Calculate relevance score for CypherBot results based on text matching and position."""
+        try:
+            title = product_data.get('title', '').lower()
+            query_lower = query.lower()
+            
+            # Base score starts high for graph-matched results
+            score = 0.8
+            
+            # Boost for exact query term matches in title
+            query_terms = query_lower.split()
+            for term in query_terms:
+                if term in title:
+                    score += 0.1
+            
+            # Small position penalty (first results are better)
+            position_penalty = position * 0.01
+            score = max(0.5, score - position_penalty)  # Minimum 0.5 for validated results
+            
+            return min(1.0, score)  # Cap at 1.0
+            
+        except Exception as e:
+            logger.warning(f"Score calculation error: {e}")
+            return 0.75  # Default good score for graph results
 
     async def _filtered_search(self, filters: Optional[Dict[str, Any]], limit: int, query: str = "") -> List[Dict[str, Any]]:
         logger.debug(f">>> _filtered_search START: filters={filters}, limit={limit}")
@@ -278,9 +303,13 @@ class CypherBotAgent:
                     if product_id:
                         # ENHANCED: Add category validation post-processing
                         if self._validate_product_category(product_data, filters):
+                            # Add CypherBot relevance score based on position and query match
+                            query_match_score = self._calculate_relevance_score(product_data, query, len(products))
+                            product_data['cypher_score'] = query_match_score
+                            product_data['agent'] = 'CypherBot'
                             products.append(product_data)
                             if len(products) <= 3:  # Log first 3 accepted products
-                                logger.debug(f"  Product {len(products)}: {product_data.get('title', 'NO_TITLE')[:30]}")
+                                logger.debug(f"  Product {len(products)}: {product_data.get('title', 'NO_TITLE')[:30]} (score: {query_match_score:.2f})")
                         else:
                             filtered_count += 1
                             logger.debug(f"  Filtered out: {product_data.get('title', 'NO_TITLE')[:30]} - wrong category")
