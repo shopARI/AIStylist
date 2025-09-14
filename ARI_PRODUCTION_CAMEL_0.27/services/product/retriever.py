@@ -404,6 +404,8 @@ class ProductRetrieverService:
             
             if points:
                 product_data = map_fashion_product(points[0].payload)
+                if product_data is None:
+                    return None  # Skip products without proper UUID
                 product = Product(product_data)
                 return product.to_full()
             
@@ -472,6 +474,8 @@ class ProductRetrieverService:
             for idx, point in enumerate(points):
                 if hasattr(point, 'payload'):
                     product_data = map_fashion_product(point.payload)
+                    if product_data is None:
+                        continue  # Skip products without proper UUID
                     product = Product(product_data)
                     
                     # Create recommendation dict
@@ -581,6 +585,8 @@ class ProductRetrieverService:
             for point in points:
                 if hasattr(point, 'payload'):
                     product_data = map_fashion_product(point.payload)
+                    if product_data is None:
+                        continue  # Skip products without proper UUID
                     product = Product(product_data)
                     products.append(product.to_full())
             
@@ -647,6 +653,8 @@ class ProductRetrieverService:
                         continue
                     
                     product_data = map_fashion_product(point.payload)
+                    if product_data is None:
+                        continue  # Skip products without proper UUID
                     product = Product(product_data)
                     
                     recommendation = product.to_recommendation(
@@ -712,6 +720,8 @@ class ProductRetrieverService:
             for point in points:
                 if hasattr(point, 'payload'):
                     product_data = map_fashion_product(point.payload)
+                    if product_data is None:
+                        continue  # Skip products without proper UUID
                     products.append((product_data, product_data.get('popularity_score', 0)))
             
             # Sort by popularity score

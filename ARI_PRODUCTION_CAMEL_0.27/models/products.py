@@ -130,10 +130,10 @@ class Product:
             if key not in FASHION_TO_STANDARD_FIELD_MAP:
                 normalized[key] = value
         
-        # Ensure ID exists
+        # Ensure ID exists and is UUID format (critical for Neo4j consistency)
         if "id" not in normalized and "product_id" not in normalized:
-            normalized["id"] = str(uuid.uuid4())
-            logger.warning(f"Generated UUID for product without ID: {normalized['id']}")
+            # Instead of generating random UUID, reject product to maintain consistency
+            raise ValueError("Product missing UUID - cannot maintain Neo4j consistency")
         
         # Apply defaults for missing fields
         for field, default_value in DEFAULT_FIELD_VALUES.items():
@@ -452,7 +452,7 @@ def map_fashion_product(product: Dict[str, Any]) -> Dict[str, Any]:
         product: Fashion format product
         
     Returns:
-        Standard format product
+        Standard format product, or None if invalid UUID
     """
     if not product:
         return product
@@ -460,6 +460,13 @@ def map_fashion_product(product: Dict[str, Any]) -> Dict[str, Any]:
     try:
         p = Product(product)
         return p.to_dict()
+    except ValueError as e:
+        if "missing UUID" in str(e):
+            logger.warning(f"Skipping product without UUID to maintain Neo4j consistency: {product.get('title', 'Unknown')}")
+            return None  # Return None for invalid products
+        else:
+            logger.error(f"Error mapping product: {e}")
+            return product
     except Exception as e:
         logger.error(f"Error mapping product: {e}")
         return product
