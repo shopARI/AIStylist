@@ -132,7 +132,7 @@ class VibeBotAgent:
         
         try:
             # BATTLE DEBUG: Print when called during battle
-            print(f"   🎯 VibeBot: Called with query='{query[:30]}...', filters={filters is not None}")
+            print(f"   VibeBot: Called with query='{query[:30]}...', filters={filters is not None}")
             
             # Get strategy from CAMEL agent
             logger.debug("Getting agent strategy...")
@@ -142,7 +142,7 @@ class VibeBotAgent:
             )
             strategy_time = (datetime.now() - strategy_start).total_seconds()
             logger.debug(f"Strategy determined in {strategy_time:.2f}s: {strategy[:100]}...")
-            print(f"   🎯 VibeBot: Strategy: {strategy[:50]}...")
+            print(f"   VibeBot: Strategy: {strategy[:50]}...")
             
             # Execute strategy
             logger.debug("Executing strategy...")
@@ -152,7 +152,7 @@ class VibeBotAgent:
             )
             exec_time = (datetime.now() - exec_start).total_seconds()
             logger.debug(f"Strategy executed in {exec_time:.2f}s, got {len(results)} results")
-            print(f"   🎯 VibeBot: Strategy returned {len(results)} results in {exec_time:.2f}s")
+            print(f"   VibeBot: Strategy returned {len(results)} results in {exec_time:.2f}s")
             
             # Update statistics
             elapsed = (datetime.now() - start_time).total_seconds()
@@ -196,7 +196,7 @@ class VibeBotAgent:
             qdrant_filters = None
             
             # DIAGNOSTIC: Log the embedding model being used
-            logger.info(f"🔍 VibeBot using embedding model: {self.qdrant.embedding_model}")
+            logger.info(f"VibeBot using embedding model: {self.qdrant.embedding_model}")
             
             results = await self.qdrant.search_by_natural_language(
                 query=enhanced_query,
@@ -343,9 +343,9 @@ Respond with the strategy name and brief explanation."""
         enhanced_query = self._enhance_query(query, strategy, ml_intelligence)
         
         # Use semantic search for all strategies (most reliable approach)
-        print(f"   🎯 VibeBot: Using semantic search for all strategies with query: '{enhanced_query}'")
+        print(f"   VibeBot: Using semantic search for all strategies with query: '{enhanced_query}'")
         results = await self._semantic_search(enhanced_query, limit, filters)
-        print(f"   🎯 VibeBot: Semantic search returned {len(results)} results")
+        print(f"   VibeBot: Semantic search returned {len(results)} results")
         
         # Deduplicate and rank
         unique_results = self._deduplicate_and_rank(results, query)
@@ -488,7 +488,7 @@ Respond with the strategy name and brief explanation."""
             
         except Exception as e:
             logger.error(f"Style search failed: {e}")
-            print(f"   🎯 VibeBot: Style search ERROR: {e}")
+            print(f"   VibeBot: Style search ERROR: {e}")
             import traceback
             traceback.print_exc()
             return []

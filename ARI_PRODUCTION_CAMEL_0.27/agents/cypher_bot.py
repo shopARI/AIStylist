@@ -117,17 +117,17 @@ class CypherBotAgent:
         
         try:
             # BATTLE DEBUG: Print when called during battle  
-            print(f"   🤖 CypherBot: Called with query='{query[:30]}...', filters={filters is not None}")
+            print(f"   CypherBot: Called with query='{query[:30]}...', filters={filters is not None}")
             
             # STEP 1: GET INTELLIGENT REASONING STRATEGY (like VibeBot does!)
-            logger.info("🧠 CypherBot: Engaging CAMEL agent for intelligent reasoning...")
+            logger.info("CypherBot: Engaging CAMEL agent for intelligent reasoning...")
             strategy_start = datetime.now()
             strategy = await self._get_intelligent_strategy(
                 query, ml_intelligence, filters, user_context
             )
             strategy_time = (datetime.now() - strategy_start).total_seconds()
-            logger.info(f"🧠 Intelligent strategy determined in {strategy_time:.2f}s: {strategy[:100]}...")
-            print(f"   🤖 CypherBot: Strategy: {strategy[:50]}...")
+            logger.info(f"Intelligent strategy determined in {strategy_time:.2f}s: {strategy[:100]}...")
+            print(f"   CypherBot: Strategy: {strategy[:50]}...")
             
             # STEP 2: EXECUTE INTELLIGENT STRATEGY
             logger.debug("Executing intelligent graph strategy...")
@@ -137,7 +137,7 @@ class CypherBotAgent:
             )
             exec_time = (datetime.now() - exec_start).total_seconds()
             logger.debug(f"Intelligent strategy executed in {exec_time:.2f}s, got {len(results)} results")
-            print(f"   🤖 CypherBot: Strategy returned {len(results)} results in {exec_time:.2f}s")
+            print(f"   CypherBot: Strategy returned {len(results)} results in {exec_time:.2f}s")
             
             # Add metadata to the results
             for idx, product in enumerate(results):
@@ -502,7 +502,7 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
             else:
                 strategy = str(response)
             
-            logger.info(f"🧠 CypherBot intelligent strategy: {strategy[:200]}...")
+            logger.info(f"CypherBot intelligent strategy: {strategy[:200]}...")
             return strategy
             
         except Exception as e:
@@ -528,7 +528,7 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
         strategy_lower = strategy.lower()
         results = []
         
-        logger.info(f"🧠 Executing intelligent strategy: {strategy_lower[:50]}...")
+        logger.info(f"Executing intelligent strategy: {strategy_lower[:50]}...")
         
         # Extract intelligent filter guidance from strategy
         intelligent_filters = self._extract_intelligent_filters(strategy, query, filters)
@@ -567,7 +567,7 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
             product['score'] = graph_score  # Map to standard score field for battle display
             product['intelligence_applied'] = True
         
-        logger.info(f"🧠 Intelligent strategy returned {len(unique_results[:limit])} products")
+        logger.info(f"Intelligent strategy returned {len(unique_results[:limit])} products")
         return unique_results[:limit]
 
     def _extract_intelligent_filters(
@@ -617,7 +617,7 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
             if extracted_params.get('occasions'):
                 intelligent_filters['occasion'] = extracted_params['occasions'][0]
         
-        logger.info(f"🧠 Intelligent filters extracted: {intelligent_filters}")
+        logger.info(f"Intelligent filters extracted: {intelligent_filters}")
         return intelligent_filters
 
     async def _collaborative_graph_search(

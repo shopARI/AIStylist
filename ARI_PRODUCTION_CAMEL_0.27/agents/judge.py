@@ -144,14 +144,14 @@ class JudgeAriAgent:
         
         try:
             # STEP 1: CONSCIOUS RELEVANCE VALIDATION - Reject garbage results
-            logger.info("🧠 Judge Ari: Applying conscious quality control...")
+            logger.info("Judge Ari: Applying conscious quality control...")
             
             filtered_cypher = await self._validate_relevance(cypher_results, query, "CypherBot")
             filtered_vibe = await self._validate_relevance(vibe_results, query, "VibeBot")
             
             # STEP 2: Check if we have acceptable results
             if not filtered_cypher and not filtered_vibe:
-                logger.warning("⚠️  Judge Ari: ALL PRODUCTS REJECTED - No relevant results found!")
+                logger.warning("WARNING: Judge Ari: ALL PRODUCTS REJECTED - No relevant results found!")
                 return {
                     "winner": "rejected",
                     "reasoning": "All products were irrelevant to the query and consciously rejected",
@@ -166,7 +166,7 @@ class JudgeAriAgent:
                 }
             
             # Log quality control results
-            logger.info(f"✅ Quality control results: CypherBot {len(cypher_results)}→{len(filtered_cypher)}, VibeBot {len(vibe_results)}→{len(filtered_vibe)}")
+            logger.info(f"Quality control results: CypherBot {len(cypher_results)}->{len(filtered_cypher)}, VibeBot {len(vibe_results)}->{len(filtered_vibe)}")
             
             # STEP 3: Get judgment strategy from CAMEL agent (using filtered results)
             strategy = await self._get_judgment_strategy(
@@ -310,7 +310,7 @@ Respond with strategy and reasoning."""
         cypher_quality = self._calculate_independent_quality(cypher_results, query)
         vibe_quality = self._calculate_independent_quality(vibe_results, query)
         
-        logger.info(f"🧠 Judge Ari independent assessment: CypherBot={cypher_quality:.3f}, VibeBot={vibe_quality:.3f}")
+        logger.info(f"Judge Ari independent assessment: CypherBot={cypher_quality:.3f}, VibeBot={vibe_quality:.3f}")
         
         # Score-independent decision based on actual product quality
         quality_diff = abs(cypher_quality - vibe_quality)
@@ -705,7 +705,7 @@ Respond with strategy and reasoning."""
         if not products:
             return []
         
-        logger.info(f"🔍 Validating relevance of {len(products)} products from {agent_name} for query: '{query}'")
+        logger.info(f"Validating relevance of {len(products)} products from {agent_name} for query: '{query}'")
         
         # Build relevance validation context
         validation_context = f"""QUERY: "{query}"
@@ -750,11 +750,11 @@ Think like a conscious fashion expert who would never embarrass a client with in
             else:
                 relevance_decision = str(response)
             
-            logger.info(f"🧠 Judge Ari relevance decision: {relevance_decision[:200]}...")
+            logger.info(f"Judge Ari relevance decision: {relevance_decision[:200]}...")
             
             # Parse the decision
             if "REJECT_ALL" in relevance_decision.upper():
-                logger.warning(f"❌ Judge Ari REJECTED ALL products from {agent_name} as irrelevant")
+                logger.warning(f"Judge Ari REJECTED ALL products from {agent_name} as irrelevant")
                 return []
             
             # Extract approved product IDs from response
@@ -770,18 +770,18 @@ Think like a conscious fashion expert who would never embarrass a client with in
             if not approved_products and "REJECT_ALL" not in relevance_decision.upper():
                 # Take top 3 as fallback if LLM didn't clearly reject
                 approved_products = products[:3]
-                logger.info(f"⚠️  Fallback: Keeping top 3 products as LLM decision was unclear")
+                logger.info(f"WARNING: Fallback: Keeping top 3 products as LLM decision was unclear")
             
             rejected_count = len(products) - len(approved_products)
             if rejected_count > 0:
-                logger.info(f"🚫 Judge Ari rejected {rejected_count} irrelevant products from {agent_name}")
+                logger.info(f"Judge Ari rejected {rejected_count} irrelevant products from {agent_name}")
             
             return approved_products
             
         except Exception as e:
             logger.error(f"Relevance validation failed for {agent_name}: {e}")
             # Conservative fallback - keep products but log the issue
-            logger.warning(f"⚠️  Relevance validation error - keeping products as fallback")
+            logger.warning(f"WARNING: Relevance validation error - keeping products as fallback")
             return products
     
     def _format_products_for_validation(self, products: List[Dict[str, Any]]) -> str:
