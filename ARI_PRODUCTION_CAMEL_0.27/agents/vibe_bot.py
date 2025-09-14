@@ -195,6 +195,9 @@ class VibeBotAgent:
             # FIXED: Don't use Qdrant filters that may not have indexes - use text enhancement instead
             qdrant_filters = None
             
+            # DIAGNOSTIC: Log the embedding model being used
+            logger.info(f"🔍 VibeBot using embedding model: {self.qdrant.embedding_model}")
+            
             results = await self.qdrant.search_by_natural_language(
                 query=enhanced_query,
                 limit=limit,

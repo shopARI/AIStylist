@@ -231,7 +231,8 @@ class VerboseBattleExecutor(BattleExecutor):
             if results:
                 print(f"   🤖 CypherBot: Top result confidence levels:")
                 for i, product in enumerate(results[:3]):
-                    score = product.get('neo4j_score', 0)
+                    # Try multiple score fields that CypherBot might use
+                    score = product.get('score', product.get('neo4j_score', product.get('cypher_score', 0)))
                     title = product.get('title', 'Unknown')[:40]
                     print(f"      #{i+1}: {title}... (score: {score:.3f})")
             
@@ -263,7 +264,8 @@ class VerboseBattleExecutor(BattleExecutor):
             if results:
                 print(f"   🎯 VibeBot: Top result similarity scores:")
                 for i, product in enumerate(results[:3]):
-                    score = product.get('qdrant_score', 0)
+                    # Try multiple score fields that VibeBot might use
+                    score = product.get('score', product.get('vibe_score', product.get('qdrant_score', 0)))
                     title = product.get('title', 'Unknown')[:40]
                     print(f"      #{i+1}: {title}... (similarity: {score:.3f})")
             else:
