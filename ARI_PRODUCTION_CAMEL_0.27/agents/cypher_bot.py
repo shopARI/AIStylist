@@ -558,10 +558,13 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
         # Deduplicate and rank by graph intelligence
         unique_results = self._deduplicate_and_rank_graph_results(results, query, strategy)
         
-        # Add intelligent metadata
+        # Add intelligent metadata with proper scoring
         for idx, product in enumerate(unique_results[:limit]):
             product['cypher_rank'] = idx + 1
-            product['graph_score'] = 1.0 - (idx * 0.1)
+            # Calculate proper graph score based on position and intelligence
+            graph_score = 1.0 - (idx * 0.05)  # Smaller penalty for better scores
+            product['graph_score'] = graph_score
+            product['score'] = graph_score  # Map to standard score field for battle display
             product['intelligence_applied'] = True
         
         logger.info(f"🧠 Intelligent strategy returned {len(unique_results[:limit])} products")

@@ -305,22 +305,44 @@ Respond with strategy and reasoning."""
         """
         strategy_lower = strategy.lower()
         
-        # Determine winner based on strategy
-        if "cypher" in strategy_lower or "data" in strategy_lower:
-            winner = "cypher"
-            reasoning = "Data-driven approach is most suitable for this query"
-        elif "vibe" in strategy_lower or "aesthetic" in strategy_lower:
-            winner = "vibe"
-            reasoning = "Aesthetic approach is most suitable for this query"
+        # More balanced winner determination - consider scores and quality, not just keywords
+        cypher_avg_score = sum(p.get('score', 0) for p in cypher_results) / max(len(cypher_results), 1)
+        vibe_avg_score = sum(p.get('score', 0) for p in vibe_results) / max(len(vibe_results), 1)
+        
+        # Score-based evaluation with keyword hints
+        if "aesthetic" in strategy_lower or "visual" in strategy_lower or "style" in strategy_lower:
+            # Vibe-favoring strategy
+            if vibe_avg_score >= 0.8 or vibe_avg_score > cypher_avg_score + 0.1:
+                winner = "vibe"
+                reasoning = "High-quality aesthetic matches found through semantic search"
+            else:
+                winner = "balanced"
+                reasoning = "Balanced selection combining aesthetic and data insights"
+        elif "data" in strategy_lower or "graph" in strategy_lower or "relationship" in strategy_lower:
+            # Cypher-favoring strategy  
+            if cypher_avg_score >= 0.9 or cypher_avg_score > vibe_avg_score + 0.1:
+                winner = "cypher"
+                reasoning = "Strong graph relationships and data patterns found"
+            else:
+                winner = "balanced"
+                reasoning = "Balanced selection combining data and aesthetic insights"
         elif "consensus" in strategy_lower:
             winner = "consensus"
             reasoning = "Both agents agree on the best products"
         elif "quality" in strategy_lower:
-            winner = "quality"
+            winner = "quality"  
             reasoning = "Selecting highest quality products from both agents"
         else:
-            winner = "balanced"
-            reasoning = "Balanced selection from both agents"
+            # Default to quality-based selection instead of arbitrary choice
+            if abs(cypher_avg_score - vibe_avg_score) < 0.05:
+                winner = "balanced"
+                reasoning = "Similar quality results - balanced selection from both agents"
+            elif cypher_avg_score > vibe_avg_score:
+                winner = "cypher"
+                reasoning = "Graph search found higher quality matches"
+            else:
+                winner = "vibe"
+                reasoning = "Semantic search found higher quality matches"
         
         # Select products based on winner
         final_products = self._select_products(
