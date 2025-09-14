@@ -303,46 +303,39 @@ Respond with strategy and reasoning."""
         Returns:
             Judgment dictionary with winner and final products
         """
-        strategy_lower = strategy.lower()
+        # SCORE-INDEPENDENT EVALUATION: Judge Ari evaluates products directly
+        # Ignore agent-reported scores and assess intrinsic product quality
         
-        # More balanced winner determination - consider scores and quality, not just keywords
-        cypher_avg_score = sum(p.get('score', 0) for p in cypher_results) / max(len(cypher_results), 1)
-        vibe_avg_score = sum(p.get('score', 0) for p in vibe_results) / max(len(vibe_results), 1)
+        # Calculate independent quality scores for each agent's results
+        cypher_quality = self._calculate_independent_quality(cypher_results, query)
+        vibe_quality = self._calculate_independent_quality(vibe_results, query)
         
-        # Score-based evaluation with keyword hints
-        if "aesthetic" in strategy_lower or "visual" in strategy_lower or "style" in strategy_lower:
-            # Vibe-favoring strategy
-            if vibe_avg_score >= 0.8 or vibe_avg_score > cypher_avg_score + 0.1:
-                winner = "vibe"
-                reasoning = "High-quality aesthetic matches found through semantic search"
-            else:
-                winner = "balanced"
-                reasoning = "Balanced selection combining aesthetic and data insights"
-        elif "data" in strategy_lower or "graph" in strategy_lower or "relationship" in strategy_lower:
-            # Cypher-favoring strategy  
-            if cypher_avg_score >= 0.9 or cypher_avg_score > vibe_avg_score + 0.1:
-                winner = "cypher"
-                reasoning = "Strong graph relationships and data patterns found"
-            else:
-                winner = "balanced"
-                reasoning = "Balanced selection combining data and aesthetic insights"
-        elif "consensus" in strategy_lower:
-            winner = "consensus"
-            reasoning = "Both agents agree on the best products"
-        elif "quality" in strategy_lower:
-            winner = "quality"  
-            reasoning = "Selecting highest quality products from both agents"
+        logger.info(f"🧠 Judge Ari independent assessment: CypherBot={cypher_quality:.3f}, VibeBot={vibe_quality:.3f}")
+        
+        # Score-independent decision based on actual product quality
+        quality_diff = abs(cypher_quality - vibe_quality)
+        
+        if quality_diff < 0.1:
+            # Very similar quality - select balanced approach
+            winner = "balanced"
+            reasoning = f"Both agents found similar quality products (CypherBot: {cypher_quality:.2f}, VibeBot: {vibe_quality:.2f})"
+        elif cypher_quality > vibe_quality + 0.1:
+            winner = "cypher"
+            reasoning = f"CypherBot found higher quality products ({cypher_quality:.2f} vs {vibe_quality:.2f})"
+        elif vibe_quality > cypher_quality + 0.1:
+            winner = "vibe"
+            reasoning = f"VibeBot found higher quality products ({vibe_quality:.2f} vs {cypher_quality:.2f})"
         else:
-            # Default to quality-based selection instead of arbitrary choice
-            if abs(cypher_avg_score - vibe_avg_score) < 0.05:
-                winner = "balanced"
-                reasoning = "Similar quality results - balanced selection from both agents"
-            elif cypher_avg_score > vibe_avg_score:
+            # Close call - use count as tiebreaker
+            if len(cypher_results) > len(vibe_results):
                 winner = "cypher"
-                reasoning = "Graph search found higher quality matches"
-            else:
+                reasoning = f"CypherBot found more relevant products ({len(cypher_results)} vs {len(vibe_results)})"
+            elif len(vibe_results) > len(cypher_results):
                 winner = "vibe"
-                reasoning = "Semantic search found higher quality matches"
+                reasoning = f"VibeBot found more relevant products ({len(vibe_results)} vs {len(cypher_results)})"
+            else:
+                winner = "balanced"
+                reasoning = "Equal quality and quantity - balanced selection"
         
         # Select products based on winner
         final_products = self._select_products(
@@ -361,6 +354,88 @@ Respond with strategy and reasoning."""
         }
         
         return judgment
+    
+    def _calculate_independent_quality(
+        self,
+        products: List[Dict[str, Any]], 
+        query: str
+    ) -> float:
+        """
+        Calculate independent product quality score ignoring agent-reported scores.
+        
+        Evaluates based on:
+        - Product completeness (title, price, images, description)
+        - Query relevance (title/description matching)
+        - Commercial viability (price reasonableness, availability)
+        - Data quality (no missing fields)
+        
+        Returns:
+            Average quality score (0.0 to 1.0)
+        """
+        if not products:
+            return 0.0
+        
+        total_quality = 0.0
+        query_terms = set(query.lower().split())
+        
+        for product in products:
+            quality = 0.0
+            
+            # 1. COMPLETENESS ASSESSMENT (0.4 points max)
+            title = product.get('title', '').strip()
+            price = product.get('price', 0)
+            images = product.get('images', [])
+            description = product.get('description', '').strip()
+            
+            if title:
+                quality += 0.15  # Has title
+            if price and price > 0:
+                quality += 0.1   # Has valid price
+            if images and len(images) > 0:
+                quality += 0.1   # Has images
+            if description:
+                quality += 0.05  # Has description
+            
+            # 2. QUERY RELEVANCE (0.3 points max)
+            title_lower = title.lower()
+            desc_lower = description.lower()
+            
+            # Count query term matches in title (higher weight)
+            title_matches = sum(1 for term in query_terms if term in title_lower)
+            quality += min(0.2, title_matches * 0.1)
+            
+            # Count query term matches in description (lower weight)
+            desc_matches = sum(1 for term in query_terms if term in desc_lower)
+            quality += min(0.1, desc_matches * 0.05)
+            
+            # 3. COMMERCIAL VIABILITY (0.2 points max)
+            if price:
+                # Reasonable price range (not too cheap/expensive)
+                if 5 <= price <= 500:
+                    quality += 0.1
+                elif 1 <= price <= 1000:
+                    quality += 0.05
+            
+            # In stock bonus
+            if product.get('in_stock', True):
+                quality += 0.05
+            
+            # Has size info
+            if product.get('size') or product.get('sizes'):
+                quality += 0.05
+            
+            # 4. DATA QUALITY (0.1 points max)
+            # No missing critical fields
+            critical_fields = ['title', 'price']
+            missing_fields = sum(1 for field in critical_fields if not product.get(field))
+            quality += max(0, 0.1 - (missing_fields * 0.05))
+            
+            total_quality += min(1.0, quality)  # Cap individual product at 1.0
+        
+        avg_quality = total_quality / len(products)
+        
+        logger.debug(f"Independent quality assessment: {len(products)} products, avg={avg_quality:.3f}")
+        return avg_quality
     
     def _select_products(
         self,
