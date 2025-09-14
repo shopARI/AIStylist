@@ -14,6 +14,7 @@ from services.user.knowledge_graph import UserKnowledgeGraphService
 from services.ml.intelligence.coordinator import IntelligenceCoordinator
 from services.memory import get_session_store
 from services.memory.session_memory import get_enhanced_session_memory
+from services.memory.coordinator import get_unified_memory_coordinator
 from services.cache.redis_client import RedisService, FallbackRedisService
 
 logger = logging.getLogger("services.application")
@@ -58,6 +59,9 @@ class ApplicationService:
         # Enhanced session memory with persistence
         self.session_memory = get_enhanced_session_memory(redis_client)
         
+        # Unified memory coordinator for comprehensive memory management
+        self.memory_coordinator = get_unified_memory_coordinator(redis_client)
+        
         # NLP tools - USE HYBRID LLM INTENT DETECTION
         self.intent_detector = get_hybrid_intent_detector(strategy=DetectionStrategy.LLM_FIRST)
         self.parameter_extractor = ParameterExtractor()
@@ -82,15 +86,54 @@ class ApplicationService:
             await self.redis_client.set_json(session_key, session_data, ttl=86400)  # 24 hour TTL
             
         try:
-            # 1. Get enhanced session memory context
-            session_context = await self.session_memory.get_session_context(session_id, context_turns=5)
-            stored_preferences = await self.session_memory.get_user_preferences(session_id, user_id)
+            # 1. Get comprehensive enhanced context from unified memory coordinator
+            enhanced_context = await self.memory_coordinator.get_enhanced_context(
+                session_id=session_id,
+                user_id=user_id,
+                current_query=message,
+                intent=None,  # Will be determined after intent detection
+                include_similar_conversations=True,
+                include_user_preferences=True,
+                max_similar_contexts=3
+            )
             
-            # Enhance message with memory context if available
+            # Extract components for backward compatibility
+            session_context = enhanced_context.get('session_context', '')
+            user_context_data = enhanced_context.get('user_context', {})
+            similar_conversations = enhanced_context.get('similar_conversations', [])
+            memory_insights = enhanced_context.get('memory_insights', {})
+            
+            # Get user preferences from unified context (more comprehensive than session-only)
+            stored_preferences = {}
+            if user_context_data and user_context_data.get('active_preferences'):
+                for category, prefs in user_context_data['active_preferences'].items():
+                    # Convert preference format for compatibility
+                    stored_preferences[category] = [p['value'] for p in prefs[:3] if p['confidence'] > 0.4]
+            
+            # Enhance message with comprehensive memory context
             enhanced_message = message
+            context_parts = []
+            
+            # Add session context
             if session_context:
-                enhanced_message = f"{session_context} | Current request: {message}"
-                logger.info(f"Enhanced message with session memory context: {len(session_context)} chars")
+                context_parts.append(f"Recent conversation: {session_context}")
+            
+            # Add user preference context
+            if stored_preferences:
+                pref_summary = ", ".join([f"{k}: {', '.join(v[:2])}" for k, v in stored_preferences.items() if v])
+                if pref_summary:
+                    context_parts.append(f"User preferences: {pref_summary}")
+            
+            # Add similar conversation insights
+            if similar_conversations:
+                similar_summary = f"Similar past queries: {len(similar_conversations)} found"
+                context_parts.append(similar_summary)
+            
+            # Build enhanced message
+            if context_parts:
+                memory_context = " | ".join(context_parts)
+                enhanced_message = f"{memory_context} | Current request: {message}"
+                logger.info(f"Enhanced message with comprehensive memory context: {len(memory_context)} chars")
             
             # 2. Detect intent and extract parameters using LLM/HYBRID - enhanced message
             hybrid_result = await self.intent_detector.detect_intent_and_extract(enhanced_message)
@@ -206,26 +249,28 @@ class ApplicationService:
                 metadata=metadata
             )
 
-            # 4. Store conversation in enhanced session memory (background task)
+            # 4. Store conversation in comprehensive unified memory system (background task)
             if background_tasks:
                 background_tasks.add_task(
-                    self._store_enhanced_session_context,
+                    self._store_comprehensive_memory,
                     session_id,
-                    user_id or "anonymous",
+                    user_id or "anonymous", 
                     message,
                     response_text,
                     intent.name if hasattr(intent, 'name') else str(intent),
+                    params,
                     len(metadata.get("products", [])),
                     metadata
                 )
             else:
-                # Store immediately for non-HTTP contexts
-                await self.session_memory.store_conversation(
+                # Store immediately for non-HTTP contexts using comprehensive memory
+                await self.memory_coordinator.store_conversation(
                     session_id=session_id,
-                    user_id=user_id or "anonymous", 
+                    user_id=user_id or "anonymous",
                     user_message=message,
                     assistant_response=response_text,
                     intent=intent.name if hasattr(intent, 'name') else str(intent),
+                    extracted_params=params,
                     products_found=len(metadata.get("products", [])),
                     metadata=metadata
                 )
@@ -274,11 +319,16 @@ class ApplicationService:
         products = battle_results.get("products", [])
         response_text = self._generate_product_response(products, message)
         
+        # Extract detailed reasoning from judgment
+        judgment = battle_results.get("judgment", {})
+        detailed_reasoning = judgment.get("detailed_reasoning")
+        
         metadata = {
             "intent": "product_search",
             "parameters": params,
             "products": products,
-            "battle_winner": battle_results.get("judgment", {}).get("winner", "unknown")
+            "battle_winner": judgment.get("winner", "unknown"),
+            "detailed_reasoning": detailed_reasoning
         }
         
         return response_text, metadata
@@ -365,29 +415,37 @@ class ApplicationService:
 
         return response
 
-    async def _store_enhanced_session_context(
+    async def _store_comprehensive_memory(
         self,
         session_id: str,
         user_id: str,
         message: str,
         response: str,
         intent: str,
+        extracted_params: Dict[str, Any],
         products_found: int,
         metadata: Dict[str, Any]
     ):
         """
-        Background task to store enhanced session context without blocking response.
+        Background task to store conversation across all memory systems.
+        Uses the unified memory coordinator for comprehensive storage.
         """
         try:
-            await self.session_memory.store_conversation(
+            success = await self.memory_coordinator.store_conversation(
                 session_id=session_id,
                 user_id=user_id,
                 user_message=message,
                 assistant_response=response,
                 intent=intent,
+                extracted_params=extracted_params,
                 products_found=products_found,
                 metadata=metadata
             )
-            logger.info(f"Stored enhanced conversation context for session {session_id}")
+            
+            if success:
+                logger.info(f"Stored comprehensive memory for session {session_id}")
+            else:
+                logger.warning(f"Partial failure storing memory for session {session_id}")
+                
         except Exception as e:
-            logger.error(f"Failed to store enhanced session context for {session_id}: {e}")
+            logger.error(f"Failed to store comprehensive memory for {session_id}: {e}")

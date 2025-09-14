@@ -310,8 +310,8 @@ Respond with strategy and reasoning."""
         cypher_quality = self._calculate_independent_quality(cypher_results, query)
         vibe_quality = self._calculate_independent_quality(vibe_results, query)
         
-        # Log detailed reasoning for transparency
-        self._log_detailed_reasoning(cypher_results, vibe_results, query, cypher_quality, vibe_quality)
+        # Log detailed reasoning for transparency and capture for return
+        detailed_reasoning = self._log_detailed_reasoning(cypher_results, vibe_results, query, cypher_quality, vibe_quality)
         
         logger.info(f"Judge Ari independent assessment: CypherBot={cypher_quality:.3f}, VibeBot={vibe_quality:.3f}")
         
@@ -353,7 +353,8 @@ Respond with strategy and reasoning."""
             "cypher_count": len(cypher_results),
             "vibe_count": len(vibe_results),
             "consensus_count": self._count_consensus(cypher_results, vibe_results),
-            "judgment_confidence": self._calculate_confidence(winner, final_products)
+            "judgment_confidence": self._calculate_confidence(winner, final_products),
+            "detailed_reasoning": detailed_reasoning
         }
         
         return judgment
@@ -447,47 +448,179 @@ Respond with strategy and reasoning."""
         query: str,
         cypher_quality: float,
         vibe_quality: float
-    ):
+    ) -> Dict[str, Any]:
         """
         Log detailed reasoning for Judge Ari's evaluation decisions.
         Provides transparency into why products are scored the way they are.
+        
+        Returns:
+            Dictionary containing detailed reasoning for display
         """
+        # Build reasoning data structure for return
+        reasoning_data = {
+            "query": query,
+            "summary": {
+                "cypher_quality": cypher_quality,
+                "vibe_quality": vibe_quality,
+                "cypher_count": len(cypher_results),
+                "vibe_count": len(vibe_results),
+                "quality_difference": abs(cypher_quality - vibe_quality)
+            },
+            "cypher_analysis": [],
+            "vibe_analysis": [],
+            "decision_factors": {},
+            "warnings": []
+        }
+        
         logger.info("=" * 80)
         logger.info(f"JUDGE ARI DETAILED REASONING FOR QUERY: '{query}'")
         logger.info("=" * 80)
         
-        # Log CypherBot analysis
+        # Log and capture CypherBot analysis
         logger.info(f"CYPHERBOT ANALYSIS ({len(cypher_results)} products, quality: {cypher_quality:.3f}):")
         if cypher_results:
             for i, product in enumerate(cypher_results[:3]):  # Show top 3
+                analysis = self._analyze_product_for_display(product, f"CypherBot #{i+1}", query)
+                reasoning_data["cypher_analysis"].append(analysis)
                 self._log_product_analysis(product, f"CypherBot #{i+1}", query)
         else:
             logger.info("  - No products found")
+            reasoning_data["cypher_analysis"].append({"message": "No products found"})
         
         logger.info("-" * 60)
         
-        # Log VibeBot analysis
+        # Log and capture VibeBot analysis
         logger.info(f"VIBEBOT ANALYSIS ({len(vibe_results)} products, quality: {vibe_quality:.3f}):")
         if vibe_results:
             for i, product in enumerate(vibe_results[:3]):  # Show top 3
+                analysis = self._analyze_product_for_display(product, f"VibeBot #{i+1}", query)
+                reasoning_data["vibe_analysis"].append(analysis)
                 self._log_product_analysis(product, f"VibeBot #{i+1}", query)
         else:
             logger.info("  - No products found")
+            reasoning_data["vibe_analysis"].append({"message": "No products found"})
         
         logger.info("-" * 60)
         
         # Overall decision reasoning
         quality_diff = abs(cypher_quality - vibe_quality)
+        decision_factors = {
+            "quality_difference": quality_diff,
+            "threshold": 0.1,
+            "cypher_advantage": cypher_quality - vibe_quality,
+            "product_counts": {"cypher": len(cypher_results), "vibe": len(vibe_results)}
+        }
+        reasoning_data["decision_factors"] = decision_factors
+        
         logger.info(f"DECISION FACTORS:")
         logger.info(f"  - Quality difference: {quality_diff:.3f} (threshold: 0.1)")
         logger.info(f"  - CypherBot advantage: {cypher_quality - vibe_quality:.3f}")
         logger.info(f"  - Product counts: CypherBot={len(cypher_results)}, VibeBot={len(vibe_results)}")
         
+        if cypher_quality == 0.0:
+            warning = "CypherBot scored 0.00 - investigating reasons..."
+            logger.warning(f"  WARNING: {warning}")
+            reasoning_data["warnings"].append({"type": "cypher_zero_score", "message": warning})
+            self._analyze_zero_score_reasons(cypher_results, query)
+        
         if vibe_quality == 0.0:
-            logger.warning("  WARNING: VibeBot scored 0.00 - investigating reasons...")
+            warning = "VibeBot scored 0.00 - investigating reasons..."
+            logger.warning(f"  WARNING: {warning}")
+            reasoning_data["warnings"].append({"type": "vibe_zero_score", "message": warning})
             self._analyze_zero_score_reasons(vibe_results, query)
         
         logger.info("=" * 80)
+        
+        return reasoning_data
+    
+    def _analyze_product_for_display(
+        self,
+        product: Dict[str, Any],
+        source: str,
+        query: str
+    ) -> Dict[str, Any]:
+        """Analyze a product and return structured data for display."""
+        title = product.get('title', 'Unknown Product')
+        price = product.get('price', 0)
+        product_id = product.get('id', 'no-id')
+        
+        # Quality breakdown
+        quality_score = 0.0
+        quality_factors = []
+        
+        # Completeness assessment
+        if product.get('title', '').strip():
+            quality_score += 0.15
+            quality_factors.append({"factor": "Has title", "status": "✓", "points": 0.15})
+        else:
+            quality_factors.append({"factor": "Missing title", "status": "✗", "points": 0.0})
+        
+        if product.get('price', 0) > 0:
+            quality_score += 0.1
+            quality_factors.append({"factor": "Has price", "status": "✓", "points": 0.1})
+        else:
+            quality_factors.append({"factor": "Missing/invalid price", "status": "✗", "points": 0.0})
+        
+        images = product.get('images', [])
+        if images and len(images) > 0:
+            quality_score += 0.1
+            quality_factors.append({"factor": f"Has {len(images)} images", "status": "✓", "points": 0.1})
+        else:
+            quality_factors.append({"factor": "No images", "status": "✗", "points": 0.0})
+        
+        if product.get('description', '').strip():
+            quality_score += 0.05
+            quality_factors.append({"factor": "Has description", "status": "✓", "points": 0.05})
+        else:
+            quality_factors.append({"factor": "No description", "status": "✗", "points": 0.0})
+        
+        # Query relevance
+        query_terms = set(query.lower().split())
+        title_lower = title.lower()
+        desc_lower = product.get('description', '').lower()
+        
+        title_matches = sum(1 for term in query_terms if term in title_lower)
+        desc_matches = sum(1 for term in query_terms if term in desc_lower)
+        
+        if title_matches > 0:
+            points = min(0.2, title_matches * 0.1)
+            quality_score += points
+            quality_factors.append({"factor": f"{title_matches} query terms in title", "status": "✓", "points": points})
+        else:
+            quality_factors.append({"factor": "No query terms in title", "status": "✗", "points": 0.0})
+        
+        if desc_matches > 0:
+            points = min(0.1, desc_matches * 0.05)
+            quality_score += points
+            quality_factors.append({"factor": f"{desc_matches} query terms in description", "status": "✓", "points": points})
+        else:
+            quality_factors.append({"factor": "No query terms in description", "status": "✗", "points": 0.0})
+        
+        # Agent-specific scores
+        agent_scores = {}
+        if 'score' in product:
+            agent_scores['Agent Score'] = product['score']
+        if 'vibe_score' in product:
+            agent_scores['Vibe Score'] = product['vibe_score']
+        if 'cypher_score' in product:
+            agent_scores['Cypher Score'] = product['cypher_score']
+        if 'qdrant_score' in product:
+            agent_scores['Qdrant Score'] = product['qdrant_score']
+        
+        return {
+            "source": source,
+            "title": title,
+            "price": price,
+            "product_id": product_id,
+            "quality_score": min(1.0, quality_score),
+            "quality_factors": quality_factors,
+            "agent_scores": agent_scores,
+            "query_relevance": {
+                "title_matches": title_matches,
+                "description_matches": desc_matches,
+                "total_terms": len(query_terms)
+            }
+        }
     
     def _log_product_analysis(
         self,

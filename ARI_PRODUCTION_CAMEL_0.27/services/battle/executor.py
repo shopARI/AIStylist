@@ -138,7 +138,8 @@ class BattleExecutor:
                 "consensus_count": judgment.get("consensus_count", 0),
                 "execution_time": execution_time,
                 "quality_threshold_applied": quality_threshold,
-                "ml_enhanced": bool(ml_intelligence)
+                "ml_enhanced": bool(ml_intelligence),
+                "judgment": judgment  # Include full judgment for detailed reasoning
             }
             
             logger.info(f"Battle executed in {execution_time:.2f}s - Winner: {result['winner']}")
