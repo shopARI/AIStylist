@@ -269,16 +269,16 @@ class ApplicationService:
                 # Product search requested (new search or continuation)
                 if is_product_continuation:
                     logger.info(f"Routing to product continuation - Current products: {len(conversation_context.current_products)}")
-                    # For continuations, pass current product context and enhanced message with conversation context
-                    search_message = enhanced_message if enhanced_message else message
+                    # For continuations, only use enhanced context if the query is vague/unclear
+                    search_message = self._decide_context_inclusion(message, enhanced_message, is_continuation=True)
                     response_text, metadata = await self._handle_product_search(
                         search_message, params, user_context, background_tasks, session_id,
                         current_products=conversation_context.current_products
                     )
                 else:
                     logger.info(f"Routing to new product search - Intent: {intent.name}, Score: {score:.2f}")
-                    # For new searches, use enhanced message if available to provide context for vague queries
-                    search_message = enhanced_message if enhanced_message else message
+                    # For new searches, only use enhanced context if query is vague and needs clarification
+                    search_message = self._decide_context_inclusion(message, enhanced_message, is_continuation=False)
                     response_text, metadata = await self._handle_product_search(
                         search_message, params, user_context, background_tasks, session_id
                     )
@@ -500,6 +500,66 @@ class ApplicationService:
             response += f"\n... and {count - 3} more."
 
         return response
+
+    def _decide_context_inclusion(self, original_message: str, enhanced_message: str, is_continuation: bool) -> str:
+        """
+        Intelligently decide whether to include conversation history based on intent inference.
+        
+        Rules:
+        - Specific, clear queries (like "black shirt" or "interview outfit") → Use original message only
+        - Vague queries (like "something similar", "that style") → Include context
+        - Continuation queries referring to previous items → Include context
+        - Professional/occasion queries with clear context → Use original message only
+        """
+        
+        # If no enhanced context available, use original
+        if not enhanced_message:
+            return original_message
+        
+        # Check if query is specific and self-contained
+        specific_indicators = [
+            # Colors + items
+            r'\b(black|white|red|blue|green|navy|gray|grey|brown|pink)\s+(shirt|dress|pants|jacket|shoes)',
+            # Professional contexts
+            r'\b(interview|job|work|professional|academic|business|formal)\b',
+            # Specific items
+            r'\b(blazer|suit|shirt|dress|pants|shoes|jacket|coat|blouse)\b',
+            # Occasions with clear context
+            r'\b(wedding|party|date|graduation|conference)\b',
+            # Complete outfit requests
+            r'what should i wear (for|to)',
+        ]
+        
+        import re
+        message_lower = original_message.lower()
+        
+        # If query is specific and self-contained, don't pollute with history
+        for pattern in specific_indicators:
+            if re.search(pattern, message_lower):
+                logger.info(f"Query is specific and self-contained, using original message only")
+                return original_message
+        
+        # Check for vague continuation indicators that need context
+        vague_indicators = [
+            r'\b(similar|like that|same style|matching|goes with)\b',
+            r'\b(it|this|that|those|these)\b',
+            r'\b(more|another|different)\b',
+            r'\b(change|swap|replace)\b'
+        ]
+        
+        # If query is vague and likely refers to previous context, include history
+        for pattern in vague_indicators:
+            if re.search(pattern, message_lower):
+                logger.info(f"Query is vague and needs context, using enhanced message")
+                return enhanced_message
+        
+        # Default: if continuation, include context; if new search, use original
+        if is_continuation:
+            logger.info(f"Continuation query, including context")
+            return enhanced_message
+        else:
+            logger.info(f"New specific query, using original message only")
+            return original_message
 
     def _generate_collaborative_response(
         self, 
