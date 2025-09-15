@@ -118,7 +118,7 @@ class LLMIntentDetector:
 INTENTS:
 - SPECIFIC_ITEM: Looking for specific clothing/accessories ("black shirt", "need shoes", "want a dress")
 - BROWSE: Exploring options ("show me clothes", "what do you have")
-- INSPIRATION: Style ideas ("outfit ideas", "what should I wear")
+- INSPIRATION: Style ideas ("outfit ideas", "what should I wear", "interview outfit")
 - CONVERSATION_HISTORY: About past conversation ("what did I ask earlier")
 - MEMORY_QUERY: About remembered info ("do you remember my size")
 - CLARIFICATION: Asking to explain ("what do you mean")
@@ -126,20 +126,28 @@ INTENTS:
 
 COMMON SENSE RULES:
 - If someone mentions clothing items → SPECIFIC_ITEM
+- If they ask "what should I wear" for events/occasions → INSPIRATION
 - If they ask about memory/history → Use memory intents  
 - If they're just chatting → GENERAL_CONVERSATION
+
+OCCASION UNDERSTANDING:
+- Interview/job/work/professional → professional attire (blazers, dress shirts, suits, dress pants)
+- Wedding/formal event → formal attire (dresses, suits, dress shoes)
+- Casual/everyday → casual clothing
+- Academic/teaching/university → business professional attire
 
 Extract: categories, colors, occasions, style_preferences, price_range, brand_preferences
 
 ALWAYS respond with valid JSON:
 {
-  "intent": "SPECIFIC_ITEM",
+  "intent": "INSPIRATION",
   "confidence": 0.9,
   "parameters": {
-    "categories": ["shirt"],
-    "colors": ["black"]
+    "occasions": ["interview", "professional"],
+    "style_preferences": ["professional", "academic"],
+    "categories": ["blazer", "dress_shirt", "dress_pants", "professional_shoes"]
   },
-  "reasoning": "User wants a black shirt"
+  "reasoning": "User needs professional attire for academic interview"
 }"""
 
         return create_agent(
