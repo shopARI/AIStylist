@@ -73,7 +73,7 @@ def extract_brand(text: str) -> str:
 
 async def mass_extract_data():
     """Extract colors, styles, brands for all products."""
-    print("🚀 MASS DATA EXTRACTION - Phase 1 (The Real One)")
+    print(" MASS DATA EXTRACTION - Phase 1 (The Real One)")
     print("=" * 60)
     
     try:
@@ -86,7 +86,7 @@ async def mass_extract_data():
             password=os.getenv("NEO4J_PASSWORD")
         )
         await neo4j_service.initialize()
-        print(f"✅ Connected to Neo4j: {os.getenv('NEO4J_DATABASE', 'default')}")
+        print(f" Connected to Neo4j: {os.getenv('NEO4J_DATABASE', 'default')}")
         
         # Get total count
         count_query = "MATCH (p:Product) RETURN count(p) as total"
@@ -114,7 +114,7 @@ async def mass_extract_data():
             batch_result = await neo4j_service.query(batch_query)
             
             if not batch_result:
-                print("✅ No more products to process")
+                print(" No more products to process")
                 break
             
             # Process each product in the batch
@@ -167,7 +167,7 @@ async def mass_extract_data():
                 percentage = (processed / total_products) * 100
                 print(f"📈 Progress: {processed:,}/{total_products:,} ({percentage:.1f}%) - {updated:,} updated")
         
-        print(f"\n✅ MASS EXTRACTION COMPLETE!")
+        print(f"\n MASS EXTRACTION COMPLETE!")
         print(f"📊 Total processed: {processed:,}")
         print(f"🔄 Total updated: {updated:,}")
         
@@ -205,10 +205,10 @@ async def mass_extract_data():
             print(f"  {rel_type}: {count:,}")
         
         print(f"  TOTAL: {total_rels:,}")
-        print(f"\n🎉 Mass data extraction complete! The graph is now properly structured!")
+        print(f"\n Mass data extraction complete! The graph is now properly structured!")
         
     except Exception as e:
-        print(f"❌ Mass extraction failed: {e}")
+        print(f" Mass extraction failed: {e}")
         import traceback
         traceback.print_exc()
 

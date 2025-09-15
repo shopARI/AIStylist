@@ -63,7 +63,7 @@ async def up(neo4j_client):
         FOR ()-[r:VIEWED]->() ON (r.timestamp)
     """)
     
-    print("✅ Initial Neo4j schema created successfully")
+    print(" Initial Neo4j schema created successfully")
 
 async def down(neo4j_client):
     """Rollback migration - remove schema elements."""
@@ -99,4 +99,4 @@ async def down(neo4j_client):
         except Exception as e:
             print(f"Warning: Could not drop index {index}: {e}")
     
-    print("✅ Initial Neo4j schema rollback completed")
+    print(" Initial Neo4j schema rollback completed")

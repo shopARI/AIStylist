@@ -23,7 +23,7 @@ async def main():
     
     try:
         # 1. Analyze current collection
-        print(f"🔍 ANALYZING COLLECTION: {collection_name}")
+        print(f" ANALYZING COLLECTION: {collection_name}")
         print("-" * 40)
         
         collection_info = client.get_collection(collection_name)
@@ -32,7 +32,7 @@ async def main():
         print(f"📈 Collection status: {collection_info.status}")
         
         if vectors_count == 0:
-            print("✅ Collection is already empty - no cleanup needed")
+            print(" Collection is already empty - no cleanup needed")
             return
         
         # 2. Sample analysis
@@ -88,7 +88,7 @@ async def main():
             cleanup_reason.append(f"Missing expected fields: {missing_fields}")
         
         if not needs_cleanup:
-            print("✅ Collection appears to be up-to-date with new UUID format")
+            print(" Collection appears to be up-to-date with new UUID format")
             return
             
         print(f"⚠️ Cleanup needed:")
@@ -96,7 +96,7 @@ async def main():
             print(f"   - {reason}")
         
         # 5. Ask for confirmation
-        print(f"\n⚡ CLEANUP OPTIONS")
+        print(f"\n CLEANUP OPTIONS")
         print("-" * 40)
         print("1. [SAFE] Delete only numeric ID vectors (preserve UUID vectors)")
         print("2. [COMPLETE] Delete entire collection and recreate")
@@ -109,10 +109,10 @@ async def main():
         elif choice == "2":
             await complete_cleanup(client, collection_name)
         else:
-            print("❌ Cleanup cancelled")
+            print(" Cleanup cancelled")
             
     except Exception as e:
-        print(f"❌ Error during cleanup: {e}")
+        print(f" Error during cleanup: {e}")
 
 async def safe_cleanup(client: QdrantClient, collection_name: str, points: List):
     """Delete only vectors with numeric IDs (old format)"""
@@ -126,7 +126,7 @@ async def safe_cleanup(client: QdrantClient, collection_name: str, points: List)
             numeric_ids.append(point.id)
     
     if not numeric_ids:
-        print("✅ No numeric IDs found to clean up")
+        print(" No numeric IDs found to clean up")
         return
     
     print(f"🗑️ Found {len(numeric_ids)} numeric ID vectors to delete")
@@ -134,7 +134,7 @@ async def safe_cleanup(client: QdrantClient, collection_name: str, points: List)
     
     confirm = input(f"Confirm deletion of {len(numeric_ids)} old vectors? (yes/no): ")
     if confirm.lower() != 'yes':
-        print("❌ Deletion cancelled")
+        print(" Deletion cancelled")
         return
     
     try:
@@ -151,7 +151,7 @@ async def safe_cleanup(client: QdrantClient, collection_name: str, points: List)
             deleted_count += len(batch)
             print(f"🗑️ Deleted batch {i//batch_size + 1}: {len(batch)} vectors ({deleted_count}/{len(numeric_ids)})")
         
-        print(f"✅ Safe cleanup completed! Deleted {deleted_count} old numeric ID vectors")
+        print(f" Safe cleanup completed! Deleted {deleted_count} old numeric ID vectors")
         
         # Verify
         collection_info = client.get_collection(collection_name)
@@ -159,7 +159,7 @@ async def safe_cleanup(client: QdrantClient, collection_name: str, points: List)
         print(f"📊 Remaining vectors: {vectors_count:,}")
         
     except Exception as e:
-        print(f"❌ Error during safe cleanup: {e}")
+        print(f" Error during safe cleanup: {e}")
 
 async def complete_cleanup(client: QdrantClient, collection_name: str):
     """Delete entire collection and recreate"""
@@ -169,7 +169,7 @@ async def complete_cleanup(client: QdrantClient, collection_name: str):
     print("⚠️ This will DELETE ALL vectors in the collection!")
     confirm = input("Type 'DELETE_ALL' to confirm complete cleanup: ")
     if confirm != 'DELETE_ALL':
-        print("❌ Complete cleanup cancelled")
+        print(" Complete cleanup cancelled")
         return
     
     try:
@@ -187,7 +187,7 @@ async def complete_cleanup(client: QdrantClient, collection_name: str):
             )
         )
         
-        print("✅ Complete cleanup successful!")
+        print(" Complete cleanup successful!")
         print("ℹ️ Collection is now empty and ready for new embeddings")
         
         # Verify
@@ -196,7 +196,7 @@ async def complete_cleanup(client: QdrantClient, collection_name: str):
         print(f"📊 Vector count: {vectors_count}")
         
     except Exception as e:
-        print(f"❌ Error during complete cleanup: {e}")
+        print(f" Error during complete cleanup: {e}")
 
 def verify_neo4j_consistency():
     """Check if Neo4j graph has UUID-based product IDs"""
@@ -213,7 +213,7 @@ def verify_neo4j_consistency():
         print(f"⚠️ Neo4j check not implemented: {e}")
 
 if __name__ == "__main__":
-    print("🚀 Starting Qdrant cleanup...")
+    print(" Starting Qdrant cleanup...")
     
     # Load environment
     from dotenv import load_dotenv

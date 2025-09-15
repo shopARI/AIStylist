@@ -80,7 +80,7 @@ agent = ChatAgent(
                 model=model
             )
             
-            print("\n✅ New pattern works!")
+            print("\n New pattern works!")
             
             self.migration_notes.append(
                 "Agent Creation: Use ModelFactory.create() first, then pass model object to ChatAgent"
@@ -88,7 +88,7 @@ agent = ChatAgent(
             return True
             
         except Exception as e:
-            print(f"\n❌ New pattern failed: {e}")
+            print(f"\n New pattern failed: {e}")
             return False
     
     def test_memory_patterns(self):
@@ -142,7 +142,7 @@ memory = LongtermAgentMemory(
                 vector_db_block=VectorDBBlock()
             )
             
-            print("\n✅ Memory pattern unchanged (backward compatible)")
+            print("\n Memory pattern unchanged (backward compatible)")
             
             self.migration_notes.append(
                 "Memory: Same pattern works, but check for new optional parameters"
@@ -158,7 +158,7 @@ memory = LongtermAgentMemory(
                 from camel.memory import AgentMemory
                 
                 memory = AgentMemory()
-                print("✅ Alternative: Use simplified AgentMemory()")
+                print(" Alternative: Use simplified AgentMemory()")
                 
                 self.migration_notes.append(
                     "Memory: Consider using simplified AgentMemory() class"
@@ -166,7 +166,7 @@ memory = LongtermAgentMemory(
                 return True
                 
             except:
-                print("❌ Could not find working memory pattern")
+                print(" Could not find working memory pattern")
                 return False
     
     def test_message_patterns(self):
@@ -197,7 +197,7 @@ response = agent.step(user_msg)
                 content="Test message"
             )
             
-            print("\n✅ Message pattern unchanged")
+            print("\n Message pattern unchanged")
             
             self.migration_notes.append(
                 "Messages: BaseMessage.make_user_message() still works"
@@ -205,7 +205,7 @@ response = agent.step(user_msg)
             return True
             
         except Exception as e:
-            print(f"\n❌ Message pattern failed: {e}")
+            print(f"\n Message pattern failed: {e}")
             return False
     
     def test_battle_agents_migration(self):
@@ -271,7 +271,7 @@ class CypherBotAgent:
                 model=model
             )
             
-            print("\n✅ Battle agent pattern works!")
+            print("\n Battle agent pattern works!")
             
             self.migration_notes.append(
                 "Battle Agents: Create model with ModelFactory first, then pass to ChatAgent"
@@ -279,7 +279,7 @@ class CypherBotAgent:
             return True
             
         except Exception as e:
-            print(f"\n❌ Battle agent pattern failed: {e}")
+            print(f"\n Battle agent pattern failed: {e}")
             return False
     
     def test_ari_personality_preservation(self):
@@ -321,11 +321,11 @@ Communication Style:
             # Check if personality is preserved
             if hasattr(ari_agent, 'system_message'):
                 if ari_personality in str(ari_agent.system_message):
-                    print("✅ Personality preserved exactly!")
+                    print(" Personality preserved exactly!")
                 else:
                     print("⚠️  Personality may be modified")
             else:
-                print("✅ Agent created (personality storage unclear)")
+                print(" Agent created (personality storage unclear)")
             
             self.migration_notes.append(
                 "Ari's Personality: Can be passed as direct string to ChatAgent"
@@ -333,7 +333,7 @@ Communication Style:
             return True
             
         except Exception as e:
-            print(f"❌ Failed to preserve personality: {e}")
+            print(f" Failed to preserve personality: {e}")
             return False
     
     def test_async_patterns(self):
@@ -376,7 +376,7 @@ else:
         for i, note in enumerate(self.migration_notes, 1):
             print(f"\n{i}. {note}")
         
-        print("\n\n🔧 MIGRATION STRATEGY:")
+        print("\n\n MIGRATION STRATEGY:")
         print("""
 1. **Create lib/camel/v070/ package**:
    - __init__.py with new imports
@@ -461,13 +461,13 @@ def run_migration_tests():
     total = len(results)
     
     for test_name, result in results.items():
-        status = "✅ PASS" if result else "❌ FAIL"
+        status = " PASS" if result else " FAIL"
         print(f"  {test_name:20} {status}")
     
     print(f"\nTotal: {passed}/{total} tests passed")
     
     if passed == total:
-        print("\n🎉 Migration path validated! Ready to proceed.")
+        print("\n Migration path validated! Ready to proceed.")
     else:
         print("\n⚠️  Some patterns need investigation before migration.")
     

@@ -27,7 +27,7 @@ class CleanupVerifier:
 
     async def verify_cleanup(self):
         """Comprehensive cleanup verification"""
-        print("🔍 POST-CLEANUP VERIFICATION")
+        print(" POST-CLEANUP VERIFICATION")
         print("=" * 60)
         
         try:
@@ -38,7 +38,7 @@ class CleanupVerifier:
                 auth=(self.neo4j_username, self.neo4j_password)
             )
             self.neo4j_driver.verify_connectivity()
-            print("✅ Neo4j connected")
+            print(" Neo4j connected")
             
             # Run all verification checks
             await self._check_collection_health()
@@ -74,20 +74,20 @@ class CleanupVerifier:
                 print(f"⚠️ Metadata inconsistency detected!")
                 print(f"   Run: python scripts/qdrant_metadata_refresh.py")
             else:
-                print("✅ Collection metadata is consistent")
+                print(" Collection metadata is consistent")
             
             # Check if collection is operational
             try:
                 points, _ = self.qdrant_client.scroll(self.collection_name, limit=1)
                 if points:
-                    print("✅ Collection is accessible and has data")
+                    print(" Collection is accessible and has data")
                 else:
                     print("ℹ️ Collection is empty")
             except Exception as e:
-                print(f"❌ Collection access error: {e}")
+                print(f" Collection access error: {e}")
                 
         except Exception as e:
-            print(f"❌ Health check failed: {e}")
+            print(f" Health check failed: {e}")
     
     async def _check_data_integrity(self):
         """Check data integrity"""
@@ -102,7 +102,7 @@ class CleanupVerifier:
                 print("ℹ️ No data to check - collection is empty")
                 return
             
-            print(f"🔍 Checking {len(points)} sample points...")
+            print(f" Checking {len(points)} sample points...")
             
             # Check ID formats
             uuid_count = 0
@@ -127,11 +127,11 @@ class CleanupVerifier:
             print(f"⚠️ Malformed: {malformed_count}")
             
             if numeric_count > 0:
-                print("❌ Old numeric IDs still present - cleanup incomplete!")
+                print(" Old numeric IDs still present - cleanup incomplete!")
             elif malformed_count > 0:
                 print("⚠️ Malformed IDs detected - data quality issue!")
             else:
-                print("✅ All IDs are in proper UUID format")
+                print(" All IDs are in proper UUID format")
                 
             # Check payload structure
             sample_point = points[0]
@@ -143,10 +143,10 @@ class CleanupVerifier:
             if missing_keys:
                 print(f"⚠️ Missing expected keys: {missing_keys}")
             else:
-                print("✅ Payload structure looks good")
+                print(" Payload structure looks good")
                 
         except Exception as e:
-            print(f"❌ Data integrity check failed: {e}")
+            print(f" Data integrity check failed: {e}")
     
     async def _check_uuid_consistency(self):
         """Check UUID consistency between Neo4j and Qdrant"""
@@ -179,10 +179,10 @@ class CleanupVerifier:
             if len(qdrant_only) > 0:
                 print(f"⚠️ Orphaned UUIDs in Qdrant: {list(qdrant_only)[:5]}")
             else:
-                print("✅ No orphaned UUIDs detected in sample")
+                print(" No orphaned UUIDs detected in sample")
                 
         except Exception as e:
-            print(f"❌ UUID consistency check failed: {e}")
+            print(f" UUID consistency check failed: {e}")
     
     async def _check_no_duplicates(self):
         """Check for duplicate UUIDs"""
@@ -221,20 +221,20 @@ class CleanupVerifier:
             duplicates = {uuid: count for uuid, count in uuid_counts.items() if count > 1}
             duplicates_found = sum(count - 1 for count in duplicates.values())
             
-            print(f"\n🔍 Total vectors checked: {total_checked:,}")
+            print(f"\n Total vectors checked: {total_checked:,}")
             print(f"🆔 Unique UUIDs: {len(uuid_counts):,}")
             print(f"🔄 Duplicate instances: {duplicates_found}")
             
             if duplicates_found > 0:
-                print(f"❌ Found {len(duplicates)} UUIDs with duplicates!")
+                print(f" Found {len(duplicates)} UUIDs with duplicates!")
                 print("   Sample duplicates:")
                 for uuid, count in list(duplicates.items())[:5]:
                     print(f"     {uuid}: {count} copies")
             else:
-                print("✅ No duplicates found")
+                print(" No duplicates found")
                 
         except Exception as e:
-            print(f"❌ Duplicate check failed: {e}")
+            print(f" Duplicate check failed: {e}")
     
     async def _check_no_orphans(self):
         """Check for orphaned UUIDs (more comprehensive)"""
@@ -248,10 +248,10 @@ class CleanupVerifier:
                 result = session.run("MATCH (p:Product) RETURN p.id as uuid")
                 valid_uuids = {record["uuid"] for record in result if record["uuid"]}
             
-            print(f"✅ Found {len(valid_uuids):,} valid UUIDs in Neo4j")
+            print(f" Found {len(valid_uuids):,} valid UUIDs in Neo4j")
             
             # Sample check of Qdrant UUIDs
-            print("🔍 Sampling Qdrant UUIDs for orphan check...")
+            print(" Sampling Qdrant UUIDs for orphan check...")
             points, _ = self.qdrant_client.scroll(self.collection_name, limit=1000)
             
             orphans_found = []
@@ -260,18 +260,18 @@ class CleanupVerifier:
                 if uuid not in valid_uuids:
                     orphans_found.append(uuid)
             
-            print(f"🔍 Checked {len(points)} Qdrant vectors")
+            print(f" Checked {len(points)} Qdrant vectors")
             print(f"👻 Orphaned UUIDs found: {len(orphans_found)}")
             
             if orphans_found:
-                print("❌ Sample orphaned UUIDs:")
+                print(" Sample orphaned UUIDs:")
                 for orphan in orphans_found[:5]:
                     print(f"     {orphan}")
             else:
-                print("✅ No orphaned UUIDs in sample")
+                print(" No orphaned UUIDs in sample")
                 
         except Exception as e:
-            print(f"❌ Orphan check failed: {e}")
+            print(f" Orphan check failed: {e}")
     
     async def _generate_final_report(self):
         """Generate final cleanup report"""
@@ -293,28 +293,28 @@ class CleanupVerifier:
             
             print(f"📊 FINAL STATISTICS:")
             print(f"   🗂️ Neo4j Products: {neo4j_products:,}")
-            print(f"   📚 Qdrant Vectors: {actual_count:,}")
+            print(f"    Qdrant Vectors: {actual_count:,}")
             print(f"   📈 Collection Status: {collection_info.status}")
             
             # Calculate efficiency
             if neo4j_products > 0:
                 coverage = (actual_count / neo4j_products) * 100
-                print(f"   🎯 Coverage: {coverage:.1f}%")
+                print(f"    Coverage: {coverage:.1f}%")
             
-            print(f"\n✅ CLEANUP SUMMARY:")
-            print(f"   ✅ Collection is operational")
-            print(f"   ✅ Data integrity verified")
-            print(f"   ✅ UUID format validated")
+            print(f"\n CLEANUP SUMMARY:")
+            print(f"    Collection is operational")
+            print(f"    Data integrity verified")
+            print(f"    UUID format validated")
             
             if metadata_count != actual_count:
                 print(f"   ⚠️ Metadata needs refresh (run qdrant_metadata_refresh.py)")
             else:
-                print(f"   ✅ Metadata is consistent")
+                print(f"    Metadata is consistent")
             
-            print(f"\n🎉 CLEANUP VERIFICATION COMPLETE!")
+            print(f"\n CLEANUP VERIFICATION COMPLETE!")
             
         except Exception as e:
-            print(f"❌ Report generation failed: {e}")
+            print(f" Report generation failed: {e}")
 
 async def main():
     verifier = CleanupVerifier()

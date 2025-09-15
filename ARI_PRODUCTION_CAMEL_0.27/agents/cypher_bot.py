@@ -191,10 +191,29 @@ class CypherBotAgent:
         logger.debug(f">>> _filtered_search START: filters={filters}, limit={limit}")
         
         if not filters:
-            logger.info("No specific filters provided, performing general search")
+            logger.info("No specific filters provided, checking if query has searchable terms")
             # For conversational queries without specific filters, return empty results
             # This prevents "no items found" message for greetings like "how are you?"
-            return []
+            # But allow basic searches for product terms even without explicit filters
+            query_lower = query.lower()
+            has_product_terms = any(term in query_lower for term in [
+                'shirt', 'dress', 'pants', 'shoes', 'jacket', 'coat', 'top', 'blouse', 
+                'skirt', 'jeans', 'sweater', 'hoodie', 'blazer', 'suit', 'hat', 'bag'
+            ])
+            
+            if not has_product_terms:
+                logger.info("No product terms found in query, returning empty results")
+                return []
+            else:
+                logger.info(f"Found product terms in query '{query}', performing basic search")
+                # Create basic filters from query
+                filters = {}
+                # Extract basic category from query
+                for term in ['shirt', 'dress', 'pants', 'shoes', 'jacket', 'coat', 'top', 'blouse', 
+                           'skirt', 'jeans', 'sweater', 'hoodie', 'blazer', 'suit', 'hat', 'bag']:
+                    if term in query_lower:
+                        filters['category'] = term
+                        break
         
         # Convert plural filter keys to singular for compatibility
         if 'occasions' in filters and filters['occasions']:
@@ -554,6 +573,11 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
         elif "occasion_patterns" in strategy_lower or "occasion" in strategy_lower:
             # Find items for specific occasions using graph patterns
             results.extend(await self._occasion_pattern_search(query, limit, intelligent_filters))
+            
+        else:
+            # GENERAL strategy or unrecognized strategy - use standard filtered search
+            logger.info(f"Using GENERAL strategy for: {strategy_lower[:50]}...")
+            results.extend(await self._intelligent_general_search(query, limit, intelligent_filters))
         
         # Always include some general results if not enough found
         if len(results) < limit:

@@ -59,6 +59,7 @@ class StyleProfile(str, Enum):
 
 class SearchIntent(str, Enum):
     """User search intent types."""
+    # Product Search Intents
     BROWSE = "browse"
     SPECIFIC_ITEM = "specific_item"
     INSPIRATION = "inspiration"
@@ -67,6 +68,13 @@ class SearchIntent(str, Enum):
     OUTFIT = "outfit"
     BRAND = "brand"
     SALE = "sale"
+    
+    # Conversation/Memory Intents
+    CONVERSATION_HISTORY = "conversation_history"  # "what did i ask earlier?"
+    MEMORY_QUERY = "memory_query"                  # "do you remember when..."
+    CLARIFICATION = "clarification"                # "what do you mean by..."
+    SYSTEM_STATUS = "system_status"               # "how are you working?"
+    GENERAL_CONVERSATION = "general_conversation" # non-fashion chat
 
 
 class BattleWinner(str, Enum):

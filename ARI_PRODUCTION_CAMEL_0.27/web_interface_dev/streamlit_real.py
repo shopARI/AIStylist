@@ -66,16 +66,16 @@ def start_fastapi_server():
             for i in range(30):
                 if check_fastapi_status():
                     st.session_state.fastapi_running = True
-                    st.success("✅ AIStylist production server started!")
+                    st.success(" AIStylist production server started!")
                     return True
                 time.sleep(1)
                 st.info(f"Starting server... ({i+1}/30)")
             
-            st.error("❌ Failed to start server within 30 seconds")
+            st.error(" Failed to start server within 30 seconds")
             return False
             
     except Exception as e:
-        st.error(f"❌ Error starting server: {e}")
+        st.error(f" Error starting server: {e}")
         return False
 
 def send_chat_message(message: str, session_id: str = None, user_id: str = "streamlit_user"):
@@ -139,19 +139,19 @@ def display_agent_insights():
     
     # Show battle system logs from FastAPI logs
     st.markdown("---")
-    st.markdown("### 🤖 Agent Battle System")
+    st.markdown("###  Agent Battle System")
     
-    st.markdown("**🔍 CypherBot (Graph Database Search)**")
+    st.markdown("** CypherBot (Graph Database Search)**")
     if len(metadata.get("products", [])) == 0:
         st.warning("CypherBot: No products found - keyword extraction may need improvement")
         st.info("Log: 'No filters provided, returning empty list'")
     else:
         st.success(f"CypherBot: Found {len(metadata.get('products', []))} products")
     
-    st.markdown("**🎯 VibeBot (Semantic Search)**") 
+    st.markdown("** VibeBot (Semantic Search)**") 
     st.info("VibeBot: Semantic search via Qdrant embeddings")
     
-    st.markdown("**🧠 ML Intelligence Suite**")
+    st.markdown("** ML Intelligence Suite**")
     st.info("Intelligence: Behavioral analysis, visual features, clustering")
     st.warning("Note: Memory system has OpenAI API format issues")
     
@@ -202,7 +202,7 @@ def display_products(products: List[Dict[str, Any]]):
 
 def main():
     """Main Streamlit application"""
-    st.title("🎨 ARI Fashion AI - Production Interface")
+    st.title(" ARI Fashion AI - Production Interface")
     st.markdown("**Connected to the REAL AIStylist production system**")
     st.markdown("---")
     
@@ -210,10 +210,10 @@ def main():
     if not st.session_state.fastapi_running:
         if check_fastapi_status():
             st.session_state.fastapi_running = True
-            st.success("✅ FastAPI server is already running!")
+            st.success(" FastAPI server is already running!")
         else:
             st.warning("FastAPI server is not running. Click below to start it.")
-            if st.button("🚀 Start AIStylist Server"):
+            if st.button(" Start AIStylist Server"):
                 start_fastapi_server()
                 st.rerun()
             st.stop()
@@ -221,7 +221,7 @@ def main():
     # Server status indicator
     col1, col2, col3 = st.columns([1, 1, 2])
     with col1:
-        st.success("✅ Server Online")
+        st.success(" Server Online")
     with col2:
         st.info(f"API: {API_BASE_URL}")
     with col3:
@@ -258,7 +258,7 @@ def main():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.header("🤖 Chat with ARI (Production System)")
+        st.header(" Chat with ARI (Production System)")
         
         # Chat input
         query = st.text_input(
@@ -312,7 +312,7 @@ def main():
                         "metadata": result.get("metadata", {})
                     })
                     
-                    st.success("✅ Response received from production system!")
+                    st.success(" Response received from production system!")
                     st.rerun()
         
         # Display last response
@@ -327,7 +327,7 @@ def main():
                     display_products(last_msg["products"])
     
     with col2:
-        st.header("🔍 Production System Insights")
+        st.header(" Production System Insights")
         
         # Show real system metadata
         display_agent_insights()
@@ -347,18 +347,18 @@ POST {API_BASE_URL}/chat
         with st.expander("⚙️ Production System Features"):
             st.markdown("""
             **This interface uses your REAL system:**
-            - ✅ Intent Detection & Parameter Extraction
-            - ✅ Full CypherBot (Neo4j graph queries)  
-            - ✅ Full VibeBot (Qdrant semantic search)
-            - ✅ Complete ML Intelligence Suite
-            - ✅ Judge ARI decision making
-            - ✅ Memory & conversation context
-            - ✅ Battle orchestrator
+            -  Intent Detection & Parameter Extraction
+            -  Full CypherBot (Neo4j graph queries)  
+            -  Full VibeBot (Qdrant semantic search)
+            -  Complete ML Intelligence Suite
+            -  Judge ARI decision making
+            -  Memory & conversation context
+            -  Battle orchestrator
             """)
     
     # Footer
     st.markdown("---")
-    st.info(f"💡 This interface connects to your actual AIStylist production system via the FastAPI server at {API_BASE_URL}")
+    st.info(f" This interface connects to your actual AIStylist production system via the FastAPI server at {API_BASE_URL}")
 
 if __name__ == "__main__":
     main()

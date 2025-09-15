@@ -126,7 +126,7 @@ class DIContainer(containers.DeclarativeContainer):
         data_store=hybrid_data_store,
         user_kg=user_kg_service,
         product_retriever=product_retriever_service,
-        memory_setup_func=create_memory_setup_function(),  # ✅ MEMORY ENABLED!
+        memory_setup_func=create_memory_setup_function(),  #  MEMORY ENABLED!
         config={
             "enable_clustering": True,
             "enable_visual": True, 

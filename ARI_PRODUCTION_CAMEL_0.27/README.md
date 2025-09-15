@@ -3,16 +3,16 @@
 > **Enterprise-Ready AI Fashion Stylist with Conversational Recommendations**  
 > Built with CAMEL-AI 0.2.7 | Neo4j | Qdrant | Redis | FastAPI
 
-## 🚀 Overview
+##  Overview
 
 ARI (AI Recommendation Intelligence) is a production-ready fashion AI system that provides personalized product recommendations through intelligent conversation. The system scales to handle **20-30M product nodes** across multiple application instances with zero data loss and sub-second response times.
 
 ### Key Features
 
-- 🎯 **Intelligent Agent Battles**: CypherBot (graph-based) vs VibeBot (vector-based) recommendations
-- 🧠 **ML-Enhanced Intelligence**: Clustering, visual analysis, behavioral patterns, and memory-based RAG
+-  **Intelligent Agent Battles**: CypherBot (graph-based) vs VibeBot (vector-based) recommendations
+-  **ML-Enhanced Intelligence**: Clustering, visual analysis, behavioral patterns, and memory-based RAG
 - 💬 **Conversational Memory**: Persistent user context and preferences across sessions
-- ⚡ **High Performance**: Redis-distributed caching with FastAPI background tasks
+-  **High Performance**: Redis-distributed caching with FastAPI background tasks
 - 🔄 **Production Scalable**: Stateless architecture for multi-instance deployment
 - 🛡️ **Enterprise Ready**: Database migrations, monitoring, and error handling
 
@@ -193,7 +193,7 @@ Content-Type: application/json
 }
 ```
 
-## 🔧 Production Features
+##  Production Features
 
 ### Performance Optimizations
 
@@ -263,7 +263,7 @@ battles:counter                # Battle ID counter
 conversation:{session}:{user}  # Chat history (7d TTL)
 ```
 
-## 🚀 Deployment
+##  Deployment
 
 ### Docker Deployment (Recommended)
 
@@ -303,7 +303,7 @@ CMD ["python", "main.py"]
 - Database connection pool utilization
 - Active session counts
 
-## 🛠️ Development
+##  Development
 
 ### Code Quality
 
@@ -331,7 +331,7 @@ python scripts/verify_connections.py
 4. Add API endpoints in `main.py`
 5. Update documentation
 
-## 🔍 Troubleshooting
+##  Troubleshooting
 
 ### Common Issues
 

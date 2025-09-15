@@ -31,7 +31,7 @@ async def investigate_qdrant_products():
         await qdrant.initialize()
         
         # Test 1: Try searching with very low threshold
-        print("\n🔍 Test 1: Wedding search with low threshold...")
+        print("\n Test 1: Wedding search with low threshold...")
         try:
             results = await qdrant.search_by_natural_language(
                 query="dress for wedding",
@@ -47,7 +47,7 @@ async def investigate_qdrant_products():
             print(f"   Error: {e}")
         
         # Test 2: Try basic searches to see what products exist
-        print("\n🔍 Test 2: Basic product searches...")
+        print("\n Test 2: Basic product searches...")
         basic_queries = ["dress", "black", "formal", "women", "shirt"]
         
         for query in basic_queries:
@@ -65,7 +65,7 @@ async def investigate_qdrant_products():
                 print(f"   '{query}' error: {e}")
         
         # Test 3: Try to get ANY products using metadata filters
-        print("\n🔍 Test 3: Try metadata filtering...")
+        print("\n Test 3: Try metadata filtering...")
         try:
             # Try to get products by category
             results = await qdrant.get_products_by_filter(
@@ -81,7 +81,7 @@ async def investigate_qdrant_products():
             print(f"   Category filter error: {e}")
         
         # Test 4: Check if we can get popular products
-        print("\n🔍 Test 4: Popular products...")
+        print("\n Test 4: Popular products...")
         try:
             results = await qdrant.get_popular_products(limit=3)
             print(f"   Popular products: {len(results)} results")
@@ -95,7 +95,7 @@ async def investigate_qdrant_products():
             print(f"   Popular products error: {e}")
         
         # Test 5: Try direct Qdrant scroll to see raw products
-        print("\n🔍 Test 5: Raw product scroll...")
+        print("\n Test 5: Raw product scroll...")
         try:
             # Use the qdrant client directly
             response = await asyncio.to_thread(
@@ -121,14 +121,14 @@ async def investigate_qdrant_products():
                     wedding_keywords = ['wedding', 'formal', 'elegant', 'dress', 'gown']
                     found_keywords = [kw for kw in wedding_keywords if kw in payload_text]
                     if found_keywords:
-                        print(f"      🎯 Contains keywords: {found_keywords}")
+                        print(f"       Contains keywords: {found_keywords}")
         except Exception as e:
             print(f"   Raw scroll error: {e}")
         
         await qdrant.close()
         
     except Exception as e:
-        print(f"❌ Investigation failed: {e}")
+        print(f" Investigation failed: {e}")
         import traceback
         traceback.print_exc()
 
@@ -165,7 +165,7 @@ async def test_embedding_similarity():
         await qdrant.close()
         
     except Exception as e:
-        print(f"❌ Embedding test failed: {e}")
+        print(f" Embedding test failed: {e}")
 
 async def check_qdrant_collection_structure():
     """Check the structure and configuration of the Qdrant collection"""
@@ -202,7 +202,7 @@ async def check_qdrant_collection_structure():
         await qdrant.close()
         
     except Exception as e:
-        print(f"❌ Collection structure check failed: {e}")
+        print(f" Collection structure check failed: {e}")
 
 async def main():
     """Run product investigation"""

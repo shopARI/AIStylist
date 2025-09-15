@@ -166,10 +166,10 @@ Provide confidence scores and note any limitations in your extraction.
 
 async def llm_mass_extract():
     """Perform LLM-based mass data extraction"""
-    print("🚀 ADVANCED LLM MASS DATA EXTRACTION")
+    print(" ADVANCED LLM MASS DATA EXTRACTION")
     print("=" * 60)
-    print(f"🤖 Using Model: GPT-4o with Structured Outputs")
-    print(f"🧠 Extraction Capabilities:")
+    print(f" Using Model: GPT-4o with Structured Outputs")
+    print(f" Extraction Capabilities:")
     print("   • Intelligent color extraction with confidence scores")
     print("   • Fashion style classification with occasion mapping")
     print("   • Material and construction detail analysis")
@@ -188,10 +188,10 @@ async def llm_mass_extract():
             password=os.getenv("NEO4J_PASSWORD")
         )
         await neo4j_service.initialize()
-        print(f"✅ Connected to Neo4j: {os.getenv('NEO4J_DATABASE', 'default')}")
+        print(f" Connected to Neo4j: {os.getenv('NEO4J_DATABASE', 'default')}")
         
         extractor = LLMExtractor()
-        print(f"✅ Initialized LLM Extractor: {extractor.model}")
+        print(f" Initialized LLM Extractor: {extractor.model}")
         
         # Get total count
         count_query = """
@@ -233,7 +233,7 @@ async def llm_mass_extract():
             batch_result = await neo4j_service.query(batch_query)
             
             if not batch_result:
-                print("✅ No more products to process")
+                print(" No more products to process")
                 break
             
             # Process batch with LLM
@@ -301,10 +301,10 @@ async def llm_mass_extract():
             if batch_delay > 0:
                 await asyncio.sleep(batch_delay)
         
-        print(f"\n✅ LLM MASS EXTRACTION COMPLETE!")
+        print(f"\n LLM MASS EXTRACTION COMPLETE!")
         print(f"📊 Total processed: {processed:,}")
         print(f"🔄 Total updated: {updated:,}")
-        print(f"🤖 Model used: {extractor.model}")
+        print(f" Model used: {extractor.model}")
         
         # Create enhanced relationships
         print(f"\n🔗 Creating enhanced relationships...")
@@ -344,10 +344,10 @@ async def llm_mass_extract():
         """
         await neo4j_service.query(material_rel_query)
         
-        print(f"🎉 Advanced LLM extraction complete! Enhanced fashion knowledge graph ready!")
+        print(f" Advanced LLM extraction complete! Enhanced fashion knowledge graph ready!")
         
     except Exception as e:
-        print(f"❌ LLM mass extraction failed: {e}")
+        print(f" LLM mass extraction failed: {e}")
         import traceback
         traceback.print_exc()
 

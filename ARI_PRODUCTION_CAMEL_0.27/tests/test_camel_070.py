@@ -21,7 +21,7 @@ def test_camel_import():
     
     try:
         import camel
-        print(f"✅ CAMEL imported successfully")
+        print(f" CAMEL imported successfully")
         print(f"   Version: {camel.__version__}")
         
         # Check if version is 0.2.70 or higher
@@ -31,14 +31,14 @@ def test_camel_import():
         patch = int(version_parts[2]) if len(version_parts) > 2 else 0
         
         if major == 0 and minor == 2 and patch >= 70:
-            print(f"✅ Version is 0.2.70+")
+            print(f" Version is 0.2.70+")
             return True
         else:
             print(f"⚠️  Version {camel.__version__} may not have new API")
             return False
             
     except ImportError as e:
-        print(f"❌ Failed to import CAMEL: {e}")
+        print(f" Failed to import CAMEL: {e}")
         print("   Install with: pip install camel-ai==0.2.70")
         return False
 
@@ -52,7 +52,7 @@ def test_model_factory():
         from camel.models import ModelFactory
         from camel.types import ModelPlatformType, ModelType
         
-        print("✅ ModelFactory imported")
+        print(" ModelFactory imported")
         
         # Test creating OpenAI model
         model = ModelFactory.create(
@@ -64,7 +64,7 @@ def test_model_factory():
             }
         )
         
-        print(f"✅ Created OpenAI model: {type(model)}")
+        print(f" Created OpenAI model: {type(model)}")
         
         # Check model attributes
         if hasattr(model, 'model_type'):
@@ -75,7 +75,7 @@ def test_model_factory():
         return True
         
     except Exception as e:
-        print(f"❌ ModelFactory test failed: {e}")
+        print(f" ModelFactory test failed: {e}")
         return False
 
 def test_chat_agent():
@@ -105,9 +105,9 @@ def test_chat_agent():
                 system_message=system_msg,
                 model=model
             )
-            print("✅ Method 1: Direct string system_message works")
+            print(" Method 1: Direct string system_message works")
         except:
-            print("❌ Method 1: Direct string failed")
+            print(" Method 1: Direct string failed")
             
             # Method 2: Try with SystemMessage class
             try:
@@ -116,26 +116,26 @@ def test_chat_agent():
                     system_message=SystemMessage(content=system_msg),
                     model=model
                 )
-                print("✅ Method 2: SystemMessage class works")
+                print(" Method 2: SystemMessage class works")
             except Exception as e:
-                print(f"❌ Method 2: SystemMessage failed: {e}")
+                print(f" Method 2: SystemMessage failed: {e}")
                 return False
         
         # Check agent attributes
         print(f"   Agent type: {type(agent)}")
         if hasattr(agent, 'model'):
-            print(f"   Has model: ✅")
+            print(f"   Has model: ")
         if hasattr(agent, 'step'):
-            print(f"   Has step method: ✅")
+            print(f"   Has step method: ")
         if hasattr(agent, 'step_async'):
-            print(f"   Has step_async: ✅")
+            print(f"   Has step_async: ")
         elif hasattr(agent, 'astep'):
-            print(f"   Has astep: ✅")
+            print(f"   Has astep: ")
             
         return True
         
     except Exception as e:
-        print(f"❌ ChatAgent test failed: {e}")
+        print(f" ChatAgent test failed: {e}")
         return False
 
 def test_memory_api():
@@ -151,19 +151,19 @@ def test_memory_api():
         # Pattern 1: From memories
         try:
             from camel.memories import LongtermAgentMemory
-            print("✅ Import from camel.memories works")
+            print(" Import from camel.memories works")
             memory_imported = True
         except:
-            print("❌ camel.memories import failed")
+            print(" camel.memories import failed")
             
         # Pattern 2: From memory (singular)
         if not memory_imported:
             try:
                 from camel.memory import LongtermAgentMemory
-                print("✅ Import from camel.memory works")
+                print(" Import from camel.memory works")
                 memory_imported = True
             except:
-                print("❌ camel.memory import failed")
+                print(" camel.memory import failed")
         
         if not memory_imported:
             print("⚠️  Could not import LongtermAgentMemory")
@@ -176,7 +176,7 @@ def test_memory_api():
                 ChatHistoryBlock,
                 VectorDBBlock
             )
-            print("✅ Memory components imported")
+            print(" Memory components imported")
             
             # Test creating memory
             from camel.utils import OpenAITokenCounter
@@ -191,17 +191,17 @@ def test_memory_api():
                 vector_db_block=VectorDBBlock()
             )
             
-            print("✅ Memory created successfully")
+            print(" Memory created successfully")
             print(f"   Memory type: {type(memory)}")
             
             return True
             
         except Exception as e:
-            print(f"❌ Memory component test failed: {e}")
+            print(f" Memory component test failed: {e}")
             return False
             
     except Exception as e:
-        print(f"❌ Memory test failed: {e}")
+        print(f" Memory test failed: {e}")
         return False
 
 def test_base_message():
@@ -224,20 +224,20 @@ def test_base_message():
             content="Hello! I'm here to help."
         )
         
-        print("✅ BaseMessage creation works")
+        print(" BaseMessage creation works")
         print(f"   User message type: {type(user_msg)}")
         print(f"   Assistant message type: {type(assistant_msg)}")
         
         # Check message attributes
         if hasattr(user_msg, 'content'):
-            print(f"   Has content attribute: ✅")
+            print(f"   Has content attribute: ")
         if hasattr(user_msg, 'role_name'):
-            print(f"   Has role_name attribute: ✅")
+            print(f"   Has role_name attribute: ")
             
         return True
         
     except Exception as e:
-        print(f"❌ BaseMessage test failed: {e}")
+        print(f" BaseMessage test failed: {e}")
         return False
 
 async def test_async_agent():
@@ -276,32 +276,32 @@ async def test_async_agent():
         # Method 1: step_async
         if hasattr(agent, 'step_async'):
             response = await agent.step_async(test_msg)
-            print("✅ step_async method works")
+            print(" step_async method works")
         # Method 2: astep
         elif hasattr(agent, 'astep'):
             response = await agent.astep(test_msg)
-            print("✅ astep method works")
+            print(" astep method works")
         # Method 3: sync step in async context
         elif hasattr(agent, 'step'):
             response = agent.step(test_msg)
-            print("✅ sync step method works (in async context)")
+            print(" sync step method works (in async context)")
         else:
-            print("❌ No suitable step method found")
+            print(" No suitable step method found")
             return False
             
         if response:
             print(f"   Response type: {type(response)}")
             if hasattr(response, 'msgs'):
-                print(f"   Response has msgs: ✅")
+                print(f"   Response has msgs: ")
             if hasattr(response, 'msg'):
-                print(f"   Response has msg: ✅")
+                print(f"   Response has msg: ")
                 if hasattr(response.msg, 'content'):
                     print(f"   Response content preview: {response.msg.content[:50]}...")
                     
         return True
         
     except Exception as e:
-        print(f"❌ Async agent test failed: {e}")
+        print(f" Async agent test failed: {e}")
         return False
 
 def test_tools_api():
@@ -334,7 +334,7 @@ def test_tools_api():
                 model=model,
                 tools=[get_weather]
             )
-            print("✅ Tools as direct list works")
+            print(" Tools as direct list works")
         except:
             # Method 2: Wrapped tools
             try:
@@ -344,14 +344,14 @@ def test_tools_api():
                     model=model,
                     tools=[FunctionTool(get_weather)]
                 )
-                print("✅ Tools as FunctionTool works")
+                print(" Tools as FunctionTool works")
             except Exception as e:
                 print(f"⚠️  Tools API may have changed: {e}")
                 
         return True
         
     except Exception as e:
-        print(f"❌ Tools test failed: {e}")
+        print(f" Tools test failed: {e}")
         return False
 
 def run_all_tests():
@@ -366,7 +366,7 @@ def run_all_tests():
     results['import'] = test_camel_import()
     
     if not results['import']:
-        print("\n❌ Cannot continue without CAMEL. Please install:")
+        print("\n Cannot continue without CAMEL. Please install:")
         print("   pip install camel-ai==0.2.70")
         return
     
@@ -391,13 +391,13 @@ def run_all_tests():
     total = len(results)
     
     for test_name, result in results.items():
-        status = "✅ PASS" if result else "❌ FAIL"
+        status = " PASS" if result else " FAIL"
         print(f"  {test_name:20} {status}")
     
     print(f"\nTotal: {passed}/{total} tests passed")
     
     if passed == total:
-        print("\n🎉 All tests passed! Ready for migration to CAMEL 0.2.70")
+        print("\n All tests passed! Ready for migration to CAMEL 0.2.70")
     else:
         print("\n⚠️  Some tests failed. Review the API changes before migration.")
     

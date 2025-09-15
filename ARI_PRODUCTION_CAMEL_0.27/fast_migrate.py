@@ -7,7 +7,7 @@ from neo4j import GraphDatabase
 import time
 
 def fast_migrate():
-    print("⚡ FAST BULK MIGRATION STARTING")
+    print(" FAST BULK MIGRATION STARTING")
     
     local_driver = GraphDatabase.driver('bolt://0.0.0.0:17687', auth=('neo4j', '6D%q@jbYmstkK2i3oW5z6B6outew9m93'))
     remote_driver = GraphDatabase.driver('bolt://34.135.40.119:7687', auth=('neo4j', 'shopari1234'))
@@ -83,9 +83,9 @@ def fast_migrate():
                     
                     print(f"   Batch {batch_num + 1}/{batches}: {len(nodes_data):,} nodes in {elapsed:.1f}s ({rate:,.0f}/sec)")
             
-            print(f"✅ {label} migration completed!")
+            print(f" {label} migration completed!")
         
-        print(f"\\n🎉 NODE MIGRATION COMPLETED!")
+        print(f"\\n NODE MIGRATION COMPLETED!")
         print(f"📊 Total nodes migrated: {total_migrated:,}")
         
         # Now migrate relationships
@@ -117,7 +117,7 @@ def fast_migrate():
                 break
         
         # Verify migration
-        print(f"\\n🔍 Verifying migration...")
+        print(f"\\n Verifying migration...")
         with remote_driver.session(database='productionbackup2') as session:
             result = session.run('CALL db.labels() YIELD label RETURN label')
             remote_labels = [record['label'] for record in result]
@@ -128,13 +128,13 @@ def fast_migrate():
                 remote_count = result.single()['count']
                 local_count = label_counts.get(label, 0)
                 
-                status = "✅" if remote_count == local_count else "❌"
+                status = "" if remote_count == local_count else ""
                 print(f"{status} {label}: {remote_count:,} / {local_count:,}")
         
-        print(f"\\n🎉 FAST MIGRATION COMPLETED!")
+        print(f"\\n FAST MIGRATION COMPLETED!")
         
     except Exception as e:
-        print(f"❌ Migration failed: {e}")
+        print(f" Migration failed: {e}")
         import traceback
         traceback.print_exc()
         

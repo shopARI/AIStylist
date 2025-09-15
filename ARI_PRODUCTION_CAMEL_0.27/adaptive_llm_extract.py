@@ -21,9 +21,9 @@ from llm_mass_extract import LLMExtractor, ProductExtraction
 
 async def adaptive_llm_mass_extract():
     """Adaptive LLM extraction with dynamic batch sizing"""
-    print("🚀 ADAPTIVE LLM MASS DATA EXTRACTION")
+    print(" ADAPTIVE LLM MASS DATA EXTRACTION")
     print("=" * 60)
-    print("🎯 Features:")
+    print(" Features:")
     print("   • Adaptive batch sizing for token limits")
     print("   • Cursor-based pagination")
     print("   • Automatic error recovery")
@@ -40,10 +40,10 @@ async def adaptive_llm_mass_extract():
             password=os.getenv("NEO4J_PASSWORD")
         )
         await neo4j_service.initialize()
-        print(f"✅ Connected to Neo4j: {os.getenv('NEO4J_DATABASE', 'default')}")
+        print(f" Connected to Neo4j: {os.getenv('NEO4J_DATABASE', 'default')}")
         
         extractor = LLMExtractor()
-        print(f"✅ Initialized: {extractor.model}")
+        print(f" Initialized: {extractor.model}")
         
         # Create optimized index (ignore errors)
         try:
@@ -64,7 +64,7 @@ async def adaptive_llm_mass_extract():
         successful_batches = 0
         
         # Find where we left off
-        print("🔍 Finding continuation point...")
+        print(" Finding continuation point...")
         try:
             progress_query = """
             MATCH (p:Product)
@@ -122,7 +122,7 @@ async def adaptive_llm_mass_extract():
             batch_result = await neo4j_service.query(batch_query, params)
             
             if not batch_result:
-                print("✅ No more products to process")
+                print(" No more products to process")
                 break
             
             # Update cursor for next batch
@@ -213,7 +213,7 @@ async def adaptive_llm_mass_extract():
                 
                 print(f"📈 Progress: {processed:,} processed, {updated:,} updated")
                 print(f"⏱️ Rate: {rate:.1f} products/sec, ETA: {eta:.1f} hours")
-                print(f"🔧 Batch size: {current_batch_size}, Token errors: {token_limit_errors}")
+                print(f" Batch size: {current_batch_size}, Token errors: {token_limit_errors}")
             
             # Rate limiting
             await asyncio.sleep(0.5)  # Reduced delay for better throughput
@@ -222,12 +222,12 @@ async def adaptive_llm_mass_extract():
         elapsed = time.time() - start_time
         total_cost = updated * 0.015
         
-        print(f"\n✅ ADAPTIVE LLM EXTRACTION COMPLETE!")
+        print(f"\n ADAPTIVE LLM EXTRACTION COMPLETE!")
         print(f"📊 Total processed: {processed:,}")
         print(f"🔄 Total updated: {updated:,}")
         print(f"⏱️ Time elapsed: {elapsed/3600:.1f} hours")
         print(f"💰 Total cost: ${total_cost:.2f}")
-        print(f"🔧 Final batch size: {current_batch_size}")
+        print(f" Final batch size: {current_batch_size}")
         print(f"⚠️ Token limit errors: {token_limit_errors}")
         
         # Create relationships efficiently
@@ -268,15 +268,15 @@ async def adaptive_llm_mass_extract():
             try:
                 print(f"   Creating relationship batch {i+1}/4...")
                 await neo4j_service.query(rel_query)
-                print(f"   ✅ Relationship batch {i+1} created")
+                print(f"    Relationship batch {i+1} created")
             except Exception as e:
                 print(f"   ⚠️ Relationship batch {i+1} error: {e}")
         
         await neo4j_service.close()
-        print(f"🎉 Adaptive LLM extraction complete! Enhanced knowledge graph ready!")
+        print(f" Adaptive LLM extraction complete! Enhanced knowledge graph ready!")
         
     except Exception as e:
-        print(f"❌ Adaptive extraction failed: {e}")
+        print(f" Adaptive extraction failed: {e}")
         import traceback
         traceback.print_exc()
 

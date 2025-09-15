@@ -1,8 +1,8 @@
-# 🎨 AIStylist Multi-Agent Web Interface
+#  AIStylist Multi-Agent Web Interface
 
 A comprehensive web interface for interacting with the AIStylist AI fashion recommendation system, providing real-time visibility into all agent thinking processes.
 
-## 🚀 Quick Start
+##  Quick Start
 
 ```bash
 # Launch the web interface
@@ -18,7 +18,7 @@ The interface will open at: http://localhost:8501
 - Conversation history and memory
 - Example queries for quick testing
 
-### 🤖 Multi-Agent Visibility
+###  Multi-Agent Visibility
 - **CypherBot**: See graph database queries in real-time
 - **VibeBot**: Monitor semantic search processes  
 - **Intelligence Systems**: View ML analysis outputs
@@ -34,7 +34,7 @@ The interface will open at: http://localhost:8501
 - Agent output history and debugging
 - System status monitoring
 
-## 🎯 Use Cases
+##  Use Cases
 
 ### Fashion Queries
 ```
@@ -50,7 +50,7 @@ The interface will open at: http://localhost:8501
 - Understand ML intelligence outputs
 - Monitor system performance
 
-## 🛠️ Technical Details
+##  Technical Details
 
 ### Architecture
 - **Frontend**: Streamlit with custom CSS styling
@@ -73,7 +73,7 @@ The interface captures detailed outputs from:
 4. Final response and products are shown
 5. Full conversation history is maintained
 
-## 🎨 Interface Layout
+##  Interface Layout
 
 ```
 ┌─────────────────────┬─────────────────────┐

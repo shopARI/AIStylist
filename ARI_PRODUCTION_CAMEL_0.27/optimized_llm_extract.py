@@ -21,10 +21,10 @@ from llm_mass_extract import LLMExtractor, ProductExtraction
 
 async def optimized_llm_mass_extract():
     """Optimized LLM extraction for large databases"""
-    print("🚀 OPTIMIZED LLM MASS DATA EXTRACTION")
+    print(" OPTIMIZED LLM MASS DATA EXTRACTION")
     print("=" * 60)
-    print("🎯 Optimized for large-scale databases (4.6M+ products)")
-    print("💡 Features:")
+    print(" Optimized for large-scale databases (4.6M+ products)")
+    print(" Features:")
     print("   • Cursor-based pagination (no expensive counting)")
     print("   • Streaming batch processing")
     print("   • Index-optimized queries")
@@ -42,13 +42,13 @@ async def optimized_llm_mass_extract():
             password=os.getenv("NEO4J_PASSWORD")
         )
         await neo4j_service.initialize()
-        print(f"✅ Connected to Neo4j: {os.getenv('NEO4J_DATABASE', 'default')}")
+        print(f" Connected to Neo4j: {os.getenv('NEO4J_DATABASE', 'default')}")
         
         extractor = LLMExtractor()
-        print(f"✅ Initialized: {extractor.model}")
+        print(f" Initialized: {extractor.model}")
         
         # Create optimized index for cursor-based pagination
-        print("🔧 Creating optimized indexes...")
+        print(" Creating optimized indexes...")
         try:
             await neo4j_service.query("CREATE INDEX product_id_title_opt FOR (p:Product) ON (p.id, p.title)")
         except:
@@ -97,7 +97,7 @@ async def optimized_llm_mass_extract():
             batch_result = await neo4j_service.query(batch_query, params)
             
             if not batch_result:
-                print("✅ No more products to process")
+                print(" No more products to process")
                 break
             
             # Update cursor
@@ -183,12 +183,12 @@ async def optimized_llm_mass_extract():
         elapsed = time.time() - start_time
         total_cost = updated * 0.015
         
-        print(f"\n✅ OPTIMIZED LLM EXTRACTION COMPLETE!")
+        print(f"\n OPTIMIZED LLM EXTRACTION COMPLETE!")
         print(f"📊 Total processed: {processed:,}")
         print(f"🔄 Total updated: {updated:,}")
         print(f"⏱️ Time elapsed: {elapsed/3600:.1f} hours")
         print(f"💰 Total cost: ${total_cost:.2f}")
-        print(f"🤖 Model: {extractor.model}")
+        print(f" Model: {extractor.model}")
         
         # Create relationships efficiently
         print(f"\n🔗 Creating optimized relationships...")
@@ -228,14 +228,14 @@ async def optimized_llm_mass_extract():
         for rel_query in rel_queries:
             try:
                 await neo4j_service.query(rel_query)
-                print(f"  ✅ Relationship batch created")
+                print(f"   Relationship batch created")
             except Exception as e:
                 print(f"  ⚠️ Relationship error: {e}")
         
-        print(f"🎉 Optimized LLM extraction complete! Enhanced knowledge graph ready!")
+        print(f" Optimized LLM extraction complete! Enhanced knowledge graph ready!")
         
     except Exception as e:
-        print(f"❌ Optimized extraction failed: {e}")
+        print(f" Optimized extraction failed: {e}")
         import traceback
         traceback.print_exc()
 

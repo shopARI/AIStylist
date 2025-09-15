@@ -12,7 +12,7 @@ async def up(redis_client):
     try:
         # This may require admin privileges
         await redis_client.client.config_set("maxmemory-policy", "allkeys-lru")
-        print("✅ Set Redis maxmemory-policy to allkeys-lru")
+        print(" Set Redis maxmemory-policy to allkeys-lru")
     except Exception as e:
         print(f"⚠️ Could not set maxmemory-policy (may require admin): {e}")
     
@@ -31,7 +31,7 @@ async def up(redis_client):
         "config:key_ttls", 
         mapping={k: str(v) for k, v in key_ttl_config.items()}
     )
-    print("✅ Configured default TTL policies for key patterns")
+    print(" Configured default TTL policies for key patterns")
     
     # 3. Set up Redis key naming conventions documentation
     key_conventions = {
@@ -48,17 +48,17 @@ async def up(redis_client):
         "config:key_conventions",
         mapping=key_conventions
     )
-    print("✅ Documented key naming conventions")
+    print(" Documented key naming conventions")
     
     # 4. Initialize migration tracking
     await redis_client.client.set("migration:redis_setup", "applied")
-    print("✅ Initialized migration tracking in Redis")
+    print(" Initialized migration tracking in Redis")
     
     # 5. Set up monitoring keys
     await redis_client.client.set("stats:redis_migration_date", str(int(__import__('time').time())))
     await redis_client.client.set("stats:redis_version", "initial")
     
-    print("✅ Redis key structure and policies configured successfully")
+    print(" Redis key structure and policies configured successfully")
 
 async def down(redis_client):
     """Rollback migration - clean up Redis configuration."""
@@ -80,4 +80,4 @@ async def down(redis_client):
     
     # Note: We don't reset maxmemory-policy as it might affect other applications
     
-    print("✅ Redis configuration rollback completed")
+    print(" Redis configuration rollback completed")

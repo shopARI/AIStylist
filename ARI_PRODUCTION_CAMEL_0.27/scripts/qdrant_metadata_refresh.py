@@ -26,23 +26,23 @@ class QdrantMetadataRefresher:
         
         try:
             # 1. Check current metadata state
-            print("🔍 Checking current metadata state...")
+            print(" Checking current metadata state...")
             await self._check_metadata_consistency()
             
             # 2. Try various refresh methods
-            print("\n🛠️ Attempting metadata refresh...")
+            print("\n Attempting metadata refresh...")
             
             # Method 1: Collection optimization (forces metadata recalculation)
             success = await self._optimize_collection()
             if success:
-                print("✅ Method 1: Collection optimization successful")
+                print(" Method 1: Collection optimization successful")
             else:
                 print("⚠️ Method 1: Collection optimization failed, trying alternatives...")
                 
                 # Method 2: Flush segments (forces index update)
                 success = await self._flush_collection()
                 if success:
-                    print("✅ Method 2: Segment flush successful")
+                    print(" Method 2: Segment flush successful")
                 else:
                     print("⚠️ Method 2: Segment flush failed, trying final method...")
                     
@@ -50,12 +50,12 @@ class QdrantMetadataRefresher:
                     await self._wait_for_sync()
             
             # 3. Verify fix
-            print("\n✅ VERIFICATION")
+            print("\n VERIFICATION")
             print("-" * 40)
             await self._check_metadata_consistency()
             
         except Exception as e:
-            print(f"❌ Error during metadata refresh: {e}")
+            print(f" Error during metadata refresh: {e}")
     
     async def _check_metadata_consistency(self):
         """Check if metadata is consistent with actual data"""
@@ -79,17 +79,17 @@ class QdrantMetadataRefresher:
                 print(f"⚠️ Discrepancy: {discrepancy:,} vectors ({percentage:.1f}%)")
                 return False
             else:
-                print("✅ Metadata is consistent!")
+                print(" Metadata is consistent!")
                 return True
                 
         except Exception as e:
-            print(f"❌ Error checking metadata: {e}")
+            print(f" Error checking metadata: {e}")
             return False
     
     async def _optimize_collection(self) -> bool:
         """Optimize collection to force metadata refresh"""
         try:
-            print("🔧 Running collection optimization...")
+            print(" Running collection optimization...")
             
             # This forces Qdrant to rebuild indexes and update metadata
             # Note: This can take time for large collections
@@ -112,7 +112,7 @@ class QdrantMetadataRefresher:
             return True
             
         except Exception as e:
-            print(f"❌ Collection optimization failed: {e}")
+            print(f" Collection optimization failed: {e}")
             return False
     
     async def _flush_collection(self) -> bool:
@@ -127,7 +127,7 @@ class QdrantMetadataRefresher:
                 self.client._client.post(
                     path=f"/collections/{self.collection_name}/segments/flush",
                 )
-                print("✅ Segments flushed successfully")
+                print(" Segments flushed successfully")
                 
                 await asyncio.sleep(5)
                 return True
@@ -137,7 +137,7 @@ class QdrantMetadataRefresher:
                 return False
                 
         except Exception as e:
-            print(f"❌ Segment flush failed: {e}")
+            print(f" Segment flush failed: {e}")
             return False
     
     async def _wait_for_sync(self):
@@ -153,13 +153,13 @@ class QdrantMetadataRefresher:
             
             is_consistent = await self._check_metadata_consistency()
             if is_consistent:
-                print(f"✅ Metadata synced after {i + check_interval} seconds!")
+                print(f" Metadata synced after {i + check_interval} seconds!")
                 return
             
             print(f"⏳ Still waiting... ({i + check_interval}/{max_wait_time}s)")
         
         print("⚠️ Natural sync timeout - metadata may still be stale")
-        print("💡 Try running this script again later, or consider recreating the collection")
+        print(" Try running this script again later, or consider recreating the collection")
     
     async def force_metadata_refresh(self):
         """Nuclear option: Force complete metadata refresh"""
@@ -168,7 +168,7 @@ class QdrantMetadataRefresher:
         
         confirm = input("Type 'FORCE_REFRESH' to proceed: ")
         if confirm != 'FORCE_REFRESH':
-            print("❌ Force refresh cancelled")
+            print(" Force refresh cancelled")
             return
         
         try:
@@ -187,20 +187,20 @@ class QdrantMetadataRefresher:
                 )
             )
             
-            print("✅ Metadata refresh initiated")
+            print(" Metadata refresh initiated")
             print("⏳ This may take 10-30 minutes for large collections")
             
         except Exception as e:
-            print(f"❌ Force refresh failed: {e}")
+            print(f" Force refresh failed: {e}")
 
 async def main():
     refresher = QdrantMetadataRefresher()
     
-    print("🔍 Checking if metadata refresh is needed...")
+    print(" Checking if metadata refresh is needed...")
     is_consistent = await refresher._check_metadata_consistency()
     
     if is_consistent:
-        print("\n✅ Metadata is already consistent - no refresh needed!")
+        print("\n Metadata is already consistent - no refresh needed!")
         return
     
     print("\n⚠️ Stale metadata detected - proceeding with refresh...")

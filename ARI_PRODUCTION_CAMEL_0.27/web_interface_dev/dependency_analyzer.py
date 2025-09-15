@@ -35,7 +35,7 @@ class DependencyAnalyzer:
         # Step 1: Discover all Python files
         py_files = self.discover_files()
         if not py_files:
-            return "❌ No Python files found in the specified directory!"
+            return " No Python files found in the specified directory!"
         
         print(f"Found {len(py_files)} Python files", file=sys.stderr)
         
@@ -455,7 +455,7 @@ class DependencyAnalyzer:
         lines.append("")
         
         # Hub files (imported by many others)
-        lines.append("🎯 HUB FILES (Central to your codebase)")
+        lines.append(" HUB FILES (Central to your codebase)")
         lines.append("-" * 40)
         hub_files = [(f, deps) for f, deps in self.imported_by.items() if len(deps) > 0]
         hub_files.sort(key=lambda x: len(x[1]), reverse=True)
@@ -556,7 +556,7 @@ class DependencyAnalyzer:
             
             # Recommend if this is a good refactoring group
             if total_lines < 2000 and len(cluster) <= 5:
-                lines.append(f"  ✅ Good size for refactoring together")
+                lines.append(f"   Good size for refactoring together")
             elif total_lines > 5000:
                 lines.append(f"  ⚠️  Too large - consider breaking into smaller groups")
             else:
@@ -572,7 +572,7 @@ class DependencyAnalyzer:
         lines.append("")
         
         # Refactoring recommendations
-        lines.append("🎯 RECOMMENDED REFACTORING GROUPS")
+        lines.append(" RECOMMENDED REFACTORING GROUPS")
         lines.append("-" * 40)
         recommendations = self.generate_recommendations(clusters)
         
@@ -1094,7 +1094,7 @@ class DependencyAnalyzer:
         lines.append("")
         
         # Hub files (imported by many others)
-        lines.append("🎯 HUB FILES (Central to your codebase)")
+        lines.append(" HUB FILES (Central to your codebase)")
         lines.append("-" * 40)
         hub_files = [(f, deps) for f, deps in self.imported_by.items() if len(deps) > 0]
         hub_files.sort(key=lambda x: len(x[1]), reverse=True)
@@ -1174,7 +1174,7 @@ class DependencyAnalyzer:
         lines.append("")
         
         # Refactoring recommendations
-        lines.append("🎯 RECOMMENDED REFACTORING GROUPS")
+        lines.append(" RECOMMENDED REFACTORING GROUPS")
         lines.append("-" * 40)
         recommendations = self.generate_recommendations(clusters)
         for i, rec in enumerate(recommendations[:5], 1):

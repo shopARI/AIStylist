@@ -16,7 +16,7 @@ async def up(qdrant_client):
         existing_collections = [col.name for col in collections.collections]
         
         if collection_name in existing_collections:
-            print(f"✅ Collection '{collection_name}' already exists, skipping creation")
+            print(f" Collection '{collection_name}' already exists, skipping creation")
             return
         
         # Create collection with optimal settings for fashion embeddings
@@ -46,10 +46,10 @@ async def up(qdrant_client):
             replication_factor=1  # Single replica for now
         )
         
-        print(f"✅ Created Qdrant collection '{collection_name}' with optimized settings")
+        print(f" Created Qdrant collection '{collection_name}' with optimized settings")
         
     except Exception as e:
-        print(f"❌ Failed to create collection: {e}")
+        print(f" Failed to create collection: {e}")
         raise
 
 async def down(qdrant_client):
@@ -63,13 +63,13 @@ async def down(qdrant_client):
         existing_collections = [col.name for col in collections.collections]
         
         if collection_name not in existing_collections:
-            print(f"✅ Collection '{collection_name}' does not exist, skipping deletion")
+            print(f" Collection '{collection_name}' does not exist, skipping deletion")
             return
         
         # WARNING: This will delete all data in the collection
         await qdrant_client.client.delete_collection(collection_name)
-        print(f"✅ Deleted Qdrant collection '{collection_name}'")
+        print(f" Deleted Qdrant collection '{collection_name}'")
         
     except Exception as e:
-        print(f"❌ Failed to delete collection: {e}")
+        print(f" Failed to delete collection: {e}")
         raise

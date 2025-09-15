@@ -41,15 +41,15 @@ class VerboseBattleExecutor(BattleExecutor):
         start_time = time.time()
         self.stats["battles_executed"] += 1
         
-        print(f"BATTLE ARENA: '{query[:50]}...'")
+        print(f"AGENT SEARCH: '{query[:50]}...'")
         print("=" * 80)
         
         try:
-            # Show battle preparation
-            self._show_battle_preparation(query, filters, ml_intelligence, user_context, conversation_context)
+            # Show search preparation
+            self._show_search_preparation(query, filters, ml_intelligence, user_context, conversation_context)
             
-            # Prepare battle parameters
-            battle_params = {
+            # Prepare search parameters
+            search_params = {
                 "query": query,
                 "limit": prefetch_limit,
                 "filters": filters,
@@ -61,7 +61,7 @@ class VerboseBattleExecutor(BattleExecutor):
             # Execute parallel searches with mind visibility
             print("\nLAUNCHING PARALLEL AGENT SEARCHES...")
             print("-" * 50)
-            cypher_results, vibe_results = await self._verbose_parallel_search(battle_params)
+            cypher_results, vibe_results = await self._verbose_parallel_search(search_params)
             
             print(f"\nSEARCH RESULTS:")
             print(f"   CypherBot found: {len(cypher_results)} products")
@@ -76,7 +76,7 @@ class VerboseBattleExecutor(BattleExecutor):
                 print(f"   After consensus: CypherBot={len(cypher_results)}, VibeBot={len(vibe_results)}")
             
             # Judge evaluation with mind visibility
-            print(f"\nJUDGE ARI EVALUATION PHASE...")
+            print(f"\nARI STYLIST EVALUATION PHASE...")
             print("-" * 50)
             judgment = await self._verbose_judge_evaluation(
                 cypher_results, vibe_results, query, ml_intelligence, user_context, limit
@@ -97,8 +97,8 @@ class VerboseBattleExecutor(BattleExecutor):
             execution_time = time.time() - start_time
             self._update_avg_time(execution_time)
             
-            # Show final battle summary
-            self._show_battle_summary(judgment, execution_time, final_products)
+            # Show final search summary
+            self._show_search_summary(judgment, execution_time, final_products)
             
             # Build result
             result = {
@@ -121,8 +121,8 @@ class VerboseBattleExecutor(BattleExecutor):
             return result
             
         except Exception as e:
-            print(f"\nBATTLE SYSTEM ERROR: {e}")
-            logger.error(f"Verbose battle execution error: {e}")
+            print(f"\nSEARCH SYSTEM ERROR: {e}")
+            logger.error(f"Verbose search execution error: {e}")
             self.stats["total_errors"] += 1
             
             return {
@@ -136,9 +136,9 @@ class VerboseBattleExecutor(BattleExecutor):
                 "error": True
             }
     
-    def _show_battle_preparation(self, query, filters, ml_intelligence, user_context, conversation_context=None):
-        """Show the battle preparation phase"""
-        print(f"BATTLE PREPARATION:")
+    def _show_search_preparation(self, query, filters, ml_intelligence, user_context, conversation_context=None):
+        """Show the search preparation phase"""
+        print(f"SEARCH PREPARATION:")
         print(f"   Query: '{query}'")
         
         if filters:
@@ -164,7 +164,7 @@ class VerboseBattleExecutor(BattleExecutor):
         else:
             print(f"   Conversation Context: None")
     
-    async def _verbose_parallel_search(self, battle_params):
+    async def _verbose_parallel_search(self, search_params):
         """Execute searches with detailed agent mind output"""
         # Store thoughts for later display
         self._cypher_thoughts = []
@@ -184,11 +184,11 @@ class VerboseBattleExecutor(BattleExecutor):
         print(f"\nEXECUTING SEARCHES IN PARALLEL...")
         
         cypher_task = asyncio.create_task(
-            self._track_cypher_search(battle_params)
+            self._track_cypher_search(search_params)
         )
         
         vibe_task = asyncio.create_task(
-            self._track_vibe_search(battle_params)
+            self._track_vibe_search(search_params)
         )
         
         # Wait for both with error handling
@@ -220,19 +220,19 @@ class VerboseBattleExecutor(BattleExecutor):
         
         return cypher_results, vibe_results
     
-    async def _track_cypher_search(self, battle_params):
+    async def _track_cypher_search(self, search_params):
         """Track CypherBot search with progress updates"""
         try:
             print(f"   CypherBot: Initiating graph search...")
             start_time = time.time()
             
-            results = await self.cypher_bot.search(**battle_params)
+            results = await self.cypher_bot.search(**search_params)
             
             search_time = time.time() - start_time
             print(f"   CypherBot: Found {len(results) if results else 0} products in {search_time:.2f}s")
             
             # Show ML Intelligence usage
-            ml_intel = battle_params.get('ml_intelligence')
+            ml_intel = search_params.get('ml_intelligence')
             if ml_intel and ml_intel.get('cypher_intel'):
                 self._show_agent_intelligence_usage("CypherBot", results, ml_intel)
             
@@ -252,20 +252,20 @@ class VerboseBattleExecutor(BattleExecutor):
             self._cypher_thoughts.append(f"Search failed: {e}")
             raise
     
-    async def _track_vibe_search(self, battle_params):
+    async def _track_vibe_search(self, search_params):
         """Track VibeBot search with progress updates"""
         try:
             print(f"   VibeBot: Initiating vector search...")
-            print(f"   VibeBot: Battle params: {battle_params}")
+            print(f"   VibeBot: Search params: {search_params}")
             start_time = time.time()
             
-            results = await self.vibe_bot.search(**battle_params)
+            results = await self.vibe_bot.search(**search_params)
             
             search_time = time.time() - start_time
             print(f"   VibeBot: Found {len(results) if results else 0} products in {search_time:.2f}s")
             
             # Show ML Intelligence usage
-            ml_intel = battle_params.get('ml_intelligence')
+            ml_intel = search_params.get('ml_intelligence')
             if ml_intel and ml_intel.get('vibe_intel'):
                 self._show_agent_intelligence_usage("VibeBot", results, ml_intel)
             
@@ -291,8 +291,8 @@ class VerboseBattleExecutor(BattleExecutor):
         """Judge evaluation with detailed thought process"""
         self._judge_thoughts = []
         
-        print(f"Judge Ari: Analyzing battle results...")
-        print(f"Judge Ari: Comparing {len(cypher_results)} vs {len(vibe_results)} products...")
+        print(f"Ari Stylist: Analyzing results...")
+        print(f"Ari Stylist: Comparing {len(cypher_results)} vs {len(vibe_results)} products...")
         
         # Find overlapping products
         cypher_ids = {r.get('id') for r in cypher_results if r.get('id')}
@@ -300,11 +300,11 @@ class VerboseBattleExecutor(BattleExecutor):
         consensus_products = cypher_ids & vibe_ids
         
         if consensus_products:
-            print(f"Judge Ari: Found {len(consensus_products)} consensus products - strong agreement!")
+            print(f"Ari Stylist: Found {len(consensus_products)} consensus products - strong agreement!")
         else:
-            print(f"Judge Ari: No consensus products - need to weigh different approaches...")
+            print(f"Ari Stylist: No consensus products - need to weigh different approaches...")
         
-        print(f"Judge Ari: Evaluating product quality and relevance...")
+        print(f"Ari Stylist: Evaluating product quality and relevance...")
         start_time = time.time()
         
         try:
@@ -318,20 +318,20 @@ class VerboseBattleExecutor(BattleExecutor):
             )
             
             eval_time = time.time() - start_time
-            print(f"Judge Ari: Evaluation completed in {eval_time:.2f}s")
+            print(f"Ari Stylist: Evaluation completed in {eval_time:.2f}s")
             
             winner = judgment.get('winner', 'unknown')
             reasoning = judgment.get('reasoning', '')
             
-            print(f"Judge Ari: VERDICT - Winner: {winner.upper()}")
+            print(f"Ari Stylist: VERDICT - Winner: {winner.upper()}")
             if reasoning:
-                print(f"Judge Ari: Reasoning: {reasoning[:100]}...")
+                print(f"Ari Stylist: Reasoning: {reasoning[:100]}...")
             
             self._judge_thoughts.append(f"Evaluated in {eval_time:.2f}s, declared {winner} winner")
             return judgment
             
         except Exception as e:
-            print(f"Judge Ari: Error during evaluation - {e}")
+            print(f"Ari Stylist: Error during evaluation - {e}")
             self._judge_thoughts.append(f"Evaluation failed: {e}")
             return {
                 "products": cypher_results + vibe_results,
@@ -340,17 +340,17 @@ class VerboseBattleExecutor(BattleExecutor):
                 "consensus_count": len(consensus_products)
             }
     
-    def _show_battle_summary(self, judgment, execution_time, final_products):
-        """Show final battle summary"""
+    def _show_search_summary(self, judgment, execution_time, final_products):
+        """Show final search summary"""
         print(f"\n" + "=" * 80)
-        print(f"BATTLE SUMMARY")
+        print(f"SEARCH SUMMARY")
         print("=" * 80)
-        print(f"Total Battle Time: {execution_time:.2f}s")
+        print(f"Total Search Time: {execution_time:.2f}s")
         print(f"Winner: {judgment.get('winner', 'unknown').upper()}")
         print(f"Final Products Selected: {len(final_products)}")
         
         if judgment.get('reasoning'):
-            print(f"Judge's Reasoning: {judgment['reasoning']}")
+            print(f"Ari Stylist's Reasoning: {judgment['reasoning']}")
         
         print(f"Consensus Products: {judgment.get('consensus_count', 0)}")
         print("=" * 80)

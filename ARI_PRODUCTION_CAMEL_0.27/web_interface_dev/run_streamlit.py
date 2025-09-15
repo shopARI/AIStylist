@@ -17,16 +17,16 @@ def main():
     # Check if .env exists
     env_file = script_dir / ".env"
     if not env_file.exists():
-        print("❌ .env file not found!")
+        print(" .env file not found!")
         print("Please ensure the .env file is present in the project directory")
         return 1
     
-    print("🚀 Starting AIStylist Multi-Agent Web Interface...")
+    print(" Starting AIStylist Multi-Agent Web Interface...")
     print(f"📂 Working directory: {script_dir}")
     print("🌐 The interface will open in your browser at http://localhost:8501")
     print("")
     print("Features:")
-    print("  🤖 Chat with ARI Fashion AI")
+    print("   Chat with ARI Fashion AI")
     print("  👁️ See agent thinking processes")
     print("  📊 Real-time ML intelligence")
     print("  🛍️ Product recommendations")
@@ -44,7 +44,7 @@ def main():
         subprocess.run(cmd, check=True)
         
     except subprocess.CalledProcessError as e:
-        print(f"❌ Error launching Streamlit: {e}")
+        print(f" Error launching Streamlit: {e}")
         return 1
     except KeyboardInterrupt:
         print("\n👋 AIStylist web interface stopped")

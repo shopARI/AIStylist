@@ -81,11 +81,11 @@ def initialize_services():
                 loop.close()
             
             st.session_state.services_initialized = True
-            st.success("✅ Services initialized successfully!")
+            st.success(" Services initialized successfully!")
             return True
             
     except Exception as e:
-        st.error(f"❌ Failed to initialize services: {e}")
+        st.error(f" Failed to initialize services: {e}")
         logger.error(f"Service initialization error: {e}", exc_info=True)
         return False
 
@@ -229,7 +229,7 @@ def display_agent_output(agent_name: str, outputs: List[Dict[str, Any]], color: 
         st.info(f"No output from {agent_name} yet")
         return
     
-    with st.expander(f"🤖 {agent_name} ({len(outputs)} outputs)", expanded=True):
+    with st.expander(f" {agent_name} ({len(outputs)} outputs)", expanded=True):
         for output in outputs[-3:]:  # Show last 3 outputs
             timestamp = datetime.fromisoformat(output['timestamp']).strftime("%H:%M:%S")
             
@@ -285,7 +285,7 @@ def display_products(products: List[Dict[str, Any]]):
 
 def main():
     """Main Streamlit application"""
-    st.title("🎨 ARI Fashion AI - Simple Interface")
+    st.title(" ARI Fashion AI - Simple Interface")
     st.markdown("---")
     
     # Initialize services
@@ -321,7 +321,7 @@ def main():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.header("🤖 Chat with ARI")
+        st.header(" Chat with ARI")
         
         # Chat input
         query = st.text_input(
@@ -372,7 +372,7 @@ def main():
                     "products": result["products"]
                 })
                 
-                st.success("✅ Response generated!")
+                st.success(" Response generated!")
                 st.rerun()
         
         # Display last response
@@ -387,7 +387,7 @@ def main():
                     display_products(last_msg["products"])
     
     with col2:
-        st.header("🔍 Agent Insights")
+        st.header(" Agent Insights")
         
         tab1, tab2, tab3, tab4 = st.tabs(["CypherBot", "VibeBot", "Intelligence", "Judge"])
         
@@ -417,7 +417,7 @@ def main():
     
     with col1:
         if st.session_state.services_initialized:
-            st.success("✅ Ready")
+            st.success(" Ready")
         else:
             st.warning("⚠️ Initializing...")
     

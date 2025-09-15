@@ -39,7 +39,7 @@ class SimpleARIChat:
         
     async def initialize_system(self):
         """Initialize the ARI system with graceful fallbacks."""
-        print("\n🚀 Initializing ARI Fashion Stylist System...")
+        print("\n Initializing ARI Fashion Stylist System...")
         
         try:
             # Try to import and initialize core services
@@ -80,12 +80,12 @@ class SimpleARIChat:
                 print(f"  ⚠ Product retriever unavailable: {e}")
                 self.product_retriever = None
             
-            print("✅ Core services initialized!\n")
+            print(" Core services initialized!\n")
             self.system_ready = True
             return True
             
         except Exception as e:
-            print(f"❌ Failed to initialize: {e}")
+            print(f" Failed to initialize: {e}")
             print("Running in minimal fallback mode...\n")
             self.system_ready = False
             return False
@@ -125,7 +125,7 @@ class SimpleARIChat:
                 # This is a shopping query - search for actual products
                 if self.product_retriever:
                     try:
-                        print(f"🔍 Searching for products: '{message}'")
+                        print(f" Searching for products: '{message}'")
                         products = await self.product_retriever.search_by_natural_language(
                             query=message,
                             top_k=5,
@@ -249,23 +249,23 @@ class SimpleARIChat:
                     current_debug = os.getenv("ARI_DEBUG", "")
                     if current_debug:
                         os.environ.pop("ARI_DEBUG", None)
-                        print("🔍 Debug mode OFF")
+                        print(" Debug mode OFF")
                     else:
                         os.environ["ARI_DEBUG"] = "1"
-                        print("🔍 Debug mode ON")
+                        print(" Debug mode ON")
                     continue
                 
                 if message.lower() == 'status':
-                    print("\n🔧 System Status:")
-                    print(f"  Intent Detector: {'✅ Ready' if self.intent_detector else '❌ Unavailable'}")
-                    print(f"  Agent Factory: {'✅ Ready' if self.agent_factory else '❌ Unavailable'}")
-                    print(f"  Conversation Handler: {'✅ Ready' if self.conversation_handler else '❌ Unavailable'}")
-                    print(f"  System Ready: {'✅ Yes' if self.system_ready else '❌ No'}")
+                    print("\n System Status:")
+                    print(f"  Intent Detector: {' Ready' if self.intent_detector else ' Unavailable'}")
+                    print(f"  Agent Factory: {' Ready' if self.agent_factory else ' Unavailable'}")
+                    print(f"  Conversation Handler: {' Ready' if self.conversation_handler else ' Unavailable'}")
+                    print(f"  System Ready: {' Yes' if self.system_ready else ' No'}")
                     print(f"  Messages: {self.conversation_count}")
                     continue
                 
                 # Process message
-                print("🤖 ARI is thinking...")
+                print(" ARI is thinking...")
                 ari_response, metadata = await self.process_message(message)
                 
                 # Increment conversation count
@@ -281,7 +281,7 @@ class SimpleARIChat:
                 print("\n\n👋 Input stream ended. Goodbye!\n")
                 break
             except Exception as e:
-                print(f"\n❌ Unexpected error: {e}")
+                print(f"\n Unexpected error: {e}")
                 print("Continuing chat...\n")
                 continue
 

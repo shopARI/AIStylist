@@ -19,7 +19,7 @@ async def preflight_database_check(settings) -> None:
     Raises:
         SystemExit: If any critical database connection fails
     """
-    logger.info("🔍 Starting pre-flight database connection checks...")
+    logger.info(" Starting pre-flight database connection checks...")
     
     checks = []
     
@@ -35,10 +35,10 @@ async def preflight_database_check(settings) -> None:
     failed_services = []
     for i, (service_name, result) in enumerate(zip([check[0] for check in checks], results)):
         if isinstance(result, Exception):
-            logger.error(f"❌ {service_name} connection failed: {result}")
+            logger.error(f" {service_name} connection failed: {result}")
             failed_services.append(service_name)
         else:
-            logger.info(f"✅ {service_name} connection verified")
+            logger.info(f" {service_name} connection verified")
     
     # Immediate failure if any critical service is down
     if failed_services:
@@ -47,7 +47,7 @@ async def preflight_database_check(settings) -> None:
         logger.error("🚨 Application will NOT start with missing database connections.")
         sys.exit(1)  # Immediate exit - no graceful degradation
     
-    logger.info("✅ All database connections verified. Application can start safely.")
+    logger.info(" All database connections verified. Application can start safely.")
 
 
 async def _check_neo4j_connection(settings) -> None:

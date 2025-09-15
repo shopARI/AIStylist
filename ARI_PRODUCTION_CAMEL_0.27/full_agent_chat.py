@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Full ARI Agent Battle Chat Interface
-Uses the complete multi-agent architecture: CypherBot, VibeBot, Judge Ari, ML Intelligence
+Full ARI Agent Collaboration Chat Interface
+Uses the complete multi-agent architecture: CypherBot, VibeBot, Ari Stylist, ML Intelligence
 """
 
 import asyncio
@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 load_dotenv()
 
 class FullAgentARIChat:
-    """Complete ARI chat interface using the full multi-agent battle system."""
+    """Complete ARI chat interface using the full multi-agent collaboration system."""
     
     def __init__(self):
         self.session_id = f"full_agent_{int(time.time())}"
@@ -34,7 +34,7 @@ class FullAgentARIChat:
     async def initialize_system(self):
         """Initialize the COMPLETE ARI system with all agents and intelligence."""
         print("Initializing COMPLETE ARI Fashion Stylist System")
-        print("   This includes: CypherBot, VibeBot, Judge Ari, ML Intelligence")
+        print("   This includes: CypherBot, VibeBot, Ari Stylist, ML Intelligence")
         print()
         
         try:
@@ -53,11 +53,11 @@ class FullAgentARIChat:
             print("COMPLETE MULTI-AGENT SYSTEM READY!")
             print("   CypherBot: Neo4j graph query specialist")
             print("   VibeBot: Vector similarity search expert") 
-            print("   Judge Ari: Intelligent result evaluator")
+            print("   Ari Stylist: Intelligent result curator")
             print("   ML Intelligence: User profiling & personalization")
             print("   Session Memory: Redis-backed conversation context")
             print("   Intent Detection: LLM + hardcoded hybrid system")
-            print("   Battle Orchestrator: Agent competition framework")
+            print("   Agent Orchestrator: Collaborative recommendation framework")
             print()
             
             self.system_ready = True
@@ -83,7 +83,7 @@ class FullAgentARIChat:
             return "Complete system not initialized", {}
         
         try:
-            print(f"ENGAGING FULL AGENT BATTLE SYSTEM...")
+            print(f"ENGAGING FULL AGENT COLLABORATION SYSTEM...")
             print(f"   Query: '{message}'")
             print()
             
@@ -108,13 +108,13 @@ class FullAgentARIChat:
             return chat_response.response, metadata
             
         except Exception as e:
-            print(f"Agent battle system error: {e}")
+            print(f"Agent collaboration system error: {e}")
             import traceback
             traceback.print_exc()
-            return f"The agent battle system encountered an issue processing: '{message}'. Please try again.", {}
+            return f"The agent collaboration system encountered an issue processing: '{message}'. Please try again.", {}
     
     def display_response(self, user_message: str, ari_response: str, metadata: Dict[str, Any]):
-        """Display the complete agent battle results."""
+        """Display the complete agent collaboration results."""
         print("\n" + "="*80)
         print(f"USER: {user_message}")
         print("="*80)
@@ -123,7 +123,7 @@ class FullAgentARIChat:
         
         # Show agent battle details
         if metadata:
-            print("AGENT BATTLE DETAILS:")
+            print("AGENT COLLABORATION DETAILS:")
             if "intent" in metadata:
                 print(f"   Intent: {metadata['intent']}")
             if "confidence" in metadata:
@@ -135,18 +135,18 @@ class FullAgentARIChat:
             if "products_found" in metadata:
                 print(f"   Products Found: {metadata['products_found']}")
             
-            # Show battle metadata if available
+            # Show collaboration metadata if available
             if "battle_metadata" in metadata:
-                battle_data = metadata["battle_metadata"]
-                print("   BATTLE RESULTS:")
-                if "winner" in battle_data:
-                    print(f"      Winner: {battle_data['winner']}")
-                if "cypher_count" in battle_data:
-                    print(f"      CypherBot Results: {battle_data['cypher_count']}")
-                if "vibe_count" in battle_data:
-                    print(f"      VibeBot Results: {battle_data['vibe_count']}")
-                if "battle_time" in battle_data:
-                    print(f"      Battle Duration: {battle_data['battle_time']:.2f}s")
+                collaboration_data = metadata["battle_metadata"]
+                print("   COLLABORATION RESULTS:")
+                if "winner" in collaboration_data:
+                    print(f"      Best Source: {collaboration_data['winner']}")
+                if "cypher_count" in collaboration_data:
+                    print(f"      CypherBot Results: {collaboration_data['cypher_count']}")
+                if "vibe_count" in collaboration_data:
+                    print(f"      VibeBot Results: {collaboration_data['vibe_count']}")
+                if "battle_time" in collaboration_data:
+                    print(f"      Collaboration Duration: {collaboration_data['battle_time']:.2f}s")
             
             # Show ML intelligence if available
             if "ml_enhanced" in metadata and metadata["ml_enhanced"]:
@@ -158,7 +158,7 @@ class FullAgentARIChat:
         print()
     
     async def run_chat(self):
-        """Run the complete agent battle chat interface."""
+        """Run the complete agent collaboration chat interface."""
         print("="*80)
         print("ARI FASHION STYLIST - COMPLETE MULTI-AGENT SYSTEM")
         print(f"Session: {self.session_id}")
@@ -201,7 +201,7 @@ class FullAgentARIChat:
                     print("   Multi-Agent Components:")
                     print("      CypherBot (Neo4j specialist)")
                     print("      VibeBot (Vector search expert)")
-                    print("      Judge Ari (Result evaluator)")
+                    print("      Ari Stylist (Result curator)")
                     print("      ML Intelligence (Personalization)")
                     print("      Enhanced Session Memory (Persistent context)")
                     
@@ -250,7 +250,7 @@ class FullAgentARIChat:
                     continue
                 
                 # Process message through COMPLETE agent system
-                print(f"\nLaunching agent battle for: '{message}'")
+                print(f"\nLaunching agent collaboration for: '{message}'")
                 ari_response, metadata = await self.process_message(message)
                 
                 # Increment conversation count
@@ -260,14 +260,14 @@ class FullAgentARIChat:
                 self.display_response(message, ari_response, metadata)
                 
             except KeyboardInterrupt:
-                print("\n\nAgent battle interrupted. Goodbye!\n")
+                print("\n\nAgent collaboration interrupted. Goodbye!\n")
                 break
             except EOFError:
                 print("\n\nInput stream ended. Goodbye!\n")
                 break
             except Exception as e:
                 print(f"\nUnexpected error: {e}")
-                print("Continuing agent battles...\n")
+                print("Continuing agent collaboration...\n")
                 continue
 
 async def main():

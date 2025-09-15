@@ -34,7 +34,7 @@ async def explore_neo4j_schema():
     
     try:
         print("="*80)
-        print("🔍 NEO4J GRAPH SCHEMA ANALYSIS")
+        print(" NEO4J GRAPH SCHEMA ANALYSIS")
         print("="*80)
         
         # 1. Get all node labels
@@ -139,16 +139,16 @@ async def explore_neo4j_schema():
             import uuid
             try:
                 uuid.UUID(str(product_id))
-                print(f"    ✅ {product_id} (Valid UUID)")
+                print(f"     {product_id} (Valid UUID)")
             except ValueError:
-                print(f"    ❌ {product_id} (Not UUID format)")
+                print(f"     {product_id} (Not UUID format)")
         
         print("\n" + "="*80)
-        print("✅ Schema analysis complete!")
+        print(" Schema analysis complete!")
         print("="*80)
         
     except Exception as e:
-        print(f"❌ Error during exploration: {e}")
+        print(f" Error during exploration: {e}")
         import traceback
         traceback.print_exc()
     

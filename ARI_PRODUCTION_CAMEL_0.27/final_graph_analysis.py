@@ -14,7 +14,7 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 from services.user.knowledge_graph import UserKnowledgeGraphService
 
 async def comprehensive_graph_analysis():
-    print('🔍 COMPREHENSIVE GRAPH ANALYSIS - POST ENHANCEMENT')
+    print(' COMPREHENSIVE GRAPH ANALYSIS - POST ENHANCEMENT')
     print('=' * 70)
     
     service = UserKnowledgeGraphService(
@@ -50,7 +50,7 @@ async def comprehensive_graph_analysis():
         print(f'   TOTAL NODES: {total_nodes:,}')
         
         # === PRODUCT ENHANCEMENT ANALYSIS ===
-        print('\n🤖 AI ENHANCEMENT ANALYSIS:')
+        print('\n AI ENHANCEMENT ANALYSIS:')
         print('-' * 35)
         
         # Products with AI extraction
@@ -95,7 +95,7 @@ async def comprehensive_graph_analysis():
         print(f'   TOTAL RELATIONSHIPS: {all_rels:,}')
         
         # === TOP ATTRIBUTES ANALYSIS ===
-        print('\n🎨 TOP EXTRACTED ATTRIBUTES:')
+        print('\n TOP EXTRACTED ATTRIBUTES:')
         print('-' * 35)
         
         # Top colors
@@ -158,7 +158,7 @@ async def comprehensive_graph_analysis():
         coverage = (ai_enhanced / total_prod_count * 100) if total_prod_count > 0 else 0
         print(f'   AI Enhancement Coverage: {coverage:.1f}% ({ai_enhanced:,}/{total_prod_count:,})')
         
-        print('\n🎉 GRAPH ENHANCEMENT SUMMARY:')
+        print('\n GRAPH ENHANCEMENT SUMMARY:')
         print('-' * 35)
         print(f'   Before: ~135 relationships, minimal metadata')
         print(f'   After: {all_rels:,} relationships, full AI metadata')

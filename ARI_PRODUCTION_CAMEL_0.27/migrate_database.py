@@ -29,7 +29,7 @@ class DatabaseMigrator:
         print(f"\n🔄 Migrating {count:,} {label} nodes...")
         
         if count == 0:
-            print(f"✅ No {label} nodes to migrate")
+            print(f" No {label} nodes to migrate")
             return
             
         batches = (count + self.batch_size - 1) // self.batch_size
@@ -79,13 +79,13 @@ class DatabaseMigrator:
                         for i, props in enumerate(nodes_data):
                             remote_session.run(f"CREATE (n:{label} $props)", props=props)
                 
-                print(f"  ✅ Batch {batch + 1} completed ({limit:,} nodes)")
+                print(f"   Batch {batch + 1} completed ({limit:,} nodes)")
                 
             except Exception as e:
-                print(f"  ❌ Batch {batch + 1} failed: {e}")
+                print(f"   Batch {batch + 1} failed: {e}")
                 raise
                 
-        print(f"✅ {label} migration completed!")
+        print(f" {label} migration completed!")
     
     def migrate_relationships(self):
         """Migrate all relationships"""
@@ -108,7 +108,7 @@ class DatabaseMigrator:
                 rel_count = result.single()['count']
             
             if rel_count == 0:
-                print(f"✅ No {rel_type} relationships to migrate")
+                print(f" No {rel_type} relationships to migrate")
                 continue
                 
             print(f"Found {rel_count:,} {rel_type} relationships")
@@ -170,17 +170,17 @@ class DatabaseMigrator:
                                 rel_props=rel_props
                             )
                     
-                    print(f"  ✅ Batch {batch + 1} completed")
+                    print(f"   Batch {batch + 1} completed")
                     
                 except Exception as e:
-                    print(f"  ❌ Batch {batch + 1} failed: {e}")
+                    print(f"   Batch {batch + 1} failed: {e}")
                     # Continue with next batch
                     continue
     
     def verify_migration(self):
         """Verify the migration completed successfully"""
         
-        print(f"\n🔍 VERIFYING MIGRATION...")
+        print(f"\n VERIFYING MIGRATION...")
         
         # Compare node counts
         with self.local_driver.session() as local_session:
@@ -199,7 +199,7 @@ class DatabaseMigrator:
                 result = remote_session.run(f"MATCH (n:{label}) RETURN count(n) as count")
                 remote_count = result.single()['count']
             
-            status = "✅" if local_count == remote_count else "❌"
+            status = "" if local_count == remote_count else ""
             print(f"{status} {label}: Local={local_count:,} Remote={remote_count:,}")
         
         # Compare relationship counts
@@ -222,13 +222,13 @@ class DatabaseMigrator:
                 except:
                     remote_count = 0
             
-            status = "✅" if local_count == remote_count else "❌"
+            status = "" if local_count == remote_count else ""
             print(f"{status} {rel_type}: Local={local_count:,} Remote={remote_count:,}")
     
     def run_migration(self):
         """Run the complete migration"""
         
-        print("🚀 STARTING DATABASE MIGRATION")
+        print(" STARTING DATABASE MIGRATION")
         print("From: bolt://0.0.0.0:17687 (local)")
         print("To: bolt://34.135.40.119:7687/productionbackup2")
         print("=" * 50)
@@ -257,10 +257,10 @@ class DatabaseMigrator:
             # Verify migration
             self.verify_migration()
             
-            print(f"\n🎉 MIGRATION COMPLETED SUCCESSFULLY!")
+            print(f"\n MIGRATION COMPLETED SUCCESSFULLY!")
             
         except Exception as e:
-            print(f"\n❌ MIGRATION FAILED: {e}")
+            print(f"\n MIGRATION FAILED: {e}")
         
         finally:
             self.local_driver.close()

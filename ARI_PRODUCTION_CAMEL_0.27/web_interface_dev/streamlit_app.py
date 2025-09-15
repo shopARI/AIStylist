@@ -112,10 +112,10 @@ def initialize_application():
                 st.session_state.container = container
                 st.session_state.app_service = app_service
                 
-                st.success("✅ AIStylist system initialized successfully!")
+                st.success(" AIStylist system initialized successfully!")
                 return True
         except Exception as e:
-            st.error(f"❌ Failed to initialize system: {e}")
+            st.error(f" Failed to initialize system: {e}")
             logger.error(f"Initialization error: {e}", exc_info=True)
             return False
     return True
@@ -127,7 +127,7 @@ def display_agent_output(agent_name: str, outputs: List[Dict[str, Any]], color: 
         return
     
     # Create expandable section for each agent
-    with st.expander(f"🤖 {agent_name} ({len(outputs)} outputs)", expanded=True):
+    with st.expander(f" {agent_name} ({len(outputs)} outputs)", expanded=True):
         for output in outputs[-3:]:  # Show last 3 outputs
             timestamp = datetime.fromisoformat(output['timestamp']).strftime("%H:%M:%S")
             
@@ -244,7 +244,7 @@ def main():
     init_session_state()
     
     # Header
-    st.title("🎨 ARI Fashion AI - Multi-Agent Interface")
+    st.title(" ARI Fashion AI - Multi-Agent Interface")
     st.markdown("---")
     
     # Initialize application
@@ -283,7 +283,7 @@ def main():
     col1, col2 = st.columns([2, 1])
     
     with col1:
-        st.header("🤖 Chat with ARI")
+        st.header(" Chat with ARI")
         
         # Chat input
         query = st.text_input(
@@ -321,7 +321,7 @@ def main():
                 response = process_query(query)
                 
                 if response:
-                    st.success("✅ Response generated!")
+                    st.success(" Response generated!")
                     st.rerun()
         
         # Display current response and products
@@ -341,7 +341,7 @@ def main():
                     st.json(results["metadata"])
     
     with col2:
-        st.header("🔍 Agent Insights")
+        st.header(" Agent Insights")
         
         # Tabs for different agent views
         tab1, tab2, tab3, tab4 = st.tabs(["CypherBot", "VibeBot", "Intelligence", "Judge"])
@@ -383,9 +383,9 @@ def main():
             
             # Show intelligence modules
             st.markdown("**Active Modules:**")
-            st.markdown("- 🧠 Behavioral Intelligence")
+            st.markdown("-  Behavioral Intelligence")
             st.markdown("- 👁️ Visual Intelligence") 
-            st.markdown("- 🎯 Clustering Intelligence")
+            st.markdown("-  Clustering Intelligence")
             st.markdown("- 💭 Memory-RAG")
         
         with tab4:
@@ -412,7 +412,7 @@ def main():
         if st.session_state.processing:
             st.warning("🔄 Processing...")
         else:
-            st.success("✅ Ready")
+            st.success(" Ready")
     
     with col2:
         st.metric("System Status", "Online" if st.session_state.container else "Offline")

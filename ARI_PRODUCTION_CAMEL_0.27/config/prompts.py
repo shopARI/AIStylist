@@ -205,10 +205,10 @@ def validate_prompts() -> bool:
     
     for name, prompt in required_prompts:
         if not prompt or not isinstance(prompt, str) or len(prompt) < 100:
-            print(f"❌ Invalid prompt: {name}")
+            print(f" Invalid prompt: {name}")
             return False
     
-    print(f"✅ All {len(required_prompts)} critical prompts validated")
+    print(f" All {len(required_prompts)} critical prompts validated")
     return True
 
 # =============================================================================
