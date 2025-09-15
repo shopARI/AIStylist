@@ -53,7 +53,7 @@ class HybridIntentDetector:
     
     def __init__(
         self,
-        strategy: DetectionStrategy = DetectionStrategy.LLM_FIRST,
+        strategy: DetectionStrategy = DetectionStrategy.LLM_ONLY,
         llm_confidence_threshold: float = 0.7,
         enable_comparison_logging: bool = True
     ):
@@ -415,7 +415,7 @@ _hybrid_detector: Optional[HybridIntentDetector] = None
 
 
 def get_hybrid_intent_detector(
-    strategy: DetectionStrategy = DetectionStrategy.LLM_FIRST
+    strategy: DetectionStrategy = DetectionStrategy.LLM_ONLY
 ) -> HybridIntentDetector:
     """Get singleton hybrid intent detector"""
     global _hybrid_detector

@@ -135,9 +135,11 @@ class BattleExecutor:
             execution_time = time.time() - start_time
             self._update_avg_time(execution_time)
             
-            # Build result
+            # Build result with both agent results for Ari's review
             result = {
                 "products": final_products,
+                "cypher_products": cypher_results,  # Add CypherBot raw results
+                "vibe_products": vibe_results,      # Add VibeBot raw results
                 "cypher_count": len(cypher_results),
                 "vibe_count": len(vibe_results),
                 "winner": judgment.get("winner", "unknown"),

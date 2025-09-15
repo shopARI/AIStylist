@@ -113,104 +113,34 @@ class LLMIntentDetector:
     def _create_intent_agent(self):
         """Create CAMEL agent specialized for fashion intent detection"""
         
-        system_message = """You are a fashion intent detection specialist. Your job is to understand customer queries and extract structured information for a fashion recommendation system.
+        system_message = """You understand customer queries for a fashion shopping system using common sense.
 
-AVAILABLE INTENTS:
-- BROWSE: Customer wants to explore options without specific requirements
-- SPECIFIC_ITEM: Customer is looking for a particular type of item
-- INSPIRATION: Customer wants styling ideas and suggestions  
-- COMPARISON: Customer wants to compare different options
-- GIFT: Customer is shopping for someone else
-- OUTFIT: Customer wants coordinated pieces/complete looks
-- BRAND: Customer is interested in specific brands
-- SALE: Customer is looking for deals and discounts
+INTENTS:
+- SPECIFIC_ITEM: Looking for specific clothing/accessories ("black shirt", "need shoes", "want a dress")
+- BROWSE: Exploring options ("show me clothes", "what do you have")
+- INSPIRATION: Style ideas ("outfit ideas", "what should I wear")
+- CONVERSATION_HISTORY: About past conversation ("what did I ask earlier")
+- MEMORY_QUERY: About remembered info ("do you remember my size")
+- CLARIFICATION: Asking to explain ("what do you mean")
+- GENERAL_CONVERSATION: Non-shopping chat
 
-CONVERSATIONAL STYLIST APPROACH - The Art of Natural Transitions:
-You are like a sophisticated stylist who can discuss ANY topic (philosophy, psychology, medicine, science, life experiences) and naturally find moments where fashion becomes relevant to enhance or express what the person is exploring.
+COMMON SENSE RULES:
+- If someone mentions clothing items → SPECIFIC_ITEM
+- If they ask about memory/history → Use memory intents  
+- If they're just chatting → GENERAL_CONVERSATION
 
-WHEN TO SUGGEST PRODUCTS IN NON-FASHION CONVERSATIONS:
-Only suggest products when there is a CLEAR and DIRECT connection to fashion, style, or appearance:
-- Person explicitly mentions wanting to change their look or style
-- Direct mentions of clothing, accessories, or appearance in context of their topic
-- Explicit requests for fashion advice related to their situation
-- Clear statements about wanting to express something through clothing
+Extract: categories, colors, occasions, style_preferences, price_range, brand_preferences
 
-IMPORTANT: NEVER suggest products for these contexts (use BROWSE intent with confidence <0.3):
-
-**NEWS & CURRENT EVENTS:**
-- Any mention of news, headlines, current events, politics, elections
-- Questions about what happened, breaking news, media reports
-- Discussions about public figures, government, political parties
-
-**ACADEMIC & PROFESSIONAL:**
-- Scientific studies, research findings, academic discussions  
-- Medical advice, health topics, clinical information
-- Work situations, career advice, professional development
-- Educational content, learning, explanations of concepts
-
-**PERSONAL & SOCIAL:**
-- Relationship advice, family discussions, friendship issues
-- Personal opinions, beliefs, philosophical discussions
-- Life advice, emotional support, personal experiences
-- Questions asking for explanations or general knowledge
-
-**CONVERSATIONAL PATTERNS:**
-- Questions starting with: "Did you see/hear...", "What do you think...", "Tell me about..."
-- Information seeking: "Explain...", "How does...", "Why is...", "What happened..."
-- Opinion requests: "Your thoughts on...", "Do you believe...", "What's your view..."
-
-THE ELEGANT BRIDGE:
-Fashion connections should ONLY happen when the person explicitly mentions clothing, style, appearance, or fashion terms. All other topics should remain purely conversational with BROWSE intent and low confidence.
-
-CRITICAL: Use INSPIRATION intent (0.8+ confidence) ONLY when there is explicit fashion/style language in the message itself.
-
-EXTRACTION TASKS:
-1. Identify the PRIMARY INTENT from the options above
-2. Extract specific parameters:
-   - categories: clothing/accessory types mentioned
-   - occasions: events or situations mentioned
-   - style_preferences: style descriptors (casual, formal, trendy, etc.)
-   - colors: any colors mentioned
-   - size_preferences: any sizes mentioned  
-   - price_range: budget information (min/max)
-   - brand_preferences: specific brands mentioned
-   - materials: fabric types mentioned
-
-RESPONSE FORMAT:
-Always respond with valid JSON in this exact format:
+ALWAYS respond with valid JSON:
 {
   "intent": "SPECIFIC_ITEM",
   "confidence": 0.9,
   "parameters": {
-    "categories": ["dress", "shoes"],
-    "occasions": ["wedding"], 
-    "style_preferences": ["elegant", "formal"],
-    "colors": ["blue", "navy"],
-    "size_preferences": ["medium"],
-    "price_range": {"min": 100, "max": 300},
-    "brand_preferences": ["gucci"],
-    "materials": ["silk"]
+    "categories": ["shirt"],
+    "colors": ["black"]
   },
-  "reasoning": "Customer is looking for a specific dress for a wedding, mentions elegant style and blue color preference"
-}
-
-IMPORTANT RULES:
-- Use semantic understanding, not just keyword matching
-- Understand synonyms and variations (e.g., "flowy" = loose/flowing, "comfy" = comfortable)
-- Handle typos naturally
-- Consider context and implied needs
-- Only include parameters that are clearly mentioned or strongly implied
-- Use empty arrays/objects for missing information
-- Confidence should reflect how certain you are about the intent (0.0-1.0)
-
-EXAMPLES OF NATURAL CONVERSATIONAL BRIDGES:
-- "I'm going through a career transition and need to feel more confident" → INSPIRATION intent (0.7 confidence), reasoning: "Life transition with confidence needs - perfect moment to suggest power pieces that support their transformation"
-- "studying medicine is so stressful, I need comfort" → INSPIRATION intent (0.6 confidence), categories: ["loungewear", "knitwear"], reasoning: "Stress and comfort needs during medical studies - opportunity for cozy, confidence-building pieces"
-- "I love autumn colors, they make me feel grounded" → INSPIRATION intent (0.8 confidence), colors: ["autumn"], reasoning: "Color psychology connection - natural bridge to seasonal pieces in those grounding tones"
-- "discussing quantum physics with a colleague today" → LOW confidence unless they mention feelings/identity/expression
-- "feeling disconnected from my creative side lately" → INSPIRATION intent (0.6 confidence), reasoning: "Creative identity crisis - opportunity to suggest artistic, expressive pieces that could reconnect them with creativity"
-
-The magic happens when ANY conversation reveals something about how they want to FEEL, BE, or EXPRESS themselves."""
+  "reasoning": "User wants a black shirt"
+}"""
 
         return create_agent(
             system_message=system_message,
@@ -301,15 +231,37 @@ Please analyze this fashion query and extract the structured information as JSON
                 response = self.agent.step(user_message)
             
             # Step 4: Parse LLM response
-            # Handle different response formats in CAMEL 0.2.7
-            if hasattr(response, 'content'):
+            # Handle CAMEL 0.2.7 response format
+            if hasattr(response, 'msgs') and response.msgs:
+                # CAMEL 0.2.7 returns msgs list, get the last message
+                last_msg = response.msgs[-1]
+                if hasattr(last_msg, 'content'):
+                    response_content = last_msg.content
+                else:
+                    response_content = str(last_msg)
+            elif hasattr(response, 'content'):
                 response_content = response.content
-            elif hasattr(response, 'msg'):
-                response_content = response.msg.content if hasattr(response.msg, 'content') else str(response.msg)
             elif hasattr(response, 'message'):
                 response_content = response.message.content if hasattr(response.message, 'content') else str(response.message)
             else:
                 response_content = str(response)
+            
+            # Debug logging
+            logger.debug(f"LLM raw response type: {type(response)}")
+            logger.debug(f"LLM response content length: {len(response_content)}")
+            logger.debug(f"LLM response content: '{response_content[:200]}...' (truncated)")
+            
+            # Check for empty response
+            if not response_content or len(response_content.strip()) == 0:
+                logger.error("LLM returned empty response")
+                return LLMIntentResult(
+                    primary_intent=SearchIntent.BROWSE,
+                    confidence=0.1,
+                    extracted_parameters={},
+                    reasoning="LLM returned empty response",
+                    processing_time=time.time() - start_time,
+                    used_knowledge=[]
+                )
             
             result = self._parse_llm_response(response_content, query, relevant_knowledge)
             result.processing_time = time.time() - start_time

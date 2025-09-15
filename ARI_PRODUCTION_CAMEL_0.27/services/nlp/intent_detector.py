@@ -48,8 +48,70 @@ class IntentDetector:
     def __init__(self):
         """Initialize intent detector with patterns."""
         
-        # Intent patterns
+        # Intent patterns - CONVERSATION INTENTS FIRST (higher priority)
         self.intent_patterns = {
+            # Conversation/Memory Intents - CHECK THESE FIRST
+            SearchIntent.CONVERSATION_HISTORY: [
+                r"what did i ask",
+                r"what did i say",
+                r"what did i tell you",
+                r"my first question",
+                r"earlier i asked",
+                r"at the beginning", 
+                r"what were we talking about",
+                r"before this",
+                r"what was my original",
+                r"remember what we discussed",
+                r".*what did i say.*",
+                r".*what did i tell.*",
+                r".*what was i asking.*",
+                r".*said to you.*",
+                r".*told you.*"
+            ],
+            SearchIntent.MEMORY_QUERY: [
+                r"do you remember",
+                r"you know i like",
+                r"recall my",
+                r"you mentioned earlier",
+                r"i told you before",
+                r"my favorite.*that i mentioned",
+                r"the.*i said i prefer"
+            ],
+            SearchIntent.CLARIFICATION: [
+                r"what do you mean by",
+                r"what do you mean",
+                r"can you explain",
+                r"i don't understand",
+                r"tell me more about",
+                r"elaborate on",
+                r"what exactly",
+                r"i'm confused",
+                r"that doesn't make sense",
+                r"can you clarify",
+                r"what.*mean by",
+                r"explain.*agents"
+            ],
+            SearchIntent.SYSTEM_STATUS: [
+                r"how do you find products",
+                r"what's your process",
+                r"how does this work",
+                r"who are the agents",
+                r"what's cypher bot",
+                r"how do agents compete",
+                r"what can you do",
+                r"how smart are you",
+                r"what's your memory"
+            ],
+            SearchIntent.GENERAL_CONVERSATION: [
+                r"nice weather",
+                r"how are you",
+                r"good morning",
+                r"hello there",
+                r"thanks for",
+                r"that's interesting",
+                r"cool story"
+            ],
+            # Product Search Intents - CHECK THESE AFTER CONVERSATION INTENTS
             SearchIntent.BROWSE: [
                 r"show me",
                 r"browse",
@@ -68,7 +130,11 @@ class IntentDetector:
                 r"i'd like (?:a |an )?(\w+)",
                 r"could you (?:help me )?find",
                 r"recommend (?:some |a |an )?(\w+)",
-                r"suggest (?:some |a |an )?(\w+)"
+                r"suggest (?:some |a |an )?(\w+)",
+                # Direct product mentions - CRITICAL FIX
+                r"\b(?:black|white|red|blue|green|navy|gray|grey)\s+(?:shirt|t-?shirt|tee|blouse|top)",
+                r"\b(?:shirt|t-?shirt|tee|blouse|top|dress|pants|jeans|jacket|coat|shoes|boots)\b",
+                r"\b(?:any|some)\s+(?:black|white|red|blue)\s+(?:shirt|t-?shirt|tee)"
             ],
             SearchIntent.INSPIRATION: [
                 r"inspire me",

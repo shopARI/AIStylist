@@ -147,8 +147,9 @@ class ApplicationService:
                 enhanced_message = f"{memory_context} | Current request: {message}"
                 logger.info(f"Enhanced message with comprehensive memory context: {len(memory_context)} chars")
             
-            # 2. Detect intent and extract parameters using LLM/HYBRID - enhanced message
-            hybrid_result = await self.intent_detector.detect_intent_and_extract(enhanced_message)
+            # 2. Detect intent and extract parameters using LLM/HYBRID - use RAW message for intent detection
+            # Enhanced context can bias intent detection, so use clean message for intent classification
+            hybrid_result = await self.intent_detector.detect_intent_and_extract(message)
             intent = hybrid_result.primary_intent
             score = hybrid_result.confidence
             params = hybrid_result.extracted_parameters
@@ -190,6 +191,40 @@ class ApplicationService:
                 "what about", "how about", "other colors", "different sizes", "similar to", 
                 "like this", "more like", "details on", "info on", "about this"
             ])
+            
+            # CONVERSATION/MEMORY INTENT HANDLING - Take priority over product search
+            if intent in [SearchIntent.CONVERSATION_HISTORY, SearchIntent.MEMORY_QUERY, 
+                         SearchIntent.CLARIFICATION, SearchIntent.SYSTEM_STATUS, SearchIntent.GENERAL_CONVERSATION]:
+                logger.info(f"Handling conversation intent: {intent.name} (confidence: {score:.2f})")
+                
+                if intent == SearchIntent.CONVERSATION_HISTORY:
+                    response_text = await self._handle_conversation_history(session_id, message)
+                elif intent == SearchIntent.MEMORY_QUERY:
+                    response_text = await self._handle_memory_query(session_id, message, params)
+                elif intent == SearchIntent.CLARIFICATION:
+                    response_text = await self._handle_clarification(session_id, message)
+                elif intent == SearchIntent.SYSTEM_STATUS:
+                    response_text = await self._handle_system_status(message)
+                else:  # GENERAL_CONVERSATION
+                    response_text = await self._handle_general_conversation(message)
+                
+                metadata = {
+                    "intent": intent.name,
+                    "confidence": score,
+                    "method": hybrid_result.detection_method,
+                    "conversation_intent": True,
+                    "products": []
+                }
+                
+                processing_time = time.time() - start_time
+                metadata["processing_time_seconds"] = round(processing_time, 2)
+                
+                return ChatResponse(
+                    response=response_text,
+                    products=[],
+                    session_id=session_id,
+                    metadata=metadata
+                )
             
             # Only search products when there's clear shopping intent OR product continuation
             should_search_products = (
@@ -234,15 +269,18 @@ class ApplicationService:
                 # Product search requested (new search or continuation)
                 if is_product_continuation:
                     logger.info(f"Routing to product continuation - Current products: {len(conversation_context.current_products)}")
-                    # For continuations, pass current product context
+                    # For continuations, pass current product context and enhanced message with conversation context
+                    search_message = enhanced_message if enhanced_message else message
                     response_text, metadata = await self._handle_product_search(
-                        message, params, user_context, background_tasks, session_id,
+                        search_message, params, user_context, background_tasks, session_id,
                         current_products=conversation_context.current_products
                     )
                 else:
                     logger.info(f"Routing to new product search - Intent: {intent.name}, Score: {score:.2f}")
+                    # For new searches, use enhanced message if available to provide context for vague queries
+                    search_message = enhanced_message if enhanced_message else message
                     response_text, metadata = await self._handle_product_search(
-                        message, params, user_context, background_tasks, session_id
+                        search_message, params, user_context, background_tasks, session_id
                     )
                 
                 # Add LLM intent metadata to product search results
@@ -355,7 +393,13 @@ class ApplicationService:
         )
 
         products = battle_results.get("products", [])
-        response_text = self._generate_product_response(products, message)
+        cypher_products = battle_results.get("cypher_products", [])
+        vibe_products = battle_results.get("vibe_products", [])
+        
+        # Generate response that shows both agent results for Ari's review
+        response_text = self._generate_collaborative_response(
+            products, cypher_products, vibe_products, message, battle_results
+        )
         
         # Extract detailed reasoning from judgment
         judgment = battle_results.get("judgment", {})
@@ -365,8 +409,12 @@ class ApplicationService:
             "intent": "product_search",
             "parameters": params,
             "products": products,
+            "cypher_products": cypher_products,  # Include raw CypherBot results
+            "vibe_products": vibe_products,      # Include raw VibeBot results
             "battle_winner": judgment.get("winner", "unknown"),
-            "detailed_reasoning": detailed_reasoning
+            "detailed_reasoning": detailed_reasoning,
+            "cypher_count": len(cypher_products),
+            "vibe_count": len(vibe_products)
         }
         
         return response_text, metadata
@@ -453,6 +501,71 @@ class ApplicationService:
 
         return response
 
+    def _generate_collaborative_response(
+        self, 
+        final_products: List[Dict], 
+        cypher_products: List[Dict], 
+        vibe_products: List[Dict], 
+        query: str, 
+        battle_results: Dict[str, Any]
+    ) -> str:
+        """
+        Creates a collaborative response showing both agent findings for Ari's review.
+        Presents what CypherBot and VibeBot found, then Ari's final decisions.
+        """
+        if not final_products and not cypher_products and not vibe_products:
+            return "I couldn't find any items that matched your request. Perhaps you could describe it a bit differently for me?"
+
+        # Start with Ari's introduction
+        response = f"I found several options for '{query}'. Here's what my team discovered:\n\n"
+        
+        # Show CypherBot results
+        if cypher_products:
+            response += f"🔍 **CypherBot found {len(cypher_products)} items from graph search:**\n"
+            for product in cypher_products[:3]:
+                title = product.get("title", "an item")
+                price = product.get("price", 0)
+                response += f"   • {title} - ${price:.2f}\n"
+            if len(cypher_products) > 3:
+                response += f"   • ... and {len(cypher_products) - 3} more\n"
+        else:
+            response += "🔍 **CypherBot:** No matches found in graph search\n"
+        
+        response += "\n"
+        
+        # Show VibeBot results  
+        if vibe_products:
+            response += f"✨ **VibeBot found {len(vibe_products)} items from semantic search:**\n"
+            for product in vibe_products[:3]:
+                title = product.get("title", "an item")
+                price = product.get("price", 0)
+                response += f"   • {title} - ${price:.2f}\n"
+            if len(vibe_products) > 3:
+                response += f"   • ... and {len(vibe_products) - 3} more\n"
+        else:
+            response += "✨ **VibeBot:** No matches found in semantic search\n"
+        
+        response += "\n"
+        
+        # Show Ari's final decisions
+        if final_products:
+            winner = battle_results.get("winner", "unknown")
+            response += f"👗 **My Final Recommendations ({len(final_products)} items):**\n"
+            response += f"   *Based on {winner}'s expertise and overall quality*\n\n"
+            
+            for product in final_products[:5]:
+                title = product.get("title", "an item")
+                price = product.get("price", 0)
+                response += f"   ⭐ {title} - ${price:.2f}\n"
+                
+            if len(final_products) > 5:
+                response += f"   ... and {len(final_products) - 5} more in your full results\n"
+        else:
+            response += "👗 **My Assessment:** None of these quite meet our quality standards.\n"
+            response += "Let me know if you'd like me to search with different criteria!"
+        
+        return response
+
     async def _store_comprehensive_memory(
         self,
         session_id: str,
@@ -487,3 +600,84 @@ class ApplicationService:
                 
         except Exception as e:
             logger.error(f"Failed to store comprehensive memory for {session_id}: {e}")
+    
+    # CONVERSATION INTENT HANDLERS
+    
+    async def _handle_conversation_history(self, session_id: str, message: str) -> str:
+        """Handle conversation history queries using CAMEL memory systems"""
+        try:
+            # Get conversation history from session memory
+            context = await self.session_memory.get_session_context(session_id, context_turns=10)
+            
+            if not context:
+                return "We just started our conversation! I don't have any previous conversation history to share."
+            
+            # Extract relevant parts based on the question
+            if "beginning" in message.lower() or "first" in message.lower():
+                # Get the first few exchanges
+                first_context = context[:200] if len(context) > 200 else context
+                return f"At the beginning of our conversation, you asked: {first_context}"
+            elif "earlier" in message.lower() or "before" in message.lower():
+                return f"Earlier in our conversation: {context[:300]}"
+            else:
+                return f"Here's what we've been discussing: {context[:400]}"
+                
+        except Exception as e:
+            logger.error(f"Error retrieving conversation history: {e}")
+            return "I'm having trouble accessing our conversation history right now. Could you refresh my memory?"
+    
+    async def _handle_memory_query(self, session_id: str, message: str, params: dict) -> str:
+        """Handle memory queries about stored preferences using CAMEL memory"""
+        try:
+            # Get user preferences from enhanced session memory
+            preferences = await self.session_memory.get_user_preferences(session_id)
+            
+            if not preferences:
+                return "I don't have any stored preferences for you yet. As we continue talking, I'll learn about your style!"
+            
+            # Format preferences in a friendly way
+            pref_text = []
+            for category, items in preferences.items():
+                if items and isinstance(items, list) and len(items) > 0:
+                    pref_text.append(f"- {category.title()}: {', '.join(items[:3])}")
+            
+            if pref_text:
+                return f"Here's what I remember about your preferences:\n" + "\n".join(pref_text)
+            else:
+                return "I have some information stored but it's still building up. Keep sharing your preferences!"
+                
+        except Exception as e:
+            logger.error(f"Error retrieving memory: {e}")
+            return "I'm having trouble accessing my memory right now. Could you remind me what you're looking for?"
+    
+    async def _handle_clarification(self, session_id: str, message: str) -> str:
+        """Handle clarification requests"""
+        clarifications = {
+            "agent collaboration": "My CypherBot (graph search) and VibeBot (vector search) work together to find the best products for you. Ari Stylist evaluates and combines their results!",
+            "how this works": "I use multiple AI agents that search our product database in different ways, then collaborate to give you the best recommendations.",
+            "cypher": "CypherBot is my graph database specialist - he's great at finding products based on specific criteria and relationships.",
+            "vibe": "VibeBot is my aesthetic expert - he finds products based on style similarity and visual vibes.",
+            "ari stylist": "Ari Stylist evaluates the results from both agents and curates the most relevant recommendations for you."
+        }
+        
+        message_lower = message.lower()
+        for keyword, explanation in clarifications.items():
+            if keyword in message_lower:
+                return explanation
+        
+        return "I'd be happy to clarify! Could you be more specific about what you'd like me to explain?"
+    
+    async def _handle_system_status(self, message: str) -> str:
+        """Handle system status and capability questions"""
+        if "agent" in message.lower():
+            return "I have three main agents: CypherBot (graph search), VibeBot (vector search), and Ari Stylist (result curation). They work together to find you great fashion pieces!"
+        elif "memory" in message.lower():
+            return "I use CAMEL-AI's advanced memory system with conversation history, user preferences, and semantic long-term memory to remember our interactions."
+        elif "work" in message.lower() or "process" in message.lower():
+            return "I analyze your request, determine intent, then my agents collaborate to find the best products. Ari Stylist curates the results based on relevance and quality!"
+        else:
+            return "I'm an AI fashion stylist powered by multiple specialized agents and advanced memory systems. I can help you find products, remember your preferences, and provide personalized recommendations!"
+    
+    async def _handle_general_conversation(self, message: str) -> str:
+        """Handle general conversation that's not fashion-related"""
+        return "I enjoy chatting! While I'm primarily here to help with fashion and style, I'm happy to have a friendly conversation. Is there anything fashion-related I can help you with today?"
