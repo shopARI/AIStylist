@@ -521,7 +521,7 @@ class ApplicationService:
         
         # Show CypherBot results
         if cypher_products:
-            response += f"🔍 **CypherBot found {len(cypher_products)} items from graph search:**\n"
+            response += f"**CypherBot found {len(cypher_products)} items from graph search:**\n"
             for product in cypher_products[:3]:
                 title = product.get("title", "an item")
                 price = product.get("price", 0)
@@ -529,13 +529,13 @@ class ApplicationService:
             if len(cypher_products) > 3:
                 response += f"   • ... and {len(cypher_products) - 3} more\n"
         else:
-            response += "🔍 **CypherBot:** No matches found in graph search\n"
+            response += "**CypherBot:** No matches found in graph search\n"
         
         response += "\n"
         
         # Show VibeBot results  
         if vibe_products:
-            response += f"✨ **VibeBot found {len(vibe_products)} items from semantic search:**\n"
+            response += f"**VibeBot found {len(vibe_products)} items from semantic search:**\n"
             for product in vibe_products[:3]:
                 title = product.get("title", "an item")
                 price = product.get("price", 0)
@@ -543,25 +543,25 @@ class ApplicationService:
             if len(vibe_products) > 3:
                 response += f"   • ... and {len(vibe_products) - 3} more\n"
         else:
-            response += "✨ **VibeBot:** No matches found in semantic search\n"
+            response += "**VibeBot:** No matches found in semantic search\n"
         
         response += "\n"
         
         # Show Ari's final decisions
         if final_products:
             winner = battle_results.get("winner", "unknown")
-            response += f"👗 **My Final Recommendations ({len(final_products)} items):**\n"
+            response += f"**My Final Recommendations ({len(final_products)} items):**\n"
             response += f"   *Based on {winner}'s expertise and overall quality*\n\n"
             
             for product in final_products[:5]:
                 title = product.get("title", "an item")
                 price = product.get("price", 0)
-                response += f"   ⭐ {title} - ${price:.2f}\n"
+                response += f"   • {title} - ${price:.2f}\n"
                 
             if len(final_products) > 5:
                 response += f"   ... and {len(final_products) - 5} more in your full results\n"
         else:
-            response += "👗 **My Assessment:** None of these quite meet our quality standards.\n"
+            response += "**My Assessment:** None of these quite meet our quality standards.\n"
             response += "Let me know if you'd like me to search with different criteria!"
         
         return response
