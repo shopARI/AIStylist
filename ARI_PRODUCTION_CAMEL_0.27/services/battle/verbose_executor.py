@@ -30,6 +30,7 @@ class VerboseBattleExecutor(BattleExecutor):
         limit: int = 5,
         user_context: Optional[Dict[str, Any]] = None,
         ml_intelligence: Optional[Dict[str, Any]] = None,
+        conversation_context: Optional[Dict[str, Any]] = None,
         prefetch_limit: int = 10,
         quality_threshold: float = 0.5,
         require_consensus: bool = False
@@ -45,7 +46,7 @@ class VerboseBattleExecutor(BattleExecutor):
         
         try:
             # Show battle preparation
-            self._show_battle_preparation(query, filters, ml_intelligence, user_context)
+            self._show_battle_preparation(query, filters, ml_intelligence, user_context, conversation_context)
             
             # Prepare battle parameters
             battle_params = {
@@ -53,7 +54,8 @@ class VerboseBattleExecutor(BattleExecutor):
                 "limit": prefetch_limit,
                 "filters": filters,
                 "ml_intelligence": ml_intelligence,
-                "user_context": user_context
+                "user_context": user_context,
+                "conversation_context": conversation_context
             }
             
             # Execute parallel searches with mind visibility
@@ -134,7 +136,7 @@ class VerboseBattleExecutor(BattleExecutor):
                 "error": True
             }
     
-    def _show_battle_preparation(self, query, filters, ml_intelligence, user_context):
+    def _show_battle_preparation(self, query, filters, ml_intelligence, user_context, conversation_context=None):
         """Show the battle preparation phase"""
         print(f"BATTLE PREPARATION:")
         print(f"   Query: '{query}'")
@@ -152,9 +154,15 @@ class VerboseBattleExecutor(BattleExecutor):
             print(f"   ML Intelligence Enhanced: NO")
         
         if user_context:
-            print(f"   👤 User Context: Available ({len(user_context)} attributes)")
+            print(f"   User Context: Available ({len(user_context)} attributes)")
         else:
-            print(f"   👤 User Context: None")
+            print(f"   User Context: None")
+            
+        if conversation_context:
+            current_products = conversation_context.get("current_products", [])
+            print(f"   Conversation Context: Available ({len(current_products)} current products)")
+        else:
+            print(f"   Conversation Context: None")
     
     async def _verbose_parallel_search(self, battle_params):
         """Execute searches with detailed agent mind output"""

@@ -119,7 +119,8 @@ class VibeBotAgent:
         limit: int = 10,
         filters: Optional[Dict[str, Any]] = None,
         ml_intelligence: Optional[Dict[str, Any]] = None,
-        user_context: Optional[Dict[str, Any]] = None
+        user_context: Optional[Dict[str, Any]] = None,
+        conversation_context: Optional[Dict[str, Any]] = None
     ) -> List[Dict[str, Any]]:
         """
         Search for products using aesthetic similarity.
@@ -129,6 +130,10 @@ class VibeBotAgent:
         
         logger.debug(f">>> {self.name}.search() START")
         logger.info(f"{self.name} searching: query='{query[:50]}...', filters={filters}")
+        
+        # Log conversation context usage
+        if conversation_context and conversation_context.get("current_products"):
+            logger.info(f"VibeBot: Using conversation context with {len(conversation_context['current_products'])} current products")
         
         try:
             # BATTLE DEBUG: Print when called during battle

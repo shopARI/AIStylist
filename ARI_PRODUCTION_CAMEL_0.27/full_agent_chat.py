@@ -33,38 +33,38 @@ class FullAgentARIChat:
         
     async def initialize_system(self):
         """Initialize the COMPLETE ARI system with all agents and intelligence."""
-        print("🚀 Initializing COMPLETE ARI Fashion Stylist System")
+        print("Initializing COMPLETE ARI Fashion Stylist System")
         print("   This includes: CypherBot, VibeBot, Judge Ari, ML Intelligence")
         print()
         
         try:
             # Initialize the full dependency injection container
             from di.container import initialize_container
-            print("⏳ Loading complete system architecture...")
+            print("Loading complete system architecture...")
             
             self.container = await initialize_container()
-            print("✅ Dependency injection container loaded")
+            print("Dependency injection container loaded")
             
             # Get the ApplicationService which orchestrates everything
             self.app_service = await self.container.application_service()
-            print("✅ Application service ready")
+            print("Application service ready")
             
             print()
-            print("🎉 COMPLETE MULTI-AGENT SYSTEM READY!")
-            print("   🤖 CypherBot: Neo4j graph query specialist")
-            print("   🎯 VibeBot: Vector similarity search expert") 
-            print("   ⚖️  Judge Ari: Intelligent result evaluator")
-            print("   🧠 ML Intelligence: User profiling & personalization")
-            print("   💾 Session Memory: Redis-backed conversation context")
-            print("   🔍 Intent Detection: LLM + hardcoded hybrid system")
-            print("   📊 Battle Orchestrator: Agent competition framework")
+            print("COMPLETE MULTI-AGENT SYSTEM READY!")
+            print("   CypherBot: Neo4j graph query specialist")
+            print("   VibeBot: Vector similarity search expert") 
+            print("   Judge Ari: Intelligent result evaluator")
+            print("   ML Intelligence: User profiling & personalization")
+            print("   Session Memory: Redis-backed conversation context")
+            print("   Intent Detection: LLM + hardcoded hybrid system")
+            print("   Battle Orchestrator: Agent competition framework")
             print()
             
             self.system_ready = True
             return True
             
         except Exception as e:
-            print(f"❌ CRITICAL FAILURE: Could not initialize complete system")
+            print(f"CRITICAL FAILURE: Could not initialize complete system")
             print(f"   Error: {e}")
             print("   Please check that all services are running:")
             print("   - Redis server")
@@ -80,10 +80,10 @@ class FullAgentARIChat:
     async def process_message(self, message: str) -> tuple[str, Dict[str, Any]]:
         """Process message through the COMPLETE ARI system with detailed agent mind output."""
         if not self.app_service:
-            return "❌ Complete system not initialized", {}
+            return "Complete system not initialized", {}
         
         try:
-            print(f"🔥 ENGAGING FULL AGENT BATTLE SYSTEM...")
+            print(f"ENGAGING FULL AGENT BATTLE SYSTEM...")
             print(f"   Query: '{message}'")
             print()
             
@@ -98,7 +98,7 @@ class FullAgentARIChat:
             )
             processing_time = time.time() - start_time
             
-            print(f"   ⚡ Processing completed in {processing_time:.2f}s")
+            print(f"   Processing completed in {processing_time:.2f}s")
             
             # Extract metadata
             metadata = chat_response.metadata
@@ -108,7 +108,7 @@ class FullAgentARIChat:
             return chat_response.response, metadata
             
         except Exception as e:
-            print(f"❌ Agent battle system error: {e}")
+            print(f"Agent battle system error: {e}")
             import traceback
             traceback.print_exc()
             return f"The agent battle system encountered an issue processing: '{message}'. Please try again.", {}
@@ -123,7 +123,7 @@ class FullAgentARIChat:
         
         # Show agent battle details
         if metadata:
-            print("🔍 AGENT BATTLE DETAILS:")
+            print("AGENT BATTLE DETAILS:")
             if "intent" in metadata:
                 print(f"   Intent: {metadata['intent']}")
             if "confidence" in metadata:
@@ -138,7 +138,7 @@ class FullAgentARIChat:
             # Show battle metadata if available
             if "battle_metadata" in metadata:
                 battle_data = metadata["battle_metadata"]
-                print("   🥊 BATTLE RESULTS:")
+                print("   BATTLE RESULTS:")
                 if "winner" in battle_data:
                     print(f"      Winner: {battle_data['winner']}")
                 if "cypher_count" in battle_data:
@@ -150,9 +150,9 @@ class FullAgentARIChat:
             
             # Show ML intelligence if available
             if "ml_enhanced" in metadata and metadata["ml_enhanced"]:
-                print("   🧠 ML Intelligence: ACTIVE")
+                print("   ML Intelligence: ACTIVE")
             if "personalized" in metadata and metadata["personalized"]:
-                print("   👤 Personalization: ENABLED")
+                print("   Personalization: ENABLED")
         
         print("="*80)
         print()
@@ -166,16 +166,15 @@ class FullAgentARIChat:
         
         # Initialize the complete system
         if not await self.initialize_system():
-            print("❌ Failed to initialize complete system. Exiting...")
+            print("Failed to initialize complete system. Exiting...")
             return
         
-        print("💬 READY FOR AGENT BATTLES!")
-        print("Ask me anything about fashion and watch the agents compete!")
+        print("Ready! Ask me anything about fashion and let the agents find the best results.")
         print()
         print("Examples:")
-        print("• 'I need a black dress for a wedding'")
-        print("• 'Show me trendy winter coats'")
-        print("• 'What would look good with dark jeans?'")
+        print("- 'I need a black dress for a wedding'")
+        print("- 'Show me trendy winter coats'")
+        print("- 'What would look good with dark jeans?'")
         print()
         print("Commands: 'quit' to exit, 'status' for system status, 'memory' for session memory")
         print()
@@ -190,42 +189,42 @@ class FullAgentARIChat:
                     continue
                 
                 if message.lower() in ['quit', 'exit', 'bye', 'goodbye']:
-                    print("\n👋 Thanks for testing the complete ARI agent system! Goodbye!\n")
+                    print("\nThanks for testing the complete ARI agent system! Goodbye!\n")
                     break
                 
                 if message.lower() == 'status':
-                    print("\n🔧 COMPLETE SYSTEM STATUS:")
-                    print(f"   System Ready: {'✅ YES' if self.system_ready else '❌ NO'}")
+                    print("\nCOMPLETE SYSTEM STATUS:")
+                    print(f"   System Ready: {'YES' if self.system_ready else 'NO'}")
                     print(f"   Session: {self.session_id}")
                     print(f"   Messages Processed: {self.conversation_count}")
-                    print(f"   Application Service: {'✅ Active' if self.app_service else '❌ Inactive'}")
+                    print(f"   Application Service: {'Active' if self.app_service else 'Inactive'}")
                     print("   Multi-Agent Components:")
-                    print("      🤖 CypherBot (Neo4j specialist)")
-                    print("      🎯 VibeBot (Vector search expert)")
-                    print("      ⚖️  Judge Ari (Result evaluator)")
-                    print("      🧠 ML Intelligence (Personalization)")
-                    print("      💾 Enhanced Session Memory (Persistent context)")
+                    print("      CypherBot (Neo4j specialist)")
+                    print("      VibeBot (Vector search expert)")
+                    print("      Judge Ari (Result evaluator)")
+                    print("      ML Intelligence (Personalization)")
+                    print("      Enhanced Session Memory (Persistent context)")
                     
                     # Show session memory stats
                     if self.app_service:
                         try:
                             stats = await self.app_service.session_memory.get_session_stats(self.session_id)
                             if stats.get("exists"):
-                                print(f"   📊 Session Memory Stats:")
+                                print(f"   Session Memory Stats:")
                                 print(f"      • Total conversations: {stats.get('total_turns', 0)}")
-                                print(f"      • Has learning summary: {'✅ Yes' if stats.get('has_summary') else '❌ No'}")
+                                print(f"      • Has learning summary: {'Yes' if stats.get('has_summary') else 'No'}")
                                 print(f"      • Recent activity: {stats.get('recent_activity', 0)} in last hour")
                                 if stats.get('preferred_categories'):
                                     print(f"      • Learned preferences: {', '.join(stats['preferred_categories'])}")
                             else:
-                                print(f"   📊 Session Memory: Fresh session (no history)")
+                                print(f"   Session Memory: Fresh session (no history)")
                         except Exception as e:
-                            print(f"   📊 Session Memory: Error checking stats - {e}")
+                            print(f"   Session Memory: Error checking stats - {e}")
                     print()
                     continue
                 
                 if message.lower() == 'memory':
-                    print("\n🧠 SESSION MEMORY DETAILS:")
+                    print("\nSESSION MEMORY DETAILS:")
                     if self.app_service:
                         try:
                             context = await self.app_service.session_memory.get_session_context(self.session_id, context_turns=10)
@@ -251,7 +250,7 @@ class FullAgentARIChat:
                     continue
                 
                 # Process message through COMPLETE agent system
-                print(f"\n🚀 Launching agent battle for: '{message}'")
+                print(f"\nLaunching agent battle for: '{message}'")
                 ari_response, metadata = await self.process_message(message)
                 
                 # Increment conversation count
@@ -261,13 +260,13 @@ class FullAgentARIChat:
                 self.display_response(message, ari_response, metadata)
                 
             except KeyboardInterrupt:
-                print("\n\n👋 Agent battle interrupted. Goodbye!\n")
+                print("\n\nAgent battle interrupted. Goodbye!\n")
                 break
             except EOFError:
-                print("\n\n👋 Input stream ended. Goodbye!\n")
+                print("\n\nInput stream ended. Goodbye!\n")
                 break
             except Exception as e:
-                print(f"\n❌ Unexpected error: {e}")
+                print(f"\nUnexpected error: {e}")
                 print("Continuing agent battles...\n")
                 continue
 

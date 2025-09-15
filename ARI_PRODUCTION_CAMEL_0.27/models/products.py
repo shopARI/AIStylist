@@ -131,9 +131,27 @@ class Product:
                 normalized[key] = value
         
         # Ensure ID exists and is UUID format (critical for Neo4j consistency)
-        if "id" not in normalized and "product_id" not in normalized:
+        # Check for id, product_id, or uuid field (Qdrant uses 'uuid' field)
+        if "id" not in normalized and "product_id" not in normalized and "uuid" not in normalized:
             # Instead of generating random UUID, reject product to maintain consistency
             raise ValueError("Product missing UUID - cannot maintain Neo4j consistency")
+        
+        # Map uuid field to id for consistency (Qdrant compatibility)
+        if "uuid" in normalized and "id" not in normalized:
+            normalized["id"] = normalized["uuid"]
+        
+        # Check if existing ID is UUID format - if not, this might be legacy data
+        existing_id = normalized.get("id") or normalized.get("product_id")
+        if existing_id:
+            try:
+                uuid.UUID(str(existing_id))
+                # Valid UUID, proceed normally
+            except ValueError:
+                # Invalid UUID format - this is legacy data, but we can still use it
+                logger.warning(f"Product has non-UUID ID format: {existing_id} - allowing for legacy compatibility")
+                # Keep the existing ID even if it's not UUID format
+                if "product_id" in normalized and "id" not in normalized:
+                    normalized["id"] = normalized["product_id"]
         
         # Apply defaults for missing fields
         for field, default_value in DEFAULT_FIELD_VALUES.items():
