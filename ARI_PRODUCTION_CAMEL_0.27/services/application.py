@@ -129,6 +129,18 @@ class ApplicationService:
                 similar_summary = f"Similar past queries: {len(similar_conversations)} found"
                 context_parts.append(similar_summary)
             
+            # Get current conversation context for intent detection (critical fix)
+            conversation_context = self.conversation_handler.get_or_create_session(session_id, user_id)
+            if conversation_context.current_products:
+                product_context = f"Currently viewing {len(conversation_context.current_products)} recommended products"
+                context_parts.append(product_context)
+                logger.info(f"Added product context for intent detection: {len(conversation_context.current_products)} products")
+            
+            # Add conversation state context for better intent detection
+            if conversation_context.state.value != "new":
+                state_context = f"Conversation state: {conversation_context.state.value}"
+                context_parts.append(state_context)
+            
             # Build enhanced message
             if context_parts:
                 memory_context = " | ".join(context_parts)
@@ -169,12 +181,20 @@ class ApplicationService:
                 session_id, message, user_id
             )
             
-            # SIMPLIFIED SMART ROUTING: LLM-first approach, only route to products when confident
+            # CONTEXT-AWARE SMART ROUTING: Consider conversation state and current products
             
-            # Only search products when there's clear shopping intent
-            # Default to conversation for everything else
+            # Check if this is product continuation vs new search
+            has_current_products = bool(conversation_context.current_products)
+            is_product_continuation = has_current_products and any(continuation_phrase in message.lower() for continuation_phrase in [
+                "this", "that", "these", "those", "it", "them", "more about", "tell me about", 
+                "what about", "how about", "other colors", "different sizes", "similar to", 
+                "like this", "more like", "details on", "info on", "about this"
+            ])
+            
+            # Only search products when there's clear shopping intent OR product continuation
             should_search_products = (
                 conversation_response_type == "search" or 
+                is_product_continuation or  # NEW: Handle product continuation scenarios
                 (intent in [SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, 
                            SearchIntent.BRAND, SearchIntent.OUTFIT, SearchIntent.BROWSE] 
                  and score > 0.7) or  # Standard threshold for explicit product intents
@@ -211,16 +231,26 @@ class ApplicationService:
             )
             
             if should_search_products:
-                # Product search requested
-                logger.info(f"Routing to product search - Intent: {intent.name}, Score: {score:.2f}")
-                response_text, metadata = await self._handle_product_search(
-                    message, params, user_context, background_tasks, session_id
-                )
+                # Product search requested (new search or continuation)
+                if is_product_continuation:
+                    logger.info(f"Routing to product continuation - Current products: {len(conversation_context.current_products)}")
+                    # For continuations, pass current product context
+                    response_text, metadata = await self._handle_product_search(
+                        message, params, user_context, background_tasks, session_id,
+                        current_products=conversation_context.current_products
+                    )
+                else:
+                    logger.info(f"Routing to new product search - Intent: {intent.name}, Score: {score:.2f}")
+                    response_text, metadata = await self._handle_product_search(
+                        message, params, user_context, background_tasks, session_id
+                    )
+                
                 # Add LLM intent metadata to product search results
                 metadata.update({
                     "llm_intent": intent.name,
                     "llm_confidence": score,
-                    "llm_method": hybrid_result.detection_method
+                    "llm_method": hybrid_result.detection_method,
+                    "is_continuation": is_product_continuation
                 })
                 # Update conversation context with products
                 if metadata.get("products"):
@@ -291,13 +321,17 @@ class ApplicationService:
         params: Dict[str, Any],
         user_context: Dict[str, Any],
         background_tasks: Optional[BackgroundTasks] = None,
-        session_id: Optional[str] = None
+        session_id: Optional[str] = None,
+        current_products: Optional[List[str]] = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Orchestrates the battle system to find and recommend products.
         Enhanced with ML intelligence for better recommendations.
         """
-        logger.info(f"Handling product search for query: '{message}'")
+        if current_products:
+            logger.info(f"Handling product continuation for query: '{message}' with {len(current_products)} current products")
+        else:
+            logger.info(f"Handling new product search for query: '{message}'")
         
         # Generate ML intelligence for the battle agents
         ml_intelligence = None
@@ -309,11 +343,15 @@ class ApplicationService:
         except Exception as e:
             logger.warning(f"ML intelligence generation failed: {e}, continuing without")
         
+        # Pass current products context to battle system for continuation scenarios
+        conversation_context = {"current_products": current_products} if current_products else None
+        
         battle_results = await self.battle_orchestrator.execute_battle(
             query=message,
             filters=params,
             user_context=user_context,
-            ml_intelligence=ml_intelligence
+            ml_intelligence=ml_intelligence,
+            conversation_context=conversation_context
         )
 
         products = battle_results.get("products", [])

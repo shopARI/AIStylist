@@ -55,6 +55,7 @@ class BattleExecutor:
         limit: int = 5,
         user_context: Optional[Dict[str, Any]] = None,
         ml_intelligence: Optional[Dict[str, Any]] = None,
+        conversation_context: Optional[Dict[str, Any]] = None,
         prefetch_limit: int = 10,
         quality_threshold: float = 0.5,
         require_consensus: bool = False
@@ -68,6 +69,7 @@ class BattleExecutor:
             limit: Final result limit
             user_context: User context
             ml_intelligence: ML intelligence for agents
+            conversation_context: Current conversation context (products, state, etc.)
             prefetch_limit: Number of products to fetch from each agent
             quality_threshold: Minimum quality score
             require_consensus: Whether to prioritize consensus products
@@ -87,8 +89,13 @@ class BattleExecutor:
                 "limit": prefetch_limit,
                 "filters": filters,
                 "ml_intelligence": ml_intelligence,
-                "user_context": user_context
+                "user_context": user_context,
+                "conversation_context": conversation_context
             }
+            
+            # Log conversation context if present (for product continuation)
+            if conversation_context and conversation_context.get("current_products"):
+                logger.info(f"Using conversation context with {len(conversation_context['current_products'])} current products")
             
             # Log ML enhancement if present
             if ml_intelligence:

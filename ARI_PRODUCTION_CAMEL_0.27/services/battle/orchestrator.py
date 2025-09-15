@@ -73,6 +73,7 @@ class BattleOrchestrator:
         limit: int = 5,
         user_context: Optional[Dict[str, Any]] = None,
         ml_intelligence: Optional[Dict[str, Any]] = None,
+        conversation_context: Optional[Dict[str, Any]] = None,
         timeout: Optional[float] = None,
         bypass_cache: bool = False
     ) -> Dict[str, Any]:
@@ -94,6 +95,7 @@ class BattleOrchestrator:
                     limit=limit,
                     user_context=user_context,
                     ml_intelligence=ml_intelligence,
+                    conversation_context=conversation_context,
                     timeout=timeout,
                     bypass_cache=bypass_cache,
                     battle_id=battle_id
@@ -109,6 +111,7 @@ class BattleOrchestrator:
         limit: int,
         user_context: Optional[Dict[str, Any]],
         ml_intelligence: Optional[Dict[str, Any]],
+        conversation_context: Optional[Dict[str, Any]],
         timeout: Optional[float],
         bypass_cache: bool,
         battle_id: str
@@ -134,6 +137,7 @@ class BattleOrchestrator:
             "limit": limit,
             "user_context": user_context,
             "ml_intelligence": ml_intelligence,
+            "conversation_context": conversation_context,
             "prefetch_limit": limit * self.config["prefetch_multiplier"],
             "quality_threshold": self.config["quality_threshold"],
         }
@@ -156,6 +160,7 @@ class BattleOrchestrator:
             'limit': battle_params.get('limit', 5),
             'user_context': battle_params.get('user_context'),
             'ml_intelligence': battle_params.get('ml_intelligence'),
+            'conversation_context': battle_params.get('conversation_context'),
             'prefetch_limit': battle_params.get('prefetch_limit', 10),
             'quality_threshold': battle_params.get('quality_threshold', 0.5),
             'require_consensus': battle_params.get('require_consensus', False)
