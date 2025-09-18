@@ -177,17 +177,28 @@ class BattleOrchestrator:
             
             battle_time = time.time() - battle_start
             
-            if self.cache and battle_results.get("final_products"):
-                await self.cache.set(cache_key, battle_results, ttl=300)
+            if self.cache and battle_results.get("products"):
+                # Cache only essential data to prevent Redis pollution (was caching ~100MB per request)
+                cache_data = {
+                    "products": battle_results.get("products", []),  # Final products only
+                    "cypher_count": battle_results.get("cypher_count", 0),
+                    "vibe_count": battle_results.get("vibe_count", 0),
+                    "winner": battle_results.get("winner", "unknown"),
+                    "execution_time": battle_time,
+                    "ml_enhanced": bool(ml_intelligence),
+                    "cached_at": time.time()
+                }
+                await self.cache.set(cache_key, cache_data, ttl=180)  # Reduced from 300s to prevent cache buildup
+                logger.info(f"Cached optimized battle result: {len(cache_data['products'])} products, ~{len(str(cache_data))} bytes")
             
             if self.metrics:
                 self.metrics.record_battle(
                     query=query,
-                    cypher_count=len(battle_results.get("cypher_products", [])),
-                    vibe_count=len(battle_results.get("vibe_products", [])),
-                    final_count=len(battle_results.get("final_products", [])),
+                    cypher_count=battle_results.get("cypher_count", 0),
+                    vibe_count=battle_results.get("vibe_count", 0),
+                    final_count=len(battle_results.get("products", [])),
                     battle_time=battle_time,
-                    winner=battle_results.get("judgment", {}).get("winner"),
+                    winner=battle_results.get("winner", "unknown"),
                     ml_enhanced=bool(ml_intelligence)
                 )
 
