@@ -112,7 +112,11 @@ qdrant_storage/
 *.pem
 .aws/
 credentials
-config
+# Config files with sensitive data only
+config/credentials*
+config/secrets*
+config/database.env
+config/production.env
 
 # Local development
 .local/
