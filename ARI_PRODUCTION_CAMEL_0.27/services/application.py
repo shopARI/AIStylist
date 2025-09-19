@@ -17,6 +17,12 @@ from services.memory.session_memory import get_enhanced_session_memory
 from services.memory.coordinator import get_unified_memory_coordinator
 from services.cache.redis_client import RedisService, FallbackRedisService
 
+# CAMEL-AI imports for LLM styling advice
+from camel.agents import ChatAgent
+from camel.models import ModelFactory
+from camel.messages import BaseMessage
+from camel.types import ModelType, ModelPlatformType
+
 logger = logging.getLogger("services.application")
 
 # --- Data Models for API contract ---
@@ -235,7 +241,7 @@ class ApplicationService:
         # Generate response that shows both agent results for Ari's review
         # Use the original message for display, not the processed search_message
         display_message = original_message or search_message
-        response_text = self._generate_collaborative_response(
+        response_text = await self._generate_collaborative_response(
             products, cypher_products, vibe_products, display_message, battle_results
         )
         
@@ -408,23 +414,31 @@ class ApplicationService:
             logger.info(f"New specific query, using original message only")
             return original_message
 
-    def _generate_collaborative_response(
-        self, 
-        final_products: List[Dict], 
-        cypher_products: List[Dict], 
-        vibe_products: List[Dict], 
-        query: str, 
+    async def _generate_collaborative_response(
+        self,
+        final_products: List[Dict],
+        cypher_products: List[Dict],
+        vibe_products: List[Dict],
+        query: str,
         battle_results: Dict[str, Any]
     ) -> str:
         """
         Creates a collaborative response showing both agent findings for Ari's review.
         Presents what CypherBot and VibeBot found, then Ari's final decisions.
+        Enhanced with LLM-generated professional styling advice for interview/work contexts.
         """
         if not final_products and not cypher_products and not vibe_products:
             return "I couldn't find any items that matched your request. Perhaps you could describe it a bit differently for me?"
 
+        # Add professional styling context if applicable
+        styling_advice = await self._generate_styling_context(query, final_products)
+
         # Start with Ari's introduction
         response = f"I found several options for '{query}'. Here's what my team discovered:\n\n"
+
+        # Add styling advice if relevant
+        if styling_advice:
+            response += styling_advice + "\n\n"
         
         # Show agent collaboration details - only if we have specific agent results
         if cypher_products or vibe_products:
@@ -472,8 +486,167 @@ class ApplicationService:
         else:
             response += "**My Assessment:** None of these quite meet our quality standards.\n"
             response += "Let me know if you'd like me to search with different criteria!"
-        
+
         return response
+
+    async def _generate_styling_context(self, query: str, final_products: List[Dict]) -> str:
+        """
+        Generate intelligent styling advice using LLM fashion expertise.
+        Provides dynamic, personalized fashion advice for specific contexts.
+        """
+        query_lower = query.lower()
+
+        # Check if styling advice is needed for professional/formal contexts
+        # Use more precise matching to avoid false positives like "workout" matching "work"
+        professional_patterns = [
+            'interview', 'job', 'professional', ' work ', 'office', 'meeting',
+            'professor', 'academic', 'university', 'college', 'teaching',
+            'wedding', 'gala', 'formal', 'black tie', 'cocktail',
+            'business casual', 'workplace', 'conference', 'presentation'
+        ]
+
+        # Check if any professional patterns match
+        query_with_spaces = f" {query_lower} "
+
+        has_professional_trigger = any(pattern in query_with_spaces for pattern in professional_patterns)
+
+        # Also check for "formal" anywhere in the query since it's always professional
+        has_formal = 'formal' in query_lower
+
+        if has_professional_trigger or has_formal:
+            try:
+                return await self._generate_llm_styling_advice(query, final_products)
+            except Exception as e:
+                logger.error(f"Failed to generate LLM styling advice: {e}")
+                # Fallback to basic professional advice
+                return self._basic_professional_fallback()
+
+        return ""  # No specific styling advice needed
+
+    async def _generate_llm_styling_advice(self, query: str, final_products: List[Dict]) -> str:
+        """
+        Generate dynamic styling advice using LLM expertise.
+        Provides personalized fashion consultation based on context and products.
+        """
+        try:
+            # Create LLM styling consultant
+            model = ModelFactory.create(
+                model_platform=ModelPlatformType.OPENAI,
+                model_type=ModelType.GPT_4O_MINI,
+                model_config_dict={
+                    "temperature": 0.7,
+                    "max_tokens": 2000  # Increased for detailed explanations
+                }
+            )
+
+            system_message = BaseMessage.make_assistant_message(
+                role_name="System",
+                content="""You are ARI, an elite fashion stylist and consultant with decades of experience in professional styling. You are known for your detailed explanations and ability to defend every styling choice with expert reasoning.
+
+Your expertise includes:
+- Professional interview styling for different industries
+- Understanding dress codes and industry expectations
+- Color theory and fabric knowledge
+- Fit and proportion guidance
+- Appropriate accessory selection
+- Building versatile professional wardrobes
+- Fashion psychology and confidence building
+- Understanding body types and flattering cuts
+
+CRITICAL: You must defend and explain WHY you recommend each piece. For every suggestion, provide:
+1. The REASONING behind the choice
+2. How it serves the specific context/occasion
+3. Why this particular combination works
+4. What psychological impact it creates
+5. How it addresses practical considerations
+
+Provide styling advice that is:
+- Specific to the context and occasion
+- Professional and authoritative with clear justifications
+- Practical and actionable with detailed explanations
+- Industry-appropriate with reasoning for each choice
+- Confidence-building through expert knowledge
+
+Format your response with clear sections. Always start with "**ARI'S EXPERT STYLING CONSULTATION:**" and defend every recommendation with professional reasoning."""
+            )
+
+            agent = ChatAgent(
+                system_message=system_message,
+                model=model
+            )
+
+            # Build context about the products found
+            product_context = ""
+            if final_products:
+                product_context = f"\n\nProducts found in search: {len(final_products)} items including:"
+                for i, product in enumerate(final_products[:3]):
+                    title = product.get("title", "Item")
+                    price = product.get("price", 0)
+                    product_context += f"\n- {title} (${price:.2f})"
+                if len(final_products) > 3:
+                    product_context += f"\n- ... and {len(final_products) - 3} more items"
+            else:
+                product_context = "\n\nNote: No specific products were found in the current search, so provide general styling guidance for this context."
+
+            # Create user query with context
+            user_prompt = f"""Please provide expert styling advice for: "{query}"
+
+Context: The user is seeking fashion guidance for this specific situation.{product_context}
+
+IMPORTANT: For each recommendation, you must explain WHY you're suggesting it. Defend every choice with professional reasoning.
+
+Please provide:
+1. **Complete Outfit Recommendations** - Each piece with detailed justification
+2. **Strategic Reasoning** - Why each piece serves the specific context
+3. **Color Psychology** - Why specific colors work for this situation
+4. **Fit & Silhouette Logic** - How each piece flatters and projects confidence
+5. **Practical Considerations** - How recommendations address real-world needs
+6. **What to Avoid & Why** - Specific pieces that would undermine the look
+7. **Professional Success Strategy** - How this styling approach achieves goals
+
+Be specific, authoritative, and defend every single choice with expert fashion knowledge. Think like a top-tier personal stylist explaining your decisions to a discerning client."""
+
+            user_message = BaseMessage.make_user_message(
+                role_name="User",
+                content=user_prompt
+            )
+
+            # Get LLM response
+            response = await agent.agenerate(user_message)
+
+            return response.content if response and response.content else self._basic_professional_fallback()
+
+        except Exception as e:
+            logger.error(f"Error generating LLM styling advice: {e}")
+            return self._basic_professional_fallback()
+
+    def _basic_professional_fallback(self) -> str:
+        """Fallback professional advice when LLM is unavailable."""
+        return """**ARI'S EXPERT STYLING CONSULTATION:**
+
+**The Universal Professional Formula with Expert Reasoning:**
+
+• **Well-fitted blazer or jacket**
+  *Why: Creates instant authority and professional presence. The structured shoulders communicate competence while providing a polished silhouette that works across all body types.*
+
+• **Quality blouse or professional shirt**
+  *Why: Serves as the foundation that bridges the blazer and bottom. Quality fabric drapes better, photographs well in professional settings, and maintains its appearance throughout long days.*
+
+• **Tailored pants or appropriate skirt**
+  *Why: Proper fit in the lower half projects attention to detail. Well-tailored pieces create clean lines that command respect while ensuring comfort for movement and sitting.*
+
+• **Professional closed-toe shoes**
+  *Why: Closed-toe maintains industry appropriateness while providing stability and confidence in your stride. The right heel height (1-3 inches) elongates the silhouette without compromising comfort.*
+
+• **Structured bag and minimal accessories**
+  *Why: A structured bag demonstrates organization and preparedness. Minimal accessories prevent distraction from your qualifications while adding subtle sophistication.*
+
+**Strategic Color Psychology:**
+- **Navy, black, charcoal:** Command authority and respect while being universally flattering
+- **Cream, white:** Projects approachability and cleanliness, perfect for contrast and light reflection
+
+**Professional Success Strategy:**
+This formula works because it creates a cohesive, confident appearance that allows your expertise to be the focus while ensuring you're taken seriously in any professional context."""
 
     async def _store_comprehensive_memory(
         self,

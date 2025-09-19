@@ -52,7 +52,7 @@ class BattleOrchestrator:
             "default_limit": 5,
             "default_timeout": 120.0,  # Increased for large Neo4j datasets with ML intelligence
             "prefetch_multiplier": 2,
-            "quality_threshold": 0.5,
+            "quality_threshold": 0.2,
             "max_concurrent_battles": 50,  # Increased from 5 for production scale
         }
         if settings:
@@ -162,7 +162,7 @@ class BattleOrchestrator:
             'ml_intelligence': battle_params.get('ml_intelligence'),
             'conversation_context': battle_params.get('conversation_context'),
             'prefetch_limit': battle_params.get('prefetch_limit', 10),
-            'quality_threshold': battle_params.get('quality_threshold', 0.5),
+            'quality_threshold': battle_params.get('quality_threshold', 0.2),
             'require_consensus': battle_params.get('require_consensus', False)
         }
         

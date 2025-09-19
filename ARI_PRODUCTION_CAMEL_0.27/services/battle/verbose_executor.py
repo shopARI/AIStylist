@@ -32,7 +32,7 @@ class VerboseBattleExecutor(BattleExecutor):
         ml_intelligence: Optional[Dict[str, Any]] = None,
         conversation_context: Optional[Dict[str, Any]] = None,
         prefetch_limit: int = 10,
-        quality_threshold: float = 0.5,
+        quality_threshold: float = 0.2,
         require_consensus: bool = False
     ) -> Dict[str, Any]:
         """

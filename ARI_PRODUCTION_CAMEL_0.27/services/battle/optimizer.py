@@ -27,21 +27,21 @@ class BattleOptimizer:
             },
             "specific_item": {
                 "prefetch_multiplier": 1.5,
-                "quality_threshold": 0.7,
+                "quality_threshold": 0.2,
                 "timeout_extension": 0.8,
                 "require_consensus": False,
                 "include_details": True
             },
             "occasion": {
                 "prefetch_multiplier": 2.5,
-                "quality_threshold": 0.8,
+                "quality_threshold": 0.2,
                 "timeout_extension": 1.2,
                 "require_consensus": False,
                 "include_details": True
             },
             "wardrobe": {
                 "prefetch_multiplier": 4,
-                "quality_threshold": 0.6,
+                "quality_threshold": 0.2,
                 "timeout_extension": 2.0,
                 "require_consensus": False,
                 "include_coordination": True
@@ -55,7 +55,7 @@ class BattleOptimizer:
             },
             "standard": {
                 "prefetch_multiplier": 2,
-                "quality_threshold": 0.5,
+                "quality_threshold": 0.2,
                 "timeout_extension": 1.0,
                 "require_consensus": False,
                 "include_details": False
