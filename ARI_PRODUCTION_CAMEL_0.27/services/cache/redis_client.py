@@ -375,7 +375,7 @@ class RedisService:
             json_str = json.dumps(value)
             return await self.set(key, json_str, ttl)
             
-        except (json.JSONEncodeError, Exception) as e:
+        except (ValueError, Exception) as e:
             logger.error(f"Redis JSON encode error for key {key}: {e}")
             return False
     

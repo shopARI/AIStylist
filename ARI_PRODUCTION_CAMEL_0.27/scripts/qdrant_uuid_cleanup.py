@@ -45,7 +45,7 @@ class QdrantUUIDCleaner:
             print(" Neo4j connected")
             
             # 2. Get valid UUIDs from Neo4j
-            print("\n📊 Getting valid UUIDs from Neo4j...")
+            print("\nGetting valid UUIDs from Neo4j...")
             valid_uuids = await self.get_valid_neo4j_uuids()
             print(f" Found {len(valid_uuids):,} valid UUIDs in Neo4j")
             
@@ -82,7 +82,7 @@ class QdrantUUIDCleaner:
             collection_info = self.qdrant_client.get_collection(self.collection_name)  
             total_vectors = collection_info.vectors_count or 0
         
-        print(f"📊 Total vectors in Qdrant: {total_vectors:,}")
+        print(f"Total vectors in Qdrant: {total_vectors:,}")
         
         if total_vectors == 0:
             print(" Collection is empty - no cleanup needed")
@@ -166,7 +166,7 @@ class QdrantUUIDCleaner:
             return
         
         # Ask for confirmation
-        print(f"\n⚠️ CLEANUP SUMMARY:")
+        print(f"\nCLEANUP SUMMARY:")
         print(f"   🗑️ Delete {len(duplicate_points):,} duplicates")
         print(f"   🗑️ Delete {len(orphaned_points):,} orphaned UUIDs")  
         print(f"   🗑️ Delete {len(numeric_points):,} old numeric IDs")
@@ -182,13 +182,13 @@ class QdrantUUIDCleaner:
         print(f"\n CLEANUP COMPLETE!")
         collection_info = self.qdrant_client.get_collection(self.collection_name)
         final_count = collection_info.vectors_count or 0
-        print(f"📊 Final vector count: {final_count:,}")
+        print(f"Final vector count: {final_count:,}")
         print(f" Expected count: {len(valid_points):,}")
         
         if final_count == len(valid_points):
             print(" Perfect! Cleanup successful!")
         else:
-            print("⚠️ Count mismatch - may need to wait for Qdrant to update")
+            print("WARNING: Count mismatch - may need to wait for Qdrant to update")
     
     async def delete_vectors(self, to_delete: List):
         """Delete vectors in batches"""

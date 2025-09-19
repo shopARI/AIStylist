@@ -371,16 +371,37 @@ class IntelligenceCoordinator:
             
             # Visual systems (for VibeBot)
             elif "visual" in name.lower():
+                # Query-based visual analysis (NEW: Always run for fashion queries)
+                if query and hasattr(system, "analyze_query_visual_patterns"):
+                    print(f"ML COORDINATOR: Calling Visual Intelligence for query analysis...")
+                    logger.info(f"ML Coordinator running visual query analysis for: '{query[:30]}...'")
+                    query_analysis = await self._safe_async_call(
+                        system.analyze_query_visual_patterns, query, context
+                    )
+                    if query_analysis:
+                        intelligence["query_visual_analysis"] = {
+                            "visual_cues": query_analysis.get("visual_cues", {}),
+                            "style_analysis": query_analysis.get("style_analysis", {}),
+                            "search_enhancements": query_analysis.get("search_enhancements", {}),
+                            "visual_relevance_score": query_analysis.get("query_visual_score", 0.5),
+                            "confidence": query_analysis.get("confidence", 0.75) * self.system_weights.get(name, 1.0),
+                            "source": "query_analysis"
+                        }
+                        print(f"   Visual Intelligence data prepared for VibeBot")
+                        logger.info(f"Visual query analysis completed for: {query[:30]}...")
+
+                # Product-specific visual analysis (existing functionality)
                 if product_id and hasattr(system, "get_visual_features"):
                     features = await self._safe_async_call(
                         system.get_visual_features, product_id
                     )
                     if features:
-                        intelligence["visual_analysis"] = {
+                        intelligence["product_visual_analysis"] = {
                             "colors": features.get("dominant_colors", []),
                             "styles": features.get("style_attributes", []),
                             "aesthetic_score": features.get("aesthetic_score", 0.5),
-                            "confidence": 0.85 * self.system_weights.get(name, 1.0)
+                            "confidence": 0.85 * self.system_weights.get(name, 1.0),
+                            "source": "product_analysis"
                         }
             
             # Behavioral systems (for CypherBot)

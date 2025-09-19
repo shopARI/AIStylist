@@ -19,7 +19,7 @@ timestamp,message
 1756872911062,[2025-09-03 00:15:11 -0400] [23] [INFO] Booting worker with pid: 23
 1756872935371,"2025-09-03 00:15:35,371 - camel_v070 - WARNING - Storage components not available"
 1756872935371,"2025-09-03 00:15:35,371 - camel_v070 - WARNING - Storage components not available"
-1756872935383,✅ All 4 critical prompts validated✅ All 4 critical prompts validated
+1756872935383,All 4 critical prompts validated All 4 critical prompts validated
 1756872935406,"/opt/ml/code/main.py:89: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/"
 1756872935406,"  @validator(""message"")"
 1756872935406,"/opt/ml/code/main.py:89: PydanticDeprecatedSince20: Pydantic V1 style `@validator` validators are deprecated. You should migrate to Pydantic V2 style `@field_validator` validators, see the migration guide for more details. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.11/migration/"

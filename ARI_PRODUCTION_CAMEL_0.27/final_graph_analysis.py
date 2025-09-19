@@ -26,7 +26,7 @@ async def comprehensive_graph_analysis():
     
     try:
         # === NODE ANALYSIS ===
-        print('📊 NODE ANALYSIS:')
+        print('NODE ANALYSIS:')
         print('-' * 30)
         
         # Total nodes by type
@@ -129,7 +129,7 @@ async def comprehensive_graph_analysis():
             print(f'     {record["brand"]}: {record["products"]:,} products')
         
         # === QUALITY METRICS ===
-        print('\n📈 DATA QUALITY METRICS:')
+        print('\nDATA QUALITY METRICS:')
         print('-' * 30)
         
         # Products with titles

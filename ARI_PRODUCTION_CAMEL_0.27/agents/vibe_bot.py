@@ -420,13 +420,23 @@ Respond with the strategy name and brief explanation."""
         try:
             # Extract colors from ML intelligence or query
             colors = []
-            
+
             if ml_intelligence and 'vibe_intel' in ml_intelligence:
                 for source, data in ml_intelligence['vibe_intel'].items():
-                    if isinstance(data, dict) and 'visual_features' in data:
-                        detected_colors = data['visual_features'].get('colors', [])
-                        colors.extend(detected_colors[:3])
-                        break
+                    if isinstance(data, dict):
+                        # NEW: Use query visual analysis
+                        if 'query_visual_analysis' in data:
+                            visual_cues = data['query_visual_analysis'].get('visual_cues', {})
+                            detected_colors = visual_cues.get('colors', [])
+                            colors.extend(detected_colors[:3])
+                            print(f"   VibeBot: Using Visual Intelligence detected colors: {detected_colors}")
+                            logger.info(f"VibeBot using visual intelligence colors: {detected_colors}")
+                            break
+                        # Fallback: Legacy visual features
+                        elif 'visual_features' in data:
+                            detected_colors = data['visual_features'].get('colors', [])
+                            colors.extend(detected_colors[:3])
+                            break
             
             # Parse colors from query if not in ML intelligence
             if not colors:
@@ -568,7 +578,35 @@ Respond with the strategy name and brief explanation."""
         if ml_intelligence and 'vibe_intel' in ml_intelligence:
             for source, data in ml_intelligence['vibe_intel'].items():
                 if isinstance(data, dict):
-                    if 'style_analysis' in data:
+                    # NEW: Use query visual analysis for enhancement
+                    if 'query_visual_analysis' in data:
+                        visual_data = data['query_visual_analysis']
+
+                        # Add visual cues
+                        visual_cues = visual_data.get('visual_cues', {})
+                        if visual_cues.get('style_cues'):
+                            enhanced += f" {' '.join(visual_cues['style_cues'][:2])}"
+                        if visual_cues.get('materials'):
+                            enhanced += f" {' '.join(visual_cues['materials'][:2])}"
+
+                        # Add style analysis
+                        style_analysis = visual_data.get('style_analysis', {})
+                        if style_analysis.get('mood') and style_analysis['mood'] != 'neutral':
+                            enhanced += f" {style_analysis['mood']}"
+                        if style_analysis.get('formality') and style_analysis['formality'] != 'neutral':
+                            enhanced += f" {style_analysis['formality']}"
+
+                        # Add search enhancements
+                        search_enhancements = visual_data.get('search_enhancements', {})
+                        if search_enhancements.get('style_direction') != 'general':
+                            enhanced += f" {search_enhancements['style_direction']}"
+
+                        print(f"   VibeBot: Enhanced query with Visual Intelligence: '{enhanced}'")
+                        logger.info(f"VibeBot enhanced query with visual intelligence: '{enhanced}'")
+                        break
+
+                    # Fallback: Legacy style analysis
+                    elif 'style_analysis' in data:
                         style = data['style_analysis']
                         if 'inferred_styles' in style:
                             styles = style['inferred_styles'][:2]

@@ -12,7 +12,7 @@ writer_ip=$(ssh -i "${CONTROL_TOWER_KEY_PAIR_PATH}" ec2-user@"${CONTROL_TOWER_HO
   "neo4j_neo4j_servers neo4j | jq -r '.[] | select(.writer==true) | .ip' | head -n1")
 
 if [[ -z "$writer_ip" ]]; then
-  echo "❌ Failed to determine writer IP"
+  echo "FAILED to determine writer IP"
   exit 1
 fi
 

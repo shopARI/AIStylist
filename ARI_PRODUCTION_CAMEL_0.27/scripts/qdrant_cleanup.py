@@ -11,7 +11,7 @@ from qdrant_client import QdrantClient
 from qdrant_client.http import models
 
 async def main():
-    print("🧹 QDRANT CLEANUP SCRIPT")
+    print("QDRANT CLEANUP SCRIPT")
     print("=" * 60)
     
     # Load environment variables
@@ -28,20 +28,20 @@ async def main():
         
         collection_info = client.get_collection(collection_name)
         vectors_count = collection_info.vectors_count or 0
-        print(f"📊 Total vectors: {vectors_count:,}")
-        print(f"📈 Collection status: {collection_info.status}")
+        print(f"Total vectors: {vectors_count:,}")
+        print(f"Collection status: {collection_info.status}")
         
         if vectors_count == 0:
             print(" Collection is already empty - no cleanup needed")
             return
         
         # 2. Sample analysis
-        print(f"\n🔎 SAMPLING VECTORS")
+        print(f"\nSAMPLING VECTORS")
         print("-" * 40)
         
         points, _ = client.scroll(collection_name, limit=10)
         if not points:
-            print("⚠️ No points found despite non-zero count")
+            print("WARNING: No points found despite non-zero count")
             return
             
         # Analyze ID formats
@@ -60,7 +60,7 @@ async def main():
         
         print(f"🆔 UUID format IDs: {uuid_count}")
         print(f"🔢 Numeric format IDs: {numeric_count}")
-        print(f"📋 Sample IDs: {id_samples[:3]}")
+        print(f"Sample IDs: {id_samples[:3]}")
         
         # 3. Check payload structure
         sample_payload = points[0].payload
@@ -91,7 +91,7 @@ async def main():
             print(" Collection appears to be up-to-date with new UUID format")
             return
             
-        print(f"⚠️ Cleanup needed:")
+        print(f"WARNING: Cleanup needed:")
         for reason in cleanup_reason:
             print(f"   - {reason}")
         
@@ -130,7 +130,7 @@ async def safe_cleanup(client: QdrantClient, collection_name: str, points: List)
         return
     
     print(f"🗑️ Found {len(numeric_ids)} numeric ID vectors to delete")
-    print(f"📋 Sample numeric IDs: {numeric_ids[:5]}")
+    print(f"Sample numeric IDs: {numeric_ids[:5]}")
     
     confirm = input(f"Confirm deletion of {len(numeric_ids)} old vectors? (yes/no): ")
     if confirm.lower() != 'yes':
@@ -156,17 +156,17 @@ async def safe_cleanup(client: QdrantClient, collection_name: str, points: List)
         # Verify
         collection_info = client.get_collection(collection_name)
         vectors_count = collection_info.vectors_count or 0
-        print(f"📊 Remaining vectors: {vectors_count:,}")
+        print(f"Remaining vectors: {vectors_count:,}")
         
     except Exception as e:
         print(f" Error during safe cleanup: {e}")
 
 async def complete_cleanup(client: QdrantClient, collection_name: str):
     """Delete entire collection and recreate"""
-    print(f"\n💥 COMPLETE CLEANUP: Recreating entire collection")
+    print(f"\nCOMPLETE CLEANUP: Recreating entire collection")
     print("-" * 50)
     
-    print("⚠️ This will DELETE ALL vectors in the collection!")
+    print("WARNING: This will DELETE ALL vectors in the collection!")
     confirm = input("Type 'DELETE_ALL' to confirm complete cleanup: ")
     if confirm != 'DELETE_ALL':
         print(" Complete cleanup cancelled")
@@ -193,7 +193,7 @@ async def complete_cleanup(client: QdrantClient, collection_name: str):
         # Verify
         collection_info = client.get_collection(collection_name)
         vectors_count = collection_info.vectors_count or 0
-        print(f"📊 Vector count: {vectors_count}")
+        print(f"Vector count: {vectors_count}")
         
     except Exception as e:
         print(f" Error during complete cleanup: {e}")
@@ -210,7 +210,7 @@ def verify_neo4j_consistency():
         print("   Expected: UUID format like '123e4567-e89b-12d3-a456-426614174000'")
         
     except Exception as e:
-        print(f"⚠️ Neo4j check not implemented: {e}")
+        print(f"WARNING: Neo4j check not implemented: {e}")
 
 if __name__ == "__main__":
     print(" Starting Qdrant cleanup...")

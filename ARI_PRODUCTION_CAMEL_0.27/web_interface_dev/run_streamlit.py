@@ -22,14 +22,14 @@ def main():
         return 1
     
     print(" Starting AIStylist Multi-Agent Web Interface...")
-    print(f"📂 Working directory: {script_dir}")
-    print("🌐 The interface will open in your browser at http://localhost:8501")
+    print(f"Working directory: {script_dir}")
+    print("The interface will open in your browser at http://localhost:8501")
     print("")
     print("Features:")
     print("   Chat with ARI Fashion AI")
-    print("  👁️ See agent thinking processes")
-    print("  📊 Real-time ML intelligence")
-    print("  🛍️ Product recommendations")
+    print("   See agent thinking processes")
+    print("   Real-time ML intelligence")
+    print("   Product recommendations")
     print("")
     
     try:

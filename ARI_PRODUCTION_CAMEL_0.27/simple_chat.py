@@ -44,27 +44,27 @@ class SimpleARIChat:
         try:
             # Try to import and initialize core services
             from services.nlp.hybrid_intent_detector import get_hybrid_intent_detector
-            print("  ✓ Intent detector imported")
+            print("  Intent detector imported")
             
             self.intent_detector = get_hybrid_intent_detector()
-            print("  ✓ Intent detector initialized")
+            print("  Intent detector initialized")
             
             # Try agent factory
             try:
                 from agents.factory import get_agent_factory
                 self.agent_factory = await get_agent_factory()
-                print("  ✓ Agent factory initialized")
+                print("  Agent factory initialized")
             except Exception as e:
-                print(f"  ⚠ Agent factory unavailable: {e}")
+                print(f"  WARNING: Agent factory unavailable: {e}")
                 self.agent_factory = None
             
             # Try conversation handler
             try:
                 from services.conversation_handler import ConversationHandler
                 self.conversation_handler = ConversationHandler()
-                print("  ✓ Conversation handler initialized")
+                print("  Conversation handler initialized")
             except Exception as e:
-                print(f"  ⚠ Conversation handler unavailable: {e}")
+                print(f"  WARNING: Conversation handler unavailable: {e}")
                 self.conversation_handler = None
             
             # Try product retriever
@@ -75,9 +75,9 @@ class SimpleARIChat:
                     qdrant_api_key=os.getenv("QDRANT_API_KEY"),
                     collection_name=os.getenv("QDRANT_COLLECTION_NAME", "fashion_products")
                 )
-                print("  ✓ Product retriever initialized")
+                print("  Product retriever initialized")
             except Exception as e:
-                print(f"  ⚠ Product retriever unavailable: {e}")
+                print(f"  WARNING: Product retriever unavailable: {e}")
                 self.product_retriever = None
             
             print(" Core services initialized!\n")
@@ -242,7 +242,7 @@ class SimpleARIChat:
                     continue
                 
                 if message.lower() in ['quit', 'exit', 'bye', 'goodbye']:
-                    print("\n👋 Thanks for chatting with ARI! Goodbye!\n")
+                    print("\nThanks for chatting with ARI! Goodbye!\n")
                     break
                 
                 if message.lower() == 'debug':
@@ -275,10 +275,10 @@ class SimpleARIChat:
                 self.display_response(message, ari_response, metadata)
                 
             except KeyboardInterrupt:
-                print("\n\n👋 Chat interrupted. Goodbye!\n")
+                print("\n\nChat interrupted. Goodbye!\n")
                 break
             except EOFError:
-                print("\n\n👋 Input stream ended. Goodbye!\n")
+                print("\n\nInput stream ended. Goodbye!\n")
                 break
             except Exception as e:
                 print(f"\n Unexpected error: {e}")

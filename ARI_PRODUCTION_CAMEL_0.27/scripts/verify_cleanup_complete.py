@@ -66,12 +66,12 @@ class CleanupVerifier:
             count_result = self.qdrant_client.count(self.collection_name)
             actual_count = count_result.count if hasattr(count_result, 'count') else 0
             
-            print(f"📊 Collection status: {collection_info.status}")
-            print(f"📈 Metadata count: {metadata_count:,}")
+            print(f"Collection status: {collection_info.status}")
+            print(f"Metadata count: {metadata_count:,}")
             print(f"🔢 Actual count: {actual_count:,}")
             
             if metadata_count != actual_count:
-                print(f"⚠️ Metadata inconsistency detected!")
+                print(f"WARNING: Metadata inconsistency detected!")
                 print(f"   Run: python scripts/qdrant_metadata_refresh.py")
             else:
                 print(" Collection metadata is consistent")
@@ -124,12 +124,12 @@ class CleanupVerifier:
             
             print(f"🆔 UUID format: {uuid_count}")
             print(f"🔢 Numeric format: {numeric_count}")
-            print(f"⚠️ Malformed: {malformed_count}")
+            print(f"WARNING: Malformed: {malformed_count}")
             
             if numeric_count > 0:
                 print(" Old numeric IDs still present - cleanup incomplete!")
             elif malformed_count > 0:
-                print("⚠️ Malformed IDs detected - data quality issue!")
+                print("WARNING: Malformed IDs detected - data quality issue!")
             else:
                 print(" All IDs are in proper UUID format")
                 
@@ -141,7 +141,7 @@ class CleanupVerifier:
             print(f"🏷️ Sample payload keys: {payload_keys}")
             missing_keys = [k for k in expected_keys if k not in payload_keys]
             if missing_keys:
-                print(f"⚠️ Missing expected keys: {missing_keys}")
+                print(f"WARNING: Missing expected keys: {missing_keys}")
             else:
                 print(" Payload structure looks good")
                 
@@ -159,13 +159,13 @@ class CleanupVerifier:
                 result = session.run("MATCH (p:Product) RETURN p.id as uuid LIMIT 100")
                 neo4j_sample = {record["uuid"] for record in result}
             
-            print(f"📊 Neo4j sample: {len(neo4j_sample)} UUIDs")
+            print(f"Neo4j sample: {len(neo4j_sample)} UUIDs")
             
             # Get sample of Qdrant UUIDs
             points, _ = self.qdrant_client.scroll(self.collection_name, limit=100)
             qdrant_sample = {str(point.id) for point in points}
             
-            print(f"📊 Qdrant sample: {len(qdrant_sample)} UUIDs")
+            print(f"Qdrant sample: {len(qdrant_sample)} UUIDs")
             
             # Check overlap
             overlap = neo4j_sample & qdrant_sample
@@ -173,11 +173,11 @@ class CleanupVerifier:
             qdrant_only = qdrant_sample - neo4j_sample
             
             print(f"🤝 Common UUIDs: {len(overlap)}")
-            print(f"📈 Neo4j only: {len(neo4j_only)}")
+            print(f"Neo4j only: {len(neo4j_only)}")
             print(f"📉 Qdrant only: {len(qdrant_only)}")
             
             if len(qdrant_only) > 0:
-                print(f"⚠️ Orphaned UUIDs in Qdrant: {list(qdrant_only)[:5]}")
+                print(f"WARNING: Orphaned UUIDs in Qdrant: {list(qdrant_only)[:5]}")
             else:
                 print(" No orphaned UUIDs detected in sample")
                 
@@ -243,7 +243,7 @@ class CleanupVerifier:
         
         try:
             # Get all Neo4j UUIDs (this could be large!)
-            print("📊 Getting all Neo4j UUIDs...")
+            print("Getting all Neo4j UUIDs...")
             with self.neo4j_driver.session() as session:
                 result = session.run("MATCH (p:Product) RETURN p.id as uuid")
                 valid_uuids = {record["uuid"] for record in result if record["uuid"]}
@@ -275,7 +275,7 @@ class CleanupVerifier:
     
     async def _generate_final_report(self):
         """Generate final cleanup report"""
-        print("\n📋 FINAL CLEANUP REPORT")
+        print("\nFINAL CLEANUP REPORT")
         print("=" * 60)
         
         try:
@@ -291,10 +291,10 @@ class CleanupVerifier:
                 result = session.run("MATCH (p:Product) RETURN count(p) as count")
                 neo4j_products = result.single()["count"]
             
-            print(f"📊 FINAL STATISTICS:")
+            print(f"FINAL STATISTICS:")
             print(f"   🗂️ Neo4j Products: {neo4j_products:,}")
             print(f"    Qdrant Vectors: {actual_count:,}")
-            print(f"   📈 Collection Status: {collection_info.status}")
+            print(f"   Collection Status: {collection_info.status}")
             
             # Calculate efficiency
             if neo4j_products > 0:
@@ -307,7 +307,7 @@ class CleanupVerifier:
             print(f"    UUID format validated")
             
             if metadata_count != actual_count:
-                print(f"   ⚠️ Metadata needs refresh (run qdrant_metadata_refresh.py)")
+                print(f"   WARNING: Metadata needs refresh (run qdrant_metadata_refresh.py)")
             else:
                 print(f"    Metadata is consistent")
             

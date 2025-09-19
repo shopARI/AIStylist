@@ -65,13 +65,13 @@ async def optimized_llm_mass_extract():
         requests_per_minute = 100
         batch_delay = (60 / requests_per_minute) * batch_size
         
-        print(f"📊 Starting streaming extraction (batch size: {batch_size})")
-        print(f"💰 Estimated cost: ~$0.015 per product")
+        print(f"Starting streaming extraction (batch size: {batch_size})")
+        print(f"Estimated cost: ~$0.015 per product")
         
         start_time = time.time()
         
         while True:
-            print(f"\n🔄 Processing batch {batch_num} (cursor: {last_processed_id[:8]}...)")
+            print(f"\nProcessing batch {batch_num} (cursor: {last_processed_id[:8]}...)")
             
             # Cursor-based batch query (much faster than SKIP/LIMIT)
             if last_processed_id:
@@ -157,11 +157,11 @@ async def optimized_llm_mass_extract():
                         updated += 1
                         
                     except Exception as e:
-                        print(f"⚠️ Update error for product {extraction['id']}: {e}")
+                        print(f"WARNING: Update error for product {extraction['id']}: {e}")
                         continue
                         
             except Exception as e:
-                print(f"⚠️ Batch processing error: {e}")
+                print(f"WARNING: Batch processing error: {e}")
                 # Continue with next batch
             
             processed += len(batch_result)
@@ -172,8 +172,8 @@ async def optimized_llm_mass_extract():
                 elapsed = time.time() - start_time
                 rate = processed / elapsed if elapsed > 0 else 0
                 eta = (4600000 - processed) / rate / 3600 if rate > 0 else 0  # Rough ETA in hours
-                print(f"📈 Progress: {processed:,} processed, {updated:,} updated")
-                print(f"⏱️ Rate: {rate:.1f} products/sec, ETA: {eta:.1f} hours")
+                print(f"Progress: {processed:,} processed, {updated:,} updated")
+                print(f"Rate: {rate:.1f} products/sec, ETA: {eta:.1f} hours")
             
             # Rate limiting
             if batch_delay > 0:
@@ -184,14 +184,14 @@ async def optimized_llm_mass_extract():
         total_cost = updated * 0.015
         
         print(f"\n OPTIMIZED LLM EXTRACTION COMPLETE!")
-        print(f"📊 Total processed: {processed:,}")
-        print(f"🔄 Total updated: {updated:,}")
-        print(f"⏱️ Time elapsed: {elapsed/3600:.1f} hours")
-        print(f"💰 Total cost: ${total_cost:.2f}")
+        print(f"Total processed: {processed:,}")
+        print(f"Total updated: {updated:,}")
+        print(f"Time elapsed: {elapsed/3600:.1f} hours")
+        print(f"Total cost: ${total_cost:.2f}")
         print(f" Model: {extractor.model}")
         
         # Create relationships efficiently
-        print(f"\n🔗 Creating optimized relationships...")
+        print(f"\nCreating optimized relationships...")
         
         # Batch relationship creation
         rel_queries = [
@@ -230,7 +230,7 @@ async def optimized_llm_mass_extract():
                 await neo4j_service.query(rel_query)
                 print(f"   Relationship batch created")
             except Exception as e:
-                print(f"  ⚠️ Relationship error: {e}")
+                print(f"  WARNING: Relationship error: {e}")
         
         print(f" Optimized LLM extraction complete! Enhanced knowledge graph ready!")
         

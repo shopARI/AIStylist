@@ -112,14 +112,27 @@ class CrossSessionUserMemory:
                     preference_key = f"{category}:{value.lower()}"
                     
                     if preference_key in profile.preferences:
-                        # Update existing preference
+                        # Update existing preference - handle both dict and object formats
                         pref = profile.preferences[preference_key]
+
+                        if isinstance(pref, dict):
+                            # Convert dict to UserPreference object for consistency
+                            pref = UserPreference(
+                                value=pref.get('value', value.lower()),
+                                category=pref.get('category', category),
+                                confidence=pref.get('confidence', 0.5),
+                                first_mentioned=pref.get('first_mentioned', current_time),
+                                last_mentioned=pref.get('last_mentioned', current_time),
+                                mention_count=pref.get('mention_count', 1),
+                                contexts=pref.get('contexts', [])
+                            )
+
                         pref.mention_count += 1
                         pref.last_mentioned = current_time
                         pref.contexts.append(context[:100])  # Limit context length
                         if len(pref.contexts) > 10:
                             pref.contexts = pref.contexts[-10:]  # Keep recent contexts
-                        
+
                         # Update confidence based on recency and frequency
                         pref.confidence = self._calculate_confidence(
                             pref.mention_count,
@@ -127,6 +140,9 @@ class CrossSessionUserMemory:
                             pref.last_mentioned,
                             current_time
                         )
+
+                        # Store back the updated object
+                        profile.preferences[preference_key] = pref
                     else:
                         # Create new preference
                         profile.preferences[preference_key] = UserPreference(
@@ -199,15 +215,29 @@ class CrossSessionUserMemory:
             # Get active preferences (above confidence threshold)
             active_preferences = {}
             for pref_key, pref in profile.preferences.items():
-                if pref.confidence >= self.min_confidence_threshold:
+                # Handle both dict and UserPreference object formats
+                if isinstance(pref, dict):
+                    confidence = pref.get('confidence', 0.0)
+                    category = pref.get('category', 'unknown')
+                    value = pref.get('value', '')
+                    mention_count = pref.get('mention_count', 1)
+                    last_mentioned = pref.get('last_mentioned', current_time)
+                else:
+                    # UserPreference object
+                    confidence = pref.confidence
                     category = pref.category
+                    value = pref.value
+                    mention_count = pref.mention_count
+                    last_mentioned = pref.last_mentioned
+
+                if confidence >= self.min_confidence_threshold:
                     if category not in active_preferences:
                         active_preferences[category] = []
                     active_preferences[category].append({
-                        'value': pref.value,
-                        'confidence': pref.confidence,
-                        'mention_count': pref.mention_count,
-                        'recency_days': (current_time - pref.last_mentioned) / 86400
+                        'value': value,
+                        'confidence': confidence,
+                        'mention_count': mention_count,
+                        'recency_days': (current_time - last_mentioned) / 86400
                     })
             
             # Sort preferences by confidence within each category
@@ -310,9 +340,17 @@ class CrossSessionUserMemory:
         
         keys_to_remove = []
         for pref_key, pref in profile.preferences.items():
+            # Handle both dict and object formats
+            if isinstance(pref, dict):
+                last_mentioned = pref.get('last_mentioned', current_time)
+                confidence = pref.get('confidence', 0.5)
+            else:
+                last_mentioned = pref.last_mentioned
+                confidence = pref.confidence
+
             # Remove if too old and low confidence
-            if (pref.last_mentioned < cutoff_time and 
-                pref.confidence < self.min_confidence_threshold):
+            if (last_mentioned < cutoff_time and
+                confidence < self.min_confidence_threshold):
                 keys_to_remove.append(pref_key)
         
         for key in keys_to_remove:

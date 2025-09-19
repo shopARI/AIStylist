@@ -26,7 +26,7 @@ class DatabaseMigrator:
     def migrate_nodes_by_label(self, label: str, count: int):
         """Migrate all nodes of a specific label"""
         
-        print(f"\n🔄 Migrating {count:,} {label} nodes...")
+        print(f"\nMigrating {count:,} {label} nodes...")
         
         if count == 0:
             print(f" No {label} nodes to migrate")
@@ -90,7 +90,7 @@ class DatabaseMigrator:
     def migrate_relationships(self):
         """Migrate all relationships"""
         
-        print(f"\n🔗 Migrating relationships...")
+        print(f"\nMigrating relationships...")
         
         # Get relationship types from local database
         with self.local_driver.session() as session:
@@ -100,7 +100,7 @@ class DatabaseMigrator:
         print(f"Relationship types: {rel_types}")
         
         for rel_type in rel_types:
-            print(f"\n🔗 Migrating {rel_type} relationships...")
+            print(f"\nMigrating {rel_type} relationships...")
             
             # Get relationship count
             with self.local_driver.session() as session:
@@ -187,7 +187,7 @@ class DatabaseMigrator:
             result = local_session.run("CALL db.labels() YIELD label RETURN label")
             labels = [record['label'] for record in result]
         
-        print(f"\n📊 NODE COUNT COMPARISON:")
+        print(f"\nNODE COUNT COMPARISON:")
         for label in labels:
             # Local count
             with self.local_driver.session() as local_session:
@@ -199,7 +199,7 @@ class DatabaseMigrator:
                 result = remote_session.run(f"MATCH (n:{label}) RETURN count(n) as count")
                 remote_count = result.single()['count']
             
-            status = "" if local_count == remote_count else ""
+            status = "[OK]" if local_count == remote_count else "[MISMATCH]"
             print(f"{status} {label}: Local={local_count:,} Remote={remote_count:,}")
         
         # Compare relationship counts
@@ -207,7 +207,7 @@ class DatabaseMigrator:
             result = local_session.run("CALL db.relationshipTypes() YIELD relationshipType RETURN relationshipType")
             rel_types = [record['relationshipType'] for record in result]
         
-        print(f"\n🔗 RELATIONSHIP COUNT COMPARISON:")
+        print(f"\nRELATIONSHIP COUNT COMPARISON:")
         for rel_type in rel_types:
             # Local count
             with self.local_driver.session() as local_session:
@@ -222,7 +222,7 @@ class DatabaseMigrator:
                 except:
                     remote_count = 0
             
-            status = "" if local_count == remote_count else ""
+            status = "[OK]" if local_count == remote_count else "[MISMATCH]"
             print(f"{status} {rel_type}: Local={local_count:,} Remote={remote_count:,}")
     
     def run_migration(self):

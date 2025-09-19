@@ -16,7 +16,7 @@ def fast_migrate():
         # Clear existing data first
         with remote_driver.session(database='productionbackup2') as session:
             session.run("MATCH (n) DETACH DELETE n")
-            print("🗑️ Cleared existing data")
+            print("Cleared existing data")
         
         # Get all node types and their counts
         with local_driver.session() as session:
@@ -29,7 +29,7 @@ def fast_migrate():
                 count = result.single()['count']
                 label_counts[label] = count
                 
-        print(f"📊 Found {len(labels)} node types, {sum(label_counts.values()):,} total nodes")
+        print(f"Found {len(labels)} node types, {sum(label_counts.values()):,} total nodes")
         
         # Migrate each node type
         batch_size = 50000
@@ -37,7 +37,7 @@ def fast_migrate():
         
         for label, count in sorted(label_counts.items(), key=lambda x: x[1], reverse=True):
             if count == 0:
-                print(f"⏭️  Skipping {label} (0 nodes)")
+                print(f"Skipping {label} (0 nodes)")
                 continue
                 
             print(f"\\n📦 Migrating {count:,} {label} nodes...")
@@ -86,7 +86,7 @@ def fast_migrate():
             print(f" {label} migration completed!")
         
         print(f"\\n NODE MIGRATION COMPLETED!")
-        print(f"📊 Total nodes migrated: {total_migrated:,}")
+        print(f"Total nodes migrated: {total_migrated:,}")
         
         # Now migrate relationships
         print(f"\\n🔗 Starting relationship migration...")
@@ -122,7 +122,7 @@ def fast_migrate():
             result = session.run('CALL db.labels() YIELD label RETURN label')
             remote_labels = [record['label'] for record in result]
             
-            print(f"📊 VERIFICATION RESULTS:")
+            print(f"VERIFICATION RESULTS:")
             for label in remote_labels:
                 result = session.run(f'MATCH (n:{label}) RETURN count(n) as count')
                 remote_count = result.single()['count']

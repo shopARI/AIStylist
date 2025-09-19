@@ -75,42 +75,43 @@ class VerboseBattleExecutor(BattleExecutor):
                 )
                 print(f"   After consensus: CypherBot={len(cypher_results)}, VibeBot={len(vibe_results)}")
             
-            # Judge evaluation with mind visibility
-            print(f"\nARI STYLIST EVALUATION PHASE...")
+            # UNIFIED PRODUCT EVALUATION - No more battles, collaborative evaluation!
+            print(f"\nARI STYLIST UNIFIED PRODUCT EVALUATION...")
             print("-" * 50)
-            judgment = await self._verbose_judge_evaluation(
+            unified_evaluation = await self._unified_product_evaluation(
                 cypher_results, vibe_results, query, ml_intelligence, user_context, limit
             )
             
             # Apply quality threshold
             print(f"\nAPPLYING QUALITY THRESHOLD ({quality_threshold})...")
             final_products = self._apply_quality_filter(
-                judgment.get("products", []),
+                unified_evaluation.get("products", []),
                 quality_threshold
             )
             print(f"   Products after quality filter: {len(final_products)}")
-            
-            # Update statistics
-            self._update_stats(judgment.get("winner", "unknown"))
-            
+
+            # Update statistics - no more "winner" concept
+            self._update_stats("collaborative")
+
             # Calculate execution time
             execution_time = time.time() - start_time
             self._update_avg_time(execution_time)
-            
+
             # Show final search summary
-            self._show_search_summary(judgment, execution_time, final_products)
+            self._show_search_summary(unified_evaluation, execution_time, final_products)
             
-            # Build result
+            # Build result - collaborative system, no "winner"
             result = {
                 "products": final_products,
                 "cypher_count": len(cypher_results),
                 "vibe_count": len(vibe_results),
-                "winner": judgment.get("winner", "unknown"),
-                "reasoning": judgment.get("reasoning", ""),
-                "consensus_count": judgment.get("consensus_count", 0),
+                "evaluation_method": "unified_collaborative",
+                "reasoning": unified_evaluation.get("reasoning", ""),
+                "consensus_count": unified_evaluation.get("consensus_count", 0),
                 "execution_time": execution_time,
                 "quality_threshold_applied": quality_threshold,
                 "ml_enhanced": bool(ml_intelligence),
+                "product_sources": unified_evaluation.get("product_sources", {}),
                 "agent_thoughts": {
                     "cypher_thoughts": getattr(self, '_cypher_thoughts', []),
                     "vibe_thoughts": getattr(self, '_vibe_thoughts', []),
@@ -339,14 +340,115 @@ class VerboseBattleExecutor(BattleExecutor):
                 "reasoning": str(e),
                 "consensus_count": len(consensus_products)
             }
-    
+
+    async def _unified_product_evaluation(self, cypher_results, vibe_results, query, ml_context, user_context, limit):
+        """
+        NEW UNIFIED APPROACH: Evaluate all products individually instead of team battles.
+        Combines products from both agents and evaluates each product on its own merits.
+        """
+        print(f"Ari Stylist: Starting unified product evaluation...")
+        print(f"Ari Stylist: Merging {len(cypher_results)} CypherBot + {len(vibe_results)} VibeBot products...")
+
+        # STEP 1: Merge all products with source tracking
+        all_products = []
+        product_sources = {}
+        seen_ids = set()
+
+        # Add CypherBot products
+        for product in cypher_results:
+            product_id = product.get('id')
+            if product_id and product_id not in seen_ids:
+                product_copy = product.copy()
+                product_copy['_source'] = 'cypher'
+                product_copy['_source_score'] = product.get('score', 0.5)
+                all_products.append(product_copy)
+                product_sources[product_id] = 'cypher'
+                seen_ids.add(product_id)
+            elif not product_id:
+                # Handle products without ID
+                product_copy = product.copy()
+                product_copy['_source'] = 'cypher'
+                product_copy['_source_score'] = product.get('score', 0.5)
+                all_products.append(product_copy)
+
+        # Add VibeBot products (avoiding duplicates)
+        consensus_count = 0
+        for product in vibe_results:
+            product_id = product.get('id')
+            if product_id and product_id not in seen_ids:
+                product_copy = product.copy()
+                product_copy['_source'] = 'vibe'
+                product_copy['_source_score'] = product.get('score', 0.5)
+                all_products.append(product_copy)
+                product_sources[product_id] = 'vibe'
+                seen_ids.add(product_id)
+            elif product_id and product_id in seen_ids:
+                # Mark consensus products
+                consensus_count += 1
+                # Enhance the existing product with vibe data
+                for existing in all_products:
+                    if existing.get('id') == product_id:
+                        existing['_source'] = 'consensus'
+                        existing['_vibe_score'] = product.get('score', 0.5)
+                        product_sources[product_id] = 'consensus'
+                        break
+            elif not product_id:
+                # Handle products without ID
+                product_copy = product.copy()
+                product_copy['_source'] = 'vibe'
+                product_copy['_source_score'] = product.get('score', 0.5)
+                all_products.append(product_copy)
+
+        print(f"Ari Stylist: Combined pool: {len(all_products)} unique products")
+        print(f"Ari Stylist: Found {consensus_count} consensus products (both agents found)")
+
+        # STEP 2: Use Judge to evaluate each product individually
+        try:
+            print(f"Ari Stylist: Evaluating each product for quality and relevance...")
+
+            # Call the existing judge evaluation but pass all products as unified
+            # The judge will score and select the best products
+            evaluation_result = await self.judge.evaluate_products_individually(
+                all_products=all_products,
+                query=query,
+                ml_context=ml_context,
+                user_context=user_context,
+                limit=limit
+            )
+
+            evaluation_result.update({
+                "product_sources": product_sources,
+                "consensus_count": consensus_count,
+                "total_unique_products": len(all_products),
+                "cypher_contributed": len(cypher_results),
+                "vibe_contributed": len(vibe_results)
+            })
+
+            print(f"Ari Stylist: Evaluation complete! Selected {len(evaluation_result.get('products', []))} best products")
+            return evaluation_result
+
+        except Exception as e:
+            print(f"Ari Stylist: Evaluation error: {e}")
+            # Fallback: return top products by source scores
+            all_products.sort(key=lambda p: p.get('_source_score', 0), reverse=True)
+            top_products = all_products[:limit]
+
+            return {
+                "products": top_products,
+                "reasoning": f"Fallback selection due to evaluation error: {e}",
+                "product_sources": product_sources,
+                "consensus_count": consensus_count,
+                "total_unique_products": len(all_products),
+                "evaluation_method": "fallback_by_score"
+            }
+
     def _show_search_summary(self, judgment, execution_time, final_products):
         """Show final search summary"""
         print(f"\n" + "=" * 80)
         print(f"SEARCH SUMMARY")
         print("=" * 80)
         print(f"Total Search Time: {execution_time:.2f}s")
-        print(f"Winner: {judgment.get('winner', 'unknown').upper()}")
+        print(f"Evaluation Method: Unified Collaborative Approach")
         print(f"Final Products Selected: {len(final_products)}")
         
         if judgment.get('reasoning'):

@@ -3,20 +3,20 @@
 > **Enterprise-Ready AI Fashion Stylist with Conversational Recommendations**  
 > Built with CAMEL-AI 0.2.7 | Neo4j | Qdrant | Redis | FastAPI
 
-##  Overview
+## Overview
 
 ARI (AI Recommendation Intelligence) is a production-ready fashion AI system that provides personalized product recommendations through intelligent conversation. The system scales to handle **20-30M product nodes** across multiple application instances with zero data loss and sub-second response times.
 
 ### Key Features
 
--  **Intelligent Agent Battles**: CypherBot (graph-based) vs VibeBot (vector-based) recommendations
--  **ML-Enhanced Intelligence**: Clustering, visual analysis, behavioral patterns, and memory-based RAG
-- 💬 **Conversational Memory**: Persistent user context and preferences across sessions
--  **High Performance**: Redis-distributed caching with FastAPI background tasks
-- 🔄 **Production Scalable**: Stateless architecture for multi-instance deployment
-- 🛡️ **Enterprise Ready**: Database migrations, monitoring, and error handling
+- **Intelligent Agent Battles**: CypherBot (graph-based) vs VibeBot (vector-based) recommendations
+- **ML-Enhanced Intelligence**: Clustering, visual analysis, behavioral patterns, and memory-based RAG
+- **Conversational Memory**: Persistent user context and preferences across sessions
+- **High Performance**: Redis-distributed caching with FastAPI background tasks
+- **Production Scalable**: Stateless architecture for multi-instance deployment
+- **Enterprise Ready**: Database migrations, monitoring, and error handling
 
-## 🏗️ Architecture
+## Architecture
 
 ### Core Components
 
@@ -46,7 +46,7 @@ ARI (AI Recommendation Intelligence) is a production-ready fashion AI system tha
 - **JudgeAri**: CAMEL-AI judge that selects the best recommendations
 - **ML Intelligence**: 4 systems providing behavioral, clustering, visual, and memory insights
 
-## 📁 Project Structure
+## Project Structure
 
 ```
 ARI_PRODUCTION_CAMEL_0.27/
@@ -92,7 +92,7 @@ ARI_PRODUCTION_CAMEL_0.27/
 └── scripts/                   # Utility and maintenance scripts
 ```
 
-## 🚦 Quick Start
+## Quick Start
 
 ### Prerequisites
 
@@ -156,7 +156,7 @@ python main.py
 # Documentation: http://localhost:8000/docs
 ```
 
-## 📡 API Usage
+## API Usage
 
 ### Chat Endpoint
 
@@ -219,7 +219,7 @@ Content-Type: application/json
 - **Request Validation**: Pydantic models with required user_id/session_id
 - **Security**: No sensitive data logging, sanitized error messages
 
-## 🗃️ Database Schema
+## Database Schema
 
 ### Neo4j Graph Schema
 
@@ -287,7 +287,7 @@ CMD ["python", "main.py"]
 - [ ] Monitoring dashboards set up
 - [ ] Backup strategies implemented
 
-## 📊 Monitoring
+## Monitoring
 
 ### Health Endpoints
 
@@ -364,10 +364,10 @@ python scripts/verify_connections.py
 4. Test with realistic data volumes
 5. Consider multi-instance deployment impacts
 
-## 📄 License
+## License
 
 This is a production system for fashion AI recommendations. Please ensure appropriate licensing and data usage compliance.
 
 ---
 
-**Built with ❤️ for scalable fashion AI at enterprise scale**
+**Built with care for scalable fashion AI at enterprise scale**

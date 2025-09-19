@@ -446,7 +446,7 @@ class DependencyAnalyzer:
         total_deps = sum(len(deps) for deps in self.dependencies.values())
         total_lines = sum(f.get('lines', 0) for f in self.files.values())
         
-        lines.append(f"📊 SUMMARY")
+        lines.append(f"SUMMARY")
         lines.append(f"  Files analyzed: {total_files}")
         lines.append(f"  Total lines of code: {total_lines:,}")
         lines.append(f"  Internal dependencies found: {total_deps}")
@@ -1086,7 +1086,7 @@ class DependencyAnalyzer:
         # Summary statistics
         total_files = len(self.files)
         total_deps = sum(len(deps) for deps in self.dependencies.values())
-        lines.append(f"📊 SUMMARY")
+        lines.append(f"SUMMARY")
         lines.append(f"  Files analyzed: {total_files}")
         lines.append(f"  Internal dependencies found: {total_deps}")
         lines.append(f"  Files with dependencies: {len(self.dependencies)}")

@@ -114,7 +114,7 @@ Provide confidence scores and note any limitations in your extraction.
             return response.choices[0].message.parsed
             
         except Exception as e:
-            print(f"⚠️ LLM extraction error: {e}")
+            print(f"WARNING: LLM extraction error: {e}")
             return None
 
     async def batch_extract(self, products: List[Dict]) -> List[Dict]:
@@ -202,11 +202,11 @@ async def llm_mass_extract():
         """
         count_result = await neo4j_service.query(count_query)
         total_products = count_result[0]['total'] if count_result else 0
-        print(f"📊 Products to process: {total_products:,}")
+        print(f"Products to process: {total_products:,}")
         
         # Estimate cost
         estimated_cost = total_products * 0.015  # ~$0.015 per product with GPT-4o
-        print(f"💰 Estimated cost: ${estimated_cost:.2f}")
+        print(f"Estimated cost: ${estimated_cost:.2f}")
         
         # Process in smaller batches for LLM processing
         batch_size = 50  # Smaller batches for LLM calls
@@ -219,7 +219,7 @@ async def llm_mass_extract():
         batch_delay = (60 / requests_per_minute) * batch_size
         
         while processed < total_products:
-            print(f"\n🔄 Processing LLM batch {batch_num} (products {processed + 1:,} - {min(processed + batch_size, total_products):,})")
+            print(f"\nProcessing LLM batch {batch_num} (products {processed + 1:,} - {min(processed + batch_size, total_products):,})")
             
             # Get batch of products
             batch_query = f"""
@@ -295,19 +295,19 @@ async def llm_mass_extract():
             # Progress update
             if batch_num % 5 == 0:
                 percentage = (processed / total_products) * 100
-                print(f"📈 Progress: {processed:,}/{total_products:,} ({percentage:.1f}%) - {updated:,} updated")
+                print(f"Progress: {processed:,}/{total_products:,} ({percentage:.1f}%) - {updated:,} updated")
             
             # Rate limiting delay
             if batch_delay > 0:
                 await asyncio.sleep(batch_delay)
         
         print(f"\n LLM MASS EXTRACTION COMPLETE!")
-        print(f"📊 Total processed: {processed:,}")
-        print(f"🔄 Total updated: {updated:,}")
+        print(f"Total processed: {processed:,}")
+        print(f"Total updated: {updated:,}")
         print(f" Model used: {extractor.model}")
         
         # Create enhanced relationships
-        print(f"\n🔗 Creating enhanced relationships...")
+        print(f"\nCreating enhanced relationships...")
         
         # Enhanced color relationships
         color_rel_query = """

@@ -80,48 +80,275 @@ class ApplicationService:
         start_time = time.time()
 
         try:
-            # Step 1: Ensure session exists in Redis
+            # Step 1: Ensure session exists
             await self._ensure_session_exists(session_id, user_id)
 
-            # Step 2: Get enhanced context and extract preferences
-            enhanced_context = await self._get_enhanced_context(session_id, user_id, message)
-            stored_preferences = self._extract_stored_preferences(enhanced_context)
-            context_parts = self._build_context_parts(enhanced_context, stored_preferences, session_id, user_id)
-            enhanced_message = self._build_enhanced_message(message, context_parts)
+            # Step 2: Analyze request (context + intent + params)
+            analysis_result = await self._analyze_request(session_id, user_id, message)
 
-            # Step 3: Detect intent and extract parameters
-            intent, score, params, method = await self._detect_intent_with_preferences(message, stored_preferences)
-
-            # Step 4: Handle conversation intents first (they take priority)
-            conversation_response = await self._handle_conversation_intents(
-                intent, score, params, session_id, message, method, start_time
+            # Step 3: Route and process the request
+            response = await self._route_and_process_request(
+                analysis_result, session_id, user_id, background_tasks
             )
-            if conversation_response:
-                return conversation_response
 
-            # Step 5: Get user context for product search
+            # Step 4: Store conversation and finalize response
+            await self._finalize_response(
+                response, session_id, user_id, message, background_tasks, start_time
+            )
+
+            return response
+
+        except Exception as e:
+            logger.error(f"Error processing message for session {session_id}: {e}", exc_info=True)
+            return ChatResponse(
+                response="I'm sorry, I encountered an issue while processing your request. Please try again.",
+                session_id=session_id,
+                metadata={"error": str(e)}
+            )
+
+    async def _ensure_session_exists(self, session_id: str, user_id: Optional[str]) -> None:
+        """
+        Ensure session exists in Redis.
+        """
+        session_key = f"session:{session_id}"
+        session_data = await self.redis_client.get_json(session_key)
+        if session_data is None:
+            session_data = {"history": [], "created_at": time.time(), "user_id": user_id}
+            await self.redis_client.set_json(session_key, session_data, ttl=86400)  # 24 hour TTL
+
+    async def _analyze_request(
+        self,
+        session_id: str,
+        user_id: Optional[str],
+        message: str
+    ) -> Dict[str, Any]:
+        """
+        Analyze the user's request: get context, detect intent, extract parameters.
+        """
+        # 1. Get comprehensive enhanced context from unified memory coordinator
+        enhanced_context = await self.memory_coordinator.get_enhanced_context(
+            session_id=session_id,
+            user_id=user_id,
+            current_query=message,
+            intent=None,  # Will be determined after intent detection
+            include_similar_conversations=True,
+            include_user_preferences=True,
+            max_similar_contexts=3
+        )
+
+        # 2. Process and enhance the context
+        processed_context = self._process_enhanced_context(enhanced_context, session_id, user_id)
+
+        # 3. Detect intent and extract parameters
+        intent_result = await self._detect_intent_and_extract_params(
+            message, processed_context['stored_preferences']
+        )
+
+        # 4. Get user context
+        user_context = await self._get_user_context(user_id)
+
+        return {
+            'enhanced_context': enhanced_context,
+            'processed_context': processed_context,
+            'intent_result': intent_result,
+            'user_context': user_context
+        }
+
+    def _process_enhanced_context(
+        self,
+        enhanced_context: Dict[str, Any],
+        session_id: str,
+        user_id: Optional[str]
+    ) -> Dict[str, Any]:
+        """
+        Process enhanced context and build enhanced message.
+        """
+        # Extract components for backward compatibility
+        session_context = enhanced_context.get('session_context', '')
+        user_context_data = enhanced_context.get('user_context', {})
+        similar_conversations = enhanced_context.get('similar_conversations', [])
+        memory_insights = enhanced_context.get('memory_insights', {})
+
+        # Get user preferences from unified context (more comprehensive than session-only)
+        stored_preferences = {}
+        if user_context_data and user_context_data.get('active_preferences'):
+            for category, prefs in user_context_data['active_preferences'].items():
+                # Convert preference format for compatibility
+                stored_preferences[category] = [p['value'] for p in prefs[:3] if p['confidence'] > 0.4]
+
+        # Build context parts for enhanced message
+        context_parts = []
+
+        # Add session context
+        if session_context:
+            context_parts.append(f"Recent conversation: {session_context}")
+
+        # Add user preference context
+        if stored_preferences:
+            pref_summary = ", ".join([f"{k}: {', '.join(v[:2])}" for k, v in stored_preferences.items() if v])
+            if pref_summary:
+                context_parts.append(f"User preferences: {pref_summary}")
+
+        # Add similar conversation insights
+        if similar_conversations:
+            similar_summary = f"Similar past queries: {len(similar_conversations)} found"
+            context_parts.append(similar_summary)
+
+        # Get current conversation context for intent detection (critical fix)
+        conversation_context = self.conversation_handler.get_or_create_session(session_id, user_id)
+        if conversation_context.current_products:
+            product_context = f"Currently viewing {len(conversation_context.current_products)} recommended products"
+            context_parts.append(product_context)
+            logger.info(f"Added product context for intent detection: {len(conversation_context.current_products)} products")
+
+        # Add conversation state context for better intent detection
+        if conversation_context.state.value != "new":
+            state_context = f"Conversation state: {conversation_context.state.value}"
+            context_parts.append(state_context)
+
+        return {
+            'session_context': session_context,
+            'user_context_data': user_context_data,
+            'similar_conversations': similar_conversations,
+            'memory_insights': memory_insights,
+            'stored_preferences': stored_preferences,
+            'context_parts': context_parts,
+            'conversation_context': conversation_context
+        }
+
+    async def _detect_intent_and_extract_params(
+        self,
+        message: str,
+        stored_preferences: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """
+        Detect intent and extract parameters using LLM/HYBRID approach.
+        """
+        # 2. Detect intent and extract parameters using LLM/HYBRID - use RAW message for intent detection
+        # Enhanced context can bias intent detection, so use clean message for intent classification
+        hybrid_result = await self.intent_detector.detect_intent_and_extract(message)
+        intent = hybrid_result.primary_intent
+        score = hybrid_result.confidence
+        params = hybrid_result.extracted_parameters
+
+        # Merge with stored preferences from enhanced session memory
+        if stored_preferences:
+            # Only merge stored preferences if current extraction is empty for that key
+            # AND the current message doesn't explicitly mention conflicting values
+            for key, value in stored_preferences.items():
+                if key not in params or not params[key]:
+                    # Special handling for colors - don't merge if current message mentions any color
+                    if key == "colors" and any(color in message.lower() for color in [
+                        "red", "blue", "green", "yellow", "black", "white", "pink", "purple",
+                        "orange", "brown", "gray", "grey", "navy", "beige", "gold", "silver"
+                    ]):
+                        continue  # Skip merging stored color if current message has explicit color
+                    params[key] = value
+            logger.info(f"Merged stored preferences from session memory: {stored_preferences}")
+
+        logger.info(f"LLM Intent: {intent.name} (Score: {score:.2f}, Method: {hybrid_result.detection_method}), Params: {params}")
+
+        return {
+            'intent': intent,
+            'score': score,
+            'params': params,
+            'method': hybrid_result.detection_method
+        }
+
+            # 2. Get user context
             user_context = await self._get_user_context(user_id)
 
-            # Step 6: Route based on intent and conversation flow
+            # 3. Route based on intent and conversation flow
+            from models.types import SearchIntent
+            
+            # First check conversation handler for conversation flow
             conversation_response_type, conversation_metadata = await self.conversation_handler.handle_message(
                 session_id, message, user_id
             )
-
+            
+            # CONTEXT-AWARE SMART ROUTING: Consider conversation state and current products
+            
             # Check if this is product continuation vs new search
-            conversation_context = self.conversation_handler.get_or_create_session(session_id, user_id)
             has_current_products = bool(conversation_context.current_products)
             is_product_continuation = has_current_products and any(continuation_phrase in message.lower() for continuation_phrase in [
-                "this", "that", "these", "those", "it", "them", "more about", "tell me about",
-                "what about", "how about", "other colors", "different sizes", "similar to",
+                "this", "that", "these", "those", "it", "them", "more about", "tell me about", 
+                "what about", "how about", "other colors", "different sizes", "similar to", 
                 "like this", "more like", "details on", "info on", "about this"
             ])
-
-            # Determine if should search for products
-            should_search_products = self._should_search_products(
-                intent, score, conversation_response_type, is_product_continuation, message
+            
+            # CONVERSATION/MEMORY INTENT HANDLING - Take priority over product search
+            if intent in [SearchIntent.CONVERSATION_HISTORY, SearchIntent.MEMORY_QUERY, 
+                         SearchIntent.CLARIFICATION, SearchIntent.SYSTEM_STATUS, SearchIntent.GENERAL_CONVERSATION]:
+                logger.info(f"Handling conversation intent: {intent.name} (confidence: {score:.2f})")
+                
+                if intent == SearchIntent.CONVERSATION_HISTORY:
+                    response_text = await self._handle_conversation_history(session_id, message)
+                elif intent == SearchIntent.MEMORY_QUERY:
+                    response_text = await self._handle_memory_query(session_id, message, params)
+                elif intent == SearchIntent.CLARIFICATION:
+                    response_text = await self._handle_clarification(session_id, message)
+                elif intent == SearchIntent.SYSTEM_STATUS:
+                    response_text = await self._handle_system_status(message)
+                else:  # GENERAL_CONVERSATION
+                    response_text = await self._handle_general_conversation(message)
+                
+                metadata = {
+                    "intent": intent.name,
+                    "confidence": score,
+                    "method": hybrid_result.detection_method,
+                    "conversation_intent": True,
+                    "products": []
+                }
+                
+                processing_time = time.time() - start_time
+                metadata["processing_time_seconds"] = round(processing_time, 2)
+                
+                return ChatResponse(
+                    response=response_text,
+                    products=[],
+                    session_id=session_id,
+                    metadata=metadata
+                )
+            
+            # Only search products when there's clear shopping intent OR product continuation
+            should_search_products = (
+                conversation_response_type == "search" or 
+                is_product_continuation or  # NEW: Handle product continuation scenarios
+                (intent in [SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE, 
+                           SearchIntent.BRAND, SearchIntent.OUTFIT, SearchIntent.BROWSE] 
+                 and score > 0.7) or  # Standard threshold for explicit product intents
+                (intent == SearchIntent.INSPIRATION and score > 0.8) or  # RAISED threshold to reduce false positives
+                # Only trigger on explicit product request phrases - exclude obvious non-shopping contexts
+                (any(phrase in message.lower() for phrase in [
+                    "i need a", "i need some", "recommend me", "show me some", "find me a", "looking for a",
+                    "want to buy", "need to buy", "show me products", "what products", "actual product"
+                ]) and not any(non_shopping_pattern in message.lower() for non_shopping_pattern in [
+                    # News/Media patterns
+                    "in the news", "breaking news", "headlines", "reporter said", "news report",
+                    "media says", "press conference", "journalist", "broadcasting",
+                    
+                    # Question patterns about events/opinions  
+                    "did you see", "did you hear", "what happened", "what do you think", "your opinion",
+                    "do you believe", "what's your view", "how do you feel about", "thoughts on",
+                    
+                    # Academic/Professional contexts
+                    "study shows", "research found", "according to", "scientist says", "doctor says",
+                    "professor", "university", "academic", "clinical trial", "peer review",
+                    
+                    # Political context (general, not specific people)
+                    "election results", "congress voted", "senate", "political party", "campaign", 
+                    "government policy", "legislation", "ballot", "polling data", "voter",
+                    
+                    # Personal life/relationships
+                    "my friend said", "my family", "relationship advice", "dating tips", "marriage",
+                    "personal life", "life advice", "friendship", "social situation",
+                    
+                    # General conversation starters
+                    "tell me about", "explain", "discuss", "talk about", "curious about",
+                    "wondering", "question about", "help me understand"
+                ]))
             )
-
-            # Step 7: Handle product search or general conversation
+            
             if should_search_products:
                 # Product search requested (new search or continuation)
                 if is_product_continuation:
@@ -130,23 +357,21 @@ class ApplicationService:
                     search_message = self._decide_context_inclusion(message, enhanced_message, is_continuation=True)
                     response_text, metadata = await self._handle_product_search(
                         search_message, params, user_context, background_tasks, session_id,
-                        current_products=conversation_context.current_products,
-                        original_message=message
+                        current_products=conversation_context.current_products
                     )
                 else:
                     logger.info(f"Routing to new product search - Intent: {intent.name}, Score: {score:.2f}")
                     # For new searches, only use enhanced context if query is vague and needs clarification
                     search_message = self._decide_context_inclusion(message, enhanced_message, is_continuation=False)
                     response_text, metadata = await self._handle_product_search(
-                        search_message, params, user_context, background_tasks, session_id,
-                        original_message=message
+                        search_message, params, user_context, background_tasks, session_id
                     )
-
+                
                 # Add LLM intent metadata to product search results
                 metadata.update({
                     "llm_intent": intent.name,
                     "llm_confidence": score,
-                    "llm_method": method,
+                    "llm_method": hybrid_result.detection_method,
                     "is_continuation": is_product_continuation
                 })
                 # Update conversation context with products
@@ -162,10 +387,13 @@ class ApplicationService:
                     "conversation_metadata": conversation_metadata,
                     "llm_intent": intent.name,
                     "llm_confidence": score,
-                    "llm_method": method
+                    "llm_method": hybrid_result.detection_method
                 }
 
-            # Step 8: Create response and finalize
+            processing_time = time.time() - start_time
+            metadata["processing_time_seconds"] = round(processing_time, 2)
+
+            # Create response immediately for faster user experience
             chat_response = ChatResponse(
                 response=response_text,
                 products=metadata.get("products", []),
@@ -173,10 +401,31 @@ class ApplicationService:
                 metadata=metadata
             )
 
-            # Step 9: Store conversation and add timing metadata
-            await self._finalize_response(
-                chat_response, session_id, user_id, message, intent, params, metadata, background_tasks, start_time
-            )
+            # 4. Store conversation in comprehensive unified memory system (background task)
+            if background_tasks:
+                background_tasks.add_task(
+                    self._store_comprehensive_memory,
+                    session_id,
+                    user_id or "anonymous", 
+                    message,
+                    response_text,
+                    intent.name if hasattr(intent, 'name') else str(intent),
+                    params,
+                    len(metadata.get("products", [])),
+                    metadata
+                )
+            else:
+                # Store immediately for non-HTTP contexts using comprehensive memory
+                await self.memory_coordinator.store_conversation(
+                    session_id=session_id,
+                    user_id=user_id or "anonymous",
+                    user_message=message,
+                    assistant_response=response_text,
+                    intent=intent.name if hasattr(intent, 'name') else str(intent),
+                    extracted_params=params,
+                    products_found=len(metadata.get("products", [])),
+                    metadata=metadata
+                )
 
             return chat_response
 
@@ -190,28 +439,27 @@ class ApplicationService:
 
     async def _handle_product_search(
         self,
-        search_message: str,
+        message: str,
         params: Dict[str, Any],
         user_context: Dict[str, Any],
         background_tasks: Optional[BackgroundTasks] = None,
         session_id: Optional[str] = None,
-        current_products: Optional[List[str]] = None,
-        original_message: Optional[str] = None
+        current_products: Optional[List[str]] = None
     ) -> Tuple[str, Dict[str, Any]]:
         """
         Orchestrates the battle system to find and recommend products.
         Enhanced with ML intelligence for better recommendations.
         """
         if current_products:
-            logger.info(f"Handling product continuation for query: '{search_message}' with {len(current_products)} current products")
+            logger.info(f"Handling product continuation for query: '{message}' with {len(current_products)} current products")
         else:
-            logger.info(f"Handling new product search for query: '{search_message}'")
+            logger.info(f"Handling new product search for query: '{message}'")
         
         # Generate ML intelligence for the battle agents
         ml_intelligence = None
         try:
             ml_intelligence = await self._generate_ml_intelligence(
-                search_message, params, user_context, session_id
+                message, params, user_context, session_id
             )
             logger.info(f"Generated ML intelligence with {len(ml_intelligence)} intelligence packets")
         except Exception as e:
@@ -221,7 +469,7 @@ class ApplicationService:
         conversation_context = {"current_products": current_products} if current_products else None
         
         battle_results = await self.battle_orchestrator.execute_battle(
-            query=search_message,
+            query=message,
             filters=params,
             user_context=user_context,
             ml_intelligence=ml_intelligence,
@@ -233,10 +481,8 @@ class ApplicationService:
         vibe_products = battle_results.get("vibe_products", [])
         
         # Generate response that shows both agent results for Ari's review
-        # Use the original message for display, not the processed search_message
-        display_message = original_message or search_message
         response_text = self._generate_collaborative_response(
-            products, cypher_products, vibe_products, display_message, battle_results
+            products, cypher_products, vibe_products, message, battle_results
         )
         
         # Extract detailed reasoning from judgment
@@ -249,7 +495,7 @@ class ApplicationService:
             "products": products,
             "cypher_products": cypher_products,  # Include raw CypherBot results
             "vibe_products": vibe_products,      # Include raw VibeBot results
-            "evaluation_method": judgment.get("evaluation_method", "unified_collaborative"),
+            "battle_winner": judgment.get("winner", "unknown"),
             "detailed_reasoning": detailed_reasoning,
             "cypher_count": len(cypher_products),
             "vibe_count": len(vibe_products)
@@ -311,19 +557,10 @@ class ApplicationService:
         if not user_id:
             return {}
         try:
-            user_details = await self.user_kg_service.get_user_details(user_id)
-            return user_details or {}
+            return await self.user_kg_service.get_user_details(user_id) or {}
         except Exception as e:
             logger.warning(f"Could not retrieve context for user {user_id}: {e}")
-            # Return empty context to avoid downstream errors
-            return {
-                "id": user_id,
-                "preferences": {},
-                "segments": [],
-                "style_profile": "",
-                "total_interactions": 0,
-                "total_purchases": 0
-            }
+            return {}
 
     def _generate_product_response(self, products: List[Dict], query: str) -> str:
         """
@@ -426,41 +663,39 @@ class ApplicationService:
         # Start with Ari's introduction
         response = f"I found several options for '{query}'. Here's what my team discovered:\n\n"
         
-        # Show agent collaboration details - only if we have specific agent results
-        if cypher_products or vibe_products:
-            # Show CypherBot results
-            if cypher_products:
-                response += f"**CypherBot found {len(cypher_products)} items from graph search:**\n"
-                for product in cypher_products[:3]:
-                    title = product.get("title", "an item")
-                    price = product.get("price", 0)
-                    response += f"   • {title} - ${price:.2f}\n"
-                if len(cypher_products) > 3:
-                    response += f"   • ... and {len(cypher_products) - 3} more\n"
-            else:
-                response += "**CypherBot:** No matches found in graph search\n"
-
-            response += "\n"
-
-            # Show VibeBot results
-            if vibe_products:
-                response += f"**VibeBot found {len(vibe_products)} items from semantic search:**\n"
-                for product in vibe_products[:3]:
-                    title = product.get("title", "an item")
-                    price = product.get("price", 0)
-                    response += f"   • {title} - ${price:.2f}\n"
-                if len(vibe_products) > 3:
-                    response += f"   • ... and {len(vibe_products) - 3} more\n"
-            else:
-                response += "**VibeBot:** No matches found in semantic search\n"
-
-            response += "\n"
+        # Show CypherBot results
+        if cypher_products:
+            response += f"**CypherBot found {len(cypher_products)} items from graph search:**\n"
+            for product in cypher_products[:3]:
+                title = product.get("title", "an item")
+                price = product.get("price", 0)
+                response += f"   • {title} - ${price:.2f}\n"
+            if len(cypher_products) > 3:
+                response += f"   • ... and {len(cypher_products) - 3} more\n"
+        else:
+            response += "**CypherBot:** No matches found in graph search\n"
+        
+        response += "\n"
+        
+        # Show VibeBot results  
+        if vibe_products:
+            response += f"**VibeBot found {len(vibe_products)} items from semantic search:**\n"
+            for product in vibe_products[:3]:
+                title = product.get("title", "an item")
+                price = product.get("price", 0)
+                response += f"   • {title} - ${price:.2f}\n"
+            if len(vibe_products) > 3:
+                response += f"   • ... and {len(vibe_products) - 3} more\n"
+        else:
+            response += "**VibeBot:** No matches found in semantic search\n"
+        
+        response += "\n"
         
         # Show Ari's final decisions
         if final_products:
-            evaluation_method = battle_results.get("evaluation_method", "collaborative analysis")
+            winner = battle_results.get("winner", "unknown")
             response += f"**My Final Recommendations ({len(final_products)} items):**\n"
-            response += f"   *Based on {evaluation_method} and overall quality*\n\n"
+            response += f"   *Based on {winner}'s expertise and overall quality*\n\n"
             
             for product in final_products[:5]:
                 title = product.get("title", "an item")
@@ -588,363 +823,5 @@ class ApplicationService:
             return "I'm an AI fashion stylist powered by multiple specialized agents and advanced memory systems. I can help you find products, remember your preferences, and provide personalized recommendations!"
     
     async def _handle_general_conversation(self, message: str) -> str:
-        """Handle general conversation using LLM for natural, dynamic responses"""
-        try:
-            # Check for time/date queries first
-            from datetime import datetime
-            time_keywords = ['time', 'date', 'day', 'today', 'now', 'clock', 'current']
-            message_lower = message.lower()
-
-            if any(keyword in message_lower for keyword in time_keywords):
-                current_time = datetime.now()
-                time_str = current_time.strftime("%I:%M %p")
-                date_str = current_time.strftime("%A, %B %d, %Y")
-
-                if 'time' in message_lower:
-                    return f"It's currently {time_str} on {date_str}. Perfect timing to think about what to wear for the rest of the day!"
-                elif 'date' in message_lower or 'day' in message_lower or 'today' in message_lower:
-                    return f"Today is {date_str}. What kind of day are you having? Are you dressing for work, leisure, or something special?"
-                else:
-                    return f"Right now it's {time_str} on {date_str}. Time flies when you're thinking about style!"
-
-            # Use LLM to generate natural conversation response
-            conversation_prompt = f"""You are ARI, a friendly AI fashion stylist who loves to chat about anything.
-The user asked: "{message}"
-
-Generate a natural, helpful response that:
-1. Actually addresses their question/topic in a knowledgeable way
-2. Shows genuine interest and engagement
-3. Smoothly connects back to fashion/style if appropriate (but don't force it)
-4. Keeps the conversation open and friendly
-
-Be conversational, informative, and authentic. You're knowledgeable about many topics but fashion is your specialty."""
-
-            # Create a quick LLM call for natural conversation
-            from services.nlp.llm_intent_detector import create_agent
-            from camel.types import ModelType
-
-            agent = create_agent(
-                system_message=conversation_prompt,
-                model_type=ModelType.GPT_4O_MINI
-            )
-
-            response = agent.step(message)
-
-            if hasattr(response, 'msgs') and response.msgs and len(response.msgs) > 0:
-                return response.msgs[-1].content
-            else:
-                return self._fallback_conversation_response(message)
-
-        except Exception as e:
-            logger.warning(f"LLM conversation generation failed: {e}")
-            return self._fallback_conversation_response(message)
-
-    def _fallback_conversation_response(self, message: str) -> str:
-        """Simple fallback for when LLM conversation fails"""
-        message_lower = message.lower()
-
-        # Just a few basic patterns as fallback
-        if any(word in message_lower for word in ["time", "day", "date"]):
-            import datetime
-            today = datetime.date.today()
-            return f"Today is {today.strftime('%A, %B %d, %Y')}! Is there anything special you're planning to wear today?"
-
-        if any(word in message_lower for word in ["hello", "hi", "hey"]):
-            return "Hello! I'm here to chat about anything on your mind. What would you like to talk about?"
-
-        # Default friendly response
-        return "That's interesting! I enjoy chatting about all kinds of topics. While fashion is my specialty, I'm always happy to have a good conversation. What else would you like to explore?"
-
-    # ==================== REFACTORED HELPER METHODS ====================
-    # These methods extract functionality from the overly complex process_message method
-
-    async def _ensure_session_exists(self, session_id: str, user_id: Optional[str]) -> None:
-        """
-        Ensure session exists in Redis.
-        Extracted from process_message for better maintainability.
-        """
-        session_key = f"session:{session_id}"
-        session_data = await self.redis_client.get_json(session_key)
-        if session_data is None:
-            session_data = {"history": [], "created_at": time.time(), "user_id": user_id}
-            await self.redis_client.set_json(session_key, session_data, ttl=86400)  # 24 hour TTL
-
-    async def _get_enhanced_context(
-        self,
-        session_id: str,
-        user_id: Optional[str],
-        message: str
-    ) -> Dict[str, Any]:
-        """
-        Get comprehensive enhanced context from unified memory coordinator.
-        Extracted from process_message for better maintainability.
-        """
-        return await self.memory_coordinator.get_enhanced_context(
-            session_id=session_id,
-            user_id=user_id,
-            current_query=message,
-            intent=None,  # Will be determined after intent detection
-            include_similar_conversations=True,
-            include_user_preferences=True,
-            max_similar_contexts=3
-        )
-
-    def _extract_stored_preferences(self, enhanced_context: Dict[str, Any]) -> Dict[str, Any]:
-        """
-        Extract stored preferences from enhanced context.
-        Extracted from process_message for better maintainability.
-        """
-        user_context_data = enhanced_context.get('user_context', {})
-        stored_preferences = {}
-
-        if user_context_data and user_context_data.get('active_preferences'):
-            for category, prefs in user_context_data['active_preferences'].items():
-                # Convert preference format for compatibility
-                stored_preferences[category] = [p['value'] for p in prefs[:3] if p['confidence'] > 0.4]
-
-        return stored_preferences
-
-    def _build_context_parts(
-        self,
-        enhanced_context: Dict[str, Any],
-        stored_preferences: Dict[str, Any],
-        session_id: str,
-        user_id: Optional[str]
-    ) -> List[str]:
-        """
-        Build context parts for enhanced message.
-        Extracted from process_message for better maintainability.
-        """
-        session_context = enhanced_context.get('session_context', '')
-        similar_conversations = enhanced_context.get('similar_conversations', [])
-
-        context_parts = []
-
-        # Add session context
-        if session_context:
-            context_parts.append(f"Recent conversation: {session_context}")
-
-        # Add user preference context
-        if stored_preferences:
-            pref_summary = ", ".join([f"{k}: {', '.join(v[:2])}" for k, v in stored_preferences.items() if v])
-            if pref_summary:
-                context_parts.append(f"User preferences: {pref_summary}")
-
-        # Add similar conversation insights
-        if similar_conversations:
-            similar_summary = f"Similar past queries: {len(similar_conversations)} found"
-            context_parts.append(similar_summary)
-
-        # Get current conversation context for intent detection (critical fix)
-        conversation_context = self.conversation_handler.get_or_create_session(session_id, user_id)
-        if conversation_context.current_products:
-            product_context = f"Currently viewing {len(conversation_context.current_products)} recommended products"
-            context_parts.append(product_context)
-            logger.info(f"Added product context for intent detection: {len(conversation_context.current_products)} products")
-
-        # Add conversation state context for better intent detection
-        if conversation_context.state.value != "new":
-            state_context = f"Conversation state: {conversation_context.state.value}"
-            context_parts.append(state_context)
-
-        return context_parts
-
-    def _build_enhanced_message(self, message: str, context_parts: List[str]) -> str:
-        """
-        Build enhanced message with memory context.
-        Extracted from process_message for better maintainability.
-        """
-        enhanced_message = message
-        if context_parts:
-            memory_context = " | ".join(context_parts)
-            enhanced_message = f"{memory_context} | Current request: {message}"
-            logger.info(f"Enhanced message with comprehensive memory context: {len(memory_context)} chars")
-        return enhanced_message
-
-    async def _detect_intent_with_preferences(
-        self,
-        message: str,
-        stored_preferences: Dict[str, Any]
-    ) -> Tuple[Any, float, Dict[str, Any], str]:
-        """
-        Detect intent and merge with stored preferences.
-        Extracted from process_message for better maintainability.
-        """
-        # Detect intent and extract parameters using LLM/HYBRID - use RAW message for intent detection
-        # Enhanced context can bias intent detection, so use clean message for intent classification
-        hybrid_result = await self.intent_detector.detect_intent_and_extract(message)
-        intent = hybrid_result.primary_intent
-        score = hybrid_result.confidence
-        params = hybrid_result.extracted_parameters
-
-        # Merge with stored preferences from enhanced session memory
-        if stored_preferences:
-            # Only merge stored preferences if current extraction is empty for that key
-            # AND the current message doesn't explicitly mention conflicting values
-            for key, value in stored_preferences.items():
-                if key not in params or not params[key]:
-                    # Special handling for colors - don't merge if current message mentions any color
-                    # Import colors from configuration
-                    from config.fashion_vocabulary import COLORS
-                    if key == "colors" and any(color in message.lower() for color in COLORS):
-                        continue  # Skip merging stored color if current message has explicit color
-                    params[key] = value
-            logger.info(f"Merged stored preferences from session memory: {stored_preferences}")
-
-        logger.info(f"LLM Intent: {intent.name} (Score: {score:.2f}, Method: {hybrid_result.detection_method}), Params: {params}")
-
-        return intent, score, params, hybrid_result.detection_method
-
-    async def _handle_conversation_intents(
-        self,
-        intent,
-        score: float,
-        params: Dict[str, Any],
-        session_id: str,
-        message: str,
-        method: str,
-        start_time: float
-    ) -> Optional[ChatResponse]:
-        """
-        Handle conversation/memory intents.
-        Extracted from process_message for better maintainability.
-        Returns ChatResponse if handled, None if not a conversation intent.
-        """
-        from models.types import SearchIntent
-
-        # CONVERSATION/MEMORY INTENT HANDLING - Take priority over product search
-        if intent in [SearchIntent.CONVERSATION_HISTORY, SearchIntent.MEMORY_QUERY,
-                     SearchIntent.CLARIFICATION, SearchIntent.SYSTEM_STATUS, SearchIntent.GENERAL_CONVERSATION]:
-            logger.info(f"Handling conversation intent: {intent.name} (confidence: {score:.2f})")
-
-            if intent == SearchIntent.CONVERSATION_HISTORY:
-                response_text = await self._handle_conversation_history(session_id, message)
-            elif intent == SearchIntent.MEMORY_QUERY:
-                response_text = await self._handle_memory_query(session_id, message, params)
-            elif intent == SearchIntent.CLARIFICATION:
-                response_text = await self._handle_clarification(session_id, message)
-            elif intent == SearchIntent.SYSTEM_STATUS:
-                response_text = await self._handle_system_status(message)
-            else:  # GENERAL_CONVERSATION
-                response_text = await self._handle_general_conversation(message)
-
-            metadata = {
-                "intent": intent.name,
-                "confidence": score,
-                "method": method,
-                "conversation_intent": True,
-                "products": []
-            }
-
-            processing_time = time.time() - start_time
-            metadata["processing_time_seconds"] = round(processing_time, 2)
-
-            return ChatResponse(
-                response=response_text,
-                products=[],
-                session_id=session_id,
-                metadata=metadata
-            )
-
-        return None  # Not a conversation intent
-
-    def _should_search_products(
-        self,
-        intent,
-        score: float,
-        conversation_response_type: str,
-        is_product_continuation: bool,
-        message: str
-    ) -> bool:
-        """
-        Determine if should search for products.
-        Extracted from process_message for better maintainability.
-        """
-        from models.types import SearchIntent
-
-        # Only search products when there's clear shopping intent OR product continuation
-        should_search_products = (
-            conversation_response_type == "search" or
-            is_product_continuation or  # NEW: Handle product continuation scenarios
-            (intent in [SearchIntent.SPECIFIC_ITEM, SearchIntent.SALE,
-                       SearchIntent.BRAND, SearchIntent.OUTFIT, SearchIntent.BROWSE]
-             and score > 0.7) or  # Standard threshold for explicit product intents
-            (intent == SearchIntent.INSPIRATION and score > 0.8) or  # RAISED threshold to reduce false positives
-            # Only trigger on explicit product request phrases - exclude obvious non-shopping contexts
-            (any(phrase in message.lower() for phrase in [
-                "i need a", "i need some", "recommend me", "show me some", "find me a", "looking for a",
-                "want to buy", "need to buy", "show me products", "what products", "actual product"
-            ]) and not any(non_shopping_pattern in message.lower() for non_shopping_pattern in [
-                # News/Media patterns
-                "in the news", "breaking news", "headlines", "reporter said", "news report",
-                "media says", "press conference", "journalist", "broadcasting",
-
-                # Question patterns about events/opinions
-                "did you see", "did you hear", "what happened", "what do you think", "your opinion",
-                "do you believe", "what's your view", "how do you feel about", "thoughts on",
-
-                # Academic/Professional contexts
-                "study shows", "research found", "according to", "scientist says", "doctor says",
-                "professor", "university", "academic", "clinical trial", "peer review",
-
-                # Political context (general, not specific people)
-                "election results", "congress voted", "senate", "political party", "campaign",
-                "government policy", "legislation", "ballot", "polling data", "voter",
-
-                # Personal life/relationships
-                "my friend said", "my family", "relationship advice", "dating tips", "marriage",
-                "personal life", "life advice", "friendship", "social situation",
-
-                # General conversation starters
-                "tell me about", "explain", "discuss", "talk about", "curious about",
-                "wondering", "question about", "help me understand"
-            ]))
-        )
-
-        return should_search_products
-
-    async def _finalize_response(
-        self,
-        chat_response: ChatResponse,
-        session_id: str,
-        user_id: Optional[str],
-        message: str,
-        intent,
-        params: Dict[str, Any],
-        metadata: Dict[str, Any],
-        background_tasks: Optional[BackgroundTasks],
-        start_time: float
-    ) -> None:
-        """
-        Finalize response with timing and storage.
-        Extracted from process_message for better maintainability.
-        """
-        processing_time = time.time() - start_time
-        metadata["processing_time_seconds"] = round(processing_time, 2)
-        chat_response.metadata.update(metadata)
-
-        # Store conversation in comprehensive unified memory system (background task)
-        if background_tasks:
-            background_tasks.add_task(
-                self._store_comprehensive_memory,
-                session_id,
-                user_id or "anonymous",
-                message,
-                chat_response.response,
-                intent.name if hasattr(intent, 'name') else str(intent),
-                params,
-                len(metadata.get("products", [])),
-                metadata
-            )
-        else:
-            # Store immediately for non-HTTP contexts using comprehensive memory
-            await self.memory_coordinator.store_conversation(
-                session_id=session_id,
-                user_id=user_id or "anonymous",
-                user_message=message,
-                assistant_response=chat_response.response,
-                intent=intent.name if hasattr(intent, 'name') else str(intent),
-                extracted_params=params,
-                products_found=len(metadata.get("products", [])),
-                metadata=metadata
-            )
+        """Handle general conversation that's not fashion-related"""
+        return "I enjoy chatting! While I'm primarily here to help with fashion and style, I'm happy to have a friendly conversation. Is there anything fashion-related I can help you with today?"

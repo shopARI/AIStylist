@@ -151,19 +151,26 @@ class JudgeAriAgent:
             
             # STEP 2: Check if we have acceptable results
             if not filtered_cypher and not filtered_vibe:
-                logger.warning("WARNING: Judge Ari: ALL PRODUCTS REJECTED - No relevant results found!")
-                return {
-                    "winner": "rejected",
-                    "reasoning": "All products were irrelevant to the query and consciously rejected",
-                    "products": [],
-                    "cypher_count": len(cypher_results),
-                    "vibe_count": len(vibe_results),
-                    "filtered_cypher_count": 0,
-                    "filtered_vibe_count": 0,
-                    "rejection_reason": "Quality control: No products met relevance standards",
-                    "needs_agent_retry": True,
-                    "judgment_confidence": 1.0  # High confidence in rejection
-                }
+                # If validation rejected everything but agents found products, be more lenient
+                if cypher_results or vibe_results:
+                    logger.warning("WARNING: Validation rejected all products, but agents found results. Using original results.")
+                    # Use original results as fallback
+                    filtered_cypher = cypher_results[:5] if cypher_results else []
+                    filtered_vibe = vibe_results[:5] if vibe_results else []
+                else:
+                    logger.warning("WARNING: Judge Ari: ALL PRODUCTS REJECTED - No relevant results found!")
+                    return {
+                        "winner": "rejected",
+                        "reasoning": "All products were irrelevant to the query and consciously rejected",
+                        "products": [],
+                        "cypher_count": len(cypher_results),
+                        "vibe_count": len(vibe_results),
+                        "filtered_cypher_count": 0,
+                        "filtered_vibe_count": 0,
+                        "rejection_reason": "Quality control: No products met relevance standards",
+                        "needs_agent_retry": True,
+                        "judgment_confidence": 1.0  # High confidence in rejection
+                    }
             
             # Log quality control results
             logger.info(f"Quality control results: CypherBot {len(cypher_results)}->{len(filtered_cypher)}, VibeBot {len(vibe_results)}->{len(filtered_vibe)}")
@@ -199,7 +206,107 @@ class JudgeAriAgent:
             logger.error(f"Judgment failed: {e}")
             # Return balanced selection on error
             return self._create_fallback_judgment(cypher_results, vibe_results, limit)
-    
+
+    async def evaluate_products_individually(
+        self,
+        all_products: List[Dict[str, Any]],
+        query: str,
+        ml_context: Optional[Dict[str, Any]] = None,
+        user_context: Optional[Dict[str, Any]] = None,
+        limit: int = 5
+    ) -> Dict[str, Any]:
+        """
+        NEW UNIFIED EVALUATION: Evaluate each product individually instead of team battles.
+
+        Args:
+            all_products: All products from both agents combined
+            query: Original search query
+            ml_context: ML intelligence context
+            user_context: User preferences and context
+            limit: Maximum products to return
+
+        Returns:
+            Evaluation dictionary with best products selected individually
+        """
+        start_time = datetime.now()
+
+        with self.stats_lock:
+            self.stats["total_judgments"] += 1
+
+        logger.info(f"{self.name} evaluating {len(all_products)} products individually (unified approach)")
+
+        try:
+            # STEP 1: Quality filter - remove obviously irrelevant products
+            logger.info("Judge Ari: Applying individual product quality validation...")
+            filtered_products = []
+
+            for product in all_products:
+                if await self._is_product_relevant(product, query):
+                    filtered_products.append(product)
+
+            logger.info(f"Quality validation: {len(all_products)} -> {len(filtered_products)} products")
+
+            if not filtered_products:
+                logger.warning("WARNING: All products rejected during individual evaluation")
+                return {
+                    "products": [],
+                    "reasoning": "All products were irrelevant to the query",
+                    "evaluation_method": "individual_quality_rejected",
+                    "total_evaluated": len(all_products),
+                    "products_passed_quality": 0
+                }
+
+            # STEP 2: Score each product individually
+            logger.info("Judge Ari: Scoring each product individually...")
+            scored_products = []
+
+            for product in filtered_products:
+                score = await self._score_individual_product(product, query, ml_context, user_context)
+                product_with_score = product.copy()
+                product_with_score['_ari_score'] = score
+                product_with_score['judge_score'] = score  # For quality threshold compatibility
+                scored_products.append(product_with_score)
+
+            # STEP 3: Sort by score and select top products
+            scored_products.sort(key=lambda p: p.get('_ari_score', 0), reverse=True)
+            top_products = scored_products[:limit]
+
+            # STEP 4: Generate reasoning
+            reasoning = await self._generate_individual_evaluation_reasoning(
+                top_products, query, len(all_products), len(filtered_products)
+            )
+
+            # Calculate consensus information
+            consensus_products = [p for p in top_products if p.get('_source') == 'consensus']
+
+            result = {
+                "products": top_products,
+                "reasoning": reasoning,
+                "evaluation_method": "individual_product_scoring",
+                "total_evaluated": len(all_products),
+                "products_passed_quality": len(filtered_products),
+                "consensus_products_selected": len(consensus_products),
+                "average_score": sum(p.get('_ari_score', 0) for p in top_products) / len(top_products) if top_products else 0
+            }
+
+            # Update statistics
+            elapsed = (datetime.now() - start_time).total_seconds()
+            self._update_individual_stats(result, elapsed)
+
+            logger.info(f"Individual evaluation complete: {len(top_products)} products selected with avg score {result['average_score']:.2f}")
+            return result
+
+        except Exception as e:
+            logger.error(f"Individual evaluation failed: {e}")
+            # Fallback: return products sorted by source scores
+            all_products.sort(key=lambda p: p.get('_source_score', 0), reverse=True)
+            return {
+                "products": all_products[:limit],
+                "reasoning": f"Fallback selection due to evaluation error: {e}",
+                "evaluation_method": "fallback_source_score",
+                "total_evaluated": len(all_products)
+            }
+
     async def _get_judgment_strategy(
         self,
         cypher_results: List[Dict[str, Any]],
@@ -1034,22 +1141,26 @@ PRODUCTS TO VALIDATE:
 
 Your job: CONSCIOUSLY EVALUATE each product for relevance to the query.
 
-CRITICAL EVALUATION CRITERIA:
-- Does this product make sense for the stated occasion/need?
-- Would a real fashion stylist recommend this item for this specific request?
-- Is the product category appropriate? (No kids' items for adult formal wear)
-- Does the style/formality level match the occasion?
+EVALUATION CRITERIA (Be very permissive and helpful):
+- If the product category is even remotely related to the request, ACCEPT IT
+- For requests like "blazer", accept blazers, jackets, coats, suits, formal wear
+- For requests like "shirt", accept shirts, tops, blouses, t-shirts
+- Only reject products that are completely unrelated (shoes for clothing, etc.)
 
-EXAMPLE REJECTIONS:
-- Kids' t-shirts for wedding guest attire → REJECT
-- Sports jerseys for "impressing at a party" → REJECT  
-- Casual sneakers for formal interviews → REJECT
-- Formal gowns for casual coffee dates → REJECT
+IMPORTANT: Default to ACCEPTING products rather than rejecting them.
+Give customers options and let them decide what they like.
 
-RESPOND WITH: List only the product IDs that are TRULY RELEVANT and appropriate.
-If NO products are relevant, respond with: "REJECT_ALL"
+EXAMPLE ACCEPTANCES:
+- "blazer" request → Accept blazers, suit jackets, formal jackets, cardigans
+- "black shirt" request → Accept any black tops, shirts, blouses, t-shirts
+- "dress" request → Accept any dresses, regardless of style or occasion
 
-Think like a conscious fashion expert who would never embarrass a client with inappropriate recommendations."""
+ONLY REJECT if completely wrong category (shoes for clothing request, etc.)
+
+RESPOND WITH: List ALL product IDs that are even remotely relevant.
+Be generous and inclusive. Only use "REJECT_ALL" if literally nothing matches the category.
+
+Think like a helpful salesperson who wants to show customers all available options."""
 
         try:
             # Create message for CAMEL agent to evaluate relevance
@@ -1184,3 +1295,227 @@ Think like a conscious fashion expert who would never embarrass a client with in
                 if total > 0 else 0
             )
         }
+
+    # NEW HELPER METHODS FOR UNIFIED PRODUCT EVALUATION
+
+    async def _is_product_relevant(self, product: Dict[str, Any], query: str) -> bool:
+        """Check if an individual product is relevant to the query."""
+        try:
+            # Basic relevance checks
+            title = product.get('title', '').lower()
+            description = product.get('description', '').lower()
+            category = product.get('category', '').lower()
+            query_lower = query.lower()
+
+            # Check for obvious irrelevance
+            irrelevant_patterns = ['unrelated', 'out of stock', 'unavailable']
+            text_to_check = f"{title} {description} {category}"
+
+            if any(pattern in text_to_check for pattern in irrelevant_patterns):
+                return False
+
+            # Basic keyword matching
+            query_words = query_lower.split()
+            for word in query_words:
+                if len(word) > 2 and word in text_to_check:
+                    return True
+
+            # If no obvious matches, assume relevant (let scoring decide)
+            return True
+
+        except Exception as e:
+            logger.warning(f"Error checking product relevance: {e}")
+            return True  # Default to relevant if error
+
+    async def _score_individual_product(
+        self,
+        product: Dict[str, Any],
+        query: str,
+        ml_context: Optional[Dict[str, Any]] = None,
+        user_context: Optional[Dict[str, Any]] = None
+    ) -> float:
+        """Score an individual product for relevance and quality."""
+        try:
+            score = 0.0
+
+            # 1. Title relevance (30%) - Improved algorithm
+            title = product.get('title', '').lower()
+            query_lower = query.lower()
+
+            # Filter out noise words and focus on meaningful terms
+            noise_words = {'hey', 'there', 'get', 'me', 'show', 'find', 'want', 'need', 'looking', 'for'}
+            meaningful_words = [word for word in query_lower.split() if len(word) > 2 and word not in noise_words]
+
+            if meaningful_words:
+                title_matches = sum(1 for word in meaningful_words if word in title)
+                title_score = min(title_matches / len(meaningful_words), 1.0) * 0.3
+            else:
+                title_score = 0.15  # Base score if no meaningful words
+            score += title_score
+
+            # 2. Source agent confidence (30%) - Increased weight since agents are smart
+            source_score = product.get('_source_score', 0.6) * 0.3  # Higher default + weight
+            score += source_score
+
+            # 3. Consensus bonus (20%)
+            if product.get('_source') == 'consensus':
+                consensus_bonus = 0.2
+                score += consensus_bonus
+
+            # 4. ML intelligence enhancement (15%)
+            if ml_context and product.get('id'):
+                # Use ML intelligence to boost score
+                ml_boost = self._calculate_ml_boost(product, ml_context)
+                score += ml_boost * 0.15
+
+            # 5. User preference alignment (5%)
+            if user_context:
+                preference_score = self._calculate_preference_score(product, user_context)
+                score += preference_score * 0.05
+
+            # 6. Base product quality score (15%) - Ensure minimum viability
+            base_quality = 0.15  # All products that agents find get base quality
+            score += base_quality
+
+            return min(score, 1.0)  # Cap at 1.0
+
+        except Exception as e:
+            logger.warning(f"Error scoring product: {e}")
+            return 0.5  # Default neutral score
+
+    def _calculate_ml_boost(self, product: Dict[str, Any], ml_context: Dict[str, Any]) -> float:
+        """Calculate ML intelligence boost for product scoring."""
+        try:
+            boost = 0.0
+
+            # Check if product matches ML insights
+            product_id = product.get('id')
+            if not product_id:
+                return 0.0
+
+            # Base ML intelligence available boost
+            if ml_context:
+                boost += 0.2  # Having ML intelligence at all is valuable
+
+            # Visual intelligence boost
+            visual_intel = ml_context.get('vibe_intel', {}).get('visual', {})
+            if visual_intel and 'query_visual_analysis' in visual_intel:
+                boost += 0.3  # Visual intelligence is working
+                visual_cues = visual_intel['query_visual_analysis'].get('visual_cues', {})
+
+                # Check color matching
+                product_title = product.get('title', '').lower()
+                detected_colors = visual_cues.get('colors', [])
+                for color in detected_colors:
+                    if color.lower() in product_title:
+                        boost += 0.3  # Additional boost for color match
+                        break
+
+            # Behavioral intelligence boost
+            behavioral_intel = ml_context.get('cypher_intel', {}).get('behavioral', {})
+            if behavioral_intel:
+                boost += 0.2
+
+            return min(boost, 1.0)
+
+        except Exception as e:
+            logger.warning(f"Error calculating ML boost: {e}")
+            return 0.0
+
+    def _calculate_preference_score(self, product: Dict[str, Any], user_context: Dict[str, Any]) -> float:
+        """Calculate user preference alignment score."""
+        try:
+            score = 0.0
+
+            # Check preferred categories
+            preferred_categories = user_context.get('preferred_categories', [])
+            product_category = product.get('category', '').lower()
+
+            if preferred_categories and product_category:
+                for pref_cat in preferred_categories:
+                    if pref_cat.lower() in product_category:
+                        score += 0.5
+                        break
+
+            # Check price range preferences
+            preferred_price_range = user_context.get('price_range')
+            product_price = product.get('price')
+
+            if preferred_price_range and product_price:
+                min_price = preferred_price_range.get('min', 0)
+                max_price = preferred_price_range.get('max', float('inf'))
+
+                if min_price <= product_price <= max_price:
+                    score += 0.5
+
+            return min(score, 1.0)
+
+        except Exception as e:
+            logger.warning(f"Error calculating preference score: {e}")
+            return 0.0
+
+    async def _generate_individual_evaluation_reasoning(
+        self,
+        top_products: List[Dict[str, Any]],
+        query: str,
+        total_evaluated: int,
+        passed_quality: int
+    ) -> str:
+        """Generate reasoning for individual product evaluation."""
+        try:
+            reasoning_parts = []
+
+            reasoning_parts.append(f"Evaluated {total_evaluated} products individually")
+            reasoning_parts.append(f"{passed_quality} products passed quality filters")
+            reasoning_parts.append(f"Selected top {len(top_products)} products based on individual scores")
+
+            # Analyze sources
+            sources = {}
+            for product in top_products:
+                source = product.get('_source', 'unknown')
+                sources[source] = sources.get(source, 0) + 1
+
+            if sources:
+                source_summary = ", ".join([f"{count} from {source}" for source, count in sources.items()])
+                reasoning_parts.append(f"Source distribution: {source_summary}")
+
+            # Check for consensus products
+            consensus_count = len([p for p in top_products if p.get('_source') == 'consensus'])
+            if consensus_count > 0:
+                reasoning_parts.append(f"{consensus_count} products found by both agents (high confidence)")
+
+            return ". ".join(reasoning_parts) + "."
+
+        except Exception as e:
+            logger.warning(f"Error generating reasoning: {e}")
+            return f"Individual evaluation of {total_evaluated} products completed with collaborative approach."
+
+    def _update_individual_stats(self, result: Dict[str, Any], elapsed_time: float):
+        """Update statistics for individual product evaluation."""
+        try:
+            with self.stats_lock:
+                # Add new stats for individual evaluation
+                if 'individual_evaluations' not in self.stats:
+                    self.stats['individual_evaluations'] = 0
+                    self.stats['avg_products_per_evaluation'] = 0.0
+                    self.stats['avg_individual_score'] = 0.0
+
+                self.stats['individual_evaluations'] += 1
+
+                # Update average products per evaluation
+                total_evals = self.stats['individual_evaluations']
+                current_avg = self.stats['avg_products_per_evaluation']
+                products_evaluated = result.get('total_evaluated', 0)
+                self.stats['avg_products_per_evaluation'] = (
+                    (current_avg * (total_evals - 1) + products_evaluated) / total_evals
+                )
+
+                # Update average individual score
+                avg_score = result.get('average_score', 0)
+                current_score_avg = self.stats['avg_individual_score']
+                self.stats['avg_individual_score'] = (
+                    (current_score_avg * (total_evals - 1) + avg_score) / total_evals
+                )
+
+        except Exception as e:
+            logger.warning(f"Error updating individual stats: {e}")

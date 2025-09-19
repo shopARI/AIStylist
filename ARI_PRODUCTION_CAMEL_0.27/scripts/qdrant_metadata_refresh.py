@@ -21,7 +21,7 @@ class QdrantMetadataRefresher:
 
     async def refresh_metadata(self):
         """Refresh stale collection metadata"""
-        print("🔄 QDRANT METADATA REFRESH")
+        print("QDRANT METADATA REFRESH")
         print("=" * 60)
         
         try:
@@ -37,14 +37,14 @@ class QdrantMetadataRefresher:
             if success:
                 print(" Method 1: Collection optimization successful")
             else:
-                print("⚠️ Method 1: Collection optimization failed, trying alternatives...")
+                print("WARNING: Method 1: Collection optimization failed, trying alternatives...")
                 
                 # Method 2: Flush segments (forces index update)
                 success = await self._flush_collection()
                 if success:
                     print(" Method 2: Segment flush successful")
                 else:
-                    print("⚠️ Method 2: Segment flush failed, trying final method...")
+                    print("WARNING: Method 2: Segment flush failed, trying final method...")
                     
                     # Method 3: Wait for natural sync (background processes)
                     await self._wait_for_sync()
@@ -68,15 +68,15 @@ class QdrantMetadataRefresher:
             count_result = self.client.count(self.collection_name)
             actual_count = count_result.count if hasattr(count_result, 'count') else 0
             
-            print(f"📊 Metadata vectors_count: {metadata_count:,}")
+            print(f"Metadata vectors_count: {metadata_count:,}")
             print(f"🔢 Actual count() result: {actual_count:,}")
-            print(f"📈 Collection status: {collection_info.status}")
+            print(f"Collection status: {collection_info.status}")
             
             # Calculate discrepancy
             if metadata_count != actual_count:
                 discrepancy = abs(metadata_count - actual_count)
                 percentage = (discrepancy / max(actual_count, 1)) * 100
-                print(f"⚠️ Discrepancy: {discrepancy:,} vectors ({percentage:.1f}%)")
+                print(f"WARNING: Discrepancy: {discrepancy:,} vectors ({percentage:.1f}%)")
                 return False
             else:
                 print(" Metadata is consistent!")
@@ -107,7 +107,7 @@ class QdrantMetadataRefresher:
             
             # Check if optimization is running
             collection_info = self.client.get_collection(self.collection_name)
-            print(f"📈 Collection status after optimization: {collection_info.status}")
+            print(f"Collection status after optimization: {collection_info.status}")
             
             return True
             
@@ -133,7 +133,7 @@ class QdrantMetadataRefresher:
                 return True
                 
             except Exception as flush_error:
-                print(f"⚠️ Direct flush failed: {flush_error}")
+                print(f"WARNING: Direct flush failed: {flush_error}")
                 return False
                 
         except Exception as e:
@@ -158,13 +158,13 @@ class QdrantMetadataRefresher:
             
             print(f"⏳ Still waiting... ({i + check_interval}/{max_wait_time}s)")
         
-        print("⚠️ Natural sync timeout - metadata may still be stale")
+        print("WARNING: Natural sync timeout - metadata may still be stale")
         print(" Try running this script again later, or consider recreating the collection")
     
     async def force_metadata_refresh(self):
         """Nuclear option: Force complete metadata refresh"""
-        print("💥 FORCING COMPLETE METADATA REFRESH")
-        print("⚠️ This is the nuclear option - use only if other methods fail")
+        print("FORCING COMPLETE METADATA REFRESH")
+        print("WARNING: This is the nuclear option - use only if other methods fail")
         
         confirm = input("Type 'FORCE_REFRESH' to proceed: ")
         if confirm != 'FORCE_REFRESH':
@@ -173,7 +173,7 @@ class QdrantMetadataRefresher:
         
         try:
             # Get collection configuration
-            print("📋 Backing up collection configuration...")
+            print("Backing up collection configuration...")
             collection_info = self.client.get_collection(self.collection_name)
             
             # Update collection with same config (forces rebuild)
@@ -203,7 +203,7 @@ async def main():
         print("\n Metadata is already consistent - no refresh needed!")
         return
     
-    print("\n⚠️ Stale metadata detected - proceeding with refresh...")
+    print("\nWARNING: Stale metadata detected - proceeding with refresh...")
     await refresher.refresh_metadata()
 
 if __name__ == "__main__":

@@ -337,7 +337,7 @@ def main():
             
             # Metadata
             if results.get("metadata"):
-                with st.expander("📊 Technical Details"):
+                with st.expander("Technical Details"):
                     st.json(results["metadata"])
     
     with col2:

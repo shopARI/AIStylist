@@ -52,7 +52,7 @@ async def explore_neo4j_schema():
             print(f"  - {record['relationshipType']}")
             
         # 3. Get node counts
-        print("\n📊 NODE COUNTS:")
+        print("\nNODE COUNTS:")
         for record in labels:
             label = record['label']
             count_query = f"MATCH (n:{label}) RETURN count(n) as count"

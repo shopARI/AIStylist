@@ -85,17 +85,17 @@ async def adaptive_llm_mass_extract():
                 count_result = await neo4j_service.query(count_query)
                 processed = count_result[0]['processed_count'] if count_result else 0
                 updated = processed
-                print(f"📊 Resuming from: {last_processed_id[:8]}... ({processed:,} already processed)")
+                print(f"Resuming from: {last_processed_id[:8]}... ({processed:,} already processed)")
             else:
-                print("📊 Starting fresh extraction")
+                print("Starting fresh extraction")
         except:
             last_processed_id = ""
-            print("📊 Starting fresh extraction (continuation check failed)")
+            print("Starting fresh extraction (continuation check failed)")
         
         start_time = time.time()
         
         while True:
-            print(f"\n🔄 Batch {batch_num} (size: {current_batch_size}, cursor: {last_processed_id[:8]}...)")
+            print(f"\nBatch {batch_num} (size: {current_batch_size}, cursor: {last_processed_id[:8]}...)")
             
             # Cursor-based batch query
             if last_processed_id:
@@ -173,7 +173,7 @@ async def adaptive_llm_mass_extract():
                         batch_updated += 1
                         
                     except Exception as e:
-                        print(f"⚠️ Update error for product {extraction['id']}: {e}")
+                        print(f"WARNING: Update error for product {extraction['id']}: {e}")
                         continue
                 
                 # Success - increase batch size gradually
@@ -183,7 +183,7 @@ async def adaptive_llm_mass_extract():
                 if successful_batches >= 3 and current_batch_size < max_batch_size:
                     current_batch_size = min(current_batch_size + 2, max_batch_size)
                     successful_batches = 0
-                    print(f"📈 Increased batch size to {current_batch_size}")
+                    print(f"Increased batch size to {current_batch_size}")
                         
             except Exception as e:
                 error_msg = str(e).lower()
@@ -192,14 +192,14 @@ async def adaptive_llm_mass_extract():
                     token_limit_errors += 1
                     if current_batch_size > min_batch_size:
                         current_batch_size = max(current_batch_size - 3, min_batch_size)
-                        print(f"🔄 Token limit hit - reduced batch size to {current_batch_size}")
+                        print(f"Token limit hit - reduced batch size to {current_batch_size}")
                         successful_batches = 0
                         continue  # Retry with smaller batch
                     else:
-                        print(f"⚠️ Token limit at minimum batch size: {e}")
+                        print(f"WARNING: Token limit at minimum batch size: {e}")
                         # Skip this batch and continue
                 else:
-                    print(f"⚠️ Batch processing error: {e}")
+                    print(f"WARNING: Batch processing error: {e}")
             
             processed += len(batch_result)
             batch_num += 1
@@ -211,7 +211,7 @@ async def adaptive_llm_mass_extract():
                 remaining = max(0, 4600000 - processed)
                 eta = remaining / rate / 3600 if rate > 0 else 0
                 
-                print(f"📈 Progress: {processed:,} processed, {updated:,} updated")
+                print(f"Progress: {processed:,} processed, {updated:,} updated")
                 print(f"⏱️ Rate: {rate:.1f} products/sec, ETA: {eta:.1f} hours")
                 print(f" Batch size: {current_batch_size}, Token errors: {token_limit_errors}")
             
@@ -223,15 +223,15 @@ async def adaptive_llm_mass_extract():
         total_cost = updated * 0.015
         
         print(f"\n ADAPTIVE LLM EXTRACTION COMPLETE!")
-        print(f"📊 Total processed: {processed:,}")
-        print(f"🔄 Total updated: {updated:,}")
+        print(f"Total processed: {processed:,}")
+        print(f"Total updated: {updated:,}")
         print(f"⏱️ Time elapsed: {elapsed/3600:.1f} hours")
-        print(f"💰 Total cost: ${total_cost:.2f}")
+        print(f"Total cost: ${total_cost:.2f}")
         print(f" Final batch size: {current_batch_size}")
-        print(f"⚠️ Token limit errors: {token_limit_errors}")
+        print(f"WARNING: Token limit errors: {token_limit_errors}")
         
         # Create relationships efficiently
-        print(f"\n🔗 Creating optimized relationships...")
+        print(f"\nCreating optimized relationships...")
         
         rel_queries = [
             # Color relationships
@@ -270,7 +270,7 @@ async def adaptive_llm_mass_extract():
                 await neo4j_service.query(rel_query)
                 print(f"    Relationship batch {i+1} created")
             except Exception as e:
-                print(f"   ⚠️ Relationship batch {i+1} error: {e}")
+                print(f"   WARNING: Relationship batch {i+1} error: {e}")
         
         await neo4j_service.close()
         print(f" Adaptive LLM extraction complete! Enhanced knowledge graph ready!")

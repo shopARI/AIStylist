@@ -421,8 +421,18 @@ class UserKnowledgeGraphService:
             }
             
             for pref in user_data.get("preferences", []):
-                if pref.get("type") and pref.get("value"):
-                    self._process_preference(preferences, pref["type"], pref["value"])
+                # Handle both dict and object formats for backward compatibility
+                if isinstance(pref, dict):
+                    if pref.get("type") and pref.get("value"):
+                        self._process_preference(preferences, pref["type"], pref["value"])
+                else:
+                    # Handle object format that might have confidence attribute
+                    try:
+                        if hasattr(pref, 'type') and hasattr(pref, 'value') and pref.type and pref.value:
+                            self._process_preference(preferences, pref.type, pref.value)
+                    except AttributeError:
+                        logger.warning(f"Skipping malformed preference: {pref}")
+                        continue
             
             # Build profile
             profile = {

@@ -63,9 +63,10 @@ class BattleOptimizer:
         }
         
         # Keyword mappings for context detection
+        from config.fashion_vocabulary import SPECIFIC_ITEMS
         self.context_keywords = {
             "luxury": ["couture", "designer", "luxury", "high-end", "exclusive", "bespoke", "premium"],
-            "specific_item": ["dress", "gown", "suit", "jacket", "coat", "shirt", "pants", "shoes"],
+            "specific_item": SPECIFIC_ITEMS,
             "occasion": ["wedding", "gala", "event", "party", "formal", "dinner", "date", "interview"],
             "wardrobe": ["wardrobe", "capsule", "collection", "essentials", "basics", "complete"],
             "trending": ["trending", "popular", "latest", "new", "hot", "viral"]

@@ -266,13 +266,13 @@ class BattleExecutor:
     ) -> List[Dict[str, Any]]:
         """
         Filter products by quality score.
-        
+
         Returns:
             Filtered products above threshold
         """
         if threshold <= 0:
             return products
-        
+
         filtered = [
             p for p in products
             if p.get("judge_score", 0) >= threshold

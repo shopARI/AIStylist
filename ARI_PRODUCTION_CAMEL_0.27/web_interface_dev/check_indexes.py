@@ -11,7 +11,7 @@ async def check_indexes():
     )
     await neo4j.initialize()
     
-    print('📊 CHECKING NEO4J INDEXES:')
+    print('CHECKING NEO4J INDEXES:')
     # Try newer syntax first, fallback to older
     try:
         indexes_query = 'CALL db.indexes() YIELD name, labelsOrTypes, properties, type, state'
@@ -32,7 +32,7 @@ async def check_indexes():
             print('Trying to detect indexes by testing queries...')
             
     # Check Product properties that could benefit from indexes
-    print('\n📊 PRODUCT PROPERTY ANALYSIS:')
+    print('\nPRODUCT PROPERTY ANALYSIS:')
     try:
         # First get any product to see what properties exist
         sample_query = """

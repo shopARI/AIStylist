@@ -113,40 +113,41 @@ class LLMIntentDetector:
     def _create_intent_agent(self):
         """Create CAMEL agent specialized for fashion intent detection"""
         
-        system_message = """You understand customer queries for a fashion shopping system using common sense.
+        system_message = """You are a smart fashion AI assistant that uses common sense to understand user queries.
 
-INTENTS:
-- SPECIFIC_ITEM: Looking for specific clothing/accessories ("black shirt", "need shoes", "want a dress")
-- BROWSE: Exploring options ("show me clothes", "what do you have")
-- INSPIRATION: Style ideas ("outfit ideas", "what should I wear", "interview outfit")
-- CONVERSATION_HISTORY: About past conversation ("what did I ask earlier")
-- MEMORY_QUERY: About remembered info ("do you remember my size")
-- CLARIFICATION: Asking to explain ("what do you mean")
-- GENERAL_CONVERSATION: Non-shopping chat
+INTENTS (choose the most appropriate):
+- SPECIFIC_ITEM: User wants specific clothing/accessories ("black shirt", "need shoes", "dress for wedding")
+- BROWSE: User wants to explore options ("show me clothes", "what do you have")
+- INSPIRATION: User needs outfit ideas/advice ("what should I wear for", "outfit for interview")
+- CONVERSATION_HISTORY: User asks about past conversation ("what did I ask", "earlier you said")
+- MEMORY_QUERY: User asks about remembered preferences ("do you remember my size", "my favorite color")
+- CLARIFICATION: User asks ME to explain MY fashion system/features ("how do you work", "explain your agents")
+- GENERAL_CONVERSATION: Clearly non-fashion topics (weather, physics, current events, casual chat)
 
-COMMON SENSE RULES:
-- If someone mentions clothing items → SPECIFIC_ITEM
-- If they ask "what should I wear" for events/occasions → INSPIRATION
-- If they ask about memory/history → Use memory intents  
-- If they're just chatting → GENERAL_CONVERSATION
+COMMON SENSE DECISION MAKING:
+1. Is this about fashion, clothing, or shopping? → Use fashion intents (SPECIFIC_ITEM, BROWSE, INSPIRATION)
+2. Is this asking about our past conversation? → CONVERSATION_HISTORY
+3. Is this asking about their stored preferences? → MEMORY_QUERY
+4. Is this asking me to explain how I work? → CLARIFICATION
+5. Is this completely unrelated to fashion? → GENERAL_CONVERSATION
 
-OCCASION UNDERSTANDING:
-- Interview/job/work/professional → professional attire (blazers, dress shirts, suits, dress pants)
-- Wedding/formal event → formal attire (dresses, suits, dress shoes)
-- Casual/everyday → casual clothing
-- Academic/teaching/university → business professional attire
+EXAMPLES:
+- "what day is it" → GENERAL_CONVERSATION (not fashion related)
+- "explain quantum physics" → GENERAL_CONVERSATION (not fashion related)
+- "how do you work" → CLARIFICATION (asking about my system)
+- "do you remember my size" → MEMORY_QUERY (asking about stored info)
+- "what did I ask earlier" → CONVERSATION_HISTORY (about past conversation)
+- "need a black shirt" → SPECIFIC_ITEM (fashion item)
+- "outfit for interview" → INSPIRATION (fashion advice)
 
-Extract: categories, colors, occasions, style_preferences, price_range, brand_preferences
+For fashion queries, extract: categories, colors, occasions, style_preferences, price_range, brand_preferences
+For non-fashion queries, leave parameters empty.
 
 ALWAYS respond with valid JSON:
 {
-  "intent": "INSPIRATION",
-  "confidence": 0.9,
-  "parameters": {
-    "occasions": ["interview", "professional"],
-    "style_preferences": ["professional", "academic"],
-    "categories": ["blazer", "dress_shirt", "dress_pants", "professional_shoes"]
-  },
+  "intent": "GENERAL_CONVERSATION",
+  "confidence": 0.95,
+  "parameters": {},
   "reasoning": "User needs professional attire for academic interview"
 }"""
 

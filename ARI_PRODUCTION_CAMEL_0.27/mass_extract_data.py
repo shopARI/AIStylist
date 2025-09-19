@@ -92,7 +92,7 @@ async def mass_extract_data():
         count_query = "MATCH (p:Product) RETURN count(p) as total"
         count_result = await neo4j_service.query(count_query)
         total_products = count_result[0]['total'] if count_result else 0
-        print(f"📊 Total products to process: {total_products:,}")
+        print(f"Total products to process: {total_products:,}")
         
         # Process in batches
         batch_size = 1000
@@ -101,7 +101,7 @@ async def mass_extract_data():
         batch_num = 1
         
         while processed < total_products:
-            print(f"\n🔄 Processing batch {batch_num} (products {processed + 1:,} - {min(processed + batch_size, total_products):,})")
+            print(f"\nProcessing batch {batch_num} (products {processed + 1:,} - {min(processed + batch_size, total_products):,})")
             
             # Get batch of products
             batch_query = f"""
@@ -165,14 +165,14 @@ async def mass_extract_data():
             # Progress update
             if batch_num % 10 == 0:
                 percentage = (processed / total_products) * 100
-                print(f"📈 Progress: {processed:,}/{total_products:,} ({percentage:.1f}%) - {updated:,} updated")
+                print(f"Progress: {processed:,}/{total_products:,} ({percentage:.1f}%) - {updated:,} updated")
         
         print(f"\n MASS EXTRACTION COMPLETE!")
-        print(f"📊 Total processed: {processed:,}")
-        print(f"🔄 Total updated: {updated:,}")
+        print(f"Total processed: {processed:,}")
+        print(f"Total updated: {updated:,}")
         
         # Now create relationships
-        print(f"\n🔗 Creating HAS_COLOR relationships...")
+        print(f"\nCreating HAS_COLOR relationships...")
         color_rel_query = """
         MATCH (p:Product), (c:Color)
         WHERE c.name IN p.extracted_colors
@@ -180,7 +180,7 @@ async def mass_extract_data():
         """
         await neo4j_service.query(color_rel_query)
         
-        print(f"🔗 Creating HAS_STYLE relationships...")
+        print(f"Creating HAS_STYLE relationships...")
         style_rel_query = """
         MATCH (p:Product), (s:Style)
         WHERE s.name IN p.extracted_styles
@@ -196,7 +196,7 @@ async def mass_extract_data():
         """
         
         final_result = await neo4j_service.query(final_count_query)
-        print(f"\n📊 FINAL RELATIONSHIP COUNTS:")
+        print(f"\nFINAL RELATIONSHIP COUNTS:")
         total_rels = 0
         for record in final_result:
             rel_type = record['relationship_type']

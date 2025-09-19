@@ -526,7 +526,395 @@ class VisualIntelligence:
             self.embedding_cache[cache_key] = features
         
         return features
-    
+
+    async def analyze_query_visual_patterns(
+        self,
+        query: str,
+        context: Optional[Dict[str, Any]] = None
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Analyze query for visual patterns and provide visual search enhancement.
+
+        Args:
+            query: Search query to analyze
+            context: Additional context (user preferences, etc.)
+
+        Returns:
+            Visual intelligence for query enhancement
+        """
+        # Handle None or empty queries
+        if query is None:
+            print("VISUAL INTELLIGENCE: Query is None, skipping analysis")
+            return None
+
+        if not query or not query.strip():
+            print("VISUAL INTELLIGENCE: Empty query, providing minimal analysis")
+            return {
+                "visual_cues": {"colors": [], "patterns": [], "materials": [], "style_cues": [], "has_visual_intent": False},
+                "style_analysis": {"occasions": [], "formality": "neutral", "mood": "neutral", "primary_style": "general", "style_confidence": 0.0},
+                "search_enhancements": {"color_filters": [], "pattern_preferences": [], "material_preferences": [], "style_direction": "general", "occasion_context": [], "visual_priority": "low", "suggested_colors": ["black", "white", "blue", "red"]},
+                "query_visual_score": 0.0,
+                "confidence": 0.0,
+                "source": "query_analysis"
+            }
+
+        try:
+            print(f"VISUAL INTELLIGENCE: Analyzing query '{query}'")
+            logger.info(f"Visual Intelligence analyzing query: '{query[:50]}...'")
+
+            # Extract visual cues from query
+            visual_cues = self._extract_visual_cues_from_query(query)
+            print(f"   Visual Cues Found:")
+            if visual_cues['colors']:
+                print(f"      - Colors: {visual_cues['colors']}")
+            if visual_cues['patterns']:
+                print(f"      - Patterns: {visual_cues['patterns']}")
+            if visual_cues['materials']:
+                print(f"      - Materials: {visual_cues['materials']}")
+            if visual_cues['style_cues']:
+                print(f"      - Style Cues: {visual_cues['style_cues']}")
+
+            # Get style analysis from query
+            style_analysis = self._analyze_query_style_intent(query, context)
+            print(f"   Style Analysis:")
+            if style_analysis['occasions']:
+                print(f"      - Occasions: {style_analysis['occasions']}")
+            print(f"      - Formality: {style_analysis['formality']}")
+            print(f"      - Mood: {style_analysis['mood']}")
+            print(f"      - Primary Style: {style_analysis['primary_style']}")
+            print(f"      - Style Confidence: {style_analysis['style_confidence']:.1%}")
+
+            # Generate visual search suggestions
+            search_enhancements = self._generate_visual_search_enhancements(query, visual_cues, style_analysis)
+            print(f"   Search Enhancements:")
+            if search_enhancements['color_filters']:
+                print(f"      - Color Filters: {search_enhancements['color_filters']}")
+            if search_enhancements['suggested_colors']:
+                print(f"      - Suggested Colors: {search_enhancements['suggested_colors']}")
+            print(f"      - Visual Priority: {search_enhancements['visual_priority']}")
+
+            visual_relevance = self._calculate_query_visual_relevance(query)
+            print(f"   Visual Relevance Score: {visual_relevance:.1%}")
+
+            intelligence = {
+                "visual_cues": visual_cues,
+                "style_analysis": style_analysis,
+                "search_enhancements": search_enhancements,
+                "query_visual_score": visual_relevance,
+                "confidence": 0.75,
+                "source": "query_analysis"
+            }
+
+            print(f"   Visual Intelligence analysis complete!")
+            logger.info(f"Query visual analysis completed: {len(visual_cues.get('colors', []))} colors, {len(visual_cues.get('style_cues', []))} style cues, primary_style={style_analysis.get('primary_style', 'unknown')}")
+
+            return intelligence
+
+        except Exception as e:
+            logger.error(f"Error analyzing query visual patterns: {e}")
+            return None
+
+    async def analyze_search_results_visually(
+        self,
+        products: List[Dict[str, Any]],
+        query: str,
+        limit: int = 5
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Analyze search results visually to provide enhanced recommendations.
+
+        Args:
+            products: List of product dictionaries
+            query: Original search query
+            limit: Maximum products to analyze
+
+        Returns:
+            Visual intelligence about search results
+        """
+        try:
+            if not products:
+                return None
+
+            logger.debug(f"Analyzing {min(len(products), limit)} products visually for query: '{query[:30]}...'")
+
+            # Select products to analyze (prioritize those with images)
+            products_to_analyze = []
+            for product in products[:limit * 2]:  # Check more products to find ones with images
+                if product.get('images') or product.get('image_url'):
+                    products_to_analyze.append(product)
+                    if len(products_to_analyze) >= limit:
+                        break
+
+            if not products_to_analyze:
+                logger.warning("No products with images found for visual analysis")
+                return None
+
+            # Analyze visual features of products
+            visual_analyses = []
+            for product in products_to_analyze:
+                product_id = product.get('id') or product.get('product_id')
+                if product_id:
+                    features = await self.get_visual_features(product_id)
+                    if features:
+                        visual_analyses.append({
+                            "product_id": product_id,
+                            "features": features,
+                            "product_data": product
+                        })
+
+            if not visual_analyses:
+                logger.warning("No visual features extracted from products")
+                return None
+
+            # Aggregate visual insights
+            aggregated_insights = self._aggregate_visual_insights(visual_analyses, query)
+
+            intelligence = {
+                "analyzed_products": len(visual_analyses),
+                "visual_insights": aggregated_insights,
+                "dominant_patterns": self._extract_dominant_visual_patterns(visual_analyses),
+                "style_recommendations": self._generate_style_recommendations(visual_analyses, query),
+                "confidence": 0.8,
+                "source": "search_results_analysis"
+            }
+
+            logger.info(f"Visual analysis of search results completed: {len(visual_analyses)} products analyzed")
+
+            return intelligence
+
+        except Exception as e:
+            logger.error(f"Error analyzing search results visually: {e}")
+            return None
+
+    def _extract_visual_cues_from_query(self, query: str) -> Dict[str, Any]:
+        """Extract visual cues from the search query."""
+        query_lower = query.lower()
+
+        # Color detection
+        colors = []
+        color_keywords = ['black', 'white', 'red', 'blue', 'green', 'yellow', 'pink', 'purple',
+                         'orange', 'brown', 'gray', 'grey', 'navy', 'beige', 'gold', 'silver',
+                         'maroon', 'teal', 'coral', 'turquoise', 'lavender', 'mint', 'cream',
+                         'khaki', 'burgundy', 'olive', 'rose', 'tan', 'charcoal', 'ivory']
+
+        for color in color_keywords:
+            if color in query_lower:
+                colors.append(color)
+
+        # Pattern detection
+        patterns = []
+        pattern_keywords = ['striped', 'floral', 'polka dot', 'checkered', 'plaid', 'solid',
+                           'printed', 'patterned', 'geometric', 'abstract', 'leopard', 'zebra']
+
+        for pattern in pattern_keywords:
+            if pattern in query_lower:
+                patterns.append(pattern)
+
+        # Material/texture detection
+        materials = []
+        material_keywords = ['cotton', 'silk', 'wool', 'leather', 'denim', 'lace', 'velvet',
+                           'satin', 'chiffon', 'knit', 'mesh', 'sequin', 'metallic', 'sheer']
+
+        for material in material_keywords:
+            if material in query_lower:
+                materials.append(material)
+
+        # Style cues
+        style_cues = []
+        style_keywords = ['vintage', 'modern', 'classic', 'trendy', 'casual', 'formal',
+                         'bohemian', 'minimalist', 'edgy', 'romantic', 'sporty', 'chic']
+
+        for style in style_keywords:
+            if style in query_lower:
+                style_cues.append(style)
+
+        return {
+            "colors": colors,
+            "patterns": patterns,
+            "materials": materials,
+            "style_cues": style_cues,
+            "has_visual_intent": len(colors) > 0 or len(patterns) > 0 or len(materials) > 0
+        }
+
+    def _analyze_query_style_intent(self, query: str, context: Optional[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze the style intent from the query."""
+        query_lower = query.lower()
+
+        # Occasion detection
+        occasions = []
+        occasion_keywords = ['wedding', 'party', 'work', 'casual', 'formal', 'date', 'beach',
+                           'evening', 'cocktail', 'business', 'vacation', 'gym', 'office', 'dinner']
+
+        for occasion in occasion_keywords:
+            if occasion in query_lower:
+                occasions.append(occasion)
+
+        # Formality level
+        formality = "neutral"
+        if any(word in query_lower for word in ['formal', 'dress up', 'elegant', 'sophisticated']):
+            formality = "formal"
+        elif any(word in query_lower for word in ['casual', 'relaxed', 'everyday', 'comfortable']):
+            formality = "casual"
+
+        # Style mood
+        mood = "neutral"
+        if any(word in query_lower for word in ['fun', 'playful', 'bright', 'colorful']):
+            mood = "playful"
+        elif any(word in query_lower for word in ['serious', 'professional', 'conservative']):
+            mood = "serious"
+        elif any(word in query_lower for word in ['romantic', 'feminine', 'soft', 'delicate']):
+            mood = "romantic"
+
+        # Primary style
+        primary_style = "general"
+        style_priority = ['bohemian', 'vintage', 'modern', 'minimalist', 'edgy', 'classic', 'trendy']
+        for style in style_priority:
+            if style in query_lower:
+                primary_style = style
+                break
+
+        return {
+            "occasions": occasions,
+            "formality": formality,
+            "mood": mood,
+            "primary_style": primary_style,
+            "style_confidence": 0.7 if occasions or formality != "neutral" else 0.4
+        }
+
+    def _generate_visual_search_enhancements(
+        self,
+        query: str,
+        visual_cues: Dict[str, Any],
+        style_analysis: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Generate visual search enhancements based on analysis."""
+
+        enhancements = {
+            "color_filters": visual_cues.get("colors", []),
+            "pattern_preferences": visual_cues.get("patterns", []),
+            "material_preferences": visual_cues.get("materials", []),
+            "style_direction": style_analysis.get("primary_style", "general"),
+            "occasion_context": style_analysis.get("occasions", []),
+            "visual_priority": "high" if visual_cues.get("has_visual_intent") else "medium"
+        }
+
+        # Add style-specific visual recommendations
+        if style_analysis.get("formality") == "formal":
+            enhancements["suggested_colors"] = ["black", "navy", "white", "gray"]
+            enhancements["avoid_patterns"] = ["cartoon", "very_casual"]
+        elif style_analysis.get("formality") == "casual":
+            enhancements["suggested_colors"] = ["bright", "colorful", "pastel", "bold"]
+            enhancements["pattern_flexibility"] = "high"
+            enhancements["color_flexibility"] = "high"
+        else:
+            # Default suggestions for neutral/unspecified formality
+            enhancements["suggested_colors"] = ["black", "white", "blue", "red"]
+
+        return enhancements
+
+    def _calculate_query_visual_relevance(self, query: str) -> float:
+        """Calculate how visually relevant a query is."""
+        query_lower = query.lower()
+
+        # Visual keywords weight
+        visual_keywords = ['color', 'pattern', 'style', 'look', 'design', 'aesthetic', 'visual']
+        visual_score = sum(1 for keyword in visual_keywords if keyword in query_lower) * 0.1
+
+        # Specific visual terms weight
+        specific_visual = ['striped', 'floral', 'solid', 'printed', 'black', 'white', 'red', 'blue',
+                          'silk', 'cotton', 'leather', 'wool', 'gown', 'evening', 'formal', 'dress', 'shirt']
+        specific_score = sum(1 for term in specific_visual if term in query_lower) * 0.1
+
+        # Base relevance for fashion queries
+        base_score = 0.3
+
+        return round(min(base_score + visual_score + specific_score, 1.0), 3)
+
+    def _aggregate_visual_insights(self, visual_analyses: List[Dict[str, Any]], query: str) -> Dict[str, Any]:
+        """Aggregate insights from multiple product analyses."""
+        if not visual_analyses:
+            return {}
+
+        # Collect all colors
+        all_colors = []
+        all_styles = []
+        aesthetic_scores = []
+
+        for analysis in visual_analyses:
+            features = analysis.get("features", {})
+            if "dominant_colors" in features:
+                all_colors.extend(features["dominant_colors"])
+            if "style_attributes" in features:
+                all_styles.extend(features["style_attributes"])
+            if "aesthetic_score" in features:
+                aesthetic_scores.append(features["aesthetic_score"])
+
+        # Find most common elements
+        from collections import Counter
+        color_counts = Counter(all_colors)
+        style_counts = Counter(all_styles)
+
+        return {
+            "dominant_colors": [color for color, count in color_counts.most_common(3)],
+            "common_styles": [style for style, count in style_counts.most_common(3)],
+            "average_aesthetic_score": sum(aesthetic_scores) / len(aesthetic_scores) if aesthetic_scores else 0.5,
+            "visual_diversity": len(set(all_colors)) / max(len(all_colors), 1),
+            "total_analyzed": len(visual_analyses)
+        }
+
+    def _extract_dominant_visual_patterns(self, visual_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Extract dominant visual patterns from the analyses."""
+        if not visual_analyses:
+            return {}
+
+        # Analyze complexity distribution
+        complexities = []
+        for analysis in visual_analyses:
+            features = analysis.get("features", {})
+            if "visual_complexity" in features:
+                complexities.append(features["visual_complexity"])
+
+        # Find most common complexity
+        from collections import Counter
+        complexity_counts = Counter(complexities)
+        dominant_complexity = complexity_counts.most_common(1)[0][0] if complexity_counts else "medium"
+
+        return {
+            "dominant_complexity": dominant_complexity,
+            "complexity_distribution": dict(complexity_counts),
+            "pattern_consistency": len(set(complexities)) <= 2  # True if most products have similar complexity
+        }
+
+    def _generate_style_recommendations(self, visual_analyses: List[Dict[str, Any]], query: str) -> List[str]:
+        """Generate style recommendations based on visual analysis."""
+        recommendations = []
+
+        # Analyze the visual data
+        all_styles = []
+        for analysis in visual_analyses:
+            features = analysis.get("features", {})
+            if "style_attributes" in features:
+                all_styles.extend(features["style_attributes"])
+
+        # Generate recommendations based on common styles
+        from collections import Counter
+        style_counts = Counter(all_styles)
+
+        if "luxury" in [style for style, count in style_counts.most_common(2)]:
+            recommendations.append("Consider premium materials and refined details")
+
+        if "casual" in [style for style, count in style_counts.most_common(2)]:
+            recommendations.append("Focus on comfort and versatility")
+
+        if "professional" in [style for style, count in style_counts.most_common(2)]:
+            recommendations.append("Emphasize clean lines and sophisticated silhouettes")
+
+        # Add query-specific recommendations
+        if "party" in query.lower() or "evening" in query.lower():
+            recommendations.append("Look for items with visual interest and elegant details")
+
+        return recommendations[:3]  # Limit to top 3 recommendations
+
     async def _process_image(self, image_url: str) -> ImageProcessingResult:
         """
         Process a single image and extract embedding.

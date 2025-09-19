@@ -14,7 +14,7 @@ async def up(redis_client):
         await redis_client.client.config_set("maxmemory-policy", "allkeys-lru")
         print(" Set Redis maxmemory-policy to allkeys-lru")
     except Exception as e:
-        print(f"⚠️ Could not set maxmemory-policy (may require admin): {e}")
+        print(f"WARNING: Could not set maxmemory-policy (may require admin): {e}")
     
     # 2. Set up default TTLs for different key types
     key_ttl_config = {

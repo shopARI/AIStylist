@@ -128,7 +128,7 @@ async def main():
         if neo4j_valid == neo4j_total and qdrant_valid == qdrant_total:
             logger.info(" SUCCESS: All sampled products have UUID format IDs!")
         else:
-            logger.warning("⚠️  WARNING: Some products have non-UUID IDs - migration may be incomplete")
+            logger.warning("WARNING: Some products have non-UUID IDs - migration may be incomplete")
             
         if neo4j_total == 0 or qdrant_total == 0:
             logger.error(" ERROR: No products found in one or both systems")

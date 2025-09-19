@@ -830,7 +830,8 @@ class ConversationHandler:
                 
                 # Extract colors
                 colors = []
-                color_words = ["red", "blue", "green", "black", "white", "pink", "purple", "yellow", "gray", "brown", "navy", "beige"]
+                from config.fashion_vocabulary import COLORS
+                color_words = COLORS
                 for color in color_words:
                     if color in content_lower:
                         colors.append(color)
@@ -1028,8 +1029,8 @@ class ConversationHandler:
         message_lower = message.lower()
         
         # Fashion/shopping context keywords (more specific to actual shopping intent)
-        shopping_context_keywords = [
-            "dress", "shirt", "pants", "shoes", "clothing", "outfit", "fashion", "style", 
+        from config.fashion_vocabulary import CATEGORIES
+        shopping_context_keywords = CATEGORIES + [
             "buy", "purchase", "shop", "wear", "size", "brand", "collection", "item", "product",
             "looking for", "need a", "want a", "show me", "find me"
         ]

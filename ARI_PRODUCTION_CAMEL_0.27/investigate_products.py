@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 async def investigate_qdrant_products():
     """Investigate products in Qdrant to understand why wedding searches fail"""
-    print("🕵️ Investigating Qdrant Products...")
+    print("Investigating Qdrant Products...")
     
     try:
         from services.product.retriever import ProductRetrieverService
@@ -169,7 +169,7 @@ async def test_embedding_similarity():
 
 async def check_qdrant_collection_structure():
     """Check the structure and configuration of the Qdrant collection"""
-    print("\n📊 Checking Qdrant Collection Structure...")
+    print("\nChecking Qdrant Collection Structure...")
     
     try:
         from services.product.retriever import ProductRetrieverService
@@ -214,7 +214,7 @@ async def main():
     await test_embedding_similarity()
     
     print("\n" + "=" * 60)
-    print("📊 Investigation Summary:")
+    print("Investigation Summary:")
     print("The issue might be:")
     print("1. Search threshold too high (default 0.3)")
     print("2. Products don't have wedding-related embeddings/text")
