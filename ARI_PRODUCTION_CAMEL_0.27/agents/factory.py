@@ -38,6 +38,7 @@ from config.prompts import (
 # Import agent implementations
 from .cypher_bot import CypherBotAgent
 from .vibe_bot import VibeBotAgent
+from .vision_bot import VisionBotAgent
 from .judge import JudgeAriAgent
 
 
@@ -369,40 +370,82 @@ class AgentFactory:
     ) -> VibeBotAgent:
         """
         Create VibeBot agent.
-        
+
         Args:
             qdrant_client: Qdrant database client
             agent_id: Optional agent identifier
-            
+
         Returns:
             VibeBot agent instance
         """
         agent_id = agent_id or f"vibe_{uuid.uuid4().hex[:8]}"
         start_time = datetime.now()
-        
+
         try:
-            agent = VibeBotAgent(qdrant_client, model_type="gpt-4o-mini")
-            
+            agent = VibeBotAgent(qdrant_client)
+
             # Set metadata
             agent.agent_id = agent_id
             agent.creation_time = start_time
-            
+
             # Update metrics
             if self.enable_metrics:
                 creation_time = (datetime.now() - start_time).total_seconds()
                 self.metrics["agents_created"] += 1
                 self.metrics["total_creation_time"] += creation_time
                 self._update_type_metrics("vibe", True)
-            
+
             logger.info(f"Created VibeBot: {agent_id}")
             return agent
-            
+
         except Exception as e:
             if self.enable_metrics:
                 self.metrics["creation_failures"] += 1
                 self._update_type_metrics("vibe", False)
             logger.error(f"Failed to create VibeBot: {e}")
             raise RuntimeError(f"VibeBot creation failed: {e}") from e
+
+    async def create_vision_bot(
+        self,
+        visual_qdrant_client: Any,
+        agent_id: Optional[str] = None
+    ) -> VisionBotAgent:
+        """
+        Create VisionBot agent.
+
+        Args:
+            visual_qdrant_client: Visual Qdrant database client
+            agent_id: Optional agent identifier
+
+        Returns:
+            VisionBot agent instance
+        """
+        agent_id = agent_id or f"vision_{uuid.uuid4().hex[:8]}"
+        start_time = datetime.now()
+
+        try:
+            agent = VisionBotAgent(visual_qdrant_client)
+
+            # Set metadata
+            agent.agent_id = agent_id
+            agent.creation_time = start_time
+
+            # Update metrics
+            if self.enable_metrics:
+                creation_time = (datetime.now() - start_time).total_seconds()
+                self.metrics["agents_created"] += 1
+                self.metrics["total_creation_time"] += creation_time
+                self._update_type_metrics("vision", True)
+
+            logger.info(f"Created VisionBot: {agent_id}")
+            return agent
+
+        except Exception as e:
+            if self.enable_metrics:
+                self.metrics["creation_failures"] += 1
+                self._update_type_metrics("vision", False)
+            logger.error(f"Failed to create VisionBot: {e}")
+            raise RuntimeError(f"VisionBot creation failed: {e}") from e
     
     async def create_judge_ari(
         self,
@@ -447,15 +490,17 @@ class AgentFactory:
     async def create_battle_agents(
         self,
         neo4j_client: Any,
-        qdrant_client: Any
+        qdrant_client: Any,
+        visual_qdrant_client: Optional[Any] = None
     ) -> Dict[str, Any]:
         """
-        Create all battle agents.
-        
+        Create all battle agents including VisionBot.
+
         Args:
             neo4j_client: Neo4j database client
-            qdrant_client: Qdrant database client
-            
+            qdrant_client: Qdrant database client for text embeddings
+            visual_qdrant_client: Optional Qdrant client for visual embeddings
+
         Returns:
             Dictionary with all battle agents
         """
@@ -464,17 +509,30 @@ class AgentFactory:
             cypher_task = asyncio.create_task(self.create_cypher_bot(neo4j_client))
             vibe_task = asyncio.create_task(self.create_vibe_bot(qdrant_client))
             judge_task = asyncio.create_task(self.create_judge_ari())
-            
-            cypher_bot, vibe_bot, judge = await asyncio.gather(
-                cypher_task, vibe_task, judge_task
-            )
-            
-            return {
-                "cypher": cypher_bot,
-                "vibe": vibe_bot,
-                "judge": judge
-            }
-            
+
+            # Create VisionBot if visual client is provided
+            if visual_qdrant_client:
+                vision_task = asyncio.create_task(self.create_vision_bot(visual_qdrant_client))
+                cypher_bot, vibe_bot, vision_bot, judge = await asyncio.gather(
+                    cypher_task, vibe_task, vision_task, judge_task
+                )
+                return {
+                    "cypher": cypher_bot,
+                    "vibe": vibe_bot,
+                    "vision": vision_bot,
+                    "judge": judge
+                }
+            else:
+                # Fallback to 2-agent battle if no visual client
+                cypher_bot, vibe_bot, judge = await asyncio.gather(
+                    cypher_task, vibe_task, judge_task
+                )
+                return {
+                    "cypher": cypher_bot,
+                    "vibe": vibe_bot,
+                    "judge": judge
+                }
+
         except Exception as e:
             logger.error(f"Failed to create battle agents: {e}")
             raise RuntimeError(f"Battle agents creation failed: {e}") from e

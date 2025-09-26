@@ -68,7 +68,7 @@ class CleanupVerifier:
             
             print(f"Collection status: {collection_info.status}")
             print(f"Metadata count: {metadata_count:,}")
-            print(f"🔢 Actual count: {actual_count:,}")
+            print(f"Count Actual count: {actual_count:,}")
             
             if metadata_count != actual_count:
                 print(f"WARNING: Metadata inconsistency detected!")
@@ -123,7 +123,7 @@ class CleanupVerifier:
                     malformed_count += 1
             
             print(f"🆔 UUID format: {uuid_count}")
-            print(f"🔢 Numeric format: {numeric_count}")
+            print(f"Count Numeric format: {numeric_count}")
             print(f"WARNING: Malformed: {malformed_count}")
             
             if numeric_count > 0:
@@ -186,7 +186,7 @@ class CleanupVerifier:
     
     async def _check_no_duplicates(self):
         """Check for duplicate UUIDs"""
-        print("\n🔄 DUPLICATE CHECK")
+        print("\nLoading DUPLICATE CHECK")
         print("-" * 40)
         
         try:
@@ -223,7 +223,7 @@ class CleanupVerifier:
             
             print(f"\n Total vectors checked: {total_checked:,}")
             print(f"🆔 Unique UUIDs: {len(uuid_counts):,}")
-            print(f"🔄 Duplicate instances: {duplicates_found}")
+            print(f"Loading Duplicate instances: {duplicates_found}")
             
             if duplicates_found > 0:
                 print(f" Found {len(duplicates)} UUIDs with duplicates!")
@@ -325,6 +325,6 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
     if os.path.exists('.env'):
         load_dotenv('.env')
-        print("📁 Loaded .env file")
+        print("Directory Loaded .env file")
     
     asyncio.run(main())

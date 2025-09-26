@@ -13,26 +13,29 @@ logger = logging.getLogger("services.battle.executor")
 
 class BattleExecutor:
     """
-    Executes battles between CypherBot and VibeBot with Judge evaluation.
+    Executes battles between CypherBot, VibeBot, and VisionBot with Judge evaluation.
     Handles parallel agent execution and result aggregation.
     """
-    
+
     def __init__(
         self,
         cypher_bot,
         vibe_bot,
-        judge
+        judge,
+        vision_bot=None
     ):
         """
         Initialize the battle executor.
-        
+
         Args:
             cypher_bot: CypherBot agent instance
             vibe_bot: VibeBot agent instance
             judge: Judge Ari instance
+            vision_bot: Optional VisionBot agent instance
         """
         self.cypher_bot = cypher_bot
         self.vibe_bot = vibe_bot
+        self.vision_bot = vision_bot
         self.judge = judge
         
         # Execution statistics
@@ -40,9 +43,10 @@ class BattleExecutor:
             "battles_executed": 0,
             "cypher_wins": 0,
             "vibe_wins": 0,
+            "vision_wins": 0,
             "consensus_wins": 0,
             "avg_execution_time": 0.0,
-            "total_execution_time": 0.0,  # Add this line
+            "total_execution_time": 0.0,
             "total_errors": 0
         }
         
@@ -102,9 +106,12 @@ class BattleExecutor:
                 self._log_ml_enhancement(ml_intelligence)
             
             # Execute parallel searches
-            cypher_results, vibe_results = await self._parallel_search(battle_params)
-            
-            logger.info(f"Search complete: CypherBot={len(cypher_results)}, VibeBot={len(vibe_results)}")
+            cypher_results, vibe_results, vision_results = await self._parallel_search(battle_params)
+
+            if self.vision_bot:
+                logger.info(f"Search complete: CypherBot={len(cypher_results)}, VibeBot={len(vibe_results)}, VisionBot={len(vision_results)}")
+            else:
+                logger.info(f"Search complete: CypherBot={len(cypher_results)}, VibeBot={len(vibe_results)}")
             
             # Apply consensus requirement if needed
             if require_consensus:
@@ -112,15 +119,21 @@ class BattleExecutor:
                     cypher_results, vibe_results, limit
                 )
             
-            # Judge evaluation
-            judgment = await self.judge.evaluate(
-                cypher_results=cypher_results,
-                vibe_results=vibe_results,
-                query=query,
-                ml_context=ml_intelligence,
-                user_context=user_context,
-                limit=limit
-            )
+            # Judge evaluation - include VisionBot results if available
+            judgment_params = {
+                "cypher_results": cypher_results,
+                "vibe_results": vibe_results,
+                "query": query,
+                "ml_context": ml_intelligence,
+                "user_context": user_context,
+                "limit": limit
+            }
+
+            # Add VisionBot results if available
+            if self.vision_bot:
+                judgment_params["vision_results"] = vision_results
+
+            judgment = await self.judge.evaluate(**judgment_params)
             
             # Apply quality threshold
             final_products = self._apply_quality_filter(
@@ -135,11 +148,11 @@ class BattleExecutor:
             execution_time = time.time() - start_time
             self._update_avg_time(execution_time)
             
-            # Build result with both agent results for Ari's review
+            # Build result with all agent results for Ari's review
             result = {
                 "products": final_products,
-                "cypher_products": cypher_results,  # Add CypherBot raw results
-                "vibe_products": vibe_results,      # Add VibeBot raw results
+                "cypher_products": cypher_results,
+                "vibe_products": vibe_results,
                 "cypher_count": len(cypher_results),
                 "vibe_count": len(vibe_results),
                 "winner": judgment.get("winner", "unknown"),
@@ -148,8 +161,13 @@ class BattleExecutor:
                 "execution_time": execution_time,
                 "quality_threshold_applied": quality_threshold,
                 "ml_enhanced": bool(ml_intelligence),
-                "judgment": judgment  # Include full judgment for detailed reasoning
+                "judgment": judgment
             }
+
+            # Add VisionBot results if available
+            if self.vision_bot:
+                result["vision_products"] = vision_results
+                result["vision_count"] = len(vision_results)
             
             logger.info(f"Battle executed in {execution_time:.2f}s - Winner: {result['winner']}")
             
@@ -160,7 +178,7 @@ class BattleExecutor:
             self.stats["total_errors"] += 1
             
             # Return empty result on error
-            return {
+            error_result = {
                 "products": [],
                 "cypher_count": 0,
                 "vibe_count": 0,
@@ -170,56 +188,81 @@ class BattleExecutor:
                 "execution_time": time.time() - start_time,
                 "error": True
             }
+
+            # Add VisionBot error fields if VisionBot is available
+            if self.vision_bot:
+                error_result["vision_count"] = 0
+
+            return error_result
     
     async def _parallel_search(
         self,
         battle_params: Dict[str, Any]
-    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
+    ) -> tuple[List[Dict[str, Any]], List[Dict[str, Any]], List[Dict[str, Any]]]:
         """
-        Execute searches in parallel for both agents.
-        
+        Execute searches in parallel for all available agents.
+
         Returns:
-            Tuple of (cypher_results, vibe_results)
+            Tuple of (cypher_results, vibe_results, vision_results)
         """
         logger.info("Launching parallel agent searches...")
-        
-        # Create search tasks
+
+        # Create search tasks for all available agents
+        tasks = []
+        task_names = []
+
+        # Always include CypherBot and VibeBot
         cypher_task = asyncio.create_task(
             self.cypher_bot.search(**battle_params)
         )
-        
         vibe_task = asyncio.create_task(
             self.vibe_bot.search(**battle_params)
         )
-        
-        # Wait for both with error handling
-        results = await asyncio.gather(
-            cypher_task,
-            vibe_task,
-            return_exceptions=True
-        )
-        
+        tasks.extend([cypher_task, vibe_task])
+        task_names.extend(["cypher", "vibe"])
+
+        # Add VisionBot if available
+        if self.vision_bot:
+            vision_task = asyncio.create_task(
+                self.vision_bot.search(**battle_params)
+            )
+            tasks.append(vision_task)
+            task_names.append("vision")
+
+        # Wait for all agents with error handling
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         # Process results
         cypher_results = []
         vibe_results = []
-        
+        vision_results = []
+
         # Handle CypherBot results
         if isinstance(results[0], Exception):
             logger.error(f"CypherBot error: {results[0]}")
         else:
             cypher_results = results[0] if results[0] else []
-        
+
         # Handle VibeBot results
         if isinstance(results[1], Exception):
             logger.error(f"VibeBot error: {results[1]}")
-            # Also print to console for immediate visibility
             print(f"   VibeBot ERROR: {results[1]}")
             import traceback
             traceback.print_exception(type(results[1]), results[1], results[1].__traceback__)
         else:
             vibe_results = results[1] if results[1] else []
-        
-        return cypher_results, vibe_results
+
+        # Handle VisionBot results if present
+        if len(results) > 2:
+            if isinstance(results[2], Exception):
+                logger.error(f"VisionBot error: {results[2]}")
+                print(f"   VisionBot ERROR: {results[2]}")
+                import traceback
+                traceback.print_exception(type(results[2]), results[2], results[2].__traceback__)
+            else:
+                vision_results = results[2] if results[2] else []
+
+        return cypher_results, vibe_results, vision_results
     
     def _apply_consensus_filter(
         self,

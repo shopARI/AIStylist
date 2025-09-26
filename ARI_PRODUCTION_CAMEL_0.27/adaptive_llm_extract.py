@@ -212,7 +212,7 @@ async def adaptive_llm_mass_extract():
                 eta = remaining / rate / 3600 if rate > 0 else 0
                 
                 print(f"Progress: {processed:,} processed, {updated:,} updated")
-                print(f"⏱️ Rate: {rate:.1f} products/sec, ETA: {eta:.1f} hours")
+                print(f"Timer Rate: {rate:.1f} products/sec, ETA: {eta:.1f} hours")
                 print(f" Batch size: {current_batch_size}, Token errors: {token_limit_errors}")
             
             # Rate limiting
@@ -225,7 +225,7 @@ async def adaptive_llm_mass_extract():
         print(f"\n ADAPTIVE LLM EXTRACTION COMPLETE!")
         print(f"Total processed: {processed:,}")
         print(f"Total updated: {updated:,}")
-        print(f"⏱️ Time elapsed: {elapsed/3600:.1f} hours")
+        print(f"Timer Time elapsed: {elapsed/3600:.1f} hours")
         print(f"Total cost: ${total_cost:.2f}")
         print(f" Final batch size: {current_batch_size}")
         print(f"WARNING: Token limit errors: {token_limit_errors}")

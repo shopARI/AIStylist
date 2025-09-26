@@ -138,18 +138,18 @@ class A100FashionSigProcessor:
         signal.signal(signal.SIGINT, self._signal_handler)
         signal.signal(signal.SIGTERM, self._signal_handler)
 
-        logger.info(f"🚀 A100 FashionSig Processor initialized")
-        logger.info(f"📊 Config: {self.batch_size} batch, {self.max_concurrent} concurrent, {self.target_products:,} target")
+        logger.info(f"A100 FashionSig Processor initialized")
+        logger.info(f"Config: {self.batch_size} batch, {self.max_concurrent} concurrent, {self.target_products:,} target")
 
     def _signal_handler(self, signum, frame):
         """Handle graceful shutdown"""
-        logger.info(f"⚠️ Received signal {signum}, initiating graceful shutdown...")
+        logger.info(f"Received signal {signum}, initiating graceful shutdown...")
         self.shutdown_requested = True
 
     async def initialize_model(self):
         """Initialize FashionSigLIP model with A100 optimization"""
         try:
-            logger.info("🔄 Loading FashionSigLIP model for A100...")
+            logger.info("Loading FashionSigLIP model for A100...")
 
             import torch
             from transformers import SiglipVisionModel, SiglipProcessor
@@ -161,11 +161,11 @@ class A100FashionSigProcessor:
                 self.device = torch.device("cuda")
                 gpu_name = torch.cuda.get_device_name(0)
                 gpu_memory = torch.cuda.get_device_properties(0).total_memory / 1024**3
-                logger.info(f"🎯 Using GPU: {gpu_name}")
-                logger.info(f"💾 GPU Memory: {gpu_memory:.1f} GB")
+                logger.info(f"Using GPU: {gpu_name}")
+                logger.info(f"GPU Memory: {gpu_memory:.1f} GB")
             else:
                 self.device = torch.device("cpu")
-                logger.warning("⚠️ CUDA not available, using CPU")
+                logger.warning("WARNING: CUDA not available, using CPU")
 
             # Load model with A100 optimizations
             model_name = "google/siglip-large-patch16-384"
@@ -180,14 +180,14 @@ class A100FashionSigProcessor:
 
             # Enable A100 optimizations
             if hasattr(torch, 'compile') and torch.cuda.is_available():
-                logger.info("🔧 Compiling model with torch.compile for A100...")
+                logger.info("Compiling Compiling model with torch.compile for A100...")
                 self.model = torch.compile(self.model, mode="max-autotune")
 
-            logger.info("✅ FashionSigLIP model loaded successfully")
+            logger.info("SUCCESS: FashionSigLIP model loaded successfully")
             return True
 
         except Exception as e:
-            logger.error(f"❌ Model initialization failed: {e}")
+            logger.error(f"ERROR: Model initialization failed: {e}")
             traceback.print_exc()
             return False
 
@@ -206,32 +206,32 @@ class A100FashionSigProcessor:
                     url=qdrant_url,
                     api_key=qdrant_api_key
                 )
-                logger.info("🔐 Using Qdrant API key authentication")
+                logger.info("Using Using Qdrant API key authentication")
             else:
                 self.qdrant_client = AsyncQdrantClient(url=qdrant_url)
-                logger.info("⚠️ No Qdrant API key found, using unauthenticated connection")
+                logger.info("WARNING: No Qdrant API key found, using unauthenticated connection")
 
             # Test connection
             info = await self.qdrant_client.get_collections()
-            logger.info(f"✅ Qdrant connected: {len(info.collections)} collections")
+            logger.info(f"SUCCESS: Qdrant connected: {len(info.collections)} collections")
 
             # Check if our collection exists, create if not
             collection_names = [c.name for c in info.collections]
             if self.collection_name not in collection_names:
-                logger.info(f"🔧 Creating collection: {self.collection_name}")
+                logger.info(f"Compiling Creating collection: {self.collection_name}")
                 # FashionSigLIP actually outputs 1024 dims (from error message)
                 await self.qdrant_client.create_collection(
                     collection_name=self.collection_name,
                     vectors_config=VectorParams(size=1024, distance=Distance.COSINE)
                 )
-                logger.info(f"✅ Collection {self.collection_name} created successfully")
+                logger.info(f"SUCCESS: Collection {self.collection_name} created successfully")
             else:
-                logger.info(f"✅ Collection {self.collection_name} already exists")
+                logger.info(f"SUCCESS: Collection {self.collection_name} already exists")
 
             return True
 
         except Exception as e:
-            logger.error(f"❌ Qdrant initialization failed: {e}")
+            logger.error(f"ERROR: Qdrant initialization failed: {e}")
             return False
 
     def load_checkpoint(self) -> bool:
@@ -243,11 +243,11 @@ class A100FashionSigProcessor:
 
                 # Convert dict back to ProcessingStats
                 self.stats = ProcessingStats(**checkpoint_data)
-                logger.info(f"📂 Resumed from checkpoint: {self.stats.total_processed:,} processed")
+                logger.info(f"Resumed Resumed from checkpoint: {self.stats.total_processed:,} processed")
                 return True
 
             except Exception as e:
-                logger.error(f"❌ Failed to load checkpoint: {e}")
+                logger.error(f"ERROR: Failed to load checkpoint: {e}")
         return False
 
     def save_checkpoint(self):
@@ -258,10 +258,10 @@ class A100FashionSigProcessor:
             with open(self.checkpoint_file, 'w') as f:
                 json.dump(asdict(self.stats), f, indent=2)
 
-            logger.debug(f"💾 Checkpoint saved: {self.stats.total_processed:,} processed")
+            logger.debug(f"GPU Memory: Checkpoint saved: {self.stats.total_processed:,} processed")
 
         except Exception as e:
-            logger.error(f"❌ Failed to save checkpoint: {e}")
+            logger.error(f"ERROR: Failed to save checkpoint: {e}")
 
     async def get_products_batch(self, offset: int, limit: int) -> List[Dict[str, Any]]:
         """Fetch products batch from database with retry logic"""
@@ -287,11 +287,11 @@ class A100FashionSigProcessor:
                     'description': f'Description for product {product_id}'
                 })
 
-            logger.debug(f"🔍 Generated {len(products)} mock products (offset={offset})")
+            logger.debug(f"Generated Generated {len(products)} mock products (offset={offset})")
             return products
 
         except Exception as e:
-            logger.error(f"❌ Product generation failed: {e}")
+            logger.error(f"ERROR: Product generation failed: {e}")
             raise e
 
     async def download_image_batch(self, products: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -334,7 +334,7 @@ class A100FashionSigProcessor:
             if r is not None and not isinstance(r, Exception)
         ]
 
-        logger.debug(f"📥 Downloaded {len(successful_downloads)}/{len(products)} images")
+        logger.debug(f"Downloaded Downloaded {len(successful_downloads)}/{len(products)} images")
         return successful_downloads
 
     async def generate_embeddings_batch(self, image_batch: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
@@ -375,11 +375,11 @@ class A100FashionSigProcessor:
                 del inputs, outputs, embeddings, embeddings_np
                 self.torch.cuda.empty_cache()
 
-            logger.debug(f"🧠 Generated {len(all_results)} embeddings")
+            logger.debug(f"Generated Generated {len(all_results)} embeddings")
             return all_results
 
         except Exception as e:
-            logger.error(f"❌ Embedding generation failed: {e}")
+            logger.error(f"ERROR: Embedding generation failed: {e}")
             return []
 
     async def upload_to_qdrant_batch(self, embedding_batch: List[Dict[str, Any]]) -> bool:
@@ -416,14 +416,14 @@ class A100FashionSigProcessor:
             )
 
             if operation_info.status == "completed":
-                logger.debug(f"📤 Uploaded {len(points)} embeddings to Qdrant")
+                logger.debug(f"Uploaded Uploaded {len(points)} embeddings to Qdrant")
                 return True
             else:
-                logger.error(f"❌ Qdrant upload failed: {operation_info.status}")
+                logger.error(f"ERROR: Qdrant upload failed: {operation_info.status}")
                 return False
 
         except Exception as e:
-            logger.error(f"❌ Qdrant upload failed: {e}")
+            logger.error(f"ERROR: Qdrant upload failed: {e}")
             return False
 
     async def process_batch(self, products: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -440,7 +440,7 @@ class A100FashionSigProcessor:
             if not products:
                 return batch_stats
 
-            logger.info(f"🔄 Processing batch of {len(products)} products...")
+            logger.info(f"Loading Processing batch of {len(products)} products...")
 
             # Monitor GPU memory
             if self.torch and self.torch.cuda.is_available():
@@ -481,12 +481,12 @@ class A100FashionSigProcessor:
                 (self.stats.batches_completed + 1)
             )
 
-            logger.info(f"✅ Batch completed in {batch_time:.1f}s: {batch_stats['successful']}/{batch_stats['processed']} successful")
+            logger.info(f"SUCCESS: Batch completed in {batch_time:.1f}s: {batch_stats['successful']}/{batch_stats['processed']} successful")
 
             return batch_stats
 
         except Exception as e:
-            logger.error(f"❌ Batch processing failed: {e}")
+            logger.error(f"ERROR: Batch processing failed: {e}")
             batch_stats['failed'] = len(products)
             batch_stats['errors'][str(e)] = batch_stats['errors'].get(str(e), 0) + 1
             return batch_stats
@@ -508,8 +508,8 @@ class A100FashionSigProcessor:
             if not self.stats.start_time:
                 self.stats.start_time = datetime.now().isoformat()
 
-            logger.info(f"🚀 Starting A100 production processing")
-            logger.info(f"📊 Target: {self.target_products:,} products, Batch: {self.batch_size}")
+            logger.info(f"Starting A100 production processing")
+            logger.info(f"Target: {self.target_products:,} products, Batch: {self.batch_size}")
 
             processed_offset = self.stats.last_processed_id or 0
 
@@ -549,12 +549,12 @@ class A100FashionSigProcessor:
                     elapsed_hours = (datetime.now() - datetime.fromisoformat(self.stats.start_time)).total_seconds() / 3600
                     rate = self.stats.total_processed / max(elapsed_hours, 0.001)
 
-                    logger.info(f"📈 Progress: {self.stats.total_processed:,}/{self.target_products:,} ({progress_pct:.1f}%) | Rate: {rate:.0f}/hr")
+                    logger.info(f"Progress: Progress: {self.stats.total_processed:,}/{self.target_products:,} ({progress_pct:.1f}%) | Rate: {rate:.0f}/hr")
 
                     # Checkpoint saving
                     if self.stats.batches_completed % self.checkpoint_interval == 0:
                         self.save_checkpoint()
-                        logger.info(f"🏁 Checkpoint: {self.stats.batches_completed} batches, {self.stats.total_processed:,} processed")
+                        logger.info(f"Checkpoint: Checkpoint: {self.stats.batches_completed} batches, {self.stats.total_processed:,} processed")
 
                     processed_offset += len(products)
 
@@ -562,7 +562,7 @@ class A100FashionSigProcessor:
                     await asyncio.sleep(0.1)
 
                 except Exception as e:
-                    logger.error(f"❌ Batch processing failed: {e}")
+                    logger.error(f"ERROR: Batch processing failed: {e}")
                     self.stats.batches_failed += 1
                     processed_offset += self.batch_size  # Skip failed batch
                     await asyncio.sleep(5)  # Wait before retrying
@@ -572,7 +572,7 @@ class A100FashionSigProcessor:
             total_time = (datetime.now() - datetime.fromisoformat(self.stats.start_time)).total_seconds()
             success_rate = (self.stats.successful / max(self.stats.total_processed, 1)) * 100
 
-            logger.info(f"🎯 A100 PRODUCTION SUMMARY:")
+            logger.info(f"Using GPU: A100 PRODUCTION SUMMARY:")
             logger.info(f"   Total processed: {self.stats.total_processed:,}")
             logger.info(f"   Successful: {self.stats.successful:,} ({success_rate:.1f}%)")
             logger.info(f"   Failed: {self.stats.failed:,}")
@@ -591,7 +591,7 @@ class A100FashionSigProcessor:
             return self.stats.successful > 0
 
         except Exception as e:
-            logger.error(f"❌ Production processing failed: {e}")
+            logger.error(f"ERROR: Production processing failed: {e}")
             traceback.print_exc()
             return False
 
@@ -611,8 +611,8 @@ if __name__ == "__main__":
         success = asyncio.run(main())
         sys.exit(0 if success else 1)
     except KeyboardInterrupt:
-        logger.info("⏸️ Processing interrupted by user")
+        logger.info("Processing interrupted by user")
         sys.exit(130)
     except Exception as e:
-        logger.error(f"❌ Fatal error: {e}")
+        logger.error(f"ERROR: Fatal error: {e}")
         sys.exit(1)

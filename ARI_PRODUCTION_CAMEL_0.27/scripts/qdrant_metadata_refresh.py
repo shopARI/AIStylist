@@ -69,7 +69,7 @@ class QdrantMetadataRefresher:
             actual_count = count_result.count if hasattr(count_result, 'count') else 0
             
             print(f"Metadata vectors_count: {metadata_count:,}")
-            print(f"🔢 Actual count() result: {actual_count:,}")
+            print(f"Count Actual count() result: {actual_count:,}")
             print(f"Collection status: {collection_info.status}")
             
             # Calculate discrepancy
@@ -118,7 +118,7 @@ class QdrantMetadataRefresher:
     async def _flush_collection(self) -> bool:
         """Flush collection segments to disk"""
         try:
-            print("💾 Flushing collection segments...")
+            print("Saving Flushing collection segments...")
             
             # Force flush to disk (may trigger metadata update)
             # This is a gentler approach than full optimization
@@ -177,7 +177,7 @@ class QdrantMetadataRefresher:
             collection_info = self.client.get_collection(self.collection_name)
             
             # Update collection with same config (forces rebuild)
-            print("🔄 Triggering metadata rebuild...")
+            print("Loading Triggering metadata rebuild...")
             self.client.update_collection(
                 collection_name=self.collection_name,
                 optimizer_config=models.OptimizersConfigDiff(
@@ -211,6 +211,6 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
     if os.path.exists('.env'):
         load_dotenv('.env')
-        print("📁 Loaded .env file")
+        print("Directory Loaded .env file")
     
     asyncio.run(main())

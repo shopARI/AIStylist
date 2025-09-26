@@ -89,7 +89,7 @@ class QdrantUUIDCleaner:
             return
         
         # Scan all points
-        print("🔄 Scanning all vectors...")
+        print("Loading Scanning all vectors...")
         
         all_points = []
         next_page_offset = None
@@ -152,14 +152,14 @@ class QdrantUUIDCleaner:
         
         # Report analysis
         print(f" Valid vectors (UUID in Neo4j): {len(valid_points):,}")
-        print(f"🔄 Duplicate vectors (same UUID): {len(duplicate_points):,}")
+        print(f"Loading Duplicate vectors (same UUID): {len(duplicate_points):,}")
         print(f"👻 Orphaned vectors (UUID not in Neo4j): {len(orphaned_points):,}")
-        print(f"🔢 Numeric ID vectors (old format): {len(numeric_points):,}")
+        print(f"Count Numeric ID vectors (old format): {len(numeric_points):,}")
         
         # Calculate cleanup
         to_delete = duplicate_points + orphaned_points + numeric_points
         print(f"\n🗑️ Total vectors to delete: {len(to_delete):,}")
-        print(f"💾 Vectors to keep: {len(valid_points):,}")
+        print(f"Saving Vectors to keep: {len(valid_points):,}")
         
         if len(to_delete) == 0:
             print(" No cleanup needed - collection is already clean!")
@@ -170,7 +170,7 @@ class QdrantUUIDCleaner:
         print(f"   🗑️ Delete {len(duplicate_points):,} duplicates")
         print(f"   🗑️ Delete {len(orphaned_points):,} orphaned UUIDs")  
         print(f"   🗑️ Delete {len(numeric_points):,} old numeric IDs")
-        print(f"   💾 Keep {len(valid_points):,} valid UUIDs")
+        print(f"   Saving Keep {len(valid_points):,} valid UUIDs")
         
         # Auto-confirm deletion (user pre-authorized)
         print(f" Auto-confirmed: Proceeding with deletion of {len(to_delete):,} vectors")
@@ -221,6 +221,6 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
     if os.path.exists('.env'):
         load_dotenv('.env')
-        print("📁 Loaded .env file")
+        print("Directory Loaded .env file")
     
     asyncio.run(main())

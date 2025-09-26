@@ -1,0 +1,43 @@
+{
+  "timestamp": "20250924_012151",
+  "total_products": 1,
+  "successful_products": 1,
+  "total_embeddings": 1,
+  "qdrant_uploaded": 0,
+  "qdrant_failed": 1,
+  "qdrant_success_rate": "0.0%",
+  "model_used": "resnet50",
+  "device_used": "cuda",
+  "embedding_dim": 2048,
+  "approach": "pure_pytorch_resnet_with_qdrant",
+  "qdrant_collection": "fashion_multimodal_embeddings",
+  "results": [
+    {
+      "product_id": "000005c0-693f-4352-90fd-60f87eb6d8a2",
+      "title": "Replay M8428 .000.84766 Jacket Black L Man",
+      "embeddings_created": 1,
+      "embeddings": [
+        {
+          "product_id": "000005c0-693f-4352-90fd-60f87eb6d8a2",
+          "image_index": 0,
+          "image_url": "https://app.shopari.com/images/bebfd6e9-d390-4f3e-b0fb-f3a1e4ddec49/22d60fd8-9d0c-42d4-84fa-9dc1c0421033/8e8b4101-feb1-4f8c-be46-60c2153303c6.png",
+          "image_size": [
+            1000,
+            1000
+          ],
+          "embedding_dim": 2048,
+          "text_content": "Replay M8428 .000.84766 Jacket Black L Man Elevate your style with the REPLAY M8428 .000.84766 jacket, a sophisticated and versatile piece designed for the modern man. This premium jacket seamlessly b",
+          "non_zero_values": 965,
+          "mean_value": 0.056869618594646454,
+          "std_value": 0.2587741017341614,
+          "timestamp": "2025-09-24T01:21:51.726601",
+          "model_used": "resnet50",
+          "device_used": "cuda",
+          "qdrant_uploaded": false,
+          "qdrant_error": "Unexpected Response: 400 (Bad Request)\nRaw response content:\nb'{\"status\":{\"error\":\"Format error in JSON body: value 000005c0-693f-4352-90fd-60f87eb6d8a2_img_0 is not a valid point ID, valid values are either an unsigned integer or a UUID\"},\"time\":0.0}'"
+        }
+      ],
+      "status": "success"
+    }
+  ]
+}

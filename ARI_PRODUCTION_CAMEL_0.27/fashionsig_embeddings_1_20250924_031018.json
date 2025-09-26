@@ -1,0 +1,20 @@
+{
+  "timestamp": "20250924_031018",
+  "model_used": "Marqo/marqo-fashionSigLIP",
+  "total_products": 1,
+  "successful_products": 0,
+  "total_embeddings": 0,
+  "qdrant_uploaded": 0,
+  "upload_success_rate": "N/A",
+  "qdrant_collection": "fashion_multimodal_embeddings",
+  "approach": "fashionsig_multimodal",
+  "results": [
+    {
+      "product_id": "1220500000016868915",
+      "title": "Smocked Mini Dress",
+      "embeddings_created": 0,
+      "embeddings": [],
+      "status": "no_embeddings"
+    }
+  ]
+}

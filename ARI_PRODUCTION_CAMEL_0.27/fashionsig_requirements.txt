@@ -1,0 +1,11 @@
+# Requirements for FashionSigLIP separate environment
+torch>=2.0.0
+torchvision
+transformers>=4.30.0
+pillow
+requests
+python-dotenv
+qdrant-client
+neo4j
+numpy
+# DO NOT install tensorflow in this environment to avoid conflicts

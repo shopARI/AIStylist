@@ -59,7 +59,7 @@ async def main():
                 numeric_count += 1
         
         print(f"🆔 UUID format IDs: {uuid_count}")
-        print(f"🔢 Numeric format IDs: {numeric_count}")
+        print(f"Count Numeric format IDs: {numeric_count}")
         print(f"Sample IDs: {id_samples[:3]}")
         
         # 3. Check payload structure
@@ -178,7 +178,7 @@ async def complete_cleanup(client: QdrantClient, collection_name: str):
         client.delete_collection(collection_name)
         
         # Recreate collection
-        print("🔄 Recreating collection...")
+        print("Loading Recreating collection...")
         client.create_collection(
             collection_name=collection_name,
             vectors_config=models.VectorParams(
@@ -219,6 +219,6 @@ if __name__ == "__main__":
     from dotenv import load_dotenv
     if os.path.exists('.env'):
         load_dotenv('.env')
-        print("📁 Loaded .env file")
+        print("Directory Loaded .env file")
     
     asyncio.run(main())

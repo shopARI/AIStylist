@@ -71,17 +71,30 @@ class IntelligenceRouter:
             # Aesthetic intelligence goes to VibeBot
             "vibe": {
                 "keywords": [
-                    "visual", "style", "aesthetic", "color", "design",
-                    "trend", "fashion", "vibe", "look", "appearance",
-                    "texture", "pattern", "silhouette", "mood"
+                    "style", "aesthetic", "trend", "fashion", "vibe", "mood",
+                    "text", "semantic", "description", "feeling"
                 ],
                 "sources": [
-                    "hybrid_visual_recommender",
                     "style_analyzer",
                     "trend_detector",
                     "aesthetic_scorer",
+                    "semantic"
+                ]
+            },
+            # Visual intelligence goes to VisionBot
+            "vision": {
+                "keywords": [
+                    "visual", "image", "photo", "picture", "look", "appearance",
+                    "color", "texture", "pattern", "silhouette", "similar",
+                    "design", "shape", "form", "visual similarity"
+                ],
+                "sources": [
                     "visual",
-                    "visual_pytorch"
+                    "visual_pytorch",
+                    "vision_bot",
+                    "visual_similarity",
+                    "image_search",
+                    "multimodal"
                 ]
             },
             # Contextual intelligence goes to both
@@ -105,6 +118,7 @@ class IntelligenceRouter:
             "total_routed": 0,
             "routed_to_cypher": 0,
             "routed_to_vibe": 0,
+            "routed_to_vision": 0,
             "routed_to_shared": 0
         }
         
@@ -222,6 +236,8 @@ class IntelligenceRouter:
             self.routing_stats["routed_to_cypher"] += 1
         elif target == "vibe":
             self.routing_stats["routed_to_vibe"] += 1
+        elif target == "vision":
+            self.routing_stats["routed_to_vision"] += 1
         else:
             self.routing_stats["routed_to_shared"] += 1
     
@@ -239,10 +255,12 @@ class IntelligenceRouter:
         if total > 0:
             stats["cypher_percentage"] = (stats["routed_to_cypher"] / total) * 100
             stats["vibe_percentage"] = (stats["routed_to_vibe"] / total) * 100
+            stats["vision_percentage"] = (stats["routed_to_vision"] / total) * 100
             stats["shared_percentage"] = (stats["routed_to_shared"] / total) * 100
         else:
             stats["cypher_percentage"] = 0
             stats["vibe_percentage"] = 0
+            stats["vision_percentage"] = 0
             stats["shared_percentage"] = 0
         
         return stats

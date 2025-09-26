@@ -237,12 +237,13 @@ class ApplicationService:
         products = battle_results.get("products", [])
         cypher_products = battle_results.get("cypher_products", [])
         vibe_products = battle_results.get("vibe_products", [])
-        
-        # Generate response that shows both agent results for Ari's review
+        vision_products = battle_results.get("vision_products", [])
+
+        # Generate response that shows all agent results for Ari's review
         # Use the original message for display, not the processed search_message
         display_message = original_message or search_message
         response_text = await self._generate_collaborative_response(
-            products, cypher_products, vibe_products, display_message, battle_results
+            products, cypher_products, vibe_products, display_message, battle_results, vision_products
         )
         
         # Extract detailed reasoning from judgment
@@ -253,13 +254,18 @@ class ApplicationService:
             "intent": "product_search",
             "parameters": params,
             "products": products,
-            "cypher_products": cypher_products,  # Include raw CypherBot results
-            "vibe_products": vibe_products,      # Include raw VibeBot results
+            "cypher_products": cypher_products,
+            "vibe_products": vibe_products,
             "evaluation_method": judgment.get("evaluation_method", "unified_collaborative"),
             "detailed_reasoning": detailed_reasoning,
             "cypher_count": len(cypher_products),
             "vibe_count": len(vibe_products)
         }
+
+        # Add VisionBot results if available
+        if vision_products:
+            metadata["vision_products"] = vision_products
+            metadata["vision_count"] = len(vision_products)
         
         return response_text, metadata
 
@@ -513,7 +519,10 @@ class ApplicationService:
         # Also check for "formal" anywhere in the query since it's always professional
         has_formal = 'formal' in query_lower
 
-        if has_professional_trigger or has_formal:
+        # Also check for outfit combination requests
+        outfit_request = self._detect_outfit_combination_request(query)
+
+        if has_professional_trigger or has_formal or outfit_request:
             try:
                 return await self._generate_llm_styling_advice(query, final_products)
             except Exception as e:
@@ -522,6 +531,60 @@ class ApplicationService:
                 return self._basic_professional_fallback()
 
         return ""  # No specific styling advice needed
+
+    def _detect_outfit_combination_request(self, query: str) -> Optional[Dict[str, Any]]:
+        """
+        Detect if the user is requesting outfit combinations with multiple pieces/colors.
+
+        Returns:
+            Dict with outfit request details or None if not a combination request
+        """
+        query_lower = query.lower()
+
+        # Keywords that indicate combination requests
+        combination_keywords = ['matching', 'match', 'coordinate', 'go with', 'pair with', 'combine']
+        multiple_keywords = ['different colors', 'color variations', 'multiple colors', 'various colors']
+        item_keywords = ['shirt', 'pants', 'blouse', 'skirt', 'jacket', 'dress', 'top', 'bottom']
+
+        # Check for combination request patterns
+        has_combination = any(keyword in query_lower for keyword in combination_keywords)
+        has_multiple = any(keyword in query_lower for keyword in multiple_keywords)
+
+        # Extract number requests (e.g., "4 different colors", "3 options")
+        import re
+        number_pattern = r'(\d+)\s*(?:different\s*)?(?:colors?|options?|variations?|pieces?)'
+        number_match = re.search(number_pattern, query_lower)
+        color_count = int(number_match.group(1)) if number_match else 4  # Default to 4
+
+        # Detect base item and matching items
+        base_item = None
+        matching_items = []
+
+        # Simple pattern matching for common requests
+        if 'pants' in query_lower and ('shirt' in query_lower or 'top' in query_lower):
+            base_item = 'pants'
+            matching_items = ['shirts', 'tops']
+        elif 'shirt' in query_lower and ('pants' in query_lower or 'skirt' in query_lower):
+            base_item = 'shirt'
+            matching_items = ['pants', 'skirts']
+        elif 'dress' in query_lower and ('jacket' in query_lower or 'cardigan' in query_lower):
+            base_item = 'dress'
+            matching_items = ['jackets', 'cardigans']
+        elif 'skirt' in query_lower and ('blouse' in query_lower or 'top' in query_lower):
+            base_item = 'skirt'
+            matching_items = ['blouses', 'tops']
+
+        # If we detected combination intent or multiple colors/options
+        if (has_combination or has_multiple or number_match) and (base_item or any(item in query_lower for item in item_keywords)):
+            return {
+                'base_item': base_item or 'foundation piece',
+                'matching_items': matching_items if matching_items else ['coordinating pieces'],
+                'color_count': min(color_count, 6),  # Cap at 6 for practicality
+                'has_combination_intent': has_combination,
+                'has_multiple_intent': has_multiple
+            }
+
+        return None
 
     async def _generate_llm_styling_advice(self, query: str, final_products: List[Dict]) -> str:
         """
@@ -589,7 +652,132 @@ Format your response with clear sections. Always start with "**ARI'S EXPERT STYL
                 product_context = "\n\nNote: No specific products were found in the current search, so provide general styling guidance for this context."
 
             # Create user query with context
-            user_prompt = f"""Please provide expert styling advice for: "{query}"
+            outfit_request = self._detect_outfit_combination_request(query)
+
+            # ENHANCED WITH VISUAL INTELLIGENCE COORDINATION
+            visual_coordination_context = ""
+            if outfit_request:
+                try:
+                    # Use Visual Intelligence for outfit coordination analysis
+                    visual_intel = await self.intelligence_coordinator.get_visual_intelligence()
+                    if visual_intel and len(final_products) > 1:
+                        print("VISUAL INTELLIGENCE: Analyzing outfit coordination for combination request...")
+
+                        # Separate products into base items and coordinating items
+                        base_products = []
+                        coordinating_products = []
+
+                        for product in final_products:
+                            title_lower = product.get('title', '').lower()
+                            categories = product.get('categories', [])
+                            if isinstance(categories, str):
+                                categories = [categories]
+                            category_text = ' '.join(categories).lower()
+
+                            # Classify products based on outfit request
+                            is_base_item = False
+                            is_coordinating_item = False
+
+                            if outfit_request['base_item']:
+                                base_item = outfit_request['base_item'].lower()
+                                if base_item in title_lower or base_item in category_text:
+                                    is_base_item = True
+
+                            for matching_item in outfit_request['matching_items']:
+                                matching_item_clean = matching_item.lower().rstrip('s')  # Remove plural
+                                if matching_item_clean in title_lower or matching_item_clean in category_text:
+                                    is_coordinating_item = True
+                                    break
+
+                            # Default assignment if classification unclear
+                            if not is_base_item and not is_coordinating_item:
+                                if len(base_products) <= len(coordinating_products):
+                                    is_base_item = True
+                                else:
+                                    is_coordinating_item = True
+
+                            if is_base_item:
+                                base_products.append(product)
+                            elif is_coordinating_item:
+                                coordinating_products.append(product)
+
+                        # Perform visual coordination analysis
+                        if base_products and coordinating_products:
+                            coordination_analysis = await visual_intel.analyze_outfit_coordination(
+                                base_products=base_products,
+                                coordinating_products=coordinating_products,
+                                color_variations=outfit_request['color_count']
+                            )
+
+                            if coordination_analysis:
+                                print(f"   Visual coordination analysis complete!")
+
+                                # Extract insights for LLM prompt
+                                color_harmony = coordination_analysis.get('color_harmony', {})
+                                outfit_combinations = coordination_analysis.get('outfit_combinations', [])
+                                color_variations = coordination_analysis.get('color_variations', [])
+                                style_coherence = coordination_analysis.get('style_coherence', {})
+
+                                visual_coordination_context = f"""
+
+VISUAL INTELLIGENCE COORDINATION ANALYSIS:
+Color Harmony Score: {color_harmony.get('overall_score', 0):.1%}
+Best Color Combinations: {', '.join(color_harmony.get('base_colors', [])) + ' with ' + ', '.join(color_harmony.get('coordinating_colors', []))}
+Style Coherence Score: {style_coherence.get('coherence_score', 0):.1%}
+Dominant Styles: {', '.join(style_coherence.get('dominant_styles', [])[:3])}
+
+TOP VISUAL COMBINATIONS IDENTIFIED:
+"""
+                                for i, combo in enumerate(outfit_combinations[:3], 1):
+                                    base_item = combo.get('base_item', {})
+                                    coord_item = combo.get('coordinating_item', {})
+                                    visual_coordination_context += f"""
+Combination {i}:
+- Base: {base_item.get('colors', [])} | Coordinating: {coord_item.get('colors', [])}
+- Compatibility: {combo.get('compatibility_score', 0):.1%}
+- Color Harmony: {combo.get('color_harmony_score', 0):.1%}
+- Style Coherence: {combo.get('style_coherence', 0):.1%}
+"""
+
+                                if color_variations:
+                                    visual_coordination_context += f"""
+
+RECOMMENDED COLOR PALETTE VARIATIONS:
+"""
+                                    for var in color_variations[:outfit_request['color_count']]:
+                                        palette = var.get('palette_name', 'Custom')
+                                        base_colors = ', '.join(var.get('base_item_colors', []))
+                                        coord_colors = ', '.join(var.get('coordinating_item_colors', []))
+                                        harmony_score = var.get('color_harmony_score', 0)
+                                        visual_coordination_context += f"""
+{palette.title()} Palette: {base_colors} + {coord_colors} (Harmony: {harmony_score:.1%})"""
+
+                except Exception as e:
+                    logger.error(f"Error in visual coordination analysis: {e}")
+                    print(f"   Visual coordination analysis error: {e}")
+
+            if outfit_request:
+                user_prompt = f"""Please provide expert outfit coordination for: "{query}"
+
+Context: The user wants complete outfit combinations with multiple options.{product_context}{visual_coordination_context}
+
+OUTFIT COORDINATION REQUEST DETECTED:
+Base Item: {outfit_request['base_item']}
+Matching Items Needed: {outfit_request['matching_items']}
+Color Variations Requested: {outfit_request['color_count']}
+
+Please provide:
+1. **Complete Outfit Sets** - Multiple coordinated combinations (use Visual Intelligence insights above if available)
+2. **Color Coordination Strategy** - {outfit_request['color_count']} different color schemes that work together
+3. **Styling Logic for Each Combination** - Why each color pairing works (reference visual analysis if provided)
+4. **Mix & Match Guidance** - How pieces work together across combinations
+5. **Versatility Analysis** - How to maximize wardrobe potential
+6. **Occasion Adaptability** - How each combination suits different contexts
+
+Format as: "OUTFIT COMBINATION 1: [Base] + [Top] + [Reasoning]" for each set.
+Provide {outfit_request['color_count']} distinct, well-coordinated outfit combinations."""
+            else:
+                user_prompt = f"""Please provide expert styling advice for: "{query}"
 
 Context: The user is seeking fashion guidance for this specific situation.{product_context}
 

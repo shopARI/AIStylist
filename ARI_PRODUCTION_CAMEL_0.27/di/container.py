@@ -14,6 +14,7 @@ from services.cache.battle_cache import BattleCache
 from services.cache.redis_client import create_redis_service
 from services.conversation_handler import ConversationHandler
 from services.application import ApplicationService
+from services.visual_qdrant_client import visual_qdrant_client
 
 # ML Intelligence Systems
 from services.ml.intelligence import create_intelligence_system
@@ -30,6 +31,7 @@ from services.battle.metrics import BattleMetrics
 from agents.factory import get_agent_factory
 from agents.cypher_bot import CypherBotAgent
 from agents.vibe_bot import VibeBotAgent
+from agents.vision_bot import VisionBotAgent
 from agents.judge import JudgeAriAgent
 
 logger = logging.getLogger("di.container")
@@ -83,6 +85,9 @@ class DIContainer(containers.DeclarativeContainer):
         BattleCache
     )
 
+    # Visual Qdrant Client for FashionSigLIP embeddings
+    visual_qdrant_service = providers.Object(visual_qdrant_client)
+
     # --- Agents (Scoped per request/battle) ---
     cypher_bot_agent = providers.Factory(
         CypherBotAgent,
@@ -92,6 +97,12 @@ class DIContainer(containers.DeclarativeContainer):
     vibe_bot_agent = providers.Factory(
         VibeBotAgent,
         qdrant_client=product_retriever_service
+    )
+
+    # VisionBot with FashionSigLIP visual embeddings
+    vision_bot_agent = providers.Factory(
+        VisionBotAgent,
+        visual_qdrant_client=visual_qdrant_service
     )
 
     judge_agent = providers.Factory(JudgeAriAgent)
@@ -107,7 +118,8 @@ class DIContainer(containers.DeclarativeContainer):
         BattleExecutor,
         cypher_bot=cypher_bot_agent,
         vibe_bot=vibe_bot_agent,
-        judge=judge_agent
+        judge=judge_agent,
+        vision_bot=vision_bot_agent
     )
 
     battle_orchestrator = providers.Singleton(

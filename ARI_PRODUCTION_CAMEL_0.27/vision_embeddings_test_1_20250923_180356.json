@@ -1,0 +1,17 @@
+{
+  "timestamp": "20250923_180356",
+  "total_products": 1,
+  "successful_products": 0,
+  "total_embeddings": 0,
+  "model_used": "Marqo/marqo-fashionSigLIP",
+  "device_used": "cuda",
+  "results": [
+    {
+      "product_id": "000005c0-693f-4352-90fd-60f87eb6d8a2",
+      "title": "Replay M8428 .000.84766 Jacket Black L Man",
+      "embeddings_created": 0,
+      "embeddings": [],
+      "status": "no_embeddings"
+    }
+  ]
+}

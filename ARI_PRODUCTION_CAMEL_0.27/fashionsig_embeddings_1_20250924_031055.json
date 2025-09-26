@@ -1,0 +1,41 @@
+{
+  "timestamp": "20250924_031055",
+  "model_used": "Marqo/marqo-fashionSigLIP",
+  "total_products": 1,
+  "successful_products": 1,
+  "total_embeddings": 1,
+  "qdrant_uploaded": 0,
+  "upload_success_rate": "0.0%",
+  "qdrant_collection": "fashion_multimodal_embeddings",
+  "approach": "fashionsig_multimodal",
+  "results": [
+    {
+      "product_id": "1220500000016868915",
+      "title": "Smocked Mini Dress",
+      "embeddings_created": 1,
+      "embeddings": [
+        {
+          "product_id": "1220500000016868915",
+          "image_index": 0,
+          "image_url": "https://cdn.shopify.com/s/files/1/0291/4536/6588/files/b8ac793adb1f4f7dbd4958fe208d35e9_64260f52-2d65-403f-b60a-3c214b42dbca.jpg?v=1721103730",
+          "image_size": [
+            1500,
+            1973
+          ],
+          "text_content": "Smocked Mini Dress The kind of easy and flattering dress you'll be reaching for all season long.This Smocked Mini Dress features a smocked bodice and an A-line silhouette, crafted from 100% rayon. The",
+          "image_embedding_dim": 1,
+          "text_embedding_dim": 1,
+          "combined_embedding_dim": 2,
+          "non_zero_image": 1,
+          "non_zero_text": 1,
+          "qdrant_uploaded": false,
+          "qdrant_point_id": null,
+          "qdrant_error": "Unexpected Response: 400 (Bad Request)\nRaw response content:\nb'{\"status\":{\"error\":\"Wrong input: Vector dimension error: expected dim: 512, got 1\"},\"time\":0.05482141}'",
+          "timestamp": "2025-09-24T03:10:55.870206",
+          "model_used": "Marqo/marqo-fashionSigLIP"
+        }
+      ],
+      "status": "success"
+    }
+  ]
+}

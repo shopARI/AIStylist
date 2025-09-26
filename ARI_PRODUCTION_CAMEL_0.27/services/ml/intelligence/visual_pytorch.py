@@ -57,7 +57,7 @@ DEFAULT_ALLOWED_DOMAINS = {
     'lp2.hm.com',
     
     # Add your specific domains here
-    'your-cdn.example.com'
+    'app.shopari.com'  # Internal ShopAri image domain
 }
 
 # SECURITY: Request limits
@@ -686,6 +686,101 @@ class VisualIntelligence:
             logger.error(f"Error analyzing search results visually: {e}")
             return None
 
+    async def analyze_outfit_coordination(
+        self,
+        base_products: List[Dict[str, Any]],
+        coordinating_products: List[Dict[str, Any]],
+        color_variations: int = 4
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Analyze outfit coordination between base items and coordinating pieces.
+
+        Args:
+            base_products: Base items (e.g., pants, jackets)
+            coordinating_products: Items to coordinate with (e.g., shirts, accessories)
+            color_variations: Number of color variations to suggest
+
+        Returns:
+            Outfit coordination intelligence with color harmony analysis
+        """
+        try:
+            print("VISUAL INTELLIGENCE: Analyzing outfit coordination...")
+
+            # Extract visual features for all products
+            base_analyses = []
+            for product in base_products:
+                product_id = product.get('id') or product.get('product_id')
+                if product_id:
+                    features = await self.get_visual_features(product_id)
+                    if features:
+                        base_analyses.append({
+                            "product_id": product_id,
+                            "features": features,
+                            "product_data": product
+                        })
+
+            coordinating_analyses = []
+            for product in coordinating_products:
+                product_id = product.get('id') or product.get('product_id')
+                if product_id:
+                    features = await self.get_visual_features(product_id)
+                    if features:
+                        coordinating_analyses.append({
+                            "product_id": product_id,
+                            "features": features,
+                            "product_data": product
+                        })
+
+            if not base_analyses or not coordinating_analyses:
+                print("   Warning: Insufficient products with visual features for coordination")
+                return None
+
+            # Analyze color harmony between items
+            color_harmony = self._analyze_color_harmony(base_analyses, coordinating_analyses)
+            print(f"   Color Harmony Score: {color_harmony.get('overall_score', 0):.1%}")
+
+            # Generate coordinated outfit combinations
+            outfit_combinations = self._generate_outfit_combinations(
+                base_analyses, coordinating_analyses, color_variations
+            )
+            print(f"   Generated {len(outfit_combinations)} outfit combinations")
+
+            # Analyze visual compatibility
+            compatibility_scores = self._calculate_visual_compatibility(
+                base_analyses, coordinating_analyses
+            )
+            print(f"   Visual Compatibility analyzed for {len(compatibility_scores)} combinations")
+
+            # Generate color variations for best combinations
+            color_variations_data = self._generate_color_variations(
+                outfit_combinations[:3], color_variations  # Top 3 combinations
+            )
+            print(f"   Generated {len(color_variations_data)} color variation sets")
+
+            coordination_intelligence = {
+                "base_items_analyzed": len(base_analyses),
+                "coordinating_items_analyzed": len(coordinating_analyses),
+                "color_harmony": color_harmony,
+                "outfit_combinations": outfit_combinations,
+                "compatibility_scores": compatibility_scores,
+                "color_variations": color_variations_data,
+                "style_coherence": self._analyze_style_coherence(base_analyses + coordinating_analyses),
+                "coordination_confidence": self._calculate_coordination_confidence(
+                    color_harmony, compatibility_scores
+                ),
+                "source": "outfit_coordination_analysis"
+            }
+
+            print("   Outfit coordination analysis complete!")
+            logger.info(f"Outfit coordination analysis: {len(outfit_combinations)} combinations, harmony={color_harmony.get('overall_score', 0):.1%}")
+
+            return coordination_intelligence
+
+        except Exception as e:
+            logger.error(f"Error analyzing outfit coordination: {e}")
+            print(f"   Error in outfit coordination analysis: {e}")
+            return None
+
     def _extract_visual_cues_from_query(self, query: str) -> Dict[str, Any]:
         """Extract visual cues from the search query."""
         query_lower = query.lower()
@@ -914,6 +1009,334 @@ class VisualIntelligence:
             recommendations.append("Look for items with visual interest and elegant details")
 
         return recommendations[:3]  # Limit to top 3 recommendations
+
+    def _analyze_color_harmony(self, base_analyses: List[Dict[str, Any]], coordinating_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze color harmony between base items and coordinating pieces."""
+        try:
+            # Extract colors from both sets
+            base_colors = []
+            for analysis in base_analyses:
+                features = analysis.get("features", {})
+                colors = features.get("dominant_colors", [])
+                base_colors.extend(colors)
+
+            coordinating_colors = []
+            for analysis in coordinating_analyses:
+                features = analysis.get("features", {})
+                colors = features.get("dominant_colors", [])
+                coordinating_colors.extend(colors)
+
+            # Define color harmony rules
+            harmony_rules = {
+                "complementary": [
+                    (["black", "white"], 0.9),
+                    (["navy", "white"], 0.85),
+                    (["gray", "white"], 0.8),
+                    (["red", "black"], 0.75),
+                    (["blue", "white"], 0.8)
+                ],
+                "analogous": [
+                    (["blue", "navy"], 0.8),
+                    (["gray", "black"], 0.75),
+                    (["beige", "brown"], 0.7)
+                ],
+                "neutral_safe": [
+                    (["black", "gray", "white"], 0.9),
+                    (["navy", "beige", "white"], 0.85)
+                ]
+            }
+
+            # Calculate harmony scores
+            harmony_scores = []
+            for rule_type, rules in harmony_rules.items():
+                for color_set, score in rules:
+                    # Check if any base color harmonizes with any coordinating color
+                    for base_color in base_colors:
+                        for coord_color in coordinating_colors:
+                            if base_color in color_set and coord_color in color_set:
+                                harmony_scores.append({
+                                    "type": rule_type,
+                                    "colors": [base_color, coord_color],
+                                    "score": score
+                                })
+
+            # Calculate overall harmony score
+            overall_score = 0.6  # Default neutral score
+            best_harmony = None
+
+            if harmony_scores:
+                best_harmony = max(harmony_scores, key=lambda x: x["score"])
+                overall_score = best_harmony["score"]
+
+            return {
+                "overall_score": overall_score,
+                "best_harmony": best_harmony,
+                "harmony_matches": harmony_scores,
+                "base_colors": list(set(base_colors)),
+                "coordinating_colors": list(set(coordinating_colors))
+            }
+
+        except Exception as e:
+            logger.error(f"Error analyzing color harmony: {e}")
+            return {"overall_score": 0.5, "error": str(e)}
+
+    def _generate_outfit_combinations(self, base_analyses: List[Dict[str, Any]], coordinating_analyses: List[Dict[str, Any]], max_combinations: int = 8) -> List[Dict[str, Any]]:
+        """Generate outfit combinations with visual compatibility scoring."""
+        combinations = []
+
+        try:
+            # Generate all possible combinations
+            for base_analysis in base_analyses:
+                for coord_analysis in coordinating_analyses:
+                    base_features = base_analysis.get("features", {})
+                    coord_features = coord_analysis.get("features", {})
+
+                    # Calculate compatibility score
+                    compatibility = self._calculate_item_compatibility(base_features, coord_features)
+
+                    # Extract visual attributes
+                    base_colors = base_features.get("dominant_colors", [])
+                    coord_colors = coord_features.get("dominant_colors", [])
+
+                    combination = {
+                        "base_item": {
+                            "product_id": base_analysis["product_id"],
+                            "colors": base_colors,
+                            "style_attributes": base_features.get("style_attributes", []),
+                            "aesthetic_score": base_features.get("aesthetic_score", 0.5)
+                        },
+                        "coordinating_item": {
+                            "product_id": coord_analysis["product_id"],
+                            "colors": coord_colors,
+                            "style_attributes": coord_features.get("style_attributes", []),
+                            "aesthetic_score": coord_features.get("aesthetic_score", 0.5)
+                        },
+                        "compatibility_score": compatibility,
+                        "color_harmony_score": self._calculate_color_harmony_score(base_colors, coord_colors),
+                        "style_coherence": self._calculate_style_coherence(base_features, coord_features)
+                    }
+
+                    combinations.append(combination)
+
+            # Sort by overall score (combination of compatibility, harmony, and coherence)
+            def combination_score(combo):
+                return (
+                    combo["compatibility_score"] * 0.4 +
+                    combo["color_harmony_score"] * 0.4 +
+                    combo["style_coherence"] * 0.2
+                )
+
+            combinations.sort(key=combination_score, reverse=True)
+
+            return combinations[:max_combinations]
+
+        except Exception as e:
+            logger.error(f"Error generating outfit combinations: {e}")
+            return []
+
+    def _calculate_visual_compatibility(self, base_analyses: List[Dict[str, Any]], coordinating_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Calculate visual compatibility scores for all item combinations."""
+        compatibility_matrix = []
+
+        try:
+            for i, base_analysis in enumerate(base_analyses):
+                base_row = []
+                base_features = base_analysis.get("features", {})
+
+                for j, coord_analysis in enumerate(coordinating_analyses):
+                    coord_features = coord_analysis.get("features", {})
+
+                    compatibility = self._calculate_item_compatibility(base_features, coord_features)
+
+                    base_row.append({
+                        "base_index": i,
+                        "coord_index": j,
+                        "base_product_id": base_analysis["product_id"],
+                        "coord_product_id": coord_analysis["product_id"],
+                        "compatibility_score": compatibility
+                    })
+
+                compatibility_matrix.append(base_row)
+
+            # Find best matches
+            all_scores = [item for row in compatibility_matrix for item in row]
+            best_matches = sorted(all_scores, key=lambda x: x["compatibility_score"], reverse=True)[:5]
+
+            return {
+                "compatibility_matrix": compatibility_matrix,
+                "best_matches": best_matches,
+                "average_compatibility": sum(item["compatibility_score"] for item in all_scores) / len(all_scores) if all_scores else 0
+            }
+
+        except Exception as e:
+            logger.error(f"Error calculating visual compatibility: {e}")
+            return {"error": str(e)}
+
+    def _generate_color_variations(self, top_combinations: List[Dict[str, Any]], num_variations: int = 4) -> List[Dict[str, Any]]:
+        """Generate color variations for the best outfit combinations."""
+        color_variations = []
+
+        # Define color palettes for variations
+        color_palettes = {
+            "classic": ["black", "white", "navy", "gray"],
+            "warm": ["burgundy", "cream", "brown", "gold"],
+            "cool": ["navy", "light blue", "silver", "white"],
+            "bold": ["red", "black", "white", "royal blue"],
+            "earth": ["olive", "tan", "cream", "brown"],
+            "monochrome": ["black", "charcoal", "gray", "white"]
+        }
+
+        try:
+            for i, combination in enumerate(top_combinations[:2]):  # Top 2 combinations
+                base_item = combination["base_item"]
+                coord_item = combination["coordinating_item"]
+
+                # Generate variations for each palette
+                for palette_name, colors in list(color_palettes.items())[:num_variations]:
+                    # Create color-matched variations
+                    variation = {
+                        "combination_index": i,
+                        "palette_name": palette_name,
+                        "base_item_colors": colors[:2],  # First 2 colors for base
+                        "coordinating_item_colors": colors[2:4] if len(colors) > 2 else colors,  # Last 2 for coordination
+                        "color_harmony_score": self._calculate_color_harmony_score(colors[:2], colors[2:4] if len(colors) > 2 else colors),
+                        "style_match": combination["style_coherence"],
+                        "recommended": palette_name in ["classic", "monochrome"],  # Flag recommended palettes
+                        "original_combination": combination
+                    }
+
+                    color_variations.append(variation)
+
+            # Sort by harmony score and style match
+            color_variations.sort(key=lambda x: (x["color_harmony_score"] + x["style_match"]) / 2, reverse=True)
+
+            return color_variations[:num_variations]
+
+        except Exception as e:
+            logger.error(f"Error generating color variations: {e}")
+            return []
+
+    def _calculate_item_compatibility(self, features1: Dict[str, Any], features2: Dict[str, Any]) -> float:
+        """Calculate compatibility between two items based on their visual features."""
+        try:
+            score = 0.5  # Base compatibility
+
+            # Color compatibility
+            colors1 = features1.get("dominant_colors", [])
+            colors2 = features2.get("dominant_colors", [])
+            color_score = self._calculate_color_harmony_score(colors1, colors2)
+
+            # Style compatibility
+            styles1 = set(features1.get("style_attributes", []))
+            styles2 = set(features2.get("style_attributes", []))
+            style_overlap = len(styles1 & styles2) / max(len(styles1 | styles2), 1)
+
+            # Aesthetic balance
+            aesthetic1 = features1.get("aesthetic_score", 0.5)
+            aesthetic2 = features2.get("aesthetic_score", 0.5)
+            aesthetic_balance = 1.0 - abs(aesthetic1 - aesthetic2)  # Closer scores = better balance
+
+            # Weighted combination
+            score = (
+                color_score * 0.5 +
+                style_overlap * 0.3 +
+                aesthetic_balance * 0.2
+            )
+
+            return min(max(score, 0.0), 1.0)
+
+        except Exception as e:
+            logger.error(f"Error calculating item compatibility: {e}")
+            return 0.5
+
+    def _calculate_color_harmony_score(self, colors1: List[str], colors2: List[str]) -> float:
+        """Calculate color harmony score between two color lists."""
+        if not colors1 or not colors2:
+            return 0.5
+
+        # Define harmonious color pairs
+        harmonious_pairs = {
+            ("black", "white"): 0.9,
+            ("navy", "white"): 0.85,
+            ("gray", "white"): 0.8,
+            ("black", "gray"): 0.75,
+            ("navy", "beige"): 0.8,
+            ("brown", "cream"): 0.75,
+            ("red", "black"): 0.7,
+            ("blue", "white"): 0.8
+        }
+
+        best_score = 0.4  # Default score
+
+        for color1 in colors1:
+            for color2 in colors2:
+                # Check both directions
+                pair_score = harmonious_pairs.get((color1, color2),
+                           harmonious_pairs.get((color2, color1), 0.4))
+                best_score = max(best_score, pair_score)
+
+        return best_score
+
+    def _calculate_style_coherence(self, features1: Dict[str, Any], features2: Dict[str, Any]) -> float:
+        """Calculate style coherence between two items."""
+        styles1 = set(features1.get("style_attributes", []))
+        styles2 = set(features2.get("style_attributes", []))
+
+        if not styles1 or not styles2:
+            return 0.5
+
+        # Calculate overlap
+        overlap = len(styles1 & styles2)
+        union = len(styles1 | styles2)
+
+        return overlap / union if union > 0 else 0.5
+
+    def _analyze_style_coherence(self, all_analyses: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Analyze overall style coherence across all items."""
+        try:
+            all_styles = []
+            for analysis in all_analyses:
+                features = analysis.get("features", {})
+                styles = features.get("style_attributes", [])
+                all_styles.extend(styles)
+
+            from collections import Counter
+            style_counts = Counter(all_styles)
+
+            # Calculate coherence score
+            total_styles = len(set(all_styles))
+            common_styles = len([style for style, count in style_counts.items() if count > 1])
+            coherence_score = common_styles / total_styles if total_styles > 0 else 0.5
+
+            return {
+                "coherence_score": coherence_score,
+                "dominant_styles": [style for style, count in style_counts.most_common(3)],
+                "style_diversity": total_styles,
+                "common_styles": common_styles
+            }
+
+        except Exception as e:
+            logger.error(f"Error analyzing style coherence: {e}")
+            return {"coherence_score": 0.5, "error": str(e)}
+
+    def _calculate_coordination_confidence(self, color_harmony: Dict[str, Any], compatibility_scores: Dict[str, Any]) -> float:
+        """Calculate overall confidence in outfit coordination analysis."""
+        try:
+            harmony_score = color_harmony.get("overall_score", 0.5)
+            avg_compatibility = compatibility_scores.get("average_compatibility", 0.5)
+
+            # Weight harmony and compatibility equally
+            confidence = (harmony_score + avg_compatibility) / 2
+
+            # Boost confidence if we have good harmony matches
+            if color_harmony.get("harmony_matches"):
+                confidence = min(confidence + 0.1, 1.0)
+
+            return confidence
+
+        except Exception as e:
+            logger.error(f"Error calculating coordination confidence: {e}")
+            return 0.5
 
     async def _process_image(self, image_url: str) -> ImageProcessingResult:
         """

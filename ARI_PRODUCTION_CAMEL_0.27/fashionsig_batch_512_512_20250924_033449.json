@@ -1,0 +1,14 @@
+{
+  "timestamp": "20250924_033449",
+  "model_used": "marqo_fashionsig_batch",
+  "batch_size": 512,
+  "total_processed": 512,
+  "successful_products": 0,
+  "total_embeddings": 0,
+  "qdrant_uploads": 0,
+  "upload_rate": "0.0%",
+  "processing_time": 39.219062089920044,
+  "products_per_second": 13.054875875817865,
+  "approach": "batch_fashionsig",
+  "results": []
+}
