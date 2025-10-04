@@ -313,17 +313,27 @@ class BattleExecutor:
         Returns:
             Filtered products above threshold
         """
+        logger.debug(f"[PRODUCT PIPELINE] Stage 5: Quality Filter - Input={len(products)}, Threshold={threshold}")
+
         if threshold <= 0:
+            logger.debug(f"[PRODUCT PIPELINE] Quality filter disabled (threshold={threshold})")
             return products
 
         filtered = [
             p for p in products
             if p.get("judge_score", 0) >= threshold
         ]
-        
+
         if len(filtered) < len(products):
             logger.info(f"Quality filter: {len(products)} -> {len(filtered)} (threshold: {threshold})")
-        
+            # Log which products were filtered out and why
+            for p in products:
+                score = p.get("judge_score", 0)
+                if score < threshold:
+                    logger.debug(f"[PRODUCT PIPELINE] Filtered out: {p.get('title', 'NO_TITLE')[:30]} (score={score:.2f} < threshold={threshold})")
+
+        logger.debug(f"[PRODUCT PIPELINE] Stage 6: Final Output - Products={len(filtered)}")
+
         return filtered
     
     def _log_ml_enhancement(self, ml_intelligence: Dict[str, Any]):

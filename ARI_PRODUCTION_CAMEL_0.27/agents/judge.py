@@ -118,12 +118,13 @@ class JudgeAriAgent:
         query: str,
         ml_context: Optional[Dict[str, Any]] = None,
         user_context: Optional[Dict[str, Any]] = None,
-        limit: int = 5
+        limit: int = 5,
+        vision_results: Optional[List[Dict[str, Any]]] = None
     ) -> Dict[str, Any]:
         """
         Evaluate battle results with INTELLIGENT QUALITY CONTROL.
         Consciously rejects irrelevant products and forces agents to retry if needed.
-        
+
         Args:
             cypher_results: Products from CypherBot
             vibe_results: Products from VibeBot
@@ -131,7 +132,8 @@ class JudgeAriAgent:
             ml_context: ML intelligence context
             user_context: User preferences and context
             limit: Maximum products to return
-            
+            vision_results: Optional products from VisionBot
+
         Returns:
             Judgment dictionary with winner, reasoning, and final products
         """
@@ -139,24 +141,29 @@ class JudgeAriAgent:
 
         with self.stats_lock:
             self.stats["total_judgments"] += 1
-       
-        logger.info(f"{self.name} evaluating: {len(cypher_results)} vs {len(vibe_results)} products")
-        
+
+        # Initialize vision_results if not provided
+        vision_results = vision_results or []
+
+        logger.info(f"{self.name} evaluating: {len(cypher_results)} vs {len(vibe_results)} products (vision: {len(vision_results)})")
+
         try:
             # STEP 1: CONSCIOUS RELEVANCE VALIDATION - Reject garbage results
             logger.info("Judge Ari: Applying conscious quality control...")
-            
+
             filtered_cypher = await self._validate_relevance(cypher_results, query, "CypherBot")
             filtered_vibe = await self._validate_relevance(vibe_results, query, "VibeBot")
+            filtered_vision = await self._validate_relevance(vision_results, query, "VisionBot") if vision_results else []
             
             # STEP 2: Check if we have acceptable results
-            if not filtered_cypher and not filtered_vibe:
+            if not filtered_cypher and not filtered_vibe and not filtered_vision:
                 # If validation rejected everything but agents found products, be more lenient
-                if cypher_results or vibe_results:
+                if cypher_results or vibe_results or vision_results:
                     logger.warning("WARNING: Validation rejected all products, but agents found results. Using original results.")
                     # Use original results as fallback
                     filtered_cypher = cypher_results[:5] if cypher_results else []
                     filtered_vibe = vibe_results[:5] if vibe_results else []
+                    filtered_vision = vision_results[:5] if vision_results else []
                 else:
                     logger.warning("WARNING: Judge Ari: ALL PRODUCTS REJECTED - No relevant results found!")
                     return {
@@ -165,15 +172,17 @@ class JudgeAriAgent:
                         "products": [],
                         "cypher_count": len(cypher_results),
                         "vibe_count": len(vibe_results),
+                        "vision_count": len(vision_results),
                         "filtered_cypher_count": 0,
                         "filtered_vibe_count": 0,
+                        "filtered_vision_count": 0,
                         "rejection_reason": "Quality control: No products met relevance standards",
                         "needs_agent_retry": True,
                         "judgment_confidence": 1.0  # High confidence in rejection
                     }
             
             # Log quality control results
-            logger.info(f"Quality control results: CypherBot {len(cypher_results)}->{len(filtered_cypher)}, VibeBot {len(vibe_results)}->{len(filtered_vibe)}")
+            logger.info(f"Quality control results: CypherBot {len(cypher_results)}->{len(filtered_cypher)}, VibeBot {len(vibe_results)}->{len(filtered_vibe)}, VisionBot {len(vision_results)}->{len(filtered_vision)}")
             
             # STEP 3: Get judgment strategy from CAMEL agent (using filtered results)
             strategy = await self._get_judgment_strategy(

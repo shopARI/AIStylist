@@ -48,15 +48,18 @@ class BattleOrchestrator:
         self.metrics = metrics
         self.redis_client = redis_client
         
+        # Default config values (can be overridden by settings parameter)
         self.config = {
             "default_limit": 5,
             "default_timeout": 120.0,  # Increased for large Neo4j datasets with ML intelligence
             "prefetch_multiplier": 2,
-            "quality_threshold": 0.2,
+            "quality_threshold": 0.2,  # Default quality threshold (configurable via QUALITY_THRESHOLD env var)
             "max_concurrent_battles": 50,  # Increased from 5 for production scale
         }
         if settings:
             self.config.update(settings)
+
+        logger.info(f"BattleOrchestrator initialized with quality_threshold={self.config['quality_threshold']}")
 
         self.battle_semaphore = asyncio.Semaphore(self.config["max_concurrent_battles"])
         

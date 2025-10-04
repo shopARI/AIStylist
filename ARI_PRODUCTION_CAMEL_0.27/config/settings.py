@@ -128,7 +128,7 @@ class BattleConfig:
     max_concurrent_battles: int = 5
     default_timeout: float = 120.0  # Increased for large Neo4j datasets
     prefetch_multiplier: int = 2
-    quality_threshold: float = 0.5
+    quality_threshold: float = 0.2  # Lower threshold to allow more products through
     enable_auto_recovery: bool = True
     recovery_attempts: int = 3
     recovery_interval: int = 60
@@ -339,7 +339,7 @@ class Settings:
             max_concurrent_battles=int(os.getenv("MAX_CONCURRENT_BATTLES", "5")),
             default_timeout=float(os.getenv("BATTLE_TIMEOUT", "120.0")),
             prefetch_multiplier=int(os.getenv("PREFETCH_MULTIPLIER", "2")),
-            quality_threshold=float(os.getenv("QUALITY_THRESHOLD", "0.5")),
+            quality_threshold=float(os.getenv("QUALITY_THRESHOLD", "0.2")),
             enable_auto_recovery=os.getenv("ENABLE_AUTO_RECOVERY", "true").lower() == "true",
             recovery_attempts=int(os.getenv("RECOVERY_ATTEMPTS", "3")),
             recovery_interval=int(os.getenv("RECOVERY_INTERVAL", "60"))

@@ -239,12 +239,26 @@ class ApplicationService:
         vibe_products = battle_results.get("vibe_products", [])
         vision_products = battle_results.get("vision_products", [])
 
-        # Generate response that shows all agent results for Ari's review
-        # Use the original message for display, not the processed search_message
-        display_message = original_message or search_message
-        response_text = await self._generate_collaborative_response(
-            products, cypher_products, vibe_products, display_message, battle_results, vision_products
-        )
+        # Check if all products were rejected by quality control
+        if not products and battle_results.get("winner") == "rejected":
+            rejection_reason = battle_results.get("rejection_reason", "Quality control rejected all products")
+            display_message = original_message or search_message
+
+            # Generate helpful fallback message
+            response_text = await self._generate_rejection_fallback(
+                display_message,
+                rejection_reason,
+                cypher_products,
+                vibe_products,
+                vision_products
+            )
+        else:
+            # Generate response that shows all agent results for Ari's review
+            # Use the original message for display, not the processed search_message
+            display_message = original_message or search_message
+            response_text = await self._generate_collaborative_response(
+                products, cypher_products, vibe_products, display_message, battle_results, vision_products
+            )
         
         # Extract detailed reasoning from judgment
         judgment = battle_results.get("judgment", {})
@@ -420,13 +434,73 @@ class ApplicationService:
             logger.info(f"New specific query, using original message only")
             return original_message
 
+    async def _generate_rejection_fallback(
+        self,
+        query: str,
+        rejection_reason: str,
+        cypher_products: List[Dict],
+        vibe_products: List[Dict],
+        vision_products: List[Dict]
+    ) -> str:
+        """
+        Generate helpful fallback message when Judge rejects all products.
+
+        Args:
+            query: User's original query
+            rejection_reason: Why products were rejected
+            cypher_products: Products found by CypherBot (before rejection)
+            vibe_products: Products found by VibeBot (before rejection)
+            vision_products: Products found by VisionBot (before rejection)
+
+        Returns:
+            Helpful fallback message with styling advice
+        """
+        total_found = len(cypher_products) + len(vibe_products) + len(vision_products)
+
+        fallback_msg = f"""I searched our inventory but couldn't find products that meet the quality standards for your request.
+
+**What I Found:**
+- Our agents found {total_found} products, but none were appropriate for: "{query}"
+- Reason: {rejection_reason}
+
+**My Recommendation:**
+"""
+
+        # Use LLM to generate helpful styling advice even without products
+        try:
+            from camel.messages import BaseMessage
+
+            advice_prompt = f"""The user asked: "{query}"
+
+We couldn't find appropriate products in our inventory, but I should still provide helpful fashion advice.
+
+Provide:
+1. General styling guidelines for this context
+2. What types of items would be appropriate
+3. Color and style recommendations
+4. Alternative suggestions
+
+Keep it concise (3-4 sentences) and helpful."""
+
+            response = await self.chat_agent.arun(advice_prompt)
+            advice_text = response.msg if hasattr(response, 'msg') else str(response)
+
+            fallback_msg += advice_text
+
+        except Exception as e:
+            logger.error(f"Failed to generate styling advice: {e}")
+            fallback_msg += "Try refining your search or browse our available categories."
+
+        return fallback_msg
+
     async def _generate_collaborative_response(
         self,
         final_products: List[Dict],
         cypher_products: List[Dict],
         vibe_products: List[Dict],
         query: str,
-        battle_results: Dict[str, Any]
+        battle_results: Dict[str, Any],
+        vision_products: List[Dict] = None
     ) -> str:
         """
         Creates a collaborative response showing both agent findings for Ari's review.

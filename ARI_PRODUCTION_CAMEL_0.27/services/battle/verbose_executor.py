@@ -347,6 +347,7 @@ class VerboseBattleExecutor(BattleExecutor):
         Combines products from both agents and evaluates each product on its own merits.
         """
         print(f"Ari Stylist: Starting unified product evaluation...")
+        logger.debug(f"[PRODUCT PIPELINE] Stage 1: Agent Results - CypherBot={len(cypher_results)}, VibeBot={len(vibe_results)}")
         print(f"Ari Stylist: Merging {len(cypher_results)} CypherBot + {len(vibe_results)} VibeBot products...")
 
         # STEP 1: Merge all products with source tracking
@@ -400,11 +401,13 @@ class VerboseBattleExecutor(BattleExecutor):
                 all_products.append(product_copy)
 
         print(f"Ari Stylist: Combined pool: {len(all_products)} unique products")
+        logger.debug(f"[PRODUCT PIPELINE] Stage 2: Merged Products - Total={len(all_products)}, Consensus={consensus_count}")
         print(f"Ari Stylist: Found {consensus_count} consensus products (both agents found)")
 
         # STEP 2: Use Judge to evaluate each product individually
         try:
             print(f"Ari Stylist: Evaluating each product for quality and relevance...")
+            logger.debug(f"[PRODUCT PIPELINE] Stage 3: Sending to Judge - Products={len(all_products)}")
 
             # Call the existing judge evaluation but pass all products as unified
             # The judge will score and select the best products
@@ -415,6 +418,8 @@ class VerboseBattleExecutor(BattleExecutor):
                 user_context=user_context,
                 limit=limit
             )
+
+            logger.debug(f"[PRODUCT PIPELINE] Stage 4: Judge Output - Products={len(evaluation_result.get('products', []))}")
 
             evaluation_result.update({
                 "product_sources": product_sources,

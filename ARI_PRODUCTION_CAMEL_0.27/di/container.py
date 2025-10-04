@@ -10,7 +10,7 @@ from config.settings import Settings
 from services.user.knowledge_graph import UserKnowledgeGraphService
 from services.product.retriever import ProductRetrieverService
 from services.data.hybrid_store import HybridDataStore
-from services.cache.battle_cache import BattleCache
+from services.cache.battle_cache import BattleCache, CacheBackend
 from services.cache.redis_client import create_redis_service
 from services.conversation_handler import ConversationHandler
 from services.application import ApplicationService
@@ -82,7 +82,8 @@ class DIContainer(containers.DeclarativeContainer):
 
 
     battle_cache = providers.Singleton(
-        BattleCache
+        BattleCache,
+        backend=CacheBackend.MEMORY
     )
 
     # Visual Qdrant Client for FashionSigLIP embeddings
