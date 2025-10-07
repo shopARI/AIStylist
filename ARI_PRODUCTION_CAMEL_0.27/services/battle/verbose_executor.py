@@ -18,10 +18,10 @@ class VerboseBattleExecutor(BattleExecutor):
     Outputs real-time information about what each agent is thinking and doing.
     """
     
-    def __init__(self, cypher_bot, vibe_bot, judge):
-        super().__init__(cypher_bot, vibe_bot, judge)
+    def __init__(self, cypher_bot, vibe_bot, judge, vision_bot=None):
+        super().__init__(cypher_bot, vibe_bot, judge, vision_bot)
         self.verbose = True
-        logger.info("VerboseBattleExecutor initialized - agent minds will be visible")
+        logger.info(f"VerboseBattleExecutor initialized - agent minds will be visible (VisionBot: {'enabled' if vision_bot else 'disabled'})")
     
     async def execute(
         self,
@@ -61,11 +61,13 @@ class VerboseBattleExecutor(BattleExecutor):
             # Execute parallel searches with mind visibility
             print("\nLAUNCHING PARALLEL AGENT SEARCHES...")
             print("-" * 50)
-            cypher_results, vibe_results = await self._verbose_parallel_search(search_params)
-            
+            cypher_results, vibe_results, vision_results = await self._verbose_parallel_search(search_params)
+
             print(f"\nSEARCH RESULTS:")
             print(f"   CypherBot found: {len(cypher_results)} products")
             print(f"   VibeBot found: {len(vibe_results)} products")
+            if self.vision_bot:
+                print(f"   VisionBot found: {len(vision_results)} products")
             
             # Apply consensus requirement if needed
             if require_consensus:
@@ -170,56 +172,77 @@ class VerboseBattleExecutor(BattleExecutor):
         # Store thoughts for later display
         self._cypher_thoughts = []
         self._vibe_thoughts = []
-        
+        self._vision_thoughts = []
+
         print(f"\nCYPHERBOT MIND:")
         print("   Thinking about graph relationships...")
         print("   Analyzing Neo4j query patterns...")
         print("   Considering user preferences and product connections...")
-        
+
         print(f"\nVIBEBOT MIND:")
         print("   Processing semantic similarity...")
         print("   Analyzing vector embeddings...")
         print("   Matching aesthetic preferences...")
-        
+
+        if self.vision_bot:
+            print(f"\nVISIONBOT MIND:")
+            print("   Analyzing visual similarity patterns...")
+            print("   Processing FashionSigLIP embeddings...")
+            print("   Matching visual aesthetic features...")
+
         # Create search tasks with progress tracking
         print(f"\nEXECUTING SEARCHES IN PARALLEL...")
-        
-        cypher_task = asyncio.create_task(
-            self._track_cypher_search(search_params)
-        )
-        
-        vibe_task = asyncio.create_task(
-            self._track_vibe_search(search_params)
-        )
-        
-        # Wait for both with error handling
-        results = await asyncio.gather(
-            cypher_task,
-            vibe_task,
-            return_exceptions=True
-        )
-        
+
+        tasks = []
+        task_names = []
+
+        cypher_task = asyncio.create_task(self._track_cypher_search(search_params))
+        tasks.append(cypher_task)
+        task_names.append("cypher")
+
+        vibe_task = asyncio.create_task(self._track_vibe_search(search_params))
+        tasks.append(vibe_task)
+        task_names.append("vibe")
+
+        if self.vision_bot:
+            vision_task = asyncio.create_task(self._track_vision_search(search_params))
+            tasks.append(vision_task)
+            task_names.append("vision")
+
+        # Wait for all with error handling
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+
         # Process results
         cypher_results = []
         vibe_results = []
-        
-        # Handle CypherBot results
+        vision_results = []
+
+        # Handle CypherBot results (always index 0)
         if isinstance(results[0], Exception):
             print(f"   ERROR: CypherBot encountered error: {results[0]}")
             logger.error(f"CypherBot error: {results[0]}")
         else:
             cypher_results = results[0] if results[0] else []
             print(f"   SUCCESS: CypherBot completed successfully")
-        
-        # Handle VibeBot results
+
+        # Handle VibeBot results (always index 1)
         if isinstance(results[1], Exception):
             print(f"   ERROR: VibeBot encountered error: {results[1]}")
             logger.error(f"VibeBot error: {results[1]}")
         else:
             vibe_results = results[1] if results[1] else []
             print(f"   SUCCESS: VibeBot completed successfully")
-        
-        return cypher_results, vibe_results
+
+        # Handle VisionBot results (index 2 if enabled)
+        if self.vision_bot:
+            if isinstance(results[2], Exception):
+                print(f"   ERROR: VisionBot encountered error: {results[2]}")
+                logger.error(f"VisionBot error: {results[2]}")
+            else:
+                vision_results = results[2] if results[2] else []
+                print(f"   SUCCESS: VisionBot completed successfully")
+
+        return cypher_results, vibe_results, vision_results
     
     async def _track_cypher_search(self, search_params):
         """Track CypherBot search with progress updates"""
@@ -287,7 +310,41 @@ class VerboseBattleExecutor(BattleExecutor):
             print(f"   VibeBot: Error during search - {e}")
             self._vibe_thoughts.append(f"Search failed: {e}")
             raise
-    
+
+    async def _track_vision_search(self, search_params):
+        """Track VisionBot search with progress updates"""
+        try:
+            print(f"   VisionBot: Initiating visual similarity search...")
+            print(f"   VisionBot: Query='{search_params.get('query', '')[:50]}...', Filters={search_params.get('filters') is not None}")
+            start_time = time.time()
+
+            results = await self.vision_bot.search(**search_params)
+
+            search_time = time.time() - start_time
+            print(f"   VisionBot: Found {len(results) if results else 0} products in {search_time:.2f}s")
+
+            # Show ML Intelligence usage
+            ml_intel = search_params.get('ml_intelligence')
+            if ml_intel and ml_intel.get('shared_intel', {}).get('visual'):
+                self._show_agent_intelligence_usage("VisionBot", results, ml_intel)
+
+            if results:
+                print(f"   VisionBot: Top visual similarity scores:")
+                for i, product in enumerate(results[:3]):
+                    score = product.get('score', product.get('vision_score', product.get('visual_score', 0)))
+                    title = product.get('title', 'Unknown')[:40]
+                    print(f"      #{i+1}: {title}... (visual sim: {score:.3f})")
+            else:
+                print(f"   VisionBot: No visual matches found")
+
+            self._vision_thoughts.append(f"Visual search in {search_time:.2f}s, found {len(results) if results else 0} matches")
+            return results
+
+        except Exception as e:
+            print(f"   VisionBot: Error during visual search - {e}")
+            self._vision_thoughts.append(f"Visual search failed: {e}")
+            raise
+
     async def _verbose_judge_evaluation(self, cypher_results, vibe_results, query, ml_context, user_context, limit):
         """Judge evaluation with detailed thought process"""
         self._judge_thoughts = []

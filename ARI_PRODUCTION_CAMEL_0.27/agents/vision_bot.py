@@ -23,6 +23,9 @@ from camel.types import ModelType, ModelPlatformType, RoleType
 # Import prompts
 from config.prompts import VISIONBOT_PROMPT
 
+# Import FashionSigLIP encoder
+from services.ml.fashionsig_encoder import get_fashionsig_encoder
+
 class VisionBotAgent:
     """
     VisionBot - Visual similarity-driven fashion intelligence using Qdrant visual embeddings.
@@ -44,6 +47,26 @@ class VisionBotAgent:
         self.visual_qdrant = visual_qdrant_client
         self.name = "VisionBot"
         self.style = "visual-similarity"
+
+        # Initialize FashionSigLIP encoder for query embeddings
+        try:
+            logger.info(f"{self.name}: Loading FashionSigLIP encoder (may take 10-30 seconds)...")
+            self.encoder = get_fashionsig_encoder()
+            logger.info(f"{self.name}: FashionSigLIP encoder loaded successfully (1024d)")
+
+            # Warm up the encoder with a test query to avoid first-query timeout
+            try:
+                import asyncio
+                logger.info(f"{self.name}: Warming up encoder with test query...")
+                test_embedding = asyncio.run(self.encoder.encode_text("test query"))
+                logger.info(f"{self.name}: Encoder warmed up successfully (embedding shape: {test_embedding.shape})")
+            except Exception as warmup_error:
+                logger.warning(f"{self.name}: Encoder warmup failed (will work on first real query): {warmup_error}")
+
+        except Exception as e:
+            logger.warning(f"{self.name}: FashionSigLIP encoder failed to load: {e}")
+            logger.warning(f"{self.name}: Will fall back to text-only search")
+            self.encoder = None
 
         # Initialize CAMEL 0.2.7 components
         self._initialize_camel_agent()
@@ -123,7 +146,8 @@ class VisionBotAgent:
         filters: Optional[Dict[str, Any]] = None,
         ml_intelligence: Optional[Dict[str, Any]] = None,
         user_context: Optional[Dict[str, Any]] = None,
-        conversation_context: Optional[Dict[str, Any]] = None
+        conversation_context: Optional[Dict[str, Any]] = None,
+        image_path: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Search for products using VISUAL SIMILARITY intelligence.
@@ -135,6 +159,7 @@ class VisionBotAgent:
             ml_intelligence: ML intelligence data
             user_context: User context
             conversation_context: Current conversation context
+            image_path: Optional path/URL to image for visual search
 
         Returns:
             List of visually similar products
@@ -161,7 +186,7 @@ class VisionBotAgent:
             logger.debug("Executing visual strategy...")
             exec_start = datetime.now()
             results = await self._execute_visual_strategy(
-                strategy, query, limit, filters, ml_intelligence
+                strategy, query, limit, filters, ml_intelligence, image_path
             )
             exec_time = (datetime.now() - exec_start).total_seconds()
             logger.debug(f"Visual strategy executed in {exec_time:.2f}s, got {len(results)} results")
@@ -180,7 +205,7 @@ class VisionBotAgent:
             self.stats["failed_searches"] += 1
             return []
 
-    async def _visual_similarity_search(self, query: str, limit: int, filters: Optional[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    async def _visual_similarity_search(self, query: str, limit: int, filters: Optional[Dict[str, Any]], image_path: Optional[str] = None) -> List[Dict[str, Any]]:
         """Visual similarity search using multimodal embeddings"""
         logger.debug(f">>> _visual_similarity_search: query='{query[:50]}...', limit={limit}")
         try:
@@ -207,26 +232,97 @@ class VisionBotAgent:
             search_start = asyncio.get_event_loop().time()
 
             # Check if this is a new Visual Qdrant Client for FashionSigLIP embeddings
-            if hasattr(self.visual_qdrant, 'visual_similarity_search'):
-                # Use new FashionSigLIP visual similarity search
-                logger.debug("Using FashionSigLIP visual similarity search")
+            if hasattr(self.visual_qdrant, 'visual_similarity_search') and self.encoder:
+                # Use FashionSigLIP visual similarity search with query embeddings
+                logger.debug("Using FashionSigLIP visual similarity search with query embeddings")
 
-                # For now, use combined embedding search with text query
-                # TODO: Add image upload and processing for true visual search
+                try:
+                    # Determine search type based on input
+                    if image_path:
+                        # Image-based search
+                        logger.debug(f"Generating image embedding from: '{image_path}'")
+                        image_embedding = await self.encoder.encode_image(image_path)
+                        logger.debug(f"Image embedding generated: shape={image_embedding.shape}, norm={np.linalg.norm(image_embedding):.3f}")
 
-                # Convert text query to search parameters
+                        # Convert filters to product_filters
+                        product_filters = {}
+                        if filters:
+                            if 'category' in filters:
+                                pass
+
+                        # Search using image embedding
+                        results = await self.visual_qdrant.visual_similarity_search(
+                            image_embedding=image_embedding,
+                            search_type="image",  # Using image embeddings
+                            limit=limit,
+                            score_threshold=0.01,  # Very low threshold for vision-only collection
+                            product_filters=product_filters
+                        )
+
+                        logger.debug(f"Image-based visual search returned {len(results)} results")
+
+                    else:
+                        # Text-based search
+                        logger.debug(f"Generating text embedding for: '{visual_enhanced_query[:50]}...'")
+                        text_embedding = await self.encoder.encode_text(visual_enhanced_query)
+                        logger.debug(f"Text embedding generated: shape={text_embedding.shape}, norm={np.linalg.norm(text_embedding):.3f}")
+
+                        # Convert filters to product_filters
+                        product_filters = {}
+                        if filters:
+                            if 'category' in filters:
+                                # Note: This would need category field in Qdrant payloads
+                                pass
+
+                        # Search using text embedding
+                        results = await self.visual_qdrant.visual_similarity_search(
+                            text_embedding=text_embedding,
+                            search_type="text",  # Using text embeddings
+                            limit=limit,
+                            score_threshold=0.01,  # Very low threshold for text vs vision embeddings
+                            product_filters=product_filters
+                        )
+
+                        # FALLBACK: If no results with threshold, try without threshold
+                        if not results:
+                            logger.warning(f"VisionBot: No results with threshold 0.01, trying without threshold")
+                            results = await self.visual_qdrant.visual_similarity_search(
+                                text_embedding=text_embedding,
+                                search_type="text",
+                                limit=limit,
+                                score_threshold=0.0,  # No threshold - return top matches
+                                product_filters=product_filters
+                            )
+                            logger.info(f"VisionBot: Fallback search returned {len(results)} results")
+
+                        logger.debug(f"Text-based visual search returned {len(results)} results")
+
+                    logger.debug(f"Visual similarity search with embeddings returned {len(results)} results")
+
+                except Exception as e:
+                    logger.error(f"FashionSigLIP embedding search failed: {e}")
+                    logger.warning("Falling back to text search")
+                    # Fallback to text search
+                    results = await self.visual_qdrant.search_by_natural_language(
+                        query=visual_enhanced_query,
+                        limit=limit,
+                        filters=None,
+                        score_threshold=0.01  # Very low threshold for better recall
+                    )
+
+            elif hasattr(self.visual_qdrant, 'visual_similarity_search'):
+                # Encoder not available, use text search without embeddings
+                logger.debug("FashionSigLIP encoder not available, using text search")
+
                 product_filters = {}
                 if filters:
                     if 'category' in filters:
-                        # Note: This would need category field in Qdrant payloads
                         pass
 
-                # Use text-based similarity search for now
-                # In future: process uploaded images to get image_embedding
                 results = await self.visual_qdrant.visual_similarity_search(
-                    search_type="combined",  # Could be "image", "text", or "combined"
+                    search_type="combined",
                     limit=limit,
-                    score_threshold=0.3,
+                    score_threshold=0.05,  # Lower threshold for vision-only collection
                     product_filters=product_filters
                 )
 
@@ -237,7 +333,7 @@ class VisionBotAgent:
                     query=visual_enhanced_query,
                     limit=limit,
                     filters=None,
-                    score_threshold=0.3
+                    score_threshold=0.05  # Lower threshold for better recall
                 )
 
             search_time = asyncio.get_event_loop().time() - search_start
@@ -307,8 +403,8 @@ Choose the best strategy and explain your reasoning in one sentence.
 Return format: STRATEGY: reasoning"""
 
         try:
-            response = await self.agent.arun(context)
-            strategy_text = response.msg if hasattr(response, 'msg') else str(response)
+            response = self.agent.step(context)
+            strategy_text = response.msg.content if hasattr(response.msg, 'content') else str(response)
             logger.debug(f"VisionBot strategy response: {strategy_text[:100]}...")
             return strategy_text
         except Exception as e:
@@ -321,7 +417,8 @@ Return format: STRATEGY: reasoning"""
         query: str,
         limit: int,
         filters: Optional[Dict[str, Any]],
-        ml_intelligence: Optional[Dict[str, Any]]
+        ml_intelligence: Optional[Dict[str, Any]],
+        image_path: Optional[str] = None
     ) -> List[Dict[str, Any]]:
         """
         Execute the chosen visual search strategy.
@@ -332,6 +429,7 @@ Return format: STRATEGY: reasoning"""
             limit: Result limit
             filters: Search filters
             ml_intelligence: ML intelligence data
+            image_path: Optional image for visual search
 
         Returns:
             Search results
@@ -340,8 +438,11 @@ Return format: STRATEGY: reasoning"""
         enhanced_query = self._enhance_visual_query(query, strategy, ml_intelligence)
 
         # Use visual similarity search for all strategies
-        print(f"   VisionBot: Using visual similarity search with query: '{enhanced_query}'")
-        results = await self._visual_similarity_search(enhanced_query, limit, filters)
+        if image_path:
+            print(f"   VisionBot: Using visual similarity search with IMAGE: '{image_path}'")
+        else:
+            print(f"   VisionBot: Using visual similarity search with query: '{enhanced_query}'")
+        results = await self._visual_similarity_search(enhanced_query, limit, filters, image_path)
         print(f"   VisionBot: Visual search returned {len(results)} results")
 
         # Deduplicate and rank results

@@ -10,6 +10,9 @@ scikit-learn>=1.3.0
 numpy>=1.24.0
 pandas>=2.0.0
 torch>=2.0.0  # For ML intelligence systems
+open-clip-torch>=2.20.0  # For FashionSigLIP embeddings
+torchvision>=0.15.0  # Required by open-clip
+Pillow>=10.0.0  # For image processing
 
 # Database Clients
 neo4j>=5.13.0

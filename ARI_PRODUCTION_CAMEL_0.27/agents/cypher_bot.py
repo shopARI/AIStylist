@@ -189,6 +189,8 @@ class CypherBotAgent:
 
     async def _filtered_search(self, filters: Optional[Dict[str, Any]], limit: int, query: str = "") -> List[Dict[str, Any]]:
         logger.debug(f">>> _filtered_search START: filters={filters}, limit={limit}")
+        logger.info(f"[DEBUG _filtered_search] Received filters: {filters}")
+        logger.info(f"[DEBUG _filtered_search] Filter keys: {list(filters.keys()) if filters else 'None'}")
         
         if not filters:
             logger.info("No specific filters provided, checking if query has searchable terms")
@@ -222,6 +224,11 @@ class CypherBotAgent:
         if 'categories' in filters and filters['categories']:
             filters['category'] = filters['categories'][0] if isinstance(filters['categories'], list) else filters['categories']
             logger.debug(f"Converted categories to category: {filters['category']}")
+
+        # CRITICAL FIX: Handle when category itself is a list (bad application filters)
+        if 'category' in filters and isinstance(filters['category'], list) and filters['category']:
+            filters['category'] = filters['category'][0]
+            logger.info(f"[FIX] Converted category list to string: {filters['category']}")
         
         # Collect all search terms
         search_terms = []
@@ -245,7 +252,8 @@ class CypherBotAgent:
                 logger.info(f"Using professional fallback terms for {occasion}: {search_terms}")
         
         if not search_terms:
-            logger.warning("No search terms extracted from filters")
+            logger.warning(f"[DEBUG] No search terms extracted from filters: {filters}")
+            logger.warning(f"[DEBUG] Filter had category: {filters.get('category')}, colors: {filters.get('colors')}, occasion: {filters.get('occasion')}")
             return []
         
         # Initialize params first
@@ -360,38 +368,52 @@ class CypherBotAgent:
     ) -> bool:
         """
         Validate that a product matches the requested category.
-        
+
         Args:
             product: Product data
             filters: Search filters including category
-            
+
         Returns:
             True if product matches category or no category filter
         """
         if not filters or 'category' not in filters:
             return True  # No category filter, accept all products
-        
+
         requested_category = filters['category'].lower()
-        
+        title = product.get('title', '').lower()
+
+        # CRITICAL FIX: Exclude beauty/cosmetics products when searching for clothing
+        beauty_keywords = ['lipstick', 'lip color', 'nail polish', 'hairdressing', 'hair gel',
+                          'makeup', 'cosmetic', 'mascara', 'eyeshadow', 'foundation', 'concealer',
+                          'perfume', 'fragrance', 'lotion', 'cream', 'serum', 'shampoo', 'conditioner']
+        clothing_categories = ['dress', 'shirt', 'pants', 'jacket', 'shoes', 'top', 'blazer',
+                              'coat', 'jeans', 'skirt', 'shorts']
+
+        if requested_category in clothing_categories:
+            for beauty_keyword in beauty_keywords:
+                if beauty_keyword in title:
+                    logger.debug(f"Filtered out beauty product: {title[:50]}")
+                    return False
+
         # Check multiple product category fields
         product_categories = []
-        
+
         # Check main category field
         if product.get('category'):
             product_categories.append(product['category'].lower())
-        
+
         # Check subcategory field
         if product.get('subcategory'):
             product_categories.append(product['subcategory'].lower())
-        
+
         # Check categories array
         if product.get('categories') and isinstance(product['categories'], list):
             product_categories.extend([cat.lower() for cat in product['categories'] if cat])
-        
+
         # Check if any product category matches the requested category
         if requested_category in product_categories:
             return True
-        
+
         # ENHANCED: Check for category relationships and synonyms
         category_mappings = {
             'shirt': ['shirt', 'blouse', 'top', 't-shirt', 'tee', 'tank', 'polo'],
@@ -402,27 +424,30 @@ class CypherBotAgent:
             'shorts': ['shorts', 'short', 'bermuda'],
             'top': ['top', 'shirt', 'blouse', 'tee', 'tank', 'camisole']
         }
-        
+
         # Check if requested category has known synonyms
         if requested_category in category_mappings:
             for synonym in category_mappings[requested_category]:
                 if synonym in product_categories:
                     return True
-        
+
         # Check reverse mapping (product category has synonyms that match request)
         for category, synonyms in category_mappings.items():
             if requested_category in synonyms:
                 for product_cat in product_categories:
                     if product_cat in synonyms:
                         return True
-        
-        # Last resort: check title for category indicators (less reliable)
-        title = product.get('title', '').lower()
+
+        # Last resort: check title for category indicators with word boundaries
+        import re
         title_indicators = category_mappings.get(requested_category, [requested_category])
         for indicator in title_indicators:
-            if indicator in title and len(indicator) > 3:  # Avoid short matches
-                return True
-        
+            if len(indicator) > 3:
+                # Use word boundary matching to avoid "dress" matching "undressed"
+                pattern = r'\b' + re.escape(indicator) + r'\b'
+                if re.search(pattern, title):
+                    return True
+
         return False
 
     async def _get_intelligent_strategy(
@@ -556,10 +581,14 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
         
         # Extract intelligent filter guidance from strategy
         intelligent_filters = self._extract_intelligent_filters(strategy, query, filters)
+        logger.info(f"[DEBUG] Strategy: {strategy[:100]}...")
+        logger.info(f"[DEBUG] Intelligent filters after extraction: {intelligent_filters}")
         
         # Execute based on intelligent strategy keywords
+        logger.info(f"[DEBUG] Strategy lower: {strategy_lower[:100]}...")
         if "collaborative" in strategy_lower or "users who bought" in strategy_lower:
             # Use collaborative filtering via graph relationships
+            logger.info(f"[DEBUG] Calling _collaborative_graph_search with filters: {intelligent_filters}")
             results.extend(await self._collaborative_graph_search(query, limit, intelligent_filters))
             
         elif "category_focused" in strategy_lower or "specific categories" in strategy_lower:
@@ -653,7 +682,7 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
         self,
         query: str,
         limit: int,
-        filters: Dict[str, Any]
+        intelligent_filters: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """
         Collaborative filtering using graph relationships.
@@ -661,7 +690,7 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
         try:
             # For now, fall back to existing filtered search but with collaborative intent
             # In future, this could use actual graph traversal for "users who bought X also bought Y"
-            return await self._filtered_search(filters, limit, query)
+            return await self._filtered_search(intelligent_filters, limit, query)
         except Exception as e:
             logger.error(f"Collaborative graph search failed: {e}")
             return []
@@ -670,14 +699,14 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
         self,
         query: str,
         limit: int,
-        filters: Dict[str, Any]
+        intelligent_filters: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """
         Category-focused search with graph relationships.
         """
         try:
             # Use existing filtered search with enhanced category focus
-            return await self._filtered_search(filters, limit, query)
+            return await self._filtered_search(intelligent_filters, limit, query)
         except Exception as e:
             logger.error(f"Category-focused search failed: {e}")
             return []
@@ -686,7 +715,7 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
         self,
         query: str,
         limit: int,
-        filters: Dict[str, Any],
+        intelligent_filters: Dict[str, Any],
         user_context: Optional[Dict[str, Any]]
     ) -> List[Dict[str, Any]]:
         """
@@ -695,10 +724,10 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
         try:
             # Add brand preferences from user context if available
             if user_context and user_context.get('preferred_brands'):
-                filters = filters.copy()
-                filters['brand'] = user_context['preferred_brands'][0]
-            
-            return await self._filtered_search(filters, limit, query)
+                intelligent_filters = intelligent_filters.copy()
+                intelligent_filters['brand'] = user_context['preferred_brands'][0]
+
+            return await self._filtered_search(intelligent_filters, limit, query)
         except Exception as e:
             logger.error(f"Brand relationship search failed: {e}")
             return []
@@ -707,14 +736,14 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
         self,
         query: str,
         limit: int,
-        filters: Dict[str, Any]
+        intelligent_filters: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """
         Occasion-based search using purchase pattern intelligence.
         """
         try:
             # Use occasion-specific search terms with existing infrastructure
-            return await self._filtered_search(filters, limit, query)
+            return await self._filtered_search(intelligent_filters, limit, query)
         except Exception as e:
             logger.error(f"Occasion pattern search failed: {e}")
             return []
@@ -723,13 +752,13 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
         self,
         query: str,
         limit: int,
-        filters: Dict[str, Any]
+        intelligent_filters: Dict[str, Any]
     ) -> List[Dict[str, Any]]:
         """
         Intelligent general search as fallback.
         """
         try:
-            return await self._filtered_search(filters, limit, query)
+            return await self._filtered_search(intelligent_filters, limit, query)
         except Exception as e:
             logger.error(f"Intelligent general search failed: {e}")
             return []

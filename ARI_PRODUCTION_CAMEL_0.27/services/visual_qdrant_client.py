@@ -23,7 +23,7 @@ class VisualQdrantClient:
 
     def __init__(self):
         self.client = None
-        self.collection_name = "fashion_fashionsig_768d"  # FashionSigLIP collection
+        self.collection_name = "fashion_fashionsig_neo4j_1024d"  # FashionSigLIP collection with UUID support
         self._initialize_client()
 
     def _initialize_client(self):
@@ -32,7 +32,8 @@ class VisualQdrantClient:
             self.client = QdrantClient(
                 url=os.getenv("QDRANT_URL", "http://localhost:6333"),
                 api_key=os.getenv("QDRANT_API_KEY"),
-                prefer_grpc=False  # Use HTTP to avoid gRPC issues
+                prefer_grpc=False,  # Use HTTP to avoid gRPC issues
+                timeout=30.0  # Increase timeout to 30 seconds
             )
 
             # Test connection
@@ -139,17 +140,19 @@ class VisualQdrantClient:
                     query_filter = Filter(must=conditions)
 
             logger.info(f"Search Performing {search_type} similarity search (limit={limit}, threshold={score_threshold})")
+            logger.info(f"[DEBUG VisionQdrant] Query vector shape: {len(query_vector) if query_vector else 'None'}")
+            logger.info(f"[DEBUG VisionQdrant] Collection: {self.collection_name}, Filter: {query_filter}")
 
-            # Execute search
-            search_results = self.client.search(
+            # Execute search (using query_points instead of deprecated search)
+            search_results = self.client.query_points(
                 collection_name=self.collection_name,
-                query_vector=query_vector,
+                query=query_vector,
                 limit=limit,
                 score_threshold=score_threshold,
                 query_filter=query_filter,
                 with_payload=True,
                 with_vectors=False  # Don't return vectors to save bandwidth
-            )
+            ).points
 
             # Format results
             results = []

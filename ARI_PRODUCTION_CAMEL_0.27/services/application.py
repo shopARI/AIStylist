@@ -873,10 +873,23 @@ Be specific, authoritative, and defend every single choice with expert fashion k
                 content=user_prompt
             )
 
-            # Get LLM response
-            response = await agent.agenerate(user_message)
+            # Get LLM response (step is synchronous in CAMEL 0.2.7)
+            response = agent.step(user_message)
 
-            return response.content if response and response.content else self._basic_professional_fallback()
+            # Handle CAMEL 0.2.7 response format (same as llm_intent_detector.py)
+            if hasattr(response, 'msgs') and response.msgs:
+                # CAMEL 0.2.7 returns msgs list, get the last message
+                last_msg = response.msgs[-1]
+                if hasattr(last_msg, 'content'):
+                    response_content = last_msg.content
+                else:
+                    response_content = str(last_msg)
+            elif hasattr(response, 'content'):
+                response_content = response.content
+            else:
+                response_content = str(response)
+
+            return response_content if response_content else self._basic_professional_fallback()
 
         except Exception as e:
             logger.error(f"Error generating LLM styling advice: {e}")
@@ -1308,7 +1321,8 @@ Be conversational, informative, and authentic. You're knowledgeable about many t
             # Only trigger on explicit product request phrases - exclude obvious non-shopping contexts
             (any(phrase in message.lower() for phrase in [
                 "i need a", "i need some", "recommend me", "show me some", "find me a", "looking for a",
-                "want to buy", "need to buy", "show me products", "what products", "actual product"
+                "want to buy", "need to buy", "show me products", "what products", "actual product",
+                "what should i wear", "what to wear", "what can i wear", "suggestions for", "help me find"
             ]) and not any(non_shopping_pattern in message.lower() for non_shopping_pattern in [
                 # News/Media patterns
                 "in the news", "breaking news", "headlines", "reporter said", "news report",
@@ -1318,9 +1332,9 @@ Be conversational, informative, and authentic. You're knowledgeable about many t
                 "did you see", "did you hear", "what happened", "what do you think", "your opinion",
                 "do you believe", "what's your view", "how do you feel about", "thoughts on",
 
-                # Academic/Professional contexts
+                # Academic/Professional contexts (but NOT when asking about wearing/buying)
                 "study shows", "research found", "according to", "scientist says", "doctor says",
-                "professor", "university", "academic", "clinical trial", "peer review",
+                "clinical trial", "peer review",
 
                 # Political context (general, not specific people)
                 "election results", "congress voted", "senate", "political party", "campaign",

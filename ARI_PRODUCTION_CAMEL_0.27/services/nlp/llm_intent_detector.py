@@ -140,7 +140,8 @@ EXAMPLES:
 - "need a black shirt" → SPECIFIC_ITEM (fashion item)
 - "outfit for interview" → INSPIRATION (fashion advice)
 
-For fashion queries, extract: categories, colors, occasions, style_preferences, price_range, brand_preferences
+For fashion queries, extract FROM THE CUSTOMER QUERY ONLY: categories, colors, occasions, style_preferences, price_range, brand_preferences
+**IMPORTANT:** DO NOT extract parameters from the FASHION KNOWLEDGE CONTEXT - only from the CUSTOMER QUERY!
 For non-fashion queries, leave parameters empty.
 
 ALWAYS respond with valid JSON:

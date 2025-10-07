@@ -39,7 +39,8 @@ class BattleOrchestrator:
             self.executor = VerboseBattleExecutor(
                 cypher_bot=executor.cypher_bot,
                 vibe_bot=executor.vibe_bot,
-                judge=executor.judge
+                judge=executor.judge,
+                vision_bot=executor.vision_bot
             )
         else:
             self.executor = executor

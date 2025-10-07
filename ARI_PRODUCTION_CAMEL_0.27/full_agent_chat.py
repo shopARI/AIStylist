@@ -9,6 +9,7 @@ import os
 import sys
 import time
 import json
+import logging
 from typing import Dict, Any, Optional
 from dotenv import load_dotenv
 
@@ -17,6 +18,12 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 # Load environment variables FIRST
 load_dotenv()
+
+# Enable debug logging for diagnosis
+logging.basicConfig(
+    level=logging.DEBUG,
+    format='[%(levelname)s] %(name)s: %(message)s'
+)
 
 class FullAgentARIChat:
     """Complete ARI chat interface using the full multi-agent collaboration system."""

@@ -260,7 +260,9 @@ class ParameterExtractor:
             matches = pattern.finditer(text)
             for match in matches:
                 brand = match.group(1).strip()
-                if len(brand) > 2 and brand.lower() not in ["the", "and", "for", "with", "new", "best"]:
+                # Filter out common words and place names that aren't brands
+                excluded_words = ["the", "and", "for", "with", "new", "best", "institute", "technology", "fashion", "university", "college"]
+                if len(brand) > 2 and brand.lower() not in excluded_words and not brand.isupper():
                     brands.append(brand)
         
         return list(set(brands))
