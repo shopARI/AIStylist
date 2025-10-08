@@ -735,8 +735,6 @@ Format your response with clear sections. Always start with "**ARI'S EXPERT STYL
                     # Use Visual Intelligence for outfit coordination analysis
                     visual_intel = await self.intelligence_coordinator.get_visual_intelligence()
                     if visual_intel and len(final_products) > 1:
-                        print("VISUAL INTELLIGENCE: Analyzing outfit coordination for combination request...")
-
                         # Separate products into base items and coordinating items
                         base_products = []
                         coordinating_products = []
@@ -784,8 +782,6 @@ Format your response with clear sections. Always start with "**ARI'S EXPERT STYL
                             )
 
                             if coordination_analysis:
-                                print(f"   Visual coordination analysis complete!")
-
                                 # Extract insights for LLM prompt
                                 color_harmony = coordination_analysis.get('color_harmony', {})
                                 outfit_combinations = coordination_analysis.get('outfit_combinations', [])
@@ -828,7 +824,6 @@ RECOMMENDED COLOR PALETTE VARIATIONS:
 
                 except Exception as e:
                     logger.error(f"Error in visual coordination analysis: {e}")
-                    print(f"   Visual coordination analysis error: {e}")
 
             if outfit_request:
                 user_prompt = f"""Please provide expert outfit coordination for: "{query}"

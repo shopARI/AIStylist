@@ -246,7 +246,6 @@ class BattleExecutor:
         # Handle VibeBot results
         if isinstance(results[1], Exception):
             logger.error(f"VibeBot error: {results[1]}")
-            print(f"   VibeBot ERROR: {results[1]}")
             import traceback
             traceback.print_exception(type(results[1]), results[1], results[1].__traceback__)
         else:
@@ -256,7 +255,6 @@ class BattleExecutor:
         if len(results) > 2:
             if isinstance(results[2], Exception):
                 logger.error(f"VisionBot error: {results[2]}")
-                print(f"   VisionBot ERROR: {results[2]}")
                 import traceback
                 traceback.print_exception(type(results[2]), results[2], results[2].__traceback__)
             else:

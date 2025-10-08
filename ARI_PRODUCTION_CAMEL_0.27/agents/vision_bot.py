@@ -171,8 +171,6 @@ class VisionBotAgent:
         logger.info(f"{self.name} searching: query='{query[:50]}...', filters={filters}")
 
         try:
-            print(f"   VisionBot: Called with query='{query[:30]}...', filters={filters is not None}")
-
             # Get visual strategy from CAMEL agent
             strategy_start = datetime.now()
             strategy = await self._get_visual_strategy(
@@ -180,7 +178,6 @@ class VisionBotAgent:
             )
             strategy_time = (datetime.now() - strategy_start).total_seconds()
             logger.info(f"Visual strategy determined in {strategy_time:.2f}s")
-            print(f"   VisionBot: Strategy: {strategy[:50]}...")
 
             # Execute visual strategy
             logger.debug("Executing visual strategy...")
@@ -190,7 +187,6 @@ class VisionBotAgent:
             )
             exec_time = (datetime.now() - exec_start).total_seconds()
             logger.debug(f"Visual strategy executed in {exec_time:.2f}s, got {len(results)} results")
-            print(f"   VisionBot: Strategy returned {len(results)} results in {exec_time:.2f}s")
 
             # Update statistics
             elapsed = (datetime.now() - start_time).total_seconds()
@@ -438,12 +434,7 @@ Return format: STRATEGY: reasoning"""
         enhanced_query = self._enhance_visual_query(query, strategy, ml_intelligence)
 
         # Use visual similarity search for all strategies
-        if image_path:
-            print(f"   VisionBot: Using visual similarity search with IMAGE: '{image_path}'")
-        else:
-            print(f"   VisionBot: Using visual similarity search with query: '{enhanced_query}'")
         results = await self._visual_similarity_search(enhanced_query, limit, filters, image_path)
-        print(f"   VisionBot: Visual search returned {len(results)} results")
 
         # Deduplicate and rank results
         unique_results = self._deduplicate_and_rank(results, query)
@@ -497,7 +488,6 @@ Return format: STRATEGY: reasoning"""
                             if styles:
                                 enhanced += f" {' '.join(styles[:2])}"
 
-                        print(f"   VisionBot: Enhanced query with Visual Intelligence: '{enhanced}'")
                         logger.info(f"VisionBot enhanced query with visual intelligence: '{enhanced}'")
 
         return enhanced

@@ -121,9 +121,6 @@ class CypherBotAgent:
             logger.info(f"CypherBot: Using conversation context with {len(conversation_context['current_products'])} current products")
         
         try:
-            # BATTLE DEBUG: Print when called during battle  
-            print(f"   CypherBot: Called with query='{query[:30]}...', filters={filters is not None}")
-            
             # STEP 1: GET INTELLIGENT REASONING STRATEGY (like VibeBot does!)
             logger.info("CypherBot: Engaging CAMEL agent for intelligent reasoning...")
             strategy_start = datetime.now()
@@ -132,8 +129,7 @@ class CypherBotAgent:
             )
             strategy_time = (datetime.now() - strategy_start).total_seconds()
             logger.info(f"Intelligent strategy determined in {strategy_time:.2f}s: {strategy[:100]}...")
-            print(f"   CypherBot: Strategy: {strategy[:50]}...")
-            
+
             # STEP 2: EXECUTE INTELLIGENT STRATEGY
             logger.debug("Executing intelligent graph strategy...")
             exec_start = datetime.now()
@@ -142,8 +138,7 @@ class CypherBotAgent:
             )
             exec_time = (datetime.now() - exec_start).total_seconds()
             logger.debug(f"Intelligent strategy executed in {exec_time:.2f}s, got {len(results)} results")
-            print(f"   CypherBot: Strategy returned {len(results)} results in {exec_time:.2f}s")
-            
+
             # Add metadata to the results
             for idx, product in enumerate(results):
                 product['agent'] = self.name
