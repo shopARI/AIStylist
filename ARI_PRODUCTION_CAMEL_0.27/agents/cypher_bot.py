@@ -286,19 +286,25 @@ class CypherBotAgent:
         else:
             # FAST multi-term query with optional sports exclusion - Fixed syntax
             base_conditions = ["p.id IS NOT NULL"]
-            # Add individual CONTAINS conditions for each search term
+
+            # Build OR conditions for search terms (match ANY term, not ALL)
+            term_conditions = []
             for i, term in enumerate(search_terms):
-                base_conditions.append(f"p.title CONTAINS $term_{i}")
+                term_conditions.append(f"p.title CONTAINS $term_{i}")
                 params[f"term_{i}"] = term
-            
+
+            # Add OR-joined search terms as a single condition
+            if term_conditions:
+                base_conditions.append(f"({' OR '.join(term_conditions)})")
+
             if category_filter:
                 # Only use title field since p.category doesn't exist in Neo4j schema
                 base_conditions.append("p.title CONTAINS $category_filter")
                 params["category_filter"] = category_filter
-            
+
             if exclude_sports:
                 base_conditions.append(self._get_sports_exclusion_clause())
-                
+
             cypher_query = f"""
             MATCH (p:Product)
             WHERE {' AND '.join(base_conditions)}
