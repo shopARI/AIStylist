@@ -19,11 +19,16 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 # Load environment variables FIRST
 load_dotenv()
 
-# Enable debug logging for diagnosis
+# Configure logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    level=logging.INFO,
     format='[%(levelname)s] %(name)s: %(message)s'
 )
+
+# Suppress noisy HTTP library logs
+logging.getLogger('httpcore').setLevel(logging.WARNING)
+logging.getLogger('httpx').setLevel(logging.WARNING)
+logging.getLogger('urllib3').setLevel(logging.WARNING)
 
 class FullAgentARIChat:
     """Complete ARI chat interface using the full multi-agent collaboration system."""
