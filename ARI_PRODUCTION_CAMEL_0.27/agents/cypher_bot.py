@@ -783,17 +783,24 @@ Strategy name and intelligent reasoning for why this approach will find the MOST
                 # Calculate intelligent score
                 score = 0.5
                 
-                # Boost for products matching intelligent strategy
+                # Boost for products matching intelligent strategy (check title AND description)
+                title_lower = product.get('title', '').lower()
+                desc_lower = product.get('description', '').lower()
+
                 if "formal" in strategy.lower() or "wedding" in strategy.lower():
-                    # Boost formal/elegant items
-                    title_lower = product.get('title', '').lower()
-                    if any(word in title_lower for word in ['dress', 'formal', 'elegant', 'gown']):
-                        score += 0.3
+                    # Boost formal/elegant items (check both title and description)
+                    formal_keywords = ['dress', 'formal', 'elegant', 'gown', 'sophisticated', 'refined', 'chic', 'luxurious']
+                    title_matches = sum(1 for word in formal_keywords if word in title_lower)
+                    desc_matches = sum(1 for word in formal_keywords if word in desc_lower)
+                    score += min((title_matches * 0.1) + (desc_matches * 0.05), 0.4)
+
                 elif "professional" in strategy.lower() or "interview" in strategy.lower():
-                    # Boost professional items
-                    title_lower = product.get('title', '').lower()
-                    if any(word in title_lower for word in ['blazer', 'shirt', 'suit', 'professional']):
-                        score += 0.3
+                    # Boost professional items (check both title and description)
+                    professional_keywords = ['blazer', 'shirt', 'suit', 'professional', 'business',
+                                            'polished', 'tailored', 'structured', 'sophisticated', 'formal', 'sleek']
+                    title_matches = sum(1 for word in professional_keywords if word in title_lower)
+                    desc_matches = sum(1 for word in professional_keywords if word in desc_lower)
+                    score += min((title_matches * 0.1) + (desc_matches * 0.05), 0.4)
                 
                 # Boost for products with good data
                 if product.get('in_stock', True):
