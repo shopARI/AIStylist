@@ -263,64 +263,59 @@ class CypherBotAgent:
         # ENHANCED: Add sports exclusion for general fashion queries  
         exclude_sports = "work" in query.lower() or "business" in query.lower() or "professional" in query.lower()
         
-        # CASCADING SEARCH STRATEGY for performance:
-        # 1. Try TITLE-only search first (fast with indexes)
-        # 2. If insufficient results, add DESCRIPTION search (slower but better recall)
+        # FULLTEXT SEARCH STRATEGY for performance + recall:
+        # Use Neo4j fulltext index to search BOTH title AND description efficiently
+        # Requires: CREATE FULLTEXT INDEX product_fulltext FOR (p:Product) ON EACH [p.title, p.description]
 
-        logger.info(f"Executing TITLE-only search first with terms: {search_terms}")
+        logger.info(f"Executing FULLTEXT search with terms: {search_terms}")
 
-        # Build TITLE-ONLY query first (fast)
-        if len(search_terms) == 1 and len(search_terms[0]) >= 3:
-            # Single term - title only
-            base_conditions = ["p.id IS NOT NULL", "p.title CONTAINS $first_term"]
-            if category_filter:
-                base_conditions.append("p.title CONTAINS $category_filter")
-                params["category_filter"] = category_filter
-            if exclude_sports:
-                base_conditions.append(self._get_sports_exclusion_clause())
+        # Build fulltext search query
+        # Fulltext search syntax: "term1 OR term2 OR term3"
+        search_string = " OR ".join(search_terms)
+        logger.debug(f"Fulltext search string: '{search_string}'")
 
+        # Build fulltext query with additional filters
+        # FULLTEXT search returns nodes with relevance scores
+        additional_filters = []
+
+        if category_filter:
+            # Add category as an AND condition to the fulltext search
+            search_string = f"({search_string}) AND {category_filter}"
+            logger.debug(f"Added category filter: {category_filter}")
+
+        if exclude_sports:
+            additional_filters.append(self._get_sports_exclusion_clause())
+
+        # Use FULLTEXT index for fast title+description search
+        if additional_filters:
+            # Fulltext search + additional WHERE filters
             cypher_query = f"""
-            MATCH (p:Product)
-            WHERE {' AND '.join(base_conditions)}
-            RETURN p
-            ORDER BY p.price ASC
+            CALL db.index.fulltext.queryNodes('product_fulltext', $search_string)
+            YIELD node AS p, score
+            WHERE {' AND '.join(additional_filters)}
+            RETURN p, score
+            ORDER BY score DESC, p.price ASC
             LIMIT $limit
             """
-            params["first_term"] = search_terms[0]
         else:
-            # Multi-term - title only
-            base_conditions = ["p.id IS NOT NULL"]
-            term_conditions = []
-            for i, term in enumerate(search_terms):
-                term_conditions.append(f"p.title CONTAINS $term_{i}")
-                params[f"term_{i}"] = term
-
-            if term_conditions:
-                base_conditions.append(f"({' OR '.join(term_conditions)})")
-
-            if category_filter:
-                base_conditions.append("p.title CONTAINS $category_filter")
-                params["category_filter"] = category_filter
-
-            if exclude_sports:
-                base_conditions.append(self._get_sports_exclusion_clause())
-
+            # Pure fulltext search (fastest)
             cypher_query = f"""
-            MATCH (p:Product)
-            WHERE {' AND '.join(base_conditions)}
-            RETURN p
-            ORDER BY p.price ASC
+            CALL db.index.fulltext.queryNodes('product_fulltext', $search_string)
+            YIELD node AS p, score
+            RETURN p, score
+            ORDER BY score DESC, p.price ASC
             LIMIT $limit
             """
 
+        params["search_string"] = search_string
         logger.debug(f"Query params: {params}")
 
         try:
-            logger.debug("Calling neo4j.query() for TITLE search...")
+            logger.debug("Calling neo4j.query() for FULLTEXT search (title + description)...")
             query_start = asyncio.get_event_loop().time()
             results = await self.neo4j.query(cypher_query, params)
             query_time = asyncio.get_event_loop().time() - query_start
-            logger.debug(f"neo4j.query() returned in {query_time:.2f}s with {len(results) if results else 0} results")
+            logger.debug(f"FULLTEXT search returned in {query_time:.2f}s with {len(results) if results else 0} results")
             
             products = []
             filtered_count = 0

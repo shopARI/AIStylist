@@ -52,11 +52,15 @@ class JudgeAriAgent:
             "vibe_wins": 0,
             "consensus_decisions": 0,
             "avg_judgment_time": 0.0,
-            "total_products_evaluated": 0
+            "total_products_evaluated": 0,
+            "learning_interactions": 0  # Track learning usage
         }
-        
+
         from threading import RLock
         self.stats_lock = RLock()
+
+        # Judgment history for learning (last 50 judgments)
+        self.judgment_history = []
 
     def _initialize_camel_agent(self):
         """Initialize the main CAMEL ChatAgent"""
@@ -203,7 +207,10 @@ class JudgeAriAgent:
                 "products_rejected": (len(cypher_results) + len(vibe_results)) - (len(filtered_cypher) + len(filtered_vibe)),
                 "quality_controlled": True
             })
-            
+
+            # Store judgment for learning (Step 3: Learning integration)
+            self._store_judgment_for_learning(judgment, query, strategy)
+
             # Update statistics
             elapsed = (datetime.now() - start_time).total_seconds()
             self._update_stats(judgment, elapsed)
@@ -366,9 +373,20 @@ VIBEBOT (Aesthetic approach):
         cypher_ids = {p.get('id') for p in cypher_results if p.get('id')}
         vibe_ids = {p.get('id') for p in vibe_results if p.get('id')}
         consensus_count = len(cypher_ids & vibe_ids)
-        
+
         context += f"\n\nCONSENSUS: {consensus_count} products found by both agents"
-        
+
+        # Add historical context for learning (Step 5: Learning integration)
+        memory_insights = self._get_memory_insights(query, "")
+        recent_patterns = self._get_recent_patterns()
+
+        context += f"""
+
+HISTORICAL CONTEXT:
+- Previous judgments: {len(self.judgment_history)}
+- Recent patterns: {recent_patterns}
+- Memory insights: {memory_insights}"""
+
         context += """
 
 Determine judgment strategy:
@@ -430,31 +448,37 @@ Respond with strategy and reasoning."""
         detailed_reasoning = self._log_detailed_reasoning(cypher_results, vibe_results, query, cypher_quality, vibe_quality)
         
         logger.info(f"Judge Ari independent assessment: CypherBot={cypher_quality:.3f}, VibeBot={vibe_quality:.3f}")
-        
-        # Score-independent decision based on actual product quality
-        quality_diff = abs(cypher_quality - vibe_quality)
-        
-        if quality_diff < 0.1:
-            # Very similar quality - select balanced approach
-            winner = "balanced"
-            reasoning = f"Both agents found similar quality products (CypherBot: {cypher_quality:.2f}, VibeBot: {vibe_quality:.2f})"
-        elif cypher_quality > vibe_quality + 0.1:
-            winner = "cypher"
-            reasoning = f"CypherBot found higher quality products ({cypher_quality:.2f} vs {vibe_quality:.2f})"
-        elif vibe_quality > cypher_quality + 0.1:
-            winner = "vibe"
-            reasoning = f"VibeBot found higher quality products ({vibe_quality:.2f} vs {cypher_quality:.2f})"
+
+        # Check if learning strategy is requested (Step 4: Learning integration)
+        if "learning" in strategy.lower() and len(self.judgment_history) >= 5:
+            winner = self._apply_learning_strategy(cypher_results, vibe_results)
+            reasoning = f"Learning-based selection using historical success patterns from {len(self.judgment_history)} past judgments"
+            logger.info(f"Applied learning strategy: {winner}")
         else:
-            # Close call - use count as tiebreaker
-            if len(cypher_results) > len(vibe_results):
-                winner = "cypher"
-                reasoning = f"CypherBot found more relevant products ({len(cypher_results)} vs {len(vibe_results)})"
-            elif len(vibe_results) > len(cypher_results):
-                winner = "vibe"
-                reasoning = f"VibeBot found more relevant products ({len(vibe_results)} vs {len(cypher_results)})"
-            else:
+            # Score-independent decision based on actual product quality
+            quality_diff = abs(cypher_quality - vibe_quality)
+
+            if quality_diff < 0.1:
+                # Very similar quality - select balanced approach
                 winner = "balanced"
-                reasoning = "Equal quality and quantity - balanced selection"
+                reasoning = f"Both agents found similar quality products (CypherBot: {cypher_quality:.2f}, VibeBot: {vibe_quality:.2f})"
+            elif cypher_quality > vibe_quality + 0.1:
+                winner = "cypher"
+                reasoning = f"CypherBot found higher quality products ({cypher_quality:.2f} vs {vibe_quality:.2f})"
+            elif vibe_quality > cypher_quality + 0.1:
+                winner = "vibe"
+                reasoning = f"VibeBot found higher quality products ({vibe_quality:.2f} vs {vibe_quality:.2f})"
+            else:
+                # Close call - use count as tiebreaker
+                if len(cypher_results) > len(vibe_results):
+                    winner = "cypher"
+                    reasoning = f"CypherBot found more relevant products ({len(cypher_results)} vs {len(vibe_results)})"
+                elif len(vibe_results) > len(cypher_results):
+                    winner = "vibe"
+                    reasoning = f"VibeBot found more relevant products ({len(vibe_results)} vs {len(cypher_results)})"
+                else:
+                    winner = "balanced"
+                    reasoning = "Equal quality and quantity - balanced selection"
         
         # Select products based on winner
         final_products = self._select_products(
@@ -1286,7 +1310,7 @@ Think like a helpful salesperson who wants to show customers all available optio
     def get_stats(self) -> Dict[str, Any]:
         """Get judge statistics."""
         total = self.stats['total_judgments']
-        
+
         return {
             "judge": self.name,
             "role": self.role,
@@ -1301,6 +1325,11 @@ Think like a helpful salesperson who wants to show customers all available optio
             ),
             "consensus_rate": (
                 self.stats['consensus_decisions'] / total * 100
+                if total > 0 else 0
+            ),
+            "judgment_history_size": len(self.judgment_history),
+            "learning_rate": (
+                self.stats.get('learning_interactions', 0) / total * 100
                 if total > 0 else 0
             )
         }
@@ -1528,3 +1557,75 @@ Think like a helpful salesperson who wants to show customers all available optio
 
         except Exception as e:
             logger.warning(f"Error updating individual stats: {e}")
+
+    # LEARNING SYSTEM - Adapted from judge_modernized.py
+
+    def _get_memory_insights(self, query: str, strategy: str) -> str:
+        """Extract insights from memory for enhanced judgment."""
+        if len(self.judgment_history) == 0:
+            return "(first judgment - no history available)"
+
+        recent = self.judgment_history[-5:]
+        successful_strategies = [j['winner'] for j in recent if j.get('successful', True)]
+
+        if successful_strategies:
+            common_strategy = Counter(successful_strategies).most_common(1)[0][0]
+            return f"(memory suggests {common_strategy} works well for similar queries)"
+
+        return "(memory analysis applied)"
+
+    def _apply_learning_strategy(
+        self,
+        cypher_results: List[Dict[str, Any]],
+        vibe_results: List[Dict[str, Any]]
+    ) -> str:
+        """Apply learning from judgment history to select best approach."""
+        if len(self.judgment_history) == 0:
+            return "balanced"
+
+        recent_success = [j for j in self.judgment_history[-10:] if j.get('successful', True)]
+
+        if recent_success:
+            strategy_success = Counter([j['winner'] for j in recent_success])
+            best_strategy = strategy_success.most_common(1)[0][0]
+            logger.info(f"Learning strategy selected: {best_strategy}")
+            return best_strategy
+
+        return "balanced"
+
+    def _store_judgment_for_learning(
+        self,
+        judgment: Dict[str, Any],
+        query: str,
+        strategy: str
+    ):
+        """Store judgment in history for learning."""
+        judgment_record = {
+            'timestamp': datetime.now().isoformat(),
+            'query': query,
+            'strategy': strategy,
+            'winner': judgment['winner'],
+            'confidence': judgment['judgment_confidence'],
+            'product_count': len(judgment['products']),
+            'successful': judgment['judgment_confidence'] > 0.7
+        }
+
+        self.judgment_history.append(judgment_record)
+
+        if len(self.judgment_history) > 50:
+            self.judgment_history = self.judgment_history[-50:]
+
+    def _get_recent_patterns(self) -> str:
+        """Get patterns from recent judgments for context."""
+        if len(self.judgment_history) < 3:
+            return "insufficient data"
+
+        recent = self.judgment_history[-5:]
+        winners = [j['winner'] for j in recent]
+        winner_counts = Counter(winners)
+
+        if winner_counts:
+            most_common = winner_counts.most_common(1)[0][0]
+            return f"recently favoring {most_common}"
+
+        return "mixed patterns"

@@ -1,0 +1,13 @@
+{
+  "total_processed": 199931,
+  "successful": 200768,
+  "failed": 0,
+  "start_time": "2025-10-09T03:56:53.844003",
+  "last_checkpoint": "2025-10-09T08:33:21.517880",
+  "last_processed_id": 199931,
+  "batches_completed": 80,
+  "batches_failed": 0,
+  "avg_batch_time": 167.53728961348534,
+  "gpu_memory_peak": 0.0079345703125,
+  "error_counts": {}
+}

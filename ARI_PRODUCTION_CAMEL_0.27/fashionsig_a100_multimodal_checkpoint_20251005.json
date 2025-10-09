@@ -1,13 +1,13 @@
 {
-  "total_processed": 3611423,
-  "successful": 3627721,
+  "total_processed": 4536148,
+  "successful": 4557281,
   "failed": 0,
   "start_time": "2025-10-05T07:45:56.761427",
-  "last_checkpoint": "2025-10-08T04:29:05.785846",
-  "last_processed_id": 3611423,
-  "batches_completed": 1445,
+  "last_checkpoint": "2025-10-08T22:40:18.941140",
+  "last_processed_id": 4536148,
+  "batches_completed": 1815,
   "batches_failed": 0,
-  "avg_batch_time": 166.27141890822801,
+  "avg_batch_time": 166.16068530292873,
   "gpu_memory_peak": 0.0079345703125,
   "error_counts": {}
 }
