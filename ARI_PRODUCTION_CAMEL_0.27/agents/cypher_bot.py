@@ -182,6 +182,169 @@ class CypherBotAgent:
             logger.warning(f"Score calculation error: {e}")
             return 0.75  # Default good score for graph results
 
+    async def _generate_semantic_cypher_query(
+        self,
+        query: str,
+        filters: Optional[Dict[str, Any]],
+        limit: int
+    ) -> tuple[str, Dict[str, Any]]:
+        """
+        Use LLM to generate semantic Cypher query from natural language.
+
+        Example: "black shirt for wedding" -> understands formal context
+        """
+
+        # Build comprehensive prompt for LLM
+        prompt = f"""You are a Neo4j Cypher query expert for a fashion e-commerce database.
+
+USER QUERY: "{query}"
+
+FILTERS PROVIDED: {filters if filters else 'None'}
+
+NEO4J SCHEMA:
+- Node: Product
+  - Properties: id (UUID), title (string), description (string), price (float), brand (string)
+  - Full-text index: product_fulltext on [title, description]
+
+AVAILABLE SEARCH SYNTAX:
+- Use: CALL db.index.fulltext.queryNodes('product_fulltext', search_string)
+- Search string supports: "term1 OR term2", "term1 AND term2", "(term1 OR term2) AND term3"
+- Returns: node AS p, score (relevance score)
+
+YOUR TASK:
+1. UNDERSTAND THE SEMANTIC INTENT:
+   - "black shirt for wedding" = formal/elegant black dress shirt
+   - "red dress for party" = stylish/trendy red party dress
+   - "casual jeans" = relaxed/comfortable denim pants
+
+2. EXPAND WITH SYNONYMS AND CONTEXT:
+   - Shirt → "shirt OR blouse OR top OR dress shirt"
+   - Wedding → ADD: "formal OR elegant OR sophisticated"
+   - Casual → ADD: "casual OR relaxed OR comfortable"
+   - Party → ADD: "party OR trendy OR stylish OR fashionable"
+
+3. GENERATE OPTIMIZED FULLTEXT SEARCH STRING:
+   - Combine base terms with context terms
+   - Use AND for must-have, OR for alternatives
+   - Example: "(black) AND (shirt OR blouse OR top) AND (formal OR elegant)"
+
+4. HANDLE COLORS/ATTRIBUTES:
+   - Colors should be AND conditions (black = must have black)
+   - Categories can be OR (shirt OR blouse)
+
+RESPOND WITH JSON:
+{{
+    "search_string": "optimized fulltext search string",
+    "reasoning": "brief explanation of semantic understanding",
+    "terms_added": ["list", "of", "context", "terms"]
+}}
+
+EXAMPLES:
+
+Query: "black shirt for wedding"
+Response: {{
+    "search_string": "(black) AND (shirt OR blouse OR dress shirt) AND (formal OR elegant OR sophisticated)",
+    "reasoning": "Wedding context requires formal attire, expanded shirt to include formal alternatives",
+    "terms_added": ["formal", "elegant", "sophisticated", "dress shirt"]
+}}
+
+Query: "red dress for party"
+Response: {{
+    "search_string": "(red) AND (dress OR gown) AND (party OR trendy OR stylish OR fashionable)",
+    "reasoning": "Party context suggests trendy/stylish dress, kept color specific",
+    "terms_added": ["party", "trendy", "stylish", "fashionable", "gown"]
+}}
+
+Query: "casual jeans for weekend"
+Response: {{
+    "search_string": "(jeans OR denim) AND (casual OR relaxed OR comfortable)",
+    "reasoning": "Weekend casual wear, added comfort-related terms",
+    "terms_added": ["denim", "casual", "relaxed", "comfortable"]
+}}
+
+NOW GENERATE FOR THE USER QUERY ABOVE:"""
+
+        try:
+            # Call CAMEL agent for semantic understanding
+            user_msg = BaseMessage.make_user_message(
+                role_name="Query Optimizer",
+                content=prompt
+            )
+
+            response = self.agent.step(user_msg)
+
+            # Extract response
+            if hasattr(response, 'msg') and hasattr(response.msg, 'content'):
+                response_text = response.msg.content
+            elif hasattr(response, 'content'):
+                response_text = response.content
+            else:
+                response_text = str(response)
+
+            logger.info(f"LLM response: {response_text[:200]}...")
+
+            # Parse JSON response
+            import json
+            import re
+
+            # Extract JSON from response (handle markdown code blocks)
+            json_match = re.search(r'\{[^}]+\}', response_text, re.DOTALL)
+            if json_match:
+                json_str = json_match.group(0)
+                query_data = json.loads(json_str)
+
+                search_string = query_data.get('search_string', '')
+                reasoning = query_data.get('reasoning', '')
+                terms_added = query_data.get('terms_added', [])
+
+                logger.info(f"LLM SEMANTIC UNDERSTANDING:")
+                logger.info(f"  Search string: {search_string}")
+                logger.info(f"  Reasoning: {reasoning}")
+                logger.info(f"  Context terms added: {terms_added}")
+
+                # Build Cypher query with LLM-generated search string
+                params = {"limit": limit, "search_string": search_string}
+
+                cypher_query = f"""
+                CALL db.index.fulltext.queryNodes('product_fulltext', $search_string)
+                YIELD node AS p, score
+                RETURN p, score
+                ORDER BY score DESC, p.price ASC
+                LIMIT $limit
+                """
+
+                return cypher_query, params
+            else:
+                raise ValueError("Could not parse JSON from LLM response")
+
+        except Exception as e:
+            logger.error(f"LLM query generation failed: {e}")
+            logger.info("Falling back to basic keyword search")
+
+            # Fallback: basic keyword search
+            search_terms = []
+            if filters:
+                if 'category' in filters:
+                    search_terms.append(filters['category'])
+                if 'colors' in filters:
+                    search_terms.extend(filters['colors'])
+
+            if not search_terms:
+                search_terms = query.lower().split()[:3]  # First 3 words
+
+            search_string = " OR ".join(search_terms)
+            params = {"limit": limit, "search_string": search_string}
+
+            cypher_query = f"""
+            CALL db.index.fulltext.queryNodes('product_fulltext', $search_string)
+            YIELD node AS p, score
+            RETURN p, score
+            ORDER BY score DESC, p.price ASC
+            LIMIT $limit
+            """
+
+            return cypher_query, params
+
     async def _filtered_search(self, filters: Optional[Dict[str, Any]], limit: int, query: str = "") -> List[Dict[str, Any]]:
         logger.debug(f">>> _filtered_search START: filters={filters}, limit={limit}")
         logger.info(f"[DEBUG _filtered_search] Received filters: {filters}")
@@ -260,55 +423,20 @@ class CypherBotAgent:
         # Check if we have a specific category filter
         category_filter = filters.get("category") if filters else None
         
-        # ENHANCED: Add sports exclusion for general fashion queries  
-        exclude_sports = "work" in query.lower() or "business" in query.lower() or "professional" in query.lower()
-        
-        # FULLTEXT SEARCH STRATEGY for performance + recall:
-        # Use Neo4j fulltext index to search BOTH title AND description efficiently
-        # Requires: CREATE FULLTEXT INDEX product_fulltext FOR (p:Product) ON EACH [p.title, p.description]
+        # LLM-POWERED SEMANTIC SEARCH
+        # Use GPT-4o to understand context and generate optimized Cypher queries
+        # Example: "black shirt for wedding" -> LLM adds "formal", "elegant", "dress shirt"
 
-        logger.info(f"Executing FULLTEXT search with terms: {search_terms}")
+        logger.info(f"Using LLM to generate SEMANTIC Cypher query for: '{query}'")
 
-        # Build fulltext search query
-        # Fulltext search syntax: "term1 OR term2 OR term3"
-        search_string = " OR ".join(search_terms)
-        logger.debug(f"Fulltext search string: '{search_string}'")
+        # Generate semantic query using LLM
+        cypher_query, params = await self._generate_semantic_cypher_query(
+            query=query,
+            filters=filters,
+            limit=limit
+        )
 
-        # Build fulltext query with additional filters
-        # FULLTEXT search returns nodes with relevance scores
-        additional_filters = []
-
-        if category_filter:
-            # Add category as an AND condition to the fulltext search
-            search_string = f"({search_string}) AND {category_filter}"
-            logger.debug(f"Added category filter: {category_filter}")
-
-        if exclude_sports:
-            additional_filters.append(self._get_sports_exclusion_clause())
-
-        # Use FULLTEXT index for fast title+description search
-        if additional_filters:
-            # Fulltext search + additional WHERE filters
-            cypher_query = f"""
-            CALL db.index.fulltext.queryNodes('product_fulltext', $search_string)
-            YIELD node AS p, score
-            WHERE {' AND '.join(additional_filters)}
-            RETURN p, score
-            ORDER BY score DESC, p.price ASC
-            LIMIT $limit
-            """
-        else:
-            # Pure fulltext search (fastest)
-            cypher_query = f"""
-            CALL db.index.fulltext.queryNodes('product_fulltext', $search_string)
-            YIELD node AS p, score
-            RETURN p, score
-            ORDER BY score DESC, p.price ASC
-            LIMIT $limit
-            """
-
-        params["search_string"] = search_string
-        logger.debug(f"Query params: {params}")
+        logger.info(f"LLM generated query with search string: {params.get('search_string', 'N/A')[:100]}")
 
         try:
             logger.debug("Calling neo4j.query() for FULLTEXT search (title + description)...")
