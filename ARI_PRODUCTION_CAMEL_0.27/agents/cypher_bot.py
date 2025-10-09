@@ -264,17 +264,17 @@ class CypherBotAgent:
         exclude_sports = "work" in query.lower() or "business" in query.lower() or "professional" in query.lower()
         
         if len(search_terms) == 1 and len(search_terms[0]) >= 3:
-            # FAST single term query with optional sports exclusion
-            base_conditions = ["p.id IS NOT NULL", "p.title CONTAINS $first_term"]
-            
+            # FAST single term query with optional sports exclusion - NOW SEARCHES DESCRIPTION TOO
+            base_conditions = ["p.id IS NOT NULL", "(p.title CONTAINS $first_term OR p.description CONTAINS $first_term)"]
+
             if category_filter:
-                # Only use title field since p.category doesn't exist in Neo4j schema
-                base_conditions.append("p.title CONTAINS $category_filter")
+                # Search in both title AND description for better recall
+                base_conditions.append("(p.title CONTAINS $category_filter OR p.description CONTAINS $category_filter)")
                 params["category_filter"] = category_filter
-            
+
             if exclude_sports:
                 base_conditions.append(self._get_sports_exclusion_clause())
-                
+
             cypher_query = f"""
             MATCH (p:Product)
             WHERE {' AND '.join(base_conditions)}
@@ -284,13 +284,13 @@ class CypherBotAgent:
             """
             params["first_term"] = search_terms[0]
         else:
-            # FAST multi-term query with optional sports exclusion - Fixed syntax
+            # FAST multi-term query with optional sports exclusion - NOW SEARCHES DESCRIPTION TOO
             base_conditions = ["p.id IS NOT NULL"]
 
-            # Build OR conditions for search terms (match ANY term, not ALL)
+            # Build OR conditions for search terms (match ANY term in title OR description)
             term_conditions = []
             for i, term in enumerate(search_terms):
-                term_conditions.append(f"p.title CONTAINS $term_{i}")
+                term_conditions.append(f"(p.title CONTAINS $term_{i} OR p.description CONTAINS $term_{i})")
                 params[f"term_{i}"] = term
 
             # Add OR-joined search terms as a single condition
@@ -298,8 +298,8 @@ class CypherBotAgent:
                 base_conditions.append(f"({' OR '.join(term_conditions)})")
 
             if category_filter:
-                # Only use title field since p.category doesn't exist in Neo4j schema
-                base_conditions.append("p.title CONTAINS $category_filter")
+                # Search in both title AND description for better recall
+                base_conditions.append("(p.title CONTAINS $category_filter OR p.description CONTAINS $category_filter)")
                 params["category_filter"] = category_filter
 
             if exclude_sports:
