@@ -263,15 +263,19 @@ class CypherBotAgent:
         # ENHANCED: Add sports exclusion for general fashion queries  
         exclude_sports = "work" in query.lower() or "business" in query.lower() or "professional" in query.lower()
         
+        # CASCADING SEARCH STRATEGY for performance:
+        # 1. Try TITLE-only search first (fast with indexes)
+        # 2. If insufficient results, add DESCRIPTION search (slower but better recall)
+
+        logger.info(f"Executing TITLE-only search first with terms: {search_terms}")
+
+        # Build TITLE-ONLY query first (fast)
         if len(search_terms) == 1 and len(search_terms[0]) >= 3:
-            # FAST single term query with optional sports exclusion - NOW SEARCHES DESCRIPTION TOO
-            base_conditions = ["p.id IS NOT NULL", "(p.title CONTAINS $first_term OR p.description CONTAINS $first_term)"]
-
+            # Single term - title only
+            base_conditions = ["p.id IS NOT NULL", "p.title CONTAINS $first_term"]
             if category_filter:
-                # Search in both title AND description for better recall
-                base_conditions.append("(p.title CONTAINS $category_filter OR p.description CONTAINS $category_filter)")
+                base_conditions.append("p.title CONTAINS $category_filter")
                 params["category_filter"] = category_filter
-
             if exclude_sports:
                 base_conditions.append(self._get_sports_exclusion_clause())
 
@@ -284,22 +288,18 @@ class CypherBotAgent:
             """
             params["first_term"] = search_terms[0]
         else:
-            # FAST multi-term query with optional sports exclusion - NOW SEARCHES DESCRIPTION TOO
+            # Multi-term - title only
             base_conditions = ["p.id IS NOT NULL"]
-
-            # Build OR conditions for search terms (match ANY term in title OR description)
             term_conditions = []
             for i, term in enumerate(search_terms):
-                term_conditions.append(f"(p.title CONTAINS $term_{i} OR p.description CONTAINS $term_{i})")
+                term_conditions.append(f"p.title CONTAINS $term_{i}")
                 params[f"term_{i}"] = term
 
-            # Add OR-joined search terms as a single condition
             if term_conditions:
                 base_conditions.append(f"({' OR '.join(term_conditions)})")
 
             if category_filter:
-                # Search in both title AND description for better recall
-                base_conditions.append("(p.title CONTAINS $category_filter OR p.description CONTAINS $category_filter)")
+                base_conditions.append("p.title CONTAINS $category_filter")
                 params["category_filter"] = category_filter
 
             if exclude_sports:
@@ -312,16 +312,15 @@ class CypherBotAgent:
             ORDER BY p.price ASC
             LIMIT $limit
             """
-        
-        logger.info(f"Executing Cypher query with terms: {search_terms}")
+
         logger.debug(f"Query params: {params}")
-        
+
         try:
-            logger.debug("Calling neo4j.query()...")
+            logger.debug("Calling neo4j.query() for TITLE search...")
             query_start = asyncio.get_event_loop().time()
             results = await self.neo4j.query(cypher_query, params)
             query_time = asyncio.get_event_loop().time() - query_start
-            logger.debug(f"neo4j.query() returned in {query_time:.2f}s")
+            logger.debug(f"neo4j.query() returned in {query_time:.2f}s with {len(results) if results else 0} results")
             
             products = []
             filtered_count = 0
