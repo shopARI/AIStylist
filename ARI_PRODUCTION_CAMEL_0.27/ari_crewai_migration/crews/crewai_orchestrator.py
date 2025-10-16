@@ -17,6 +17,13 @@ sys.path.insert(0, '/home/leo/AIStylist/ARI_PRODUCTION_CAMEL_0.27')
 sys.path.insert(0, '/home/leo/AIStylist/ARI_PRODUCTION_CAMEL_0.27/ari_crewai_migration')
 
 from crews.product_search_crew import ProductSearchCrew, load_and_create_crew
+from crews.mini_crews import (
+    create_graph_search_crew,
+    create_vector_search_crew,
+    create_visual_search_crew,
+    create_judge_crew
+)
+from flows import create_and_run_flow
 from memory.redis_memory_provider import create_redis_memory_provider
 from nlp.hybrid_intent_detector import get_hybrid_intent_detector, DetectionStrategy
 from models.types import SearchIntent
@@ -109,11 +116,18 @@ class CrewAIOrchestrator:
         else:
             logger.warning("ConversationHandler unavailable - will use fallback responses")
 
-        # Load product search crew
+        # Initialize mini-crews for Flow-based execution
+        logger.info("Initializing mini-crews for ProductSearchFlow...")
+        self.graph_crew = create_graph_search_crew()
+        self.vector_crew = create_vector_search_crew()
+        self.visual_crew = create_visual_search_crew()
+        self.judge_crew = create_judge_crew()
+
+        # Keep old crew for backward compatibility (deprecated)
         if crew:
             self.product_crew = crew
         else:
-            logger.info(f"Loading {process_type} product search crew")
+            logger.info(f"Loading legacy {process_type} product search crew (deprecated)")
             base_crew = load_and_create_crew(process_type=process_type)
             self.product_crew = ProductSearchCrew(base_crew)
 
@@ -238,19 +252,36 @@ class CrewAIOrchestrator:
                 )
             else:
                 self.routing_stats["product_intents"] += 1
-                logger.info(f"Routing to PRODUCT SEARCH crew for: {intent_result.primary_intent.name}")
+                logger.info(f"Routing to PRODUCT SEARCH FLOW for: {intent_result.primary_intent.name}")
 
                 # Merge detected parameters with provided filters
                 merged_filters = self._merge_filters(filters, intent_result.extracted_parameters)
 
-                result = await self.product_crew.execute(
+                # Use Flow-based execution with mini-crews and parallel search
+                flow_result = await create_and_run_flow(
                     query=query,
                     filters=merged_filters,
                     limit=limit,
                     user_context=user_context,
-                    ml_intelligence=generated_intelligence,  # Pass generated intelligence
-                    conversation_context=conversation_context
+                    ml_intelligence=generated_intelligence,
+                    conversation_context=conversation_context,
+                    graph_crew=self.graph_crew,
+                    vector_crew=self.vector_crew,
+                    visual_crew=self.visual_crew,
+                    judge_crew=self.judge_crew
                 )
+
+                # Convert Pydantic result to dict for compatibility
+                result = {
+                    "products": [p.dict() for p in flow_result.products],
+                    "reasoning": flow_result.reasoning,
+                    "metadata": flow_result.metadata
+                }
+                result["metadata"]["graph_count"] = flow_result.graph_count
+                result["metadata"]["vector_count"] = flow_result.vector_count
+                result["metadata"]["visual_count"] = flow_result.visual_count
+                result["metadata"]["consensus_count"] = flow_result.consensus_count
+                result["metadata"]["quality_controlled"] = flow_result.quality_controlled
 
             # Add execution time and intent metadata
             execution_time = time.time() - search_start
