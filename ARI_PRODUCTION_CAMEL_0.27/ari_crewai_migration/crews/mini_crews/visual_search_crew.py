@@ -22,6 +22,8 @@ def create_visual_search_crew(agents_dir: str = None, tasks_dir: str = None) -> 
     # Load VisionBot agent
     if agents_dir is None:
         agents_dir = Path(__file__).parent.parent.parent / 'agents'
+    else:
+        agents_dir = Path(agents_dir)  # Convert to Path if string
 
     vision_agent = load_agent(str(agents_dir / 'vision_bot.yaml'))
 

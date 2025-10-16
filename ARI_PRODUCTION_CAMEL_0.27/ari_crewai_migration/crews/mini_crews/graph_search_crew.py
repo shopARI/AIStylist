@@ -22,6 +22,8 @@ def create_graph_search_crew(agents_dir: str = None, tasks_dir: str = None) -> C
     # Load CypherBot agent
     if agents_dir is None:
         agents_dir = Path(__file__).parent.parent.parent / 'agents'
+    else:
+        agents_dir = Path(agents_dir)  # Convert to Path if string
 
     cypher_agent = load_agent(str(agents_dir / 'cypher_bot.yaml'))
 
