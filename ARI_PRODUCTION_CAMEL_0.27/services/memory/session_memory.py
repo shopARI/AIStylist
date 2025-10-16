@@ -43,14 +43,20 @@ class EnhancedSessionMemory:
         redis_client,
         max_turns_per_session: int = 50,
         max_session_age_days: int = 30,
-        summary_after_turns: int = 10
+        summary_after_turns: int = 10,
+        enable_redis_storage: bool = False  # DISABLED by default
     ):
         self.redis = redis_client
         self.max_turns_per_session = max_turns_per_session
         self.max_session_age_days = max_session_age_days
         self.summary_after_turns = summary_after_turns
-        
-        logger.info(f"Enhanced session memory initialized (max_turns: {max_turns_per_session}, max_age: {max_session_age_days} days)")
+        self.enable_redis_storage = enable_redis_storage
+
+        # In-memory fallback storage when Redis is disabled
+        self.memory_store = {}  # session_id -> conversation_data
+
+        storage_mode = "Redis" if enable_redis_storage else "Memory-only"
+        logger.info(f"Enhanced session memory initialized ({storage_mode}, max_turns: {max_turns_per_session}, max_age: {max_session_age_days} days)")
     
     async def store_conversation(
         self,
@@ -73,12 +79,16 @@ class EnhancedSessionMemory:
             metadata=metadata or {}
         )
         
-        # Store in Redis
+        # Store in memory or Redis based on configuration
         session_key = f"session_memory:{session_id}"
-        
+
         try:
-            # Get existing conversation
-            conversation_data = await self.redis.get_json(session_key)
+            # Get existing conversation from memory or Redis
+            if self.enable_redis_storage:
+                conversation_data = await self.redis.get_json(session_key)
+            else:
+                conversation_data = self.memory_store.get(session_id)
+
             if not conversation_data:
                 conversation_data = {
                     "user_id": user_id,
@@ -86,27 +96,34 @@ class EnhancedSessionMemory:
                     "turns": [],
                     "summary": None
                 }
-            
+
             # Add new turn
             conversation_data["turns"].append(asdict(turn))
             conversation_data["last_active"] = time.time()
-            
+
             # Apply memory limits
             await self._apply_memory_limits(conversation_data)
-            
+
             # Generate summary if needed
             if len(conversation_data["turns"]) % self.summary_after_turns == 0:
                 conversation_data["summary"] = await self._generate_summary(conversation_data["turns"])
-            
-            # Store back to Redis (30 day TTL)
-            await self.redis.set_json(
-                session_key, 
-                conversation_data, 
-                ttl=self.max_session_age_days * 24 * 3600
-            )
-            
+
+            # Store based on configuration
+            if self.enable_redis_storage:
+                # Store to Redis (30 day TTL)
+                await self.redis.set_json(
+                    session_key,
+                    conversation_data,
+                    ttl=self.max_session_age_days * 24 * 3600
+                )
+                logger.debug(f"Stored conversation turn to Redis for session {session_id}")
+            else:
+                # Store to memory only (no Redis)
+                self.memory_store[session_id] = conversation_data
+                logger.debug(f"Stored conversation turn to memory for session {session_id} (Redis storage disabled)")
+
             logger.info(f"Stored conversation turn for session {session_id} (total turns: {len(conversation_data['turns'])})")
-            
+
         except Exception as e:
             logger.error(f"Error storing conversation: {e}")
     
@@ -116,11 +133,16 @@ class EnhancedSessionMemory:
         context_turns: int = 5
     ) -> str:
         """Get recent conversation context for the session"""
-        
+
         session_key = f"session_memory:{session_id}"
-        
+
         try:
-            conversation_data = await self.redis.get_json(session_key)
+            # Get from memory or Redis based on configuration
+            if self.enable_redis_storage:
+                conversation_data = await self.redis.get_json(session_key)
+            else:
+                conversation_data = self.memory_store.get(session_id)
+
             if not conversation_data:
                 return ""
             
@@ -159,11 +181,16 @@ class EnhancedSessionMemory:
         user_id: str = None
     ) -> Dict[str, Any]:
         """Extract user preferences from conversation history"""
-        
+
         session_key = f"session_memory:{session_id}"
-        
+
         try:
-            conversation_data = await self.redis.get_json(session_key)
+            # Get from memory or Redis based on configuration
+            if self.enable_redis_storage:
+                conversation_data = await self.redis.get_json(session_key)
+            else:
+                conversation_data = self.memory_store.get(session_id)
+
             if not conversation_data:
                 return {}
             
@@ -279,11 +306,16 @@ class EnhancedSessionMemory:
     
     async def get_session_stats(self, session_id: str) -> Dict[str, Any]:
         """Get session statistics"""
-        
+
         session_key = f"session_memory:{session_id}"
-        
+
         try:
-            conversation_data = await self.redis.get_json(session_key)
+            # Get from memory or Redis based on configuration
+            if self.enable_redis_storage:
+                conversation_data = await self.redis.get_json(session_key)
+            else:
+                conversation_data = self.memory_store.get(session_id)
+
             if not conversation_data:
                 return {"exists": False}
             

@@ -49,21 +49,29 @@ class CAMELVectorMemory:
         embedding_model: str = "text-embedding-3-small",
         max_contexts_per_query: int = 5,
         similarity_threshold: float = 0.7,
-        enable_vector_storage: bool = True
+        enable_vector_storage: bool = True,
+        enable_redis_storage: bool = False  # DISABLED by default
     ):
         self.redis = redis_client
         self.embedding_model = embedding_model
         self.max_contexts = max_contexts_per_query
         self.similarity_threshold = similarity_threshold
-        
+        self.enable_redis_storage = enable_redis_storage
+
+        # In-memory fallback storage when Redis is disabled
+        self.memory_store = {}  # context_key -> context_data
+        self.user_indices = {}  # user_id -> list of (context_key, timestamp)
+
         # Initialize CAMEL components if available
         self.vector_memory = None
         self.embedding_model_instance = None
-        
+
+        storage_mode = "Redis" if enable_redis_storage else "Memory-only"
         if CAMEL_AVAILABLE and enable_vector_storage:
             self._initialize_camel_vector_memory()
+            logger.info(f"CAMEL vector memory initialized ({storage_mode} backend)")
         else:
-            logger.warning("CAMEL vector memory disabled - falling back to Redis-only storage")
+            logger.warning(f"CAMEL vector memory disabled - using {storage_mode} storage only")
     
     def _initialize_camel_vector_memory(self):
         """Initialize CAMEL VectorDB memory components"""
@@ -127,24 +135,37 @@ class CAMELVectorMemory:
                     
                 except Exception as e:
                     logger.warning(f"Failed to store in CAMEL VectorDB: {e}")
-            
-            # Always store in Redis as backup/fast access
+
+            # Store in Redis or memory based on configuration
             context_key = f"vector_context:{context.session_id}:{time.time()}"
-            await self.redis.set_json(
-                context_key,
-                asdict(context),
-                ttl=90 * 24 * 3600  # 90 days
-            )
-            
-            # Add to user's context index
-            user_index_key = f"user_contexts:{context.user_id}"
-            await self.redis.client.zadd(
-                user_index_key,
-                {context_key: context.timestamp}
-            )
-            await self.redis.client.expire(user_index_key, 90 * 24 * 3600)
-            
-            logger.info(f"Stored conversation context (vector: {vector_stored}, redis: True)")
+
+            if self.enable_redis_storage:
+                # Store in Redis as backup/fast access
+                await self.redis.set_json(
+                    context_key,
+                    asdict(context),
+                    ttl=90 * 24 * 3600  # 90 days
+                )
+
+                # Add to user's context index
+                user_index_key = f"user_contexts:{context.user_id}"
+                await self.redis.client.zadd(
+                    user_index_key,
+                    {context_key: context.timestamp}
+                )
+                await self.redis.client.expire(user_index_key, 90 * 24 * 3600)
+                logger.debug(f"Stored context to Redis for session {context.session_id}")
+            else:
+                # Store in memory only (no Redis)
+                self.memory_store[context_key] = asdict(context)
+
+                # Add to user's in-memory context index
+                if context.user_id not in self.user_indices:
+                    self.user_indices[context.user_id] = []
+                self.user_indices[context.user_id].append((context_key, context.timestamp))
+                logger.debug(f"Stored context to memory for session {context.session_id} (Redis disabled)")
+
+            logger.info(f"Stored conversation context (vector: {vector_stored}, storage: {'redis' if self.enable_redis_storage else 'memory'})")
             return True
             
         except Exception as e:
@@ -224,15 +245,23 @@ class CAMELVectorMemory:
         try:
             cutoff_time = time.time() - (days_back * 24 * 3600)
             user_index_key = f"user_contexts:{user_id}"
-            
-            # Get recent context keys from Redis
-            context_keys = await self.redis.client.zrangebyscore(
-                user_index_key,
-                cutoff_time,
-                '+inf',
-                withscores=True
-            )
-            
+
+            # Get recent context keys from Redis or memory
+            if self.enable_redis_storage:
+                context_keys = await self.redis.client.zrangebyscore(
+                    user_index_key,
+                    cutoff_time,
+                    '+inf',
+                    withscores=True
+                )
+            else:
+                # Get from in-memory index
+                all_contexts = self.user_indices.get(user_id, [])
+                context_keys = [
+                    (key, ts) for key, ts in all_contexts
+                    if ts >= cutoff_time
+                ]
+
             if not context_keys:
                 return {}
             
@@ -251,7 +280,12 @@ class CAMELVectorMemory:
             # Analyze each context
             for context_key, timestamp in context_keys:
                 try:
-                    context_data = await self.redis.get_json(context_key)
+                    # Get from memory or Redis based on configuration
+                    if self.enable_redis_storage:
+                        context_data = await self.redis.get_json(context_key)
+                    else:
+                        context_data = self.memory_store.get(context_key)
+
                     if not context_data:
                         continue
                     
@@ -347,19 +381,30 @@ class CAMELVectorMemory:
         intent: Optional[str],
         limit: int
     ) -> List[ConversationContext]:
-        """Fallback Redis-based context search using keywords"""
+        """Fallback context search using keywords (Redis or memory)"""
         try:
             user_index_key = f"user_contexts:{user_id}"
-            
-            # Get recent context keys
-            context_keys = await self.redis.client.zrevrange(user_index_key, 0, 50)  # Last 50 contexts
+
+            # Get recent context keys from Redis or memory
+            if self.enable_redis_storage:
+                context_keys = await self.redis.client.zrevrange(user_index_key, 0, 50)  # Last 50 contexts
+            else:
+                # Get from in-memory index (last 50 contexts)
+                all_contexts = self.user_indices.get(user_id, [])
+                sorted_contexts = sorted(all_contexts, key=lambda x: x[1], reverse=True)
+                context_keys = [key for key, ts in sorted_contexts[:50]]
             
             contexts = []
             query_words = set(query.lower().split())
             
             for context_key in context_keys:
                 try:
-                    context_data = await self.redis.get_json(context_key)
+                    # Get from memory or Redis based on configuration
+                    if self.enable_redis_storage:
+                        context_data = await self.redis.get_json(context_key)
+                    else:
+                        context_data = self.memory_store.get(context_key)
+
                     if not context_data:
                         continue
                     

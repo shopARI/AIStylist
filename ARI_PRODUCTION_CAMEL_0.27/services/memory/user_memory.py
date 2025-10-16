@@ -45,14 +45,20 @@ class CrossSessionUserMemory:
         redis_client,
         max_user_history: int = 100,
         preference_decay_days: int = 90,
-        min_confidence_threshold: float = 0.3
+        min_confidence_threshold: float = 0.3,
+        enable_redis_storage: bool = False  # DISABLED by default
     ):
         self.redis = redis_client
         self.max_user_history = max_user_history
         self.preference_decay_days = preference_decay_days
         self.min_confidence_threshold = min_confidence_threshold
-        
-        logger.info("Cross-session user memory initialized")
+        self.enable_redis_storage = enable_redis_storage
+
+        # In-memory fallback storage when Redis is disabled
+        self.memory_store = {}  # user_id -> profile_data
+
+        storage_mode = "Redis" if enable_redis_storage else "Memory-only"
+        logger.info(f"Cross-session user memory initialized ({storage_mode}, max_history: {max_user_history})")
     
     async def update_user_preferences(
         self,
@@ -72,8 +78,12 @@ class CrossSessionUserMemory:
         current_time = time.time()
         
         try:
-            # Get existing user profile
-            profile_data = await self.redis.get_json(user_key)
+            # Get existing user profile from memory or Redis
+            if self.enable_redis_storage:
+                profile_data = await self.redis.get_json(user_key)
+            else:
+                profile_data = self.memory_store.get(user_id)
+
             if not profile_data:
                 profile = UserProfile(
                     user_id=user_id,
@@ -176,14 +186,21 @@ class CrossSessionUserMemory:
             
             # Update profile metadata
             profile.updated_at = current_time
-            
-            # Store back to Redis (long TTL for user memory)
-            await self.redis.set_json(
-                user_key, 
-                asdict(profile), 
-                ttl=365 * 24 * 3600  # 1 year TTL
-            )
-            
+
+            # Store based on configuration
+            if self.enable_redis_storage:
+                # Store to Redis (long TTL for user memory)
+                await self.redis.set_json(
+                    user_key,
+                    asdict(profile),
+                    ttl=365 * 24 * 3600  # 1 year TTL
+                )
+                logger.debug(f"Stored user profile to Redis for {user_id}")
+            else:
+                # Store to memory only (no Redis)
+                self.memory_store[user_id] = asdict(profile)
+                logger.debug(f"Stored user profile to memory for {user_id} (Redis storage disabled)")
+
             logger.info(f"Updated user {user_id} preferences: {len(preference_updates)} updates")
             
         except Exception as e:
@@ -203,9 +220,14 @@ class CrossSessionUserMemory:
             return {}
         
         user_key = f"user_memory:{user_id}"
-        
+
         try:
-            profile_data = await self.redis.get_json(user_key)
+            # Get from memory or Redis based on configuration
+            if self.enable_redis_storage:
+                profile_data = await self.redis.get_json(user_key)
+            else:
+                profile_data = self.memory_store.get(user_id)
+
             if not profile_data:
                 return {}
             

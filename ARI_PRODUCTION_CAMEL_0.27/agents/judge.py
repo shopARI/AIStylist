@@ -947,46 +947,77 @@ Respond with strategy and reasoning."""
         vibe_results: List[Dict[str, Any]],
         limit: int
     ) -> List[Dict[str, Any]]:
-        """Get products both agents agree on."""
+        """Get products both agents agree on with duplicate prevention."""
         consensus = []
-        
-        # Create ID mapping
-        cypher_map = {p.get('id'): p for p in cypher_results if p.get('id')}
-        vibe_map = {p.get('id'): p for p in vibe_results if p.get('id')}
-        
-        # Find common IDs
-        common_ids = set(cypher_map.keys()) & set(vibe_map.keys())
-        
-        for product_id in common_ids:
+
+        def get_unique_key(product: Dict[str, Any]) -> str:
+            """Get unique key for product (ID or title)."""
+            product_id = product.get('id')
+            if product_id and product_id not in (None, '', 'null', 'undefined'):
+                return f"id:{product_id}"
+            # Fallback to title if no valid ID
+            title = product.get('title', '').lower().strip()
+            if title:
+                return f"title:{title}"
+            return None
+
+        # Create mapping using unique keys
+        cypher_map = {}
+        for p in cypher_results:
+            key = get_unique_key(p)
+            if key:
+                cypher_map[key] = p
+
+        vibe_map = {}
+        for p in vibe_results:
+            key = get_unique_key(p)
+            if key:
+                vibe_map[key] = p
+
+        # Find common keys (consensus products)
+        common_keys = set(cypher_map.keys()) & set(vibe_map.keys())
+
+        logger.info(f"Found {len(common_keys)} consensus products between agents")
+
+        for key in common_keys:
             # Merge information from both
-            merged = cypher_map[product_id].copy()
-            vibe_data = vibe_map[product_id]
-            
+            merged = cypher_map[key].copy()
+            vibe_data = vibe_map[key]
+
             # Add vibe-specific data
             if 'vibe_score' in vibe_data:
                 merged['vibe_score'] = vibe_data['vibe_score']
             if 'vibe_reason' in vibe_data:
                 merged['vibe_reason'] = vibe_data['vibe_reason']
-            
+
             merged['winning_agent'] = 'Consensus'
             merged['selection_reason'] = 'Both agents selected this product'
             consensus.append(merged)
-        
-        # If not enough consensus, add from both
+
+        # If not enough consensus, add from both (avoiding duplicates)
         if len(consensus) < limit:
-            remaining = limit - len(consensus)
+            seen_keys = set(common_keys)  # Track what we've already added
+
             # Add top products from each that aren't in consensus
             for p in cypher_results:
-                if p.get('id') not in common_ids and len(consensus) < limit:
+                if len(consensus) >= limit:
+                    break
+                key = get_unique_key(p)
+                if key and key not in seen_keys:
                     p['winning_agent'] = 'CypherBot'
                     p['selection_reason'] = 'Added to reach limit'
                     consensus.append(p)
-            
+                    seen_keys.add(key)
+
             for p in vibe_results:
-                if p.get('id') not in common_ids and len(consensus) < limit:
+                if len(consensus) >= limit:
+                    break
+                key = get_unique_key(p)
+                if key and key not in seen_keys:
                     p['winning_agent'] = 'VibeBot'
                     p['selection_reason'] = 'Added to reach limit'
                     consensus.append(p)
+                    seen_keys.add(key)
         
         return consensus[:limit]
     
@@ -996,25 +1027,43 @@ Respond with strategy and reasoning."""
         vibe_results: List[Dict[str, Any]],
         limit: int
     ) -> List[Dict[str, Any]]:
-        """Select products by quality scores."""
+        """Select products by quality scores with duplicate prevention."""
         all_products = {}
-        
+
+        def get_unique_key(product: Dict[str, Any]) -> str:
+            """Get unique key for product (ID or title)."""
+            product_id = product.get('id')
+            if product_id and product_id not in (None, '', 'null', 'undefined'):
+                return f"id:{product_id}"
+            # Fallback to title if no valid ID
+            title = product.get('title', '').lower().strip()
+            if title:
+                return f"title:{title}"
+            # Last resort: use object id (will treat each as unique)
+            return f"obj:{id(product)}"
+
         # Add all products with source tracking
         for p in cypher_results:
-            if p.get('id'):
-                all_products[p['id']] = p.copy()
-                all_products[p['id']]['sources'] = ['CypherBot']
-                
+            key = get_unique_key(p)
+            if key not in all_products:
+                all_products[key] = p.copy()
+                all_products[key]['sources'] = ['CypherBot']
+            else:
+                # Already exists, add source
+                if 'CypherBot' not in all_products[key].get('sources', []):
+                    all_products[key]['sources'].append('CypherBot')
+
         for p in vibe_results:
-            if p.get('id'):
-                if p['id'] in all_products:
-                    all_products[p['id']]['sources'].append('VibeBot')
-                    # Merge scores
-                    if 'vibe_score' in p:
-                        all_products[p['id']]['vibe_score'] = p['vibe_score']
-                else:
-                    all_products[p['id']] = p.copy()
-                    all_products[p['id']]['sources'] = ['VibeBot']
+            key = get_unique_key(p)
+            if key in all_products:
+                # Product already exists from CypherBot, add VibeBot source
+                all_products[key]['sources'].append('VibeBot')
+                # Merge scores
+                if 'vibe_score' in p:
+                    all_products[key]['vibe_score'] = p['vibe_score']
+            else:
+                all_products[key] = p.copy()
+                all_products[key]['sources'] = ['VibeBot']
         
         # Calculate quality scores
         for product in all_products.values():
@@ -1057,40 +1106,64 @@ Respond with strategy and reasoning."""
         vibe_results: List[Dict[str, Any]],
         limit: int
     ) -> List[Dict[str, Any]]:
-        """Interleave products from both agents."""
+        """Interleave products from both agents with duplicate prevention."""
         products = []
         seen_ids = set()
-        
+        seen_titles = set()  # Fallback for products without IDs
+
+        def is_duplicate(product: Dict[str, Any]) -> bool:
+            """Check if product is a duplicate using ID or title."""
+            product_id = product.get('id')
+            product_title = product.get('title', '').lower().strip()
+
+            # Check by ID if available and valid
+            if product_id and product_id not in (None, '', 'null', 'undefined'):
+                if product_id in seen_ids:
+                    return True
+                seen_ids.add(product_id)
+                if product_title:
+                    seen_titles.add(product_title)
+                return False
+
+            # Fallback: check by title for products without IDs
+            if product_title:
+                if product_title in seen_titles:
+                    return True
+                seen_titles.add(product_title)
+                return False
+
+            # No ID and no title - allow but log warning
+            logger.warning(f"Product with no ID and no title found during deduplication")
+            return False
+
         # Interleave taking from each alternately
         for i in range(limit):
             # Take from CypherBot
             if i % 2 == 0 and i // 2 < len(cypher_results):
                 product = cypher_results[i // 2]
-                if product.get('id') not in seen_ids:
+                if not is_duplicate(product):
                     product['winning_agent'] = 'CypherBot'
                     product['selection_reason'] = 'Balanced selection'
                     products.append(product)
-                    seen_ids.add(product.get('id'))
-            
+
             # Take from VibeBot
             elif i % 2 == 1 and i // 2 < len(vibe_results):
                 product = vibe_results[i // 2]
-                if product.get('id') not in seen_ids:
+                if not is_duplicate(product):
                     product['winning_agent'] = 'VibeBot'
                     product['selection_reason'] = 'Balanced selection'
                     products.append(product)
-                    seen_ids.add(product.get('id'))
-        
+
         # Fill remaining if needed
         for p in cypher_results + vibe_results:
             if len(products) >= limit:
                 break
-            if p.get('id') not in seen_ids:
+            if not is_duplicate(p):
                 p['winning_agent'] = 'Filler'
                 p['selection_reason'] = 'Added to reach limit'
                 products.append(p)
-                seen_ids.add(p.get('id'))
-        
+
+        logger.info(f"Interleaved products: {len(products)} unique products from {len(cypher_results)} cypher + {len(vibe_results)} vibe results")
         return products[:limit]
     
     def _summarize_products(self, products: List[Dict[str, Any]]) -> str:
