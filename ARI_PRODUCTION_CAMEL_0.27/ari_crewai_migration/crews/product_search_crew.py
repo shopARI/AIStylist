@@ -55,18 +55,22 @@ def create_product_search_crew(
             if task_name in tasks:
                 task_list.append(tasks[task_name])
 
-        # Create crew configuration with production timeouts
+        # Step callback for debugging - logs each step
+        def step_callback(step_output):
+            logger.info(f"[CREW STEP] {step_output}")
+
+        # Create crew configuration (ONLY VALID CREW PARAMETERS)
+        # max_iter and max_execution_time belong on AGENTS, not CREW
         crew_config = {
             "agents": agent_list,
             "tasks": task_list,
             "process": process,
-            "memory": True,
-            "verbose": verbose,
-            "max_iter": 3,  # Reduced - sequential tasks should complete in 1-2 iterations
-            "cache": True,
+            "memory": False,  # DISABLED to prevent unbounded context growth
+            "verbose": True,  # ENABLED for full debugging visibility
+            "cache": False,  # DISABLED to prevent stale data loops
             "max_rpm": 60,  # Rate limiting
-            "max_execution_time": 120,  # 2 minutes max for entire crew (reduced from 5)
-            "step_callback": None  # Disable step callbacks to prevent loops
+            "step_callback": step_callback,  # Log every step in real-time
+            "output_log_file": "crew_execution.log"  # Log to file for analysis
         }
 
         # Add manager LLM for hierarchical process

@@ -37,12 +37,14 @@ agent:
     model: gpt-4o
     temperature: 0.7
     max_tokens: 1500
+    timeout: 30
   tools:
     - qdrant_search_tool
     - embedding_generation_tool
     - qdrant_hybrid_search_tool
-  memory: true
-  verbose: false
+  memory: false
+  verbose: true
   allow_delegation: false
   max_iter: 1
   max_execution_time: 30
+  max_retry_limit: 0

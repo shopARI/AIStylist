@@ -36,12 +36,14 @@ agent:
     model: gpt-4o
     temperature: 0.7
     max_tokens: 2000
+    timeout: 30
   tools:
     - neo4j_query_tool
     - semantic_expansion_tool
     - neo4j_fulltext_search_tool
-  memory: true
-  verbose: false
+  memory: false
+  verbose: true
   allow_delegation: false
   max_iter: 1
   max_execution_time: 30
+  max_retry_limit: 0

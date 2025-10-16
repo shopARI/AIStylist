@@ -36,12 +36,14 @@ agent:
     model: gpt-4o
     temperature: 0.6
     max_tokens: 1500
+    timeout: 30
   tools:
     - fashionsig_embedding_tool
     - visual_similarity_search_tool
     - multi_image_search_tool
-  memory: true
-  verbose: false
+  memory: false
+  verbose: true
   allow_delegation: false
   max_iter: 1
   max_execution_time: 30
+  max_retry_limit: 0
