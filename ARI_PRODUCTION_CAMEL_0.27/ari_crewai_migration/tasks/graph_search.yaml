@@ -1,0 +1,28 @@
+task:
+  description: |
+    Search Neo4j graph database for products matching query using semantic Cypher queries.
+    Utilize fulltext indexes and relationship traversal for comprehensive results.
+
+    Strategy:
+    - Apply semantic query expansion to improve recall
+    - Generate optimized Cypher queries
+    - Leverage graph relationships for collaborative filtering
+    - Filter by category, price, and availability
+
+    Input parameters:
+    - query: User search query
+    - filters: Category, price range, and other filters
+    - ml_intelligence: ML context from intelligence generation task
+    - limit: Maximum products to return
+
+  expected_output: |
+    List of products from graph database with:
+    - product_id: Unique product identifier
+    - title: Product name
+    - price: Product price
+    - category: Product category
+    - images: Product image URLs
+    - graph_score: Relevance score from graph search
+    - relationship_context: Graph relationship metadata
+
+  async_execution: false

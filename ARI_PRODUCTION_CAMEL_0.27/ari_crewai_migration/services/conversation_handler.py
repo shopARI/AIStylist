@@ -1086,21 +1086,27 @@ class ConversationHandler:
         message: str,
         user_id: Optional[str] = None
     ) -> str:
-        """Generate LLM-based conversational response for general topics."""
-        try:
-            # Get conversation history for context
-            conversation_history = self.conversations.get(session_id, [])
+        """
+        Generate LLM-based conversational response for general topics.
+        FAIL FAST: Raises exception if OpenAI API fails.
+        """
+        # Get conversation history for context
+        conversation_history = self.conversations.get(session_id, [])
 
-            # Get current date/time for real-time information
-            now = datetime.now()
-            current_date = now.strftime("%A, %B %d, %Y")
-            current_time = now.strftime("%I:%M %p")
+        # Get current date/time for real-time information
+        now = datetime.now()
+        current_date = now.strftime("%A, %B %d, %Y")
+        current_time = now.strftime("%I:%M %p")
 
-            # Build conversation context - only include last 5 exchanges to stay within token limits
-            messages = [
-                {
-                    "role": "system",
-                    "content": f"""You are Ari, a friendly and knowledgeable fashion stylist AI. You can discuss any topic that users bring up, not just fashion. Be helpful, informative, and conversational.
+        # DEBUG: Print to verify interpolation
+        print(f"[DEBUG ConversationHandler] Current Date: {current_date}")
+        print(f"[DEBUG ConversationHandler] Current Time: {current_time}")
+
+        # Build conversation context - only include last 5 exchanges to stay within token limits
+        messages = [
+            {
+                "role": "system",
+                "content": f"""You are Ari, a friendly and knowledgeable fashion stylist AI. You can discuss any topic that users bring up, not just fashion. Be helpful, informative, and conversational.
 
 When users ask about non-fashion topics (like science, philosophy, general knowledge, etc.), engage naturally and provide helpful information while maintaining your warm personality.
 
@@ -1111,39 +1117,39 @@ The current date is: {current_date}
 The current time is: {current_time}
 
 When users ask "what time is it" or "what's the date", you MUST use the information above. Do not say you don't have access to real-time information - you have it right here."""
-                }
-            ]
-            
-            # Add recent conversation history for context
-            for msg in conversation_history[-5:]:  # Last 5 messages for context
-                if msg.role == MessageRole.USER:
-                    messages.append({"role": "user", "content": msg.content})
-                elif msg.role == MessageRole.ASSISTANT:
-                    messages.append({"role": "assistant", "content": msg.content})
-            
-            # Add current message
-            messages.append({"role": "user", "content": message})
-            
-            # Generate response using OpenAI
-            response = await self.openai_client.chat.completions.create(
-                model="gpt-3.5-turbo",
-                messages=messages,
-                max_tokens=300,
-                temperature=0.7,
-                timeout=30
-            )
-            
-            generated_response = response.choices[0].message.content.strip()
-            
-            # Log for debugging
-            logger.info(f"Generated conversational response for topic in message: '{message[:50]}...'")
-            
-            return generated_response
-            
-        except Exception as e:
-            logger.error(f"Error generating conversational response: {e}")
-            # Fallback to friendly default
-            return "I'm here to help with any questions you have! Whether it's about fashion, style, or just chatting about life, I'm happy to talk. What's on your mind?"
+            }
+        ]
+
+        # Add recent conversation history for context
+        for msg in conversation_history[-5:]:  # Last 5 messages for context
+            if msg.role == MessageRole.USER:
+                messages.append({"role": "user", "content": msg.content})
+            elif msg.role == MessageRole.ASSISTANT:
+                messages.append({"role": "assistant", "content": msg.content})
+
+        # Add current message
+        messages.append({"role": "user", "content": message})
+
+        # DEBUG: Log the system prompt to verify datetime interpolation
+        logger.info(f"System prompt includes: Date={current_date}, Time={current_time}")
+        logger.debug(f"Full system message: {messages[0]['content'][:200]}...")
+
+        # Generate response using OpenAI
+        # FAIL FAST: Let exceptions propagate - no silent fallbacks
+        response = await self.openai_client.chat.completions.create(
+            model="gpt-3.5-turbo",
+            messages=messages,
+            max_tokens=300,
+            temperature=0.7,
+            timeout=30
+        )
+
+        generated_response = response.choices[0].message.content.strip()
+
+        # Log for debugging
+        logger.info(f"Generated conversational response for topic in message: '{message[:50]}...'")
+
+        return generated_response
     
     async def get_stats(self) -> Dict[str, Any]:
         """Get comprehensive handler statistics."""

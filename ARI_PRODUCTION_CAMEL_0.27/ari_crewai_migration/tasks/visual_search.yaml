@@ -1,0 +1,28 @@
+task:
+  description: |
+    Search for visually similar products using FashionSigLIP embeddings.
+    Find products that look similar in terms of style, color, pattern, and silhouette.
+
+    Strategy:
+    - Generate visual embeddings from reference images (if provided)
+    - Search Qdrant visual collection for similarity
+    - Match by color, pattern, texture, and silhouette
+    - Rank by visual similarity scores
+
+    Input parameters:
+    - query: User search query
+    - reference_images: Optional image URLs for visual reference
+    - ml_intelligence: ML context from intelligence generation
+    - limit: Maximum products to return
+
+  expected_output: |
+    List of visually similar products with:
+    - product_id: Unique product identifier
+    - title: Product name
+    - price: Product price
+    - category: Product category
+    - images: Product image URLs
+    - visual_score: Visual similarity score
+    - visual_features: Matched visual attributes (color, pattern, texture)
+
+  async_execution: false

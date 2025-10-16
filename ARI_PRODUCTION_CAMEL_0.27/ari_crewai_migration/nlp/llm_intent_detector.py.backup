@@ -1,0 +1,316 @@
+"""
+LLM-based Intent Detector with RAG for CrewAI Migration
+Uses common sense reasoning with LangChain LLMs instead of CAMEL agents
+"""
+
+import logging
+import json
+import asyncio
+from typing import Dict, Any, List, Optional, Tuple
+from dataclasses import dataclass
+import time
+import os
+
+# LangChain imports for CrewAI compatibility
+try:
+    from langchain_openai import ChatOpenAI
+    from langchain.schema import SystemMessage, HumanMessage
+    LANGCHAIN_AVAILABLE = True
+except ImportError:
+    LANGCHAIN_AVAILABLE = False
+
+# Import from parent directory
+import sys
+sys.path.append('/home/leo/AIStylist/ARI_PRODUCTION_CAMEL_0.27')
+from models.types import SearchIntent
+
+# Import fashion knowledge from local nlp module
+try:
+    from .fashion_knowledge import FASHION_KNOWLEDGE_BASE, get_relevant_knowledge
+except ImportError:
+    # Fallback to inline import
+    FASHION_KNOWLEDGE_BASE = []
+    def get_relevant_knowledge(query: str) -> List[str]:
+        return []
+
+logger = logging.getLogger("ari_crewai.nlp.llm_intent_detector")
+
+@dataclass
+class LLMIntentResult:
+    """Result from LLM intent detection"""
+    primary_intent: SearchIntent
+    confidence: float
+    extracted_parameters: Dict[str, Any]
+    reasoning: str
+    processing_time: float
+    used_knowledge: List[str]
+
+class LLMIntentDetector:
+    """
+    LLM-powered intent detector with fashion domain RAG and common sense reasoning.
+    Uses LangChain LLMs for CrewAI compatibility.
+    """
+
+    def __init__(
+        self,
+        model_name: str = "gpt-4o-mini",
+        temperature: float = 0.3,  # Lower for more consistent structured output
+        max_tokens: int = 2000
+    ):
+        """Initialize LLM intent detector with LangChain"""
+
+        if not LANGCHAIN_AVAILABLE:
+            raise RuntimeError("LangChain not available for LLM intent detection")
+
+        self.model_name = model_name
+        self.temperature = temperature
+        self.max_tokens = max_tokens
+
+        # Create LangChain LLM
+        self.llm = self._create_llm()
+
+        # Fashion knowledge base
+        self.knowledge_base = FASHION_KNOWLEDGE_BASE
+
+        logger.info(f"LLM Intent Detector initialized with {model_name}")
+
+    def _create_llm(self):
+        """Create LangChain LLM for intent detection"""
+        return ChatOpenAI(
+            model_name=self.model_name,
+            temperature=self.temperature,
+            max_tokens=self.max_tokens,
+            openai_api_key=os.getenv("OPENAI_API_KEY")
+        )
+
+    def _get_relevant_knowledge(self, query: str, top_k: int = 5) -> List[str]:
+        """Get relevant fashion knowledge for RAG context"""
+
+        # Simple keyword-based matching
+        query_words = query.lower().split()
+        relevant_knowledge = []
+
+        for entry in self.knowledge_base:
+            entry_keywords = entry.get("keywords", [])
+            content = entry["content"]
+
+            # Check for keyword overlap
+            if any(keyword.lower() in query_words for keyword in entry_keywords):
+                relevant_knowledge.append(content)
+
+            # Also check direct word overlap in content
+            elif any(word in content.lower() for word in query_words if len(word) > 3):
+                relevant_knowledge.append(content)
+
+        # Return top matches
+        return relevant_knowledge[:top_k]
+
+    async def detect_intent_and_extract(self, query: str) -> LLMIntentResult:
+        """
+        Main method: detect intent and extract parameters using LLM + RAG + common sense
+
+        Args:
+            query: User's natural language query
+
+        Returns:
+            LLMIntentResult with intent, parameters, and metadata
+        """
+        start_time = time.time()
+
+        try:
+            # Step 1: Get relevant fashion knowledge for context
+            relevant_knowledge = self._get_relevant_knowledge(query)
+
+            # Step 2: Build context-enhanced prompt with common sense reasoning
+            knowledge_context = ""
+            if relevant_knowledge:
+                knowledge_context = "\\n\\nFASHION KNOWLEDGE CONTEXT:\\n" + "\\n".join(relevant_knowledge[:3])
+
+            # Step 3: Create system message with common sense instructions
+            system_message = SystemMessage(content=self._get_system_prompt())
+
+            # Step 4: Create user message
+            user_prompt = f"""CUSTOMER QUERY: "{query}"{knowledge_context}
+
+Please analyze this fashion query using COMMON SENSE and extract the structured information as JSON."""
+
+            user_message = HumanMessage(content=user_prompt)
+
+            # Step 5: Get LLM response
+            response = await asyncio.to_thread(
+                self.llm.invoke,
+                [system_message, user_message]
+            )
+
+            response_content = response.content
+
+            # Debug logging
+            logger.debug(f"LLM response content length: {len(response_content)}")
+            logger.debug(f"LLM response content: '{response_content[:200]}...' (truncated)")
+
+            # Check for empty response
+            if not response_content or len(response_content.strip()) == 0:
+                logger.error("LLM returned empty response")
+                return self._fallback_result(start_time)
+
+            result = self._parse_llm_response(response_content, query, relevant_knowledge)
+            result.processing_time = time.time() - start_time
+
+            logger.debug(f"LLM intent detection completed in {result.processing_time:.2f}s")
+            return result
+
+        except Exception as e:
+            logger.error(f"LLM intent detection failed: {e}", exc_info=True)
+            return self._fallback_result(start_time)
+
+    def _get_system_prompt(self) -> str:
+        """Get system prompt for common sense intent detection"""
+        return """You are a smart fashion AI assistant that uses COMMON SENSE to understand user queries.
+
+INTENTS (choose the most appropriate):
+- SPECIFIC_ITEM: User wants specific clothing/accessories ("black shirt", "need shoes", "dress for wedding")
+- BROWSE: User wants to explore options ("show me clothes", "what do you have")
+- INSPIRATION: User needs outfit ideas/advice ("what should I wear for", "outfit for interview")
+- CONVERSATION_HISTORY: User asks about past conversation ("what did I ask", "earlier you said")
+- MEMORY_QUERY: User asks about remembered preferences ("do you remember my size", "my favorite color")
+- CLARIFICATION: User asks ME to explain MY fashion system/features ("how do you work", "explain your agents")
+- GENERAL_CONVERSATION: Clearly non-fashion topics (weather, physics, current events, casual chat)
+- GIFT: Shopping for someone else ("gift for my mom", "birthday present")
+- OUTFIT: Complete outfit request ("outfit for interview", "what goes with this")
+- BRAND: Brand-specific search ("show me Nike", "anything from Zara")
+- SALE: Looking for deals ("on sale", "discount", "cheap")
+- COMPARISON: Comparing options ("which is better", "compare these")
+
+COMMON SENSE DECISION MAKING:
+1. Is this about fashion, clothing, or shopping? → Use fashion intents (SPECIFIC_ITEM, BROWSE, INSPIRATION)
+2. Is this asking about our past conversation? → CONVERSATION_HISTORY
+3. Is this asking about their stored preferences? → MEMORY_QUERY
+4. Is this asking me to explain how I work? → CLARIFICATION
+5. Is this completely unrelated to fashion? → GENERAL_CONVERSATION
+
+EXAMPLES:
+- "what day is it" → GENERAL_CONVERSATION (not fashion related)
+- "explain quantum physics" → GENERAL_CONVERSATION (not fashion related)
+- "how do you work" → CLARIFICATION (asking about my system)
+- "do you remember my size" → MEMORY_QUERY (asking about stored info)
+- "what did I ask earlier" → CONVERSATION_HISTORY (about past conversation)
+- "need a black shirt" → SPECIFIC_ITEM (fashion item)
+- "outfit for interview" → INSPIRATION (fashion advice)
+- "gift for mom" → GIFT (shopping for someone)
+- "anything on sale" → SALE (looking for deals)
+
+For fashion queries, extract FROM THE CUSTOMER QUERY ONLY: categories, colors, occasions, style_preferences, price_range, brand_preferences
+**IMPORTANT:** DO NOT extract parameters from the FASHION KNOWLEDGE CONTEXT - only from the CUSTOMER QUERY!
+For non-fashion queries, leave parameters empty.
+
+ALWAYS respond with valid JSON:
+{
+  "intent": "SPECIFIC_ITEM",
+  "confidence": 0.95,
+  "parameters": {
+    "categories": ["shirts"],
+    "colors": ["black"],
+    "occasions": ["interview"]
+  },
+  "reasoning": "User needs specific black shirt for professional interview setting"
+}"""
+
+    def _parse_llm_response(
+        self,
+        response_content: str,
+        original_query: str,
+        used_knowledge: List[str]
+    ) -> LLMIntentResult:
+        """Parse LLM JSON response into structured result"""
+
+        try:
+            # Extract JSON from response
+            response_content = response_content.strip()
+
+            # Handle potential markdown code blocks
+            if "```json" in response_content:
+                start = response_content.find("```json") + 7
+                end = response_content.find("```", start)
+                json_str = response_content[start:end].strip()
+            elif "```" in response_content:
+                start = response_content.find("```") + 3
+                end = response_content.rfind("```")
+                json_str = response_content[start:end].strip()
+            else:
+                json_str = response_content
+
+            # Parse JSON
+            llm_result = json.loads(json_str)
+
+            # Map intent string to enum
+            intent_str = llm_result.get("intent", "BROWSE").upper()
+            try:
+                primary_intent = SearchIntent[intent_str]
+            except KeyError:
+                logger.warning(f"Unknown intent '{intent_str}', using BROWSE")
+                primary_intent = SearchIntent.BROWSE
+
+            return LLMIntentResult(
+                primary_intent=primary_intent,
+                confidence=float(llm_result.get("confidence", 0.5)),
+                extracted_parameters=llm_result.get("parameters", {}),
+                reasoning=llm_result.get("reasoning", "LLM analysis completed"),
+                processing_time=0.0,  # Will be set by caller
+                used_knowledge=[k[:100] + "..." for k in used_knowledge]  # Truncate for logging
+            )
+
+        except (json.JSONDecodeError, KeyError, ValueError) as e:
+            logger.error(f"Failed to parse LLM response: {e}")
+            logger.debug(f"Raw response: {response_content}")
+
+            # Fallback result
+            return LLMIntentResult(
+                primary_intent=SearchIntent.BROWSE,
+                confidence=0.2,
+                extracted_parameters={},
+                reasoning=f"Failed to parse LLM response: {str(e)}",
+                processing_time=0.0,
+                used_knowledge=[]
+            )
+
+    def _fallback_result(self, start_time: float) -> LLMIntentResult:
+        """Fallback result when LLM fails"""
+        return LLMIntentResult(
+            primary_intent=SearchIntent.BROWSE,
+            confidence=0.1,
+            extracted_parameters={},
+            reasoning="LLM processing error, using fallback",
+            processing_time=time.time() - start_time,
+            used_knowledge=[]
+        )
+
+    def get_performance_stats(self) -> Dict[str, Any]:
+        """Get performance statistics"""
+        return {
+            "model_name": self.model_name,
+            "temperature": self.temperature,
+            "max_tokens": self.max_tokens,
+            "knowledge_entries": len(self.knowledge_base)
+        }
+
+
+# Global instance for hybrid usage
+_llm_intent_detector: Optional[LLMIntentDetector] = None
+
+
+def get_llm_intent_detector() -> LLMIntentDetector:
+    """Get singleton LLM intent detector instance"""
+    global _llm_intent_detector
+
+    if _llm_intent_detector is None:
+        _llm_intent_detector = LLMIntentDetector()
+
+    return _llm_intent_detector
+
+
+# Export for hybrid integration
+__all__ = [
+    'LLMIntentDetector',
+    'LLMIntentResult',
+    'get_llm_intent_detector'
+]

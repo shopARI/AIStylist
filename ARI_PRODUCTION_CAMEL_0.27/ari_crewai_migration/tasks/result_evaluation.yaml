@@ -1,0 +1,31 @@
+task:
+  description: |
+    Evaluate all search results from graph, vector, and visual searches.
+    Apply quality control, detect consensus, and select best recommendations.
+    Reject irrelevant products and provide detailed reasoning for selections.
+
+    Strategy:
+    - Score each product independently for quality
+    - Detect consensus products (found by multiple agents)
+    - Apply quality threshold filtering
+    - Rank by combined quality and relevance
+    - Generate detailed judgment reasoning
+
+    Input parameters:
+    - graph_results: Products from graph search task
+    - vector_results: Products from vector search task
+    - visual_results: Products from visual search task
+    - query: Original user query
+    - ml_intelligence: ML context
+    - quality_threshold: Minimum quality score (default 0.5)
+
+  expected_output: |
+    Curated product list with:
+    - final_products: Top ranked products after quality control
+    - quality_assessments: Quality score for each product
+    - consensus_products: Products found by multiple agents
+    - rejected_products: Products filtered out with rejection reasons
+    - judgment_confidence: Overall confidence in recommendations
+    - detailed_reasoning: Explanation of selection criteria and decisions
+
+  async_execution: false

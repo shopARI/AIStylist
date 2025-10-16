@@ -1,0 +1,112 @@
+name: Test Suite
+
+on:
+  push:
+    branches: [ main, develop ]
+  pull_request:
+    branches: [ main, develop ]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ['3.10', '3.11']
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python ${{ matrix.python-version }}
+      uses: actions/setup-python@v4
+      with:
+        python-version: ${{ matrix.python-version }}
+
+    - name: Cache dependencies
+      uses: actions/cache@v3
+      with:
+        path: ~/.cache/pip
+        key: ${{ runner.os }}-pip-${{ hashFiles('**/requirements.txt') }}
+        restore-keys: |
+          ${{ runner.os }}-pip-
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install pytest pytest-asyncio pytest-cov
+        pip install crewai>=0.203.1 python-dotenv chromadb
+
+    - name: Run unit tests
+      run: |
+        python -m pytest tests/unit/ -v --tb=short --cov=nlp --cov=crews --cov-report=xml --cov-report=term
+
+    - name: Run integration tests (pattern-based)
+      run: |
+        python -m pytest tests/integration/test_intent_detection_comprehensive.py -v --tb=short
+
+    - name: Check test coverage
+      run: |
+        python -m pytest tests/unit/ --cov=nlp --cov=crews --cov-report=term --cov-fail-under=70
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v3
+      with:
+        files: ./coverage.xml
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+
+  lint:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install linting tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install flake8 black isort
+
+    - name: Run flake8
+      run: |
+        flake8 nlp/ crews/ --count --select=E9,F63,F7,F82 --show-source --statistics
+        flake8 nlp/ crews/ --count --exit-zero --max-complexity=10 --max-line-length=127 --statistics
+
+    - name: Check code formatting with black
+      run: |
+        black --check nlp/ crews/ tests/ || true
+
+    - name: Check import sorting with isort
+      run: |
+        isort --check-only nlp/ crews/ tests/ || true
+
+  security:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.10'
+
+    - name: Install security tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit safety
+
+    - name: Run bandit security check
+      run: |
+        bandit -r nlp/ crews/ -ll || true
+
+    - name: Check dependencies for vulnerabilities
+      run: |
+        safety check || true

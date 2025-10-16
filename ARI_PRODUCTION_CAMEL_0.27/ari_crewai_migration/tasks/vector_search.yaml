@@ -1,0 +1,28 @@
+task:
+  description: |
+    Search Qdrant vector database for semantically similar products using embeddings.
+    Find products matching user's style preferences and aesthetic intent.
+
+    Strategy:
+    - Generate text embedding from query
+    - Search Qdrant for semantic similarity
+    - Apply style and aesthetic filtering
+    - Rank by vector similarity scores
+
+    Input parameters:
+    - query: User search query
+    - filters: Category, price range, and style filters
+    - ml_intelligence: ML context from intelligence generation
+    - limit: Maximum products to return
+
+  expected_output: |
+    List of products from vector search with:
+    - product_id: Unique product identifier
+    - title: Product name
+    - price: Product price
+    - category: Product category
+    - images: Product image URLs
+    - vector_score: Semantic similarity score
+    - style_match_reason: Explanation of style matching
+
+  async_execution: false

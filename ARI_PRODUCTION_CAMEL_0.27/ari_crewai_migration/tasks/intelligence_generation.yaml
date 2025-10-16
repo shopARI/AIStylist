@@ -1,0 +1,23 @@
+task:
+  description: |
+    Generate ML intelligence context for the search query including visual analysis,
+    behavioral patterns, and contextual insights to enhance agent search strategies.
+
+    Analyze the query to extract:
+    - Visual intelligence (colors, patterns, styles detected)
+    - Behavioral intelligence (user preferences, interaction patterns)
+    - Contextual intelligence (occasion, season, trends)
+
+    Input parameters:
+    - query: User search query
+    - user_context: User preference and history data
+    - session_id: Current session identifier
+
+  expected_output: |
+    ML intelligence packet containing:
+    - visual_intelligence: Detected visual attributes and style elements
+    - behavioral_intelligence: User behavior patterns and preferences
+    - contextual_intelligence: Occasion, formality, and situational context
+    - agent_routing: Recommendations for which agents to prioritize
+
+  async_execution: false
