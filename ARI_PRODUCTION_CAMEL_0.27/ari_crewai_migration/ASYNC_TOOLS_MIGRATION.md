@@ -3,10 +3,10 @@
 
 ## Overview
 Phase 2 introduces truly async tools that don't block the event loop. This allows:
-- ✅ Proper timeout enforcement (no more infinite loops)
-- ✅ Parallel crew execution without blocking
-- ✅ Better resource utilization
-- ✅ Faster overall execution
+- Proper timeout enforcement (no more infinite loops)
+- Parallel crew execution without blocking
+- Better resource utilization
+- Faster overall execution
 
 ## Created Async Tools
 
@@ -35,28 +35,28 @@ Phase 2 introduces truly async tools that don't block the event loop. This allow
 ```python
 @tool("Execute Neo4j Query")
 def neo4j_query_tool(cypher: str, parameters: Dict = None) -> List[Dict]:
-    driver = AsyncGraphDatabase.driver(...)
+ driver = AsyncGraphDatabase.driver(...)
 
-    async def execute():
-        # Async code
-        return results
+ async def execute():
+ # Async code
+ return results
 
-    # ❌ BLOCKS event loop waiting for async code
-    results = asyncio.run(execute())
-    return results
+ # BLOCKS event loop waiting for async code
+ results = asyncio.run(execute())
+ return results
 ```
 
 ### Async Tool (Non-blocking)
 ```python
 @tool("Execute Neo4j Query (Async)")
 async def async_neo4j_query_tool(cypher: str, parameters: Dict = None) -> List[Dict]:
-    driver = AsyncGraphDatabase.driver(...)
+ driver = AsyncGraphDatabase.driver(...)
 
-    # ✅ Properly awaits without blocking
-    async with driver.session() as session:
-        result = await session.run(cypher, parameters or {})
-        # ... process results
-        return records
+ # Properly awaits without blocking
+ async with driver.session() as session:
+ result = await session.run(cypher, parameters or {})
+ # ... process results
+ return records
 ```
 
 ## How to Use Async Tools in Agent YAMLs
@@ -68,20 +68,20 @@ Update agent YAML files to reference async tools:
 ```yaml
 # agents/cypher_bot.yaml
 agent:
-  tools:
-    - neo4j_query_tool
-    - semantic_expansion_tool
-    - neo4j_fulltext_search_tool
+ tools:
+ - neo4j_query_tool
+ - semantic_expansion_tool
+ - neo4j_fulltext_search_tool
 ```
 
 **After:**
 ```yaml
 # agents/cypher_bot.yaml
 agent:
-  tools:
-    - async_neo4j_query_tool
-    - async_semantic_expansion_tool
-    - async_neo4j_fulltext_search_tool
+ tools:
+ - async_neo4j_query_tool
+ - async_semantic_expansion_tool
+ - async_neo4j_fulltext_search_tool
 ```
 
 ### Option 2: Dynamic Tool Registration (For Testing)
@@ -89,9 +89,9 @@ Register async tools programmatically when creating crews:
 
 ```python
 from tools.async_tools.async_neo4j_tools import (
-    async_neo4j_query_tool,
-    async_semantic_expansion_tool,
-    async_neo4j_fulltext_search_tool
+ async_neo4j_query_tool,
+ async_semantic_expansion_tool,
+ async_neo4j_fulltext_search_tool
 )
 
 # When creating mini-crew
@@ -101,9 +101,9 @@ cypher_agent = load_agent('agents/cypher_bot.yaml')
 
 # Override tools with async versions
 cypher_agent.tools = [
-    async_neo4j_query_tool,
-    async_semantic_expansion_tool,
-    async_neo4j_fulltext_search_tool
+ async_neo4j_query_tool,
+ async_semantic_expansion_tool,
+ async_neo4j_fulltext_search_tool
 ]
 ```
 
@@ -112,27 +112,27 @@ cypher_agent.tools = [
 ### CypherBot (Graph Search)
 ```yaml
 tools:
-  - async_neo4j_query_tool           # Replaces: neo4j_query_tool
-  - async_semantic_expansion_tool    # Replaces: semantic_expansion_tool
-  - async_neo4j_fulltext_search_tool # Replaces: neo4j_fulltext_search_tool
+ - async_neo4j_query_tool # Replaces: neo4j_query_tool
+ - async_semantic_expansion_tool # Replaces: semantic_expansion_tool
+ - async_neo4j_fulltext_search_tool # Replaces: neo4j_fulltext_search_tool
 ```
 
 ### VibeBot (Vector Search)
 ```yaml
 tools:
-  - async_qdrant_hybrid_search_tool      # Replaces: qdrant_hybrid_search_tool
-  - async_embedding_generation_tool      # Replaces: embedding_generation_tool
-  - async_qdrant_search_tool             # Replaces: qdrant_search_tool
-  - async_qdrant_filter_search_tool      # New: filter-only search
+ - async_qdrant_hybrid_search_tool # Replaces: qdrant_hybrid_search_tool
+ - async_embedding_generation_tool # Replaces: embedding_generation_tool
+ - async_qdrant_search_tool # Replaces: qdrant_search_tool
+ - async_qdrant_filter_search_tool # New: filter-only search
 ```
 
 ### VisionBot (Visual Search)
 ```yaml
 tools:
-  - async_visual_similarity_search_tool    # Replaces: visual_similarity_search_tool
-  - async_fashionsig_embedding_tool        # Replaces: fashionsig_embedding_tool
-  - async_multi_image_search_tool          # Replaces: multi_image_search_tool
-  - async_fashionsig_multimodal_search_tool # New: text-to-visual
+ - async_visual_similarity_search_tool # Replaces: visual_similarity_search_tool
+ - async_fashionsig_embedding_tool # Replaces: fashionsig_embedding_tool
+ - async_multi_image_search_tool # Replaces: multi_image_search_tool
+ - async_fashionsig_multimodal_search_tool # New: text-to-visual
 ```
 
 ### Judge Ari (Evaluation)
@@ -144,11 +144,11 @@ No database tools needed - uses LLM only for evaluation
 ```python
 # Test that all async tools can be imported
 from tools.async import (
-    async_neo4j_query_tool,
-    async_qdrant_search_tool,
-    async_fashionsig_embedding_tool
+ async_neo4j_query_tool,
+ async_qdrant_search_tool,
+ async_fashionsig_embedding_tool
 )
-print("✅ All async tools imported successfully")
+print(" All async tools imported successfully")
 ```
 
 ### Integration Test: Mock Async Call
@@ -157,13 +157,13 @@ import asyncio
 from tools.async import async_semantic_expansion_tool
 
 async def test_async_tool():
-    result = await async_semantic_expansion_tool(
-        query="black dress for wedding",
-        context={"occasion": "wedding"}
-    )
-    assert "synonyms" in result
-    assert "expanded_query" in result
-    print("✅ Async tool executed successfully")
+ result = await async_semantic_expansion_tool(
+ query="black dress for wedding",
+ context={"occasion": "wedding"}
+ )
+ assert "synonyms" in result
+ assert "expanded_query" in result
+ print(" Async tool executed successfully")
 
 asyncio.run(test_async_tool())
 ```
@@ -173,23 +173,23 @@ asyncio.run(test_async_tool())
 # Test with ProductSearchFlow (already uses async)
 from flows import create_and_run_flow
 from crews.mini_crews import (
-    create_graph_search_crew,
-    create_vector_search_crew,
-    create_visual_search_crew,
-    create_judge_crew
+ create_graph_search_crew,
+ create_vector_search_crew,
+ create_visual_search_crew,
+ create_judge_crew
 )
 
 # Mini-crews will automatically use async tools if configured
 async def test_flow():
-    result = await create_and_run_flow(
-        query="red dress",
-        limit=5,
-        graph_crew=create_graph_search_crew(),
-        vector_crew=create_vector_search_crew(),
-        visual_crew=create_visual_search_crew(),
-        judge_crew=create_judge_crew()
-    )
-    print(f"✅ Flow executed with {len(result.products)} products")
+ result = await create_and_run_flow(
+ query="red dress",
+ limit=5,
+ graph_crew=create_graph_search_crew(),
+ vector_crew=create_vector_search_crew(),
+ visual_crew=create_visual_search_crew(),
+ judge_crew=create_judge_crew()
+ )
+ print(f" Flow executed with {len(result.products)} products")
 
 asyncio.run(test_flow())
 ```
@@ -201,44 +201,44 @@ asyncio.run(test_flow())
 import asyncio
 
 async def test_timeout():
-    """Verify async tools respect timeouts"""
-    try:
-        # Should timeout after 1s
-        result = await asyncio.wait_for(
-            async_neo4j_query_tool("MATCH (p:Product) RETURN p LIMIT 10", {}),
-            timeout=1.0
-        )
-        print("✅ Query completed within timeout")
-    except asyncio.TimeoutError:
-        print("✅ Timeout enforced correctly")
+ """Verify async tools respect timeouts"""
+ try:
+ # Should timeout after 1s
+ result = await asyncio.wait_for(
+ async_neo4j_query_tool("MATCH (p:Product) RETURN p LIMIT 10", {}),
+ timeout=1.0
+ )
+ print(" Query completed within timeout")
+ except asyncio.TimeoutError:
+ print(" Timeout enforced correctly")
 ```
 
 ### 2. Parallel Execution
 ```python
 async def test_parallel():
-    """Verify multiple async tools run in parallel"""
-    import time
+ """Verify multiple async tools run in parallel"""
+ import time
 
-    start = time.time()
+ start = time.time()
 
-    # Run 3 async tools in parallel
-    results = await asyncio.gather(
-        async_semantic_expansion_tool("dress"),
-        async_semantic_expansion_tool("shoes"),
-        async_semantic_expansion_tool("jacket")
-    )
+ # Run 3 async tools in parallel
+ results = await asyncio.gather(
+ async_semantic_expansion_tool("dress"),
+ async_semantic_expansion_tool("shoes"),
+ async_semantic_expansion_tool("jacket")
+ )
 
-    elapsed = time.time() - start
+ elapsed = time.time() - start
 
-    # If truly parallel, should be ~same time as 1 call
-    # If sequential, would be 3x longer
-    print(f"✅ Parallel execution: {elapsed:.2f}s for 3 calls")
-    assert elapsed < 0.5  # Should be fast for semantic expansion
+ # If truly parallel, should be ~same time as 1 call
+ # If sequential, would be 3x longer
+ print(f" Parallel execution: {elapsed:.2f}s for 3 calls")
+ assert elapsed < 0.5 # Should be fast for semantic expansion
 ```
 
 ## Migration Checklist
 
-### Phase 2A: Tool Creation ✅
+### Phase 2A: Tool Creation 
 - [x] Create `tools/async_tools/async_neo4j_tools.py`
 - [x] Create `tools/async_tools/async_qdrant_tools.py`
 - [x] Create `tools/async_tools/async_fashionsig_tools.py`
@@ -276,7 +276,7 @@ async def test_parallel():
 - Vector search: 1-3s (non-blocking)
 - Visual search: 2-4s (non-blocking)
 - **Total (parallel in Flow with async)**: 2-5s (limited by slowest crew)
-- **Improvement**: 3-7x faster! 🚀
+- **Improvement**: 3-7x faster! 
 
 ## Troubleshooting
 

@@ -122,22 +122,22 @@ With all services, you can run **all 14 tests** (100% coverage).
 #### Performance Metrics
 ```
 Complete Flow Execution:
-  Total Products Found: 5-10 (depends on query)
-  Graph Search Products: 3-5
-  Vector Search Products: 3-5
-  Visual Search Products: 0-3 (if FashionSigLIP available)
-  Total Execution Time: 3-10s
+ Total Products Found: 5-10 (depends on query)
+ Graph Search Products: 3-5
+ Vector Search Products: 3-5
+ Visual Search Products: 0-3 (if FashionSigLIP available)
+ Total Execution Time: 3-10s
 
-  Expected: 3-7s (optimal)
-  Acceptable: 7-15s (first run, cold caches)
-  Slow: >15s (may indicate issues)
+ Expected: 3-7s (optimal)
+ Acceptable: 7-15s (first run, cold caches)
+ Slow: >15s (may indicate issues)
 ```
 
 #### Parallel vs Sequential
 ```
 Sequential Execution: 6-14s (crews run one after another)
-Parallel Execution:   2-5s  (crews run simultaneously)
-Speedup:              3-7x faster
+Parallel Execution: 2-5s (crews run simultaneously)
+Speedup: 3-7x faster
 ```
 
 #### Timeout Enforcement
@@ -158,7 +158,7 @@ All tests are skipped gracefully when credentials are not available.
 
 ## Interpreting Results
 
-### ✅ Success Indicators
+### Success Indicators
 
 1. **All tests pass** (no failures)
 2. **Performance within range** (3-10s for complete flow)
@@ -166,14 +166,14 @@ All tests are skipped gracefully when credentials are not available.
 4. **Timeouts accurate** (within 100ms of target)
 5. **Pydantic validation passes** (all products conform to schema)
 
-### ⚠️ Warning Signs
+### Warning Signs
 
 1. **Execution time > 15s** (may indicate network/database issues)
 2. **Few products returned** (< 3 total products)
 3. **One crew returning 0 products** (integration issue)
 4. **Timeout variance > 500ms** (event loop blocking)
 
-### ❌ Failure Indicators
+### Failure Indicators
 
 1. **Connection errors** (check credentials and network)
 2. **Pydantic validation errors** (data schema mismatch)
@@ -254,21 +254,21 @@ Flow Reported Time: 4.18s
 Sample Products:
 
 1. Elegant Black Evening Dress with Lace Detail
-   ID: prod_12345
-   Price: $89.99
-   Category: dress
+ ID: prod_12345
+ Price: $89.99
+ Category: dress
 
 2. Classic Black Cocktail Dress
-   ID: prod_67890
-   Price: $65.50
-   Category: dress
+ ID: prod_67890
+ Price: $65.50
+ Category: dress
 
 3. Formal Black Maxi Dress
-   ID: prod_11223
-   Price: $120.00
-   Category: dress
+ ID: prod_11223
+ Price: $120.00
+ Category: dress
 
-✅ Performance excellent: 4.23s
+ Performance excellent: 4.23s
 ```
 
 ### Multiple Query Test
@@ -277,9 +277,9 @@ Sample Products:
 ==============================================================
 MULTIPLE QUERY TEST RESULTS
 ==============================================================
-black dress                      8 products in   4.23s
-casual shoes                     7 products in   3.89s
-winter jacket                    6 products in   4.56s
+black dress 8 products in 4.23s
+casual shoes 7 products in 3.89s
+winter jacket 6 products in 4.56s
 ==============================================================
 
 Average execution time: 4.23s
@@ -317,45 +317,45 @@ name: E2E Tests
 on: [push, pull_request]
 
 jobs:
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v2
+ e2e:
+ runs-on: ubuntu-latest
+ steps:
+ - uses: actions/checkout@v2
 
-      - name: Setup Python
-        uses: actions/setup-python@v2
-        with:
-          python-version: '3.10'
+ - name: Setup Python
+ uses: actions/setup-python@v2
+ with:
+ python-version: '3.10'
 
-      - name: Install dependencies
-        run: |
-          pip install -r requirements.txt
+ - name: Install dependencies
+ run: |
+ pip install -r requirements.txt
 
-      - name: Configure E2E environment
-        env:
-          NEO4J_URI: ${{ secrets.NEO4J_URI }}
-          NEO4J_USER: ${{ secrets.NEO4J_USER }}
-          NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
-          QDRANT_URL: ${{ secrets.QDRANT_URL }}
-          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
-        run: |
-          echo "NEO4J_URI=$NEO4J_URI" > .env.e2e
-          echo "NEO4J_USER=$NEO4J_USER" >> .env.e2e
-          echo "NEO4J_PASSWORD=$NEO4J_PASSWORD" >> .env.e2e
-          echo "QDRANT_URL=$QDRANT_URL" >> .env.e2e
-          echo "QDRANT_API_KEY=$QDRANT_API_KEY" >> .env.e2e
-          echo "OPENAI_API_KEY=$OPENAI_API_KEY" >> .env.e2e
+ - name: Configure E2E environment
+ env:
+ NEO4J_URI: ${{ secrets.NEO4J_URI }}
+ NEO4J_USER: ${{ secrets.NEO4J_USER }}
+ NEO4J_PASSWORD: ${{ secrets.NEO4J_PASSWORD }}
+ QDRANT_URL: ${{ secrets.QDRANT_URL }}
+ QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
+ OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+ run: |
+ echo "NEO4J_URI=$NEO4J_URI" > .env.e2e
+ echo "NEO4J_USER=$NEO4J_USER" >> .env.e2e
+ echo "NEO4J_PASSWORD=$NEO4J_PASSWORD" >> .env.e2e
+ echo "QDRANT_URL=$QDRANT_URL" >> .env.e2e
+ echo "QDRANT_API_KEY=$QDRANT_API_KEY" >> .env.e2e
+ echo "OPENAI_API_KEY=$OPENAI_API_KEY" >> .env.e2e
 
-      - name: Run E2E tests
-        run: ./run_e2e_tests.sh
+ - name: Run E2E tests
+ run: ./run_e2e_tests.sh
 ```
 
 ---
 
 ## Next Steps After E2E Testing
 
-### If All Tests Pass ✅
+### If All Tests Pass 
 1. Review performance metrics
 2. Document any optimization opportunities
 3. Proceed to Phase 6 (Production Deployment)
@@ -363,14 +363,14 @@ jobs:
 5. Run smoke tests in staging
 6. Deploy to production
 
-### If Tests Fail ❌
+### If Tests Fail 
 1. Review failure logs
 2. Identify root cause
 3. Fix issues (code, config, or data)
 4. Re-run E2E tests
 5. Repeat until all tests pass
 
-### If Performance Issues ⚠️
+### If Performance Issues 
 1. Profile slow queries
 2. Optimize database queries
 3. Implement caching where appropriate
