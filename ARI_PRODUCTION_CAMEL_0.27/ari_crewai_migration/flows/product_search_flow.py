@@ -76,29 +76,16 @@ class ProductSearchFlow(Flow[ProductSearchState]):
         logger.info("ProductSearchFlow initialized with 4 mini-crews")
 
     @start()
-    def initialize_search(self):
-        """
-        Flow entry point - initialize state and route to parallel search.
-
-        Returns:
-            str: Next step name ('parallel_search')
-        """
-        logger.info(f"=== FLOW START: Query='{self.state.query[:50]}...' ===")
-        self.state.current_step = "parallel_search"
-        self.state.start_time = datetime.now()
-
-        return "parallel_search"
-
-    @listen("parallel_search")
     async def parallel_search_step(self):
         """
-        Execute graph, vector, and visual searches in parallel.
+        Flow entry point - Execute graph, vector, and visual searches in parallel.
         Each mini-crew has 30s timeout. Total step: 90s max.
-
-        Returns:
-            str: Next step name ('judge_evaluation' or 'finalize_results')
         """
+        logger.info(f"=== FLOW START: Query='{self.state.query[:50]}...' ===")
         logger.info("=== STEP 1: PARALLEL SEARCH ===")
+
+        self.state.current_step = "parallel_search"
+        self.state.start_time = datetime.now()
         step_start = time.time()
 
         try:
@@ -153,23 +140,9 @@ class ProductSearchFlow(Flow[ProductSearchState]):
             step_time = time.time() - step_start
             logger.info(f"=== PARALLEL SEARCH COMPLETE: {step_time:.2f}s ===")
 
-            # Route to judge if we have any results
-            has_results = any([
-                self.state.graph_result,
-                self.state.vector_result,
-                self.state.visual_result
-            ])
-
-            if has_results:
-                return "judge_evaluation"
-            else:
-                logger.warning("All searches failed - no results to judge")
-                return "finalize_results"
-
         except Exception as e:
             logger.error(f"Parallel search step failed: {e}", exc_info=True)
             self.state.errors.append(f"Parallel search error: {e}")
-            return "finalize_results"
 
     async def _run_graph_search(self, inputs: Dict[str, Any]) -> GraphSearchResult:
         """Execute graph search crew and parse Pydantic output."""
@@ -202,14 +175,11 @@ class ProductSearchFlow(Flow[ProductSearchState]):
         else:
             raise ValueError("Visual crew did not return Pydantic output")
 
-    @listen("judge_evaluation")
+    @listen(parallel_search_step)
     async def judge_evaluation_step(self):
         """
         Judge evaluates all search results and selects best products.
         Timeout: 30 seconds.
-
-        Returns:
-            str: Next step name ('finalize_results')
         """
         logger.info("=== STEP 2: JUDGE EVALUATION ===")
         step_start = time.time()
@@ -241,16 +211,12 @@ class ProductSearchFlow(Flow[ProductSearchState]):
                 f"in {step_time:.2f}s ==="
             )
 
-            return "finalize_results"
-
         except asyncio.TimeoutError:
             logger.error(f"Judge evaluation timed out after {self.state.judge_timeout}s")
             self.state.errors.append("Judge evaluation timeout")
-            return "finalize_results"
         except Exception as e:
             logger.error(f"Judge evaluation failed: {e}", exc_info=True)
             self.state.errors.append(f"Judge error: {e}")
-            return "finalize_results"
 
     async def _run_judge(self, inputs: Dict[str, Any]) -> JudgmentResult:
         """Execute judge crew and parse Pydantic output."""
@@ -262,8 +228,8 @@ class ProductSearchFlow(Flow[ProductSearchState]):
         else:
             raise ValueError("Judge crew did not return Pydantic output")
 
-    @listen("finalize_results")
-    def finalize_results_step(self) -> ProductSearchResult:
+    @listen(judge_evaluation_step)
+    async def finalize_results_step(self) -> ProductSearchResult:
         """
         Package final results into ProductSearchResult.
         This is the flow's final output.
@@ -386,16 +352,6 @@ async def create_and_run_flow(
     Returns:
         ProductSearchResult: Structured output with products and metadata
     """
-    # Initialize state
-    initial_state = ProductSearchState(
-        query=query,
-        filters=filters or {},
-        limit=limit,
-        user_context=user_context or {},
-        ml_intelligence=ml_intelligence or {},
-        conversation_context=conversation_context or {}
-    )
-
     # Create flow
     flow = ProductSearchFlow(
         graph_search_crew=graph_crew,
@@ -404,7 +360,18 @@ async def create_and_run_flow(
         judge_crew=judge_crew
     )
 
-    # Execute flow
-    result = await flow.kickoff(state=initial_state)
+    # Prepare inputs dict for Flow
+    # Flow will automatically populate state from inputs
+    inputs = {
+        "query": query,
+        "filters": filters or {},
+        "limit": limit,
+        "user_context": user_context or {},
+        "ml_intelligence": ml_intelligence or {},
+        "conversation_context": conversation_context or {}
+    }
+
+    # Execute flow with inputs (use kickoff_async since we're in async context)
+    result = await flow.kickoff_async(inputs=inputs)
 
     return result

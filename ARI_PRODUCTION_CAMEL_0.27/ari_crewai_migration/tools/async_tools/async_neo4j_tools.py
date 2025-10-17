@@ -31,9 +31,9 @@ async def async_neo4j_query_tool(cypher: str, parameters: Dict[str, Any] = None)
     """
     driver = None
     try:
-        # Get Neo4j connection from environment
-        neo4j_uri = os.getenv("NEO4J_URL", "bolt://localhost:7687")
-        neo4j_user = os.getenv("NEO4J_USERNAME", "neo4j")
+        # Get Neo4j connection from environment (support both naming conventions)
+        neo4j_uri = os.getenv("NEO4J_URI") or os.getenv("NEO4J_URL", "bolt://localhost:7687")
+        neo4j_user = os.getenv("NEO4J_USER") or os.getenv("NEO4J_USERNAME", "neo4j")
         neo4j_password = os.getenv("NEO4J_PASSWORD", "")
 
         driver = AsyncGraphDatabase.driver(

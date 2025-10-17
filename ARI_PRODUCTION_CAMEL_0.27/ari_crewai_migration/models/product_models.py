@@ -133,7 +133,7 @@ class JudgmentResult(BaseModel):
 class ProductSearchState(BaseModel):
     """Flow state - tracks execution through all steps."""
     # Input
-    query: str = Field(..., description="User search query")
+    query: str = Field("", description="User search query (empty string default for Flow init)")
     filters: Dict[str, Any] = Field(default_factory=dict, description="Search filters")
     limit: int = Field(default=5, ge=1, le=50, description="Maximum products to return")
     user_context: Dict[str, Any] = Field(default_factory=dict, description="User preferences")

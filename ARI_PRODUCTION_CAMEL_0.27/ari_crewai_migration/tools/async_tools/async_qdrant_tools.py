@@ -144,7 +144,8 @@ async def async_embedding_generation_tool(text: str, model: str = "text-embeddin
 async def async_qdrant_hybrid_search_tool(
     query_text: str,
     limit: int = 10,
-    filters: Dict[str, Any] = None
+    filters: Dict[str, Any] = None,
+    collection_name: str = None
 ) -> List[Dict]:
     """
     Perform hybrid search combining text embedding and filtering (async, non-blocking).
@@ -154,6 +155,7 @@ async def async_qdrant_hybrid_search_tool(
         query_text: Natural language search query
         limit: Maximum results to return
         filters: Optional filters
+        collection_name: Qdrant collection name (defaults to env var)
 
     Returns:
         List of similar products
@@ -174,7 +176,7 @@ async def async_qdrant_hybrid_search_tool(
             return []
 
         # Search with embedding asynchronously
-        return await async_qdrant_search_tool(embedding, limit, filters)
+        return await async_qdrant_search_tool(embedding, limit, filters, collection_name)
 
     except Exception as e:
         logger.error(f"Async hybrid search failed: {e}")
