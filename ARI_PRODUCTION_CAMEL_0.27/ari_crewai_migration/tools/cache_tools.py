@@ -6,7 +6,7 @@ import os
 import json
 import logging
 from typing import Dict, Any, Optional
-from crewai import tool
+from crewai.tools import tool
 import redis.asyncio as redis
 
 logger = logging.getLogger("crewai.tools.cache")

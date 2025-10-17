@@ -38,9 +38,9 @@ agent:
     max_tokens: 1500
     timeout: 30
   tools:
-    - fashionsig_embedding_tool
-    - visual_similarity_search_tool
-    - multi_image_search_tool
+    - async_fashionsig_embedding_tool
+    - async_visual_similarity_search_tool
+    - async_multi_image_search_tool
   memory: false
   verbose: true
   allow_delegation: false

@@ -11,23 +11,14 @@ from neo4j import AsyncGraphDatabase
 logger = logging.getLogger("crewai.tools.async_neo4j")
 
 
-@tool("Execute Neo4j Cypher Query (Async)")
-async def async_neo4j_query_tool(cypher: str, parameters: Dict[str, Any] = None) -> List[Dict]:
+# ============================================================================
+# CORE IMPLEMENTATION FUNCTIONS (no @tool decorator)
+# These can be called internally by other functions
+# ============================================================================
+
+async def _execute_neo4j_query(cypher: str, parameters: Dict[str, Any] = None) -> List[Dict]:
     """
-    Execute Cypher query against fashion product graph database (async, non-blocking).
-
-    Args:
-        cypher: Cypher query string with semantic expansion
-        parameters: Optional query parameters for safe binding
-
-    Returns:
-        List of product records from graph database
-
-    Example:
-        results = await async_neo4j_query_tool(
-            cypher="MATCH (p:Product) WHERE p.category = $category RETURN p LIMIT 10",
-            parameters={"category": "dress"}
-        )
+    Core implementation: Execute Cypher query against Neo4j (internal use).
     """
     driver = None
     try:
@@ -65,6 +56,32 @@ async def async_neo4j_query_tool(cypher: str, parameters: Dict[str, Any] = None)
     finally:
         if driver:
             await driver.close()
+
+
+# ============================================================================
+# TOOL WRAPPERS (with @tool decorator)
+# These are exposed to CrewAI agents
+# ============================================================================
+
+@tool("Execute Neo4j Cypher Query (Async)")
+async def async_neo4j_query_tool(cypher: str, parameters: Dict[str, Any] = None) -> List[Dict]:
+    """
+    Execute Cypher query against fashion product graph database (async, non-blocking).
+
+    Args:
+        cypher: Cypher query string with semantic expansion
+        parameters: Optional query parameters for safe binding
+
+    Returns:
+        List of product records from graph database
+
+    Example:
+        results = await async_neo4j_query_tool(
+            cypher="MATCH (p:Product) WHERE p.category = $category RETURN p LIMIT 10",
+            parameters={"category": "dress"}
+        )
+    """
+    return await _execute_neo4j_query(cypher, parameters)
 
 
 @tool("Semantic Query Expansion (Async)")
@@ -202,8 +219,8 @@ async def async_neo4j_fulltext_search_tool(
         LIMIT $limit
         """
 
-        # Execute query using async neo4j tool
-        results = await async_neo4j_query_tool(cypher, parameters)
+        # Execute query using internal function (not the decorated tool)
+        results = await _execute_neo4j_query(cypher, parameters)
 
         # Format results
         products = []
@@ -252,7 +269,7 @@ async def async_neo4j_fulltext_search_tool(
         LIMIT $limit
         """
 
-        results = await async_neo4j_query_tool(cypher_fallback, parameters)
+        results = await _execute_neo4j_query(cypher_fallback, parameters)
 
         # Format results
         products = []

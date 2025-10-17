@@ -12,31 +12,19 @@ from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
 logger = logging.getLogger("crewai.tools.async_qdrant")
 
 
-@tool("Search Qdrant Vector Database (Async)")
-async def async_qdrant_search_tool(
+# ============================================================================
+# CORE IMPLEMENTATION FUNCTIONS (no @tool decorator)
+# These can be called internally by other functions
+# ============================================================================
+
+async def _search_qdrant(
     query_embedding: List[float],
     limit: int = 10,
     filters: Dict[str, Any] = None,
     collection_name: str = None
 ) -> List[Dict]:
     """
-    Search Qdrant for similar products using vector embeddings (async, non-blocking).
-
-    Args:
-        query_embedding: Vector embedding for similarity search
-        limit: Maximum results to return
-        filters: Optional filters for category, price, etc.
-        collection_name: Qdrant collection name (defaults to env var)
-
-    Returns:
-        List of similar products with scores
-
-    Example:
-        products = await async_qdrant_search_tool(
-            query_embedding=[0.1, 0.2, ...],
-            limit=5,
-            filters={"category": "dress"}
-        )
+    Core implementation: Search Qdrant vector database (internal use).
     """
     client = None
     try:
@@ -106,20 +94,9 @@ async def async_qdrant_search_tool(
             await client.close()
 
 
-@tool("Generate Text Embedding (Async)")
-async def async_embedding_generation_tool(text: str, model: str = "text-embedding-3-small") -> List[float]:
+async def _generate_embedding(text: str, model: str = "text-embedding-3-small") -> List[float]:
     """
-    Generate embedding vector for text query using OpenAI (async, non-blocking).
-
-    Args:
-        text: Text to embed
-        model: OpenAI embedding model name
-
-    Returns:
-        Embedding vector as list of floats
-
-    Example:
-        embedding = await async_embedding_generation_tool("black dress for wedding")
+    Core implementation: Generate text embedding using OpenAI (internal use).
     """
     try:
         from openai import AsyncOpenAI
@@ -138,6 +115,58 @@ async def async_embedding_generation_tool(text: str, model: str = "text-embeddin
     except Exception as e:
         logger.error(f"Async embedding generation failed: {e}")
         return []
+
+
+# ============================================================================
+# TOOL WRAPPERS (with @tool decorator)
+# These are exposed to CrewAI agents
+# ============================================================================
+
+@tool("Search Qdrant Vector Database (Async)")
+async def async_qdrant_search_tool(
+    query_embedding: List[float],
+    limit: int = 10,
+    filters: Dict[str, Any] = None,
+    collection_name: str = None
+) -> List[Dict]:
+    """
+    Search Qdrant for similar products using vector embeddings (async, non-blocking).
+
+    Args:
+        query_embedding: Vector embedding for similarity search
+        limit: Maximum results to return
+        filters: Optional filters for category, price, etc.
+        collection_name: Qdrant collection name (defaults to env var)
+
+    Returns:
+        List of similar products with scores
+
+    Example:
+        products = await async_qdrant_search_tool(
+            query_embedding=[0.1, 0.2, ...],
+            limit=5,
+            filters={"category": "dress"}
+        )
+    """
+    return await _search_qdrant(query_embedding, limit, filters, collection_name)
+
+
+@tool("Generate Text Embedding (Async)")
+async def async_embedding_generation_tool(text: str, model: str = "text-embedding-3-small") -> List[float]:
+    """
+    Generate embedding vector for text query using OpenAI (async, non-blocking).
+
+    Args:
+        text: Text to embed
+        model: OpenAI embedding model name
+
+    Returns:
+        Embedding vector as list of floats
+
+    Example:
+        embedding = await async_embedding_generation_tool("black dress for wedding")
+    """
+    return await _generate_embedding(text, model)
 
 
 @tool("Hybrid Search Qdrant (Async)")
@@ -168,15 +197,15 @@ async def async_qdrant_hybrid_search_tool(
         )
     """
     try:
-        # Generate embedding asynchronously
-        embedding = await async_embedding_generation_tool(query_text)
+        # Generate embedding asynchronously (use internal function)
+        embedding = await _generate_embedding(query_text)
 
         if not embedding:
             logger.error("Failed to generate async embedding")
             return []
 
-        # Search with embedding asynchronously
-        return await async_qdrant_search_tool(embedding, limit, filters, collection_name)
+        # Search with embedding asynchronously (use internal function)
+        return await _search_qdrant(embedding, limit, filters, collection_name)
 
     except Exception as e:
         logger.error(f"Async hybrid search failed: {e}")

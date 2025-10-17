@@ -186,11 +186,16 @@ class ProductSearchFlow(Flow[ProductSearchState]):
 
         try:
             # Prepare inputs for judge
+            # Convert Product Pydantic objects to dicts (CrewAI requirement)
+            graph_products = [p.model_dump() for p in self.state.graph_result.products] if self.state.graph_result else []
+            vector_products = [p.model_dump() for p in self.state.vector_result.products] if self.state.vector_result else []
+            visual_products = [p.model_dump() for p in self.state.visual_result.products] if self.state.visual_result else []
+
             judge_inputs = {
                 "query": self.state.query,
-                "graph_results": self.state.graph_result.products if self.state.graph_result else [],
-                "vector_results": self.state.vector_result.products if self.state.vector_result else [],
-                "visual_results": self.state.visual_result.products if self.state.visual_result else [],
+                "graph_results": graph_products,
+                "vector_results": vector_products,
+                "visual_results": visual_products,
                 "ml_intelligence": self.state.ml_intelligence,
                 "user_context": self.state.user_context,
                 "limit": self.state.limit

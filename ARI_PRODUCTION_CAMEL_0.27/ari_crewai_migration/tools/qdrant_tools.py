@@ -5,7 +5,7 @@ Wraps Qdrant vector search functionality into CrewAI-compatible tools.
 import os
 import logging
 from typing import Dict, List, Any, Optional
-from crewai import tool
+from crewai.tools import tool
 from qdrant_client import QdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
 

@@ -8,22 +8,20 @@ import asyncio
 from typing import Dict, List, Any
 from crewai.tools import tool
 
+# Import internal functions from other tool modules (not the decorated versions)
+from tools.async_tools.async_qdrant_tools import _search_qdrant, _generate_embedding
+
 logger = logging.getLogger("crewai.tools.async_fashionsig")
 
 
-@tool("Generate FashionSigLIP Image Embedding (Async)")
-async def async_fashionsig_embedding_tool(image_path: str) -> List[float]:
+# ============================================================================
+# CORE IMPLEMENTATION FUNCTIONS (no @tool decorator)
+# These can be called internally by other functions
+# ============================================================================
+
+async def _generate_fashionsig_embedding(image_path: str) -> List[float]:
     """
-    Generate visual embedding using FashionSigLIP model (async, non-blocking).
-
-    Args:
-        image_path: Path to product image or image URL
-
-    Returns:
-        Visual embedding vector
-
-    Example:
-        embedding = await async_fashionsig_embedding_tool("/path/to/dress.jpg")
+    Core implementation: Generate FashionSigLIP visual embedding (internal use).
     """
     try:
         # Import FashionSigLIP encoder from existing services
@@ -54,6 +52,28 @@ async def async_fashionsig_embedding_tool(image_path: str) -> List[float]:
         return []
 
 
+# ============================================================================
+# TOOL WRAPPERS (with @tool decorator)
+# These are exposed to CrewAI agents
+# ============================================================================
+
+@tool("Generate FashionSigLIP Image Embedding (Async)")
+async def async_fashionsig_embedding_tool(image_path: str) -> List[float]:
+    """
+    Generate visual embedding using FashionSigLIP model (async, non-blocking).
+
+    Args:
+        image_path: Path to product image or image URL
+
+    Returns:
+        Visual embedding vector
+
+    Example:
+        embedding = await async_fashionsig_embedding_tool("/path/to/dress.jpg")
+    """
+    return await _generate_fashionsig_embedding(image_path)
+
+
 @tool("Visual Similarity Search (Async)")
 async def async_visual_similarity_search_tool(
     image_path: str,
@@ -78,17 +98,15 @@ async def async_visual_similarity_search_tool(
         )
     """
     try:
-        # Generate visual embedding asynchronously
-        embedding = await async_fashionsig_embedding_tool(image_path)
+        # Generate visual embedding asynchronously (use internal function)
+        embedding = await _generate_fashionsig_embedding(image_path)
 
         if not embedding:
             logger.error("Failed to generate async visual embedding")
             return []
 
-        # Search Qdrant with visual embedding asynchronously
-        from tools.async_tools.async_qdrant_tools import async_qdrant_search_tool
-
-        results = await async_qdrant_search_tool(
+        # Search Qdrant with visual embedding asynchronously (use internal function)
+        results = await _search_qdrant(
             query_embedding=embedding,
             limit=limit,
             filters=filters,
@@ -128,9 +146,9 @@ async def async_multi_image_search_tool(
         )
     """
     try:
-        # Generate embeddings for all images in parallel
+        # Generate embeddings for all images in parallel (use internal function)
         embedding_tasks = [
-            async_fashionsig_embedding_tool(image_path)
+            _generate_fashionsig_embedding(image_path)
             for image_path in image_paths
         ]
 
@@ -151,10 +169,8 @@ async def async_multi_image_search_tool(
         import numpy as np
         avg_embedding = np.mean(valid_embeddings, axis=0).tolist()
 
-        # Search with averaged embedding asynchronously
-        from tools.async_tools.async_qdrant_tools import async_qdrant_search_tool
-
-        results = await async_qdrant_search_tool(
+        # Search with averaged embedding asynchronously (use internal function)
+        results = await _search_qdrant(
             query_embedding=avg_embedding,
             limit=limit,
             filters=filters,
@@ -211,18 +227,15 @@ async def async_fashionsig_multimodal_search_tool(
 
         if not embedding:
             logger.warning("FashionSigLIP multimodal integration pending")
-            # Fallback to text embedding from OpenAI
-            from tools.async_tools.async_qdrant_tools import async_embedding_generation_tool
-            embedding = await async_embedding_generation_tool(query_text)
+            # Fallback to text embedding from OpenAI (use internal function)
+            embedding = await _generate_embedding(query_text)
 
         if not embedding:
             logger.error("Failed to generate any embedding for multimodal search")
             return []
 
-        # Search with embedding
-        from tools.async_tools.async_qdrant_tools import async_qdrant_search_tool
-
-        results = await async_qdrant_search_tool(
+        # Search with embedding (use internal function)
+        results = await _search_qdrant(
             query_embedding=embedding,
             limit=limit,
             filters=filters,

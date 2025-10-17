@@ -51,14 +51,35 @@ def load_tools_for_agent(tool_names: List[str]) -> List:
 
     # Import all available tools
     try:
+        # Sync tools (legacy)
         from tools.neo4j_tools import neo4j_query_tool, semantic_expansion_tool, neo4j_fulltext_search_tool
         from tools.qdrant_tools import qdrant_search_tool, embedding_generation_tool, qdrant_hybrid_search_tool
         from tools.fashionsig_tools import fashionsig_embedding_tool, visual_similarity_search_tool, multi_image_search_tool
         from tools.quality_tools import quality_scoring_tool, consensus_detection_tool, learning_analysis_tool
         from tools.cache_tools import cache_lookup_tool, cache_store_tool
 
+        # Async tools (Phase 2 - non-blocking)
+        from tools.async_tools.async_neo4j_tools import (
+            async_neo4j_query_tool,
+            async_semantic_expansion_tool,
+            async_neo4j_fulltext_search_tool
+        )
+        from tools.async_tools.async_qdrant_tools import (
+            async_qdrant_search_tool,
+            async_embedding_generation_tool,
+            async_qdrant_hybrid_search_tool,
+            async_qdrant_filter_search_tool
+        )
+        from tools.async_tools.async_fashionsig_tools import (
+            async_fashionsig_embedding_tool,
+            async_visual_similarity_search_tool,
+            async_multi_image_search_tool,
+            async_fashionsig_multimodal_search_tool
+        )
+
         # Map tool names to tool objects
         tool_map = {
+            # Sync tools (legacy)
             'neo4j_query_tool': neo4j_query_tool,
             'semantic_expansion_tool': semantic_expansion_tool,
             'neo4j_fulltext_search_tool': neo4j_fulltext_search_tool,
@@ -73,6 +94,19 @@ def load_tools_for_agent(tool_names: List[str]) -> List:
             'learning_analysis_tool': learning_analysis_tool,
             'cache_lookup_tool': cache_lookup_tool,
             'cache_store_tool': cache_store_tool,
+
+            # Async tools (Phase 2 - recommended for production)
+            'async_neo4j_query_tool': async_neo4j_query_tool,
+            'async_semantic_expansion_tool': async_semantic_expansion_tool,
+            'async_neo4j_fulltext_search_tool': async_neo4j_fulltext_search_tool,
+            'async_qdrant_search_tool': async_qdrant_search_tool,
+            'async_embedding_generation_tool': async_embedding_generation_tool,
+            'async_qdrant_hybrid_search_tool': async_qdrant_hybrid_search_tool,
+            'async_qdrant_filter_search_tool': async_qdrant_filter_search_tool,
+            'async_fashionsig_embedding_tool': async_fashionsig_embedding_tool,
+            'async_visual_similarity_search_tool': async_visual_similarity_search_tool,
+            'async_multi_image_search_tool': async_multi_image_search_tool,
+            'async_fashionsig_multimodal_search_tool': async_fashionsig_multimodal_search_tool,
         }
 
         # Load requested tools

@@ -6,7 +6,7 @@ import os
 import logging
 import asyncio
 from typing import Dict, List, Any, Optional
-from crewai import tool
+from crewai.tools import tool
 from neo4j import AsyncGraphDatabase
 
 logger = logging.getLogger("crewai.tools.neo4j")

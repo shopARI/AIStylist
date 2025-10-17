@@ -4,7 +4,7 @@ Implements quality scoring, consensus detection, and learning analysis.
 """
 import logging
 from typing import Dict, List, Any
-from crewai import tool
+from crewai.tools import tool
 
 logger = logging.getLogger("crewai.tools.quality")
 
