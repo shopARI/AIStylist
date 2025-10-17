@@ -38,27 +38,33 @@ def create_judge_crew(agents_dir: str = None, tasks_dir: str = None) -> Crew:
         3. Detect consensus products (found by multiple agents)
         4. Apply quality threshold filtering
         5. Rank by combined quality and relevance
-        6. Generate detailed reasoning
+        6. Enrich final products with judge scores
+        7. Generate detailed reasoning
 
         Input parameters:
         - query: {query}
-        - graph_results: Products from GraphSearchCrew
-        - vector_results: Products from VectorSearchCrew
-        - visual_results: Products from VisualSearchCrew
+        - graph_results: Products from GraphSearchCrew (may have cypher_score populated)
+        - vector_results: Products from VectorSearchCrew (may have vibe_score populated)
+        - visual_results: Products from VisualSearchCrew (may have visual_score populated)
         - ml_intelligence: {ml_intelligence}
         - user_context: {user_context}
         - limit: {limit}
 
+        IMPORTANT: For each Product in final_products, you MUST populate:
+        - judge_score: Your final quality score for this product (0.0-1.0)
+        - reasoning: Update or set the reasoning field with your evaluation justification (1-2 sentences)
+        - Preserve existing cypher_score, vibe_score, visual_score, agent_source, and search_method from input products
+
         You MUST return a structured JudgmentResult with:
-        - final_products: Top ranked products after quality control
-        - quality_assessments: Quality scores by product ID
+        - final_products: Top ranked products after quality control (with judge_score populated!)
+        - quality_assessments: Quality scores by product ID (map of product_id -> score)
         - consensus_products: Product IDs found by multiple agents
         - rejected_products: Products filtered out with rejection reasons
         - judgment_confidence: Overall confidence in recommendations (0.0-1.0)
         - detailed_reasoning: Explanation of selection criteria and decisions
         - execution_time: Time taken
         """,
-        expected_output="Structured JudgmentResult with final products, quality scores, consensus detection, and detailed reasoning",
+        expected_output="Structured JudgmentResult with enriched final products (judge_score populated), quality assessments, consensus detection, and detailed reasoning",
         agent=judge_agent,
         output_pydantic=JudgmentResult  # ← STRUCTURED OUTPUT!
     )

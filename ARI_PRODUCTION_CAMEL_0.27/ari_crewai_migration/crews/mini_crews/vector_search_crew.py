@@ -36,7 +36,8 @@ def create_vector_search_crew(agents_dir: str = None, tasks_dir: str = None) -> 
         1. Analyze query for aesthetic and style cues
         2. Choose search strategy (SEMANTIC, VISUAL, COLOR, STYLE, or GENERAL)
         3. Execute Qdrant embedding search
-        4. Return structured products with vibe scores
+        4. Enrich each product with metadata scores
+        5. Return structured products with vibe scores
 
         Input parameters:
         - query: {query}
@@ -44,14 +45,20 @@ def create_vector_search_crew(agents_dir: str = None, tasks_dir: str = None) -> 
         - ml_intelligence: {ml_intelligence}
         - limit: {limit}
 
+        IMPORTANT: For each Product object you return, you MUST populate these metadata fields:
+        - vibe_score: Semantic similarity score (0.0-1.0) from Qdrant search
+        - agent_source: Set to "VibeBot"
+        - search_method: The strategy name you chose (e.g., "SEMANTIC")
+        - reasoning: Brief explanation of why this product matches the query aesthetically (1 sentence)
+
         You MUST return a structured VectorSearchResult with:
-        - products: List of Product objects
+        - products: List of Product objects (with metadata fields populated!)
         - search_strategy: The strategy name you chose
         - reasoning: Why you chose this strategy
         - execution_time: Time taken
         - products_found: Number of products found
         """,
-        expected_output="Structured VectorSearchResult with products list, strategy, and reasoning",
+        expected_output="Structured VectorSearchResult with enriched products (metadata populated), strategy, and reasoning",
         agent=vibe_agent,
         output_pydantic=VectorSearchResult  # ← STRUCTURED OUTPUT!
     )
