@@ -1,0 +1,98 @@
+{
+  "database": "productionbackup2",
+  "nodes": {
+    "Product": {
+      "properties": {
+        "embedding_id": "str",
+        "embedding_created_at": "DateTime",
+        "images": "str",
+        "embedding_model": "str",
+        "description": "str",
+        "active": "bool",
+        "visited_num": "int",
+        "title": "str",
+        "inventory": "int",
+        "ready_for_embedding": "bool",
+        "price": "int",
+        "classification_reason": "str",
+        "is_fashion": "bool",
+        "id": "str",
+        "category": "str",
+        "classification_reasoning": "str",
+        "brand": "str",
+        "classified_at": "DateTime",
+        "fashion_confidence": "float",
+        "embedding_tokens": "int",
+        "fashion_category": "str"
+      }
+    },
+    "Category": {
+      "properties": {
+        "name": "str"
+      }
+    },
+    "Collection": {
+      "properties": {
+        "title": "str"
+      }
+    },
+    "Brand": {
+      "properties": {
+        "name": "str"
+      }
+    },
+    "Status": {
+      "properties": {
+        "name": "str"
+      }
+    },
+    "PriceRange": {
+      "properties": {
+        "name": "str"
+      }
+    },
+    "User": {
+      "properties": {
+        "updated_at": "str",
+        "created_at": "str",
+        "id": "str",
+        "last_active": "str"
+      }
+    },
+    "MemoryState": {
+      "properties": {
+        "data": "str",
+        "created_at": "str",
+        "id": "str",
+        "type": "str",
+        "version": "str"
+      }
+    }
+  },
+  "relationships": {
+    "IN_COLLECTION": {
+      "from": "Product",
+      "to": "Collection"
+    },
+    "IN_PRICE_RANGE": {
+      "from": "Product",
+      "to": "PriceRange"
+    },
+    "HAS_STATUS": {
+      "from": "Product",
+      "to": "Status"
+    },
+    "BY_BRAND": {
+      "from": "Product",
+      "to": "Brand"
+    },
+    "IN_CATEGORY": {
+      "from": "Product",
+      "to": "Category"
+    },
+    "HAS_MEMORY": {
+      "from": "User",
+      "to": "MemoryState"
+    }
+  }
+}

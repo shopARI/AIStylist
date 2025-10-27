@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARI User Profile Graph Schema - Neo4j</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: 'Arial', sans-serif;
+            background: #f5f5f5;
+            color: black;
+            padding: 20px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            text-align: center;
+            margin-bottom: 10px;
+            font-size: 28px;
+            border-bottom: 3px solid black;
+            padding-bottom: 10px;
+        }
+
+        .subtitle {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 16px;
+            font-style: italic;
+            color: #333;
+        }
+
+        .legend {
+            margin-bottom: 20px;
+            padding: 20px;
+            border: 2px solid black;
+            background: white;
+            display: flex;
+            justify-content: space-around;
+            flex-wrap: wrap;
+            gap: 20px;
+        }
+
+        .legend h3 {
+            width: 100%;
+            margin-bottom: 15px;
+            font-size: 18px;
+            text-align: center;
+        }
+
+        .legend-section {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+
+        .legend-section h4 {
+            font-size: 14px;
+            margin-bottom: 5px;
+            text-decoration: underline;
+        }
+
+        .legend-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+        }
+
+        .node-example {
+            width: 100px;
+            height: 40px;
+            border: 2px solid black;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 11px;
+            font-weight: bold;
+            border-radius: 5px;
+        }
+
+        .diagram-wrapper {
+            width: 100%;
+            background: white;
+            border: 3px solid black;
+            padding: 20px;
+        }
+
+        .diagram {
+            width: 100%;
+            height: 1100px;
+            position: relative;
+        }
+
+        svg {
+            width: 100%;
+            height: 100%;
+        }
+
+        .node {
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+
+        .node:hover rect,
+        .node:hover ellipse {
+            filter: brightness(0.9);
+        }
+
+        .node rect,
+        .node ellipse {
+            stroke-width: 2.5;
+        }
+
+        .node text {
+            font-size: 13px;
+            font-weight: bold;
+            text-anchor: middle;
+            pointer-events: none;
+        }
+
+        .node .property {
+            font-size: 10px;
+            font-style: italic;
+            font-weight: normal;
+        }
+
+        .relationship {
+            fill: none;
+            stroke-width: 2;
+            marker-end: url(#arrowhead);
+            opacity: 0.8;
+        }
+
+        .relationship:hover {
+            stroke-width: 3;
+            opacity: 1;
+        }
+
+        .relationship-label {
+            font-size: 11px;
+            font-weight: bold;
+            text-anchor: middle;
+        }
+
+        .relationship-properties {
+            font-size: 9px;
+            font-style: italic;
+            fill: #555;
+        }
+
+        .section-label {
+            font-size: 14px;
+            font-weight: bold;
+            fill: #333;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+
+        .info-box {
+            background: white;
+            border: 2px solid black;
+            padding: 15px;
+            margin-top: 20px;
+        }
+
+        .info-box h3 {
+            margin-bottom: 10px;
+            font-size: 16px;
+        }
+
+        .info-box ul {
+            list-style: none;
+            padding-left: 0;
+        }
+
+        .info-box li {
+            margin-bottom: 5px;
+            font-size: 13px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ARI User Profile Graph Schema</h1>
+        <p class="subtitle">Neo4j Graph Database - Circular Relationship Model</p>
+
+        <div class="legend">
+            <h3>Legend</h3>
+
+            <div class="legend-section">
+                <h4>Node Types</h4>
+                <div class="legend-item">
+                    <div class="node-example" style="background: #000; color: white;">User</div>
+                    <span>Core User Node</span>
+                </div>
+                <div class="legend-item">
+                    <div class="node-example" style="background: #ccc; color: black;">Profile</div>
+                    <span>Demographics/Psychographics</span>
+                </div>
+                <div class="legend-item">
+                    <div class="node-example" style="background: #888; color: white;">Preference</div>
+                    <span>Style/Brand/Color/Occasion</span>
+                </div>
+                <div class="legend-item">
+                    <div class="node-example" style="background: #444; color: white;">Social</div>
+                    <span>Social Connections</span>
+                </div>
+                <div class="legend-item">
+                    <div class="node-example" style="background: white; border-style: dashed;">Product</div>
+                    <span>Product Interactions</span>
+                </div>
+            </div>
+
+            <div class="legend-section">
+                <h4>Relationship Types</h4>
+                <div class="legend-item">
+                    <svg width="80" height="20">
+                        <defs>
+                            <marker id="legend-arrow1" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                                <polygon points="0 0, 10 3, 0 6" fill="#000"/>
+                            </marker>
+                        </defs>
+                        <line x1="0" y1="10" x2="70" y2="10" stroke="#000" stroke-width="2" marker-end="url(#legend-arrow1)"/>
+                    </svg>
+                    <span>Profile/Demographic</span>
+                </div>
+                <div class="legend-item">
+                    <svg width="80" height="20">
+                        <defs>
+                            <marker id="legend-arrow2" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                                <polygon points="0 0, 10 3, 0 6" fill="#555"/>
+                            </marker>
+                        </defs>
+                        <line x1="0" y1="10" x2="70" y2="10" stroke="#555" stroke-width="2" marker-end="url(#legend-arrow2)"/>
+                    </svg>
+                    <span>Preferences</span>
+                </div>
+                <div class="legend-item">
+                    <svg width="80" height="20">
+                        <defs>
+                            <marker id="legend-arrow3" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                                <polygon points="0 0, 10 3, 0 6" fill="#888"/>
+                            </marker>
+                        </defs>
+                        <line x1="0" y1="10" x2="70" y2="10" stroke="#888" stroke-width="2" marker-end="url(#legend-arrow3)"/>
+                    </svg>
+                    <span>Social</span>
+                </div>
+                <div class="legend-item">
+                    <svg width="80" height="20">
+                        <defs>
+                            <marker id="legend-arrow4" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                                <polygon points="0 0, 10 3, 0 6" fill="#aaa"/>
+                            </marker>
+                        </defs>
+                        <line x1="0" y1="10" x2="70" y2="10" stroke="#aaa" stroke-width="2" stroke-dasharray="5,5" marker-end="url(#legend-arrow4)"/>
+                    </svg>
+                    <span>Behavioral</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="diagram-wrapper">
+            <div class="diagram">
+                <svg viewBox="0 0 1400 1100" xmlns="http://www.w3.org/2000/svg">
+                    <!-- Define arrowhead markers for different relationship types -->
+                    <defs>
+                        <!-- Profile relationships - Black -->
+                        <marker id="arrowhead-profile" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" fill="#000" />
+                        </marker>
+                        <!-- Preference relationships - Dark Grey -->
+                        <marker id="arrowhead-preference" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" fill="#555" />
+                        </marker>
+                        <!-- Social relationships - Medium Grey -->
+                        <marker id="arrowhead-social" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" fill="#888" />
+                        </marker>
+                        <!-- Behavioral relationships - Light Grey -->
+                        <marker id="arrowhead-behavioral" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto">
+                            <polygon points="0 0, 10 3, 0 6" fill="#aaa" />
+                        </marker>
+                    </defs>
+
+                    <!-- Title -->
+                    <text x="700" y="30" style="font-size: 18px; font-weight: bold; text-anchor: middle;">CIRCULAR USER PROFILE GRAPH</text>
+
+                    <!-- Center: Core User Node -->
+                    <g class="node core" id="user-node">
+                        <ellipse cx="700" cy="550" rx="120" ry="80" fill="#000" stroke="#000"/>
+                        <text x="700" y="535" fill="white" style="font-size: 16px;">:User</text>
+                        <text x="700" y="555" fill="white" class="property">id, email, name</text>
+                        <text x="700" y="570" fill="white" class="property">age_range, gender</text>
+                        <text x="700" y="585" fill="white" class="property">location, timezone</text>
+                    </g>
+
+                    <!-- Ring 1: Profile Nodes (Demographics, Personality) - Top Left Quadrant -->
+
+                    <!-- Demographic Node - 10 o'clock -->
+                    <g class="node profile">
+                        <rect x="300" y="200" width="170" height="85" rx="5" fill="#ccc" stroke="#000"/>
+                        <text x="385" y="225">:Demographic</text>
+                        <text x="385" y="245" class="property">income_range</text>
+                        <text x="385" y="260" class="property">education_level</text>
+                        <text x="385" y="275" class="property">occupation</text>
+                    </g>
+                    <path class="relationship" d="M 590,510 Q 500,380 470,285"
+                          stroke="#000" marker-end="url(#arrowhead-profile)"/>
+                    <text x="510" y="380" class="relationship-label">HAS_DEMOGRAPHIC</text>
+
+                    <!-- Personality Node - 11 o'clock -->
+                    <g class="node profile">
+                        <rect x="480" y="150" width="170" height="100" rx="5" fill="#ccc" stroke="#000"/>
+                        <text x="565" y="180">:Personality</text>
+                        <text x="565" y="200" class="property">style_archetype</text>
+                        <text x="565" y="215" class="property">fashion_confidence</text>
+                        <text x="565" y="230" class="property">values[]</text>
+                        <text x="565" y="245" class="property">shopping_behavior</text>
+                    </g>
+                    <path class="relationship" d="M 670,490 Q 630,350 650,250"
+                          stroke="#000" marker-end="url(#arrowhead-profile)"/>
+                    <text x="640" y="360" class="relationship-label">HAS_PERSONALITY</text>
+
+                    <!-- Ring 2: Preference Nodes - Top Right Quadrant -->
+
+                    <!-- StylePreference Node - 1 o'clock -->
+                    <g class="node preference">
+                        <rect x="780" y="150" width="170" height="100" rx="5" fill="#888" stroke="#000"/>
+                        <text x="865" y="180" fill="white">:StylePreference</text>
+                        <text x="865" y="200" fill="white" class="property">category: "dress"</text>
+                        <text x="865" y="215" fill="white" class="property">occasions[]</text>
+                        <text x="865" y="230" fill="white" class="property">fit_preferences[]</text>
+                        <text x="865" y="245" fill="white" class="property">color_palette[]</text>
+                    </g>
+                    <path class="relationship" d="M 730,490 Q 770,350 780,250"
+                          stroke="#555" marker-end="url(#arrowhead-preference)"/>
+                    <text x="750" y="360" class="relationship-label" fill="#555">PREFERS_STYLE</text>
+                    <text x="750" y="375" class="relationship-properties">{strength: 0.9}</text>
+
+                    <!-- Brand Node - 2 o'clock -->
+                    <g class="node preference">
+                        <rect x="970" y="220" width="150" height="80" rx="5" fill="#888" stroke="#000"/>
+                        <text x="1045" y="250" fill="white">:Brand</text>
+                        <text x="1045" y="270" fill="white" class="property">name: "Everlane"</text>
+                        <text x="1045" y="285" fill="white" class="property">preference_level</text>
+                    </g>
+                    <path class="relationship" d="M 800,510 Q 900,400 970,270"
+                          stroke="#555" marker-end="url(#arrowhead-preference)"/>
+                    <text x="880" y="420" class="relationship-label" fill="#555">LOVES_BRAND</text>
+
+                    <!-- Color Node - 3 o'clock -->
+                    <g class="node preference">
+                        <rect x="1000" y="380" width="150" height="75" rx="5" fill="#888" stroke="#000"/>
+                        <text x="1075" y="405" fill="white">:Color</text>
+                        <text x="1075" y="425" fill="white" class="property">name: "burgundy"</text>
+                        <text x="1075" y="440" fill="white" class="property">hex: "#800020"</text>
+                    </g>
+                    <path class="relationship" d="M 820,540 L 1000,415"
+                          stroke="#555" marker-end="url(#arrowhead-preference)"/>
+                    <text x="900" y="470" class="relationship-label" fill="#555">PREFERS_COLOR</text>
+                    <text x="900" y="485" class="relationship-properties">{intensity: "primary"}</text>
+
+                    <!-- Occasion Node - 4 o'clock -->
+                    <g class="node preference">
+                        <rect x="1000" y="520" width="170" height="85" rx="5" fill="#888" stroke="#000"/>
+                        <text x="1085" y="545" fill="white">:Occasion</text>
+                        <text x="1085" y="565" fill="white" class="property">name: "wedding"</text>
+                        <text x="1085" y="580" fill="white" class="property">formality: "semi-formal"</text>
+                        <text x="1085" y="595" fill="white" class="property">season, time_of_day</text>
+                    </g>
+                    <path class="relationship" d="M 820,570 L 1000,565"
+                          stroke="#555" marker-end="url(#arrowhead-preference)"/>
+                    <text x="900" y="560" class="relationship-label" fill="#555">DRESSES_FOR</text>
+
+                    <!-- Ring 3: Social Nodes - Bottom Right Quadrant -->
+
+                    <!-- SocialProfile Node - 5 o'clock -->
+                    <g class="node social">
+                        <rect x="970" y="680" width="170" height="95" rx="5" fill="#444" stroke="#000"/>
+                        <text x="1055" y="710" fill="white">:SocialProfile</text>
+                        <text x="1055" y="730" fill="white" class="property">platform: "instagram"</text>
+                        <text x="1055" y="745" fill="white" class="property">username, followers</text>
+                        <text x="1055" y="760" fill="white" class="property">connected_at</text>
+                    </g>
+                    <path class="relationship" d="M 800,600 Q 900,670 970,720"
+                          stroke="#888" marker-end="url(#arrowhead-social)"/>
+                    <text x="870" y="655" class="relationship-label" fill="#888">CONNECTED_TO</text>
+                    <text x="870" y="670" class="relationship-properties">{platform}</text>
+
+                    <!-- User (Other) Node - 6 o'clock -->
+                    <g class="node social">
+                        <ellipse cx="700" cy="850" rx="100" ry="65" fill="#444" stroke="#000"/>
+                        <text x="700" y="840" fill="white">:User</text>
+                        <text x="700" y="860" fill="white" class="property">(other users)</text>
+                    </g>
+                    <path class="relationship" d="M 710,630 Q 720,740 710,785"
+                          stroke="#888" marker-end="url(#arrowhead-social)"/>
+                    <text x="735" y="710" class="relationship-label" fill="#888">FOLLOWS</text>
+
+                    <path class="relationship" d="M 690,630 Q 680,740 690,785"
+                          stroke="#888" stroke-dasharray="4,4" marker-end="url(#arrowhead-social)"/>
+                    <text x="615" y="710" class="relationship-label" fill="#888">INSPIRED_BY</text>
+
+                    <!-- Self-referential SIMILAR_TO -->
+                    <path class="relationship" d="M 580,550 Q 450,650 580,580"
+                          stroke="#888" stroke-dasharray="6,3" marker-end="url(#arrowhead-social)"/>
+                    <text x="480" y="600" class="relationship-label" fill="#888">SIMILAR_TO</text>
+                    <text x="480" y="615" class="relationship-properties">{score: 0.85}</text>
+
+                    <!-- Ring 4: Product & Behavioral - Left Quadrant -->
+
+                    <!-- Product Node - 8 o'clock -->
+                    <g class="node product">
+                        <rect x="250" y="680" width="170" height="100" rx="5" fill="white" stroke="#000" stroke-dasharray="5,3"/>
+                        <text x="335" y="710">:Product</text>
+                        <text x="335" y="730" class="property">id, title, price</text>
+                        <text x="335" y="745" class="property">category, brand</text>
+                        <text x="335" y="760" class="property">images[], colors[]</text>
+                        <text x="335" y="775" class="property">metadata</text>
+                    </g>
+
+                    <!-- Behavioral relationships with better spacing -->
+                    <path class="relationship" d="M 600,600 Q 500,720 420,720"
+                          stroke="#aaa" marker-end="url(#arrowhead-behavioral)"/>
+                    <text x="500" y="660" class="relationship-label" fill="#aaa">VIEWED</text>
+                    <text x="500" y="675" class="relationship-properties">{timestamp, duration}</text>
+
+                    <path class="relationship" d="M 590,580 Q 480,700 420,700"
+                          stroke="#aaa" marker-end="url(#arrowhead-behavioral)"/>
+                    <text x="460" y="630" class="relationship-label" fill="#aaa">PURCHASED</text>
+                    <text x="460" y="645" class="relationship-properties">{timestamp, price}</text>
+
+                    <path class="relationship" d="M 590,560 Q 460,680 420,680"
+                          stroke="#aaa" stroke-dasharray="4,4" marker-end="url(#arrowhead-behavioral)"/>
+                    <text x="440" y="600" class="relationship-label" fill="#aaa">SAVED</text>
+
+                    <path class="relationship" d="M 585,540 Q 440,660 420,660"
+                          stroke="#aaa" stroke-dasharray="6,3" marker-end="url(#arrowhead-behavioral)"/>
+                    <text x="420" y="570" class="relationship-label" fill="#aaa">SHARED</text>
+                    <text x="420" y="585" class="relationship-properties">{platform}</text>
+
+                    <!-- Product Node Alternative Brand - 9 o'clock -->
+                    <g class="node product">
+                        <rect x="110" y="480" width="170" height="85" rx="5" fill="white" stroke="#000" stroke-dasharray="5,3"/>
+                        <text x="195" y="510">:Product</text>
+                        <text x="195" y="530" class="property">(search results,</text>
+                        <text x="195" y="545" class="property">recommendations,</text>
+                        <text x="195" y="560" class="property">catalog items)</text>
+                    </g>
+                    <path class="relationship" d="M 580,540 Q 450,540 280,530"
+                          stroke="#aaa" marker-end="url(#arrowhead-behavioral)"/>
+                    <text x="420" y="525" class="relationship-label" fill="#aaa">INTERACTED</text>
+
+                    <!-- Section Labels around the perimeter -->
+                    <text x="385" y="120" class="section-label">PROFILE DATA</text>
+                    <text x="1050" y="120" class="section-label">PREFERENCES</text>
+                    <text x="1050" y="870" class="section-label">SOCIAL GRAPH</text>
+                    <text x="180" y="650" class="section-label">BEHAVIORAL</text>
+
+                    <!-- Circular guides (optional decorative elements) -->
+                    <circle cx="700" cy="550" r="250" fill="none" stroke="#ddd" stroke-width="1" stroke-dasharray="2,2"/>
+                    <circle cx="700" cy="550" r="400" fill="none" stroke="#ddd" stroke-width="1" stroke-dasharray="2,2"/>
+
+                    <!-- Vector Embedding Note -->
+                    <g>
+                        <rect x="520" y="980" width="360" height="80" rx="5" fill="#f0f0f0" stroke="#666" stroke-width="2"/>
+                        <text x="700" y="1005" style="font-size: 12px; font-weight: bold; text-anchor: middle;">Embeddings Stored on User Node:</text>
+                        <text x="700" y="1025" style="font-size: 11px; font-style: italic; text-anchor: middle;">style_embedding: [1536-dim vector]</text>
+                        <text x="700" y="1040" style="font-size: 11px; font-style: italic; text-anchor: middle;">profile_embedding: [1536-dim vector]</text>
+                        <text x="700" y="1055" style="font-size: 10px; text-anchor: middle; fill: #666;">For semantic similarity via vector search</text>
+                    </g>
+                </svg>
+            </div>
+        </div>
+
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 20px;">
+            <div class="info-box">
+                <h3>Node Types (9 Total)</h3>
+                <ul>
+                    <li><strong>Core:</strong> User (center node)</li>
+                    <li><strong>Profile:</strong> Demographic, Personality</li>
+                    <li><strong>Preferences:</strong> StylePreference, Brand, Color, Occasion</li>
+                    <li><strong>Social:</strong> SocialProfile, User (connections)</li>
+                    <li><strong>Products:</strong> Product (interactions & catalog)</li>
+                </ul>
+            </div>
+
+            <div class="info-box">
+                <h3>Relationship Types (15 Total)</h3>
+                <ul>
+                    <li><strong>Profile:</strong> HAS_DEMOGRAPHIC, HAS_PERSONALITY</li>
+                    <li><strong>Preferences:</strong> PREFERS_STYLE, LOVES_BRAND, AVOIDS_BRAND, PREFERS_COLOR, DRESSES_FOR</li>
+                    <li><strong>Social:</strong> CONNECTED_TO, FOLLOWS, INSPIRED_BY, SIMILAR_TO</li>
+                    <li><strong>Behavioral:</strong> VIEWED, PURCHASED, SAVED, SHARED, INTERACTED</li>
+                </ul>
+            </div>
+        </div>
+
+        <div class="info-box" style="margin-top: 20px;">
+            <h3>Design Principles</h3>
+            <ul style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+                <li><strong>Circular Layout:</strong> Organized by data type in concentric rings</li>
+                <li><strong>Query-Optimized:</strong> Schema designed for "find similar users" queries</li>
+                <li><strong>Weighted Relationships:</strong> Properties like strength, score, intensity on edges</li>
+                <li><strong>Temporal Tracking:</strong> Timestamps on behavioral relationships</li>
+                <li><strong>Hybrid Storage:</strong> Graph structure + vector embeddings for semantic search</li>
+                <li><strong>Privacy-Ready:</strong> Separates PII from preferences for granular access control</li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

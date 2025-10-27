@@ -1,0 +1,668 @@
+{
+  "version": "1.0",
+  "metadata": {
+    "created_by": "Product Team",
+    "last_updated": "2025-01-24",
+    "estimated_duration_minutes": 3,
+    "description": "User style autonomy and expression profiling"
+  },
+  "welcome": {
+    "title": "Welcome to ARI - Your Personal Style AI",
+    "message": "Let's find your perfect style balance. This takes about 3 minutes and helps me understand how you want to work together.",
+    "hook": "Think of this as a style conversation, not a quiz. There are no wrong answers!"
+  },
+  "steps": [
+    {
+      "step_id": "style_autonomy",
+      "title": "How We'll Work Together",
+      "description": "Understanding your creative control preferences",
+      "order": 1,
+      "questions": [
+        {
+          "id": "advice_receptiveness",
+          "type": "slider",
+          "question": "When it comes to style recommendations, where do you fall?",
+          "scale": {
+            "min": 1,
+            "max": 10,
+            "min_label": "Show me completely new ideas",
+            "max_label": "Help me refine what I already like",
+            "default": 5
+          },
+          "required": true,
+          "help_text": "This helps me know how adventurous to be with suggestions"
+        },
+        {
+          "id": "creative_control",
+          "type": "slider",
+          "question": "How much creative control do you want?",
+          "scale": {
+            "min": 1,
+            "max": 10,
+            "min_label": "Surprise me with bold choices",
+            "max_label": "I have a clear vision, help me execute",
+            "default": 5
+          },
+          "required": true
+        },
+        {
+          "id": "risk_tolerance",
+          "type": "slider",
+          "question": "How comfortable are you experimenting with new styles?",
+          "scale": {
+            "min": 1,
+            "max": 10,
+            "min_label": "Love pushing boundaries",
+            "max_label": "Prefer staying in my comfort zone",
+            "default": 5
+          },
+          "required": true
+        },
+        {
+          "id": "decision_making_style",
+          "type": "multiple_choice",
+          "question": "What's your ideal styling interaction?",
+          "options": [
+            {
+              "value": "tell_me",
+              "label": "Tell me what to wear - I trust your judgment",
+              "weight": 1
+            },
+            {
+              "value": "curated_options",
+              "label": "Give me 2-3 curated options to choose from",
+              "weight": 5
+            },
+            {
+              "value": "many_options",
+              "label": "Show me many options, I'll decide what resonates",
+              "weight": 10
+            }
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "step_id": "gender_expression",
+      "title": "Your Style Identity",
+      "description": "How you express yourself through fashion",
+      "order": 2,
+      "questions": [
+        {
+          "id": "expression_spectrum",
+          "type": "slider",
+          "question": "How would you describe your style aesthetic? (Optional - we'll also learn from your choices)",
+          "scale": {
+            "min": 1,
+            "max": 10,
+            "min_label": "Structured & Tailored",
+            "center_label": "Fluid & Balanced",
+            "max_label": "Soft & Flowing",
+            "default": 5
+          },
+          "required": false,
+          "visual_aids": true,
+          "help_text": "We'll refine this understanding as we learn your preferences - feel free to skip",
+          "allow_skip": true,
+          "skip_label": "I'd rather show you through my choices",
+          "track_as": "stated_expression_spectrum"
+        },
+        {
+          "id": "style_adjectives",
+          "type": "multi_select",
+          "question": "Which words describe your ideal style? (Select all that apply)",
+          "options": [
+            "Androgynous",
+            "Edgy",
+            "Classic",
+            "Fluid",
+            "Minimalist",
+            "Maximalist",
+            "Romantic",
+            "Streetwear",
+            "Professional",
+            "Bohemian",
+            "Athletic",
+            "Avant-garde",
+            "Vintage",
+            "Contemporary",
+            "Understated",
+            "Bold"
+          ],
+          "allow_custom": true,
+          "custom_placeholder": "Add your own style words...",
+          "min_selections": 2,
+          "max_selections": 5,
+          "required": true
+        },
+        {
+          "id": "fit_preferences",
+          "type": "multi_select",
+          "question": "How do you prefer your clothes to fit?",
+          "options": [
+            "Oversized",
+            "Relaxed",
+            "Tailored",
+            "Form-fitting",
+            "Flowing",
+            "Structured",
+            "Layered"
+          ],
+          "allow_custom": true,
+          "max_selections": 3,
+          "required": true
+        },
+        {
+          "id": "inspiration_sources",
+          "type": "text",
+          "question": "Any style icons or inspiration sources? (Optional)",
+          "placeholder": "Names, Instagram handles, celebrities, eras, movements...",
+          "required": false,
+          "multiline": true
+        },
+        {
+          "id": "occasion_flexibility",
+          "type": "slider",
+          "question": "How differently do you present in various contexts?",
+          "scale": {
+            "min": 1,
+            "max": 10,
+            "min_label": "I dress the same everywhere",
+            "max_label": "I adapt significantly per occasion",
+            "default": 5
+          },
+          "required": true
+        }
+      ]
+    },
+    {
+      "step_id": "self_expression",
+      "title": "Your Style Goals",
+      "description": "What you want your style to communicate",
+      "order": 3,
+      "questions": [
+        {
+          "id": "statement_level",
+          "type": "slider",
+          "question": "In most situations, I prefer to...",
+          "scale": {
+            "min": 1,
+            "max": 10,
+            "min_label": "Blend in professionally",
+            "max_label": "Stand out always",
+            "default": 5
+          },
+          "required": true
+        },
+        {
+          "id": "change_readiness",
+          "type": "multiple_choice",
+          "question": "Where are you in your style journey?",
+          "options": [
+            {
+              "value": "refine",
+              "label": "Refining my current style - small tweaks"
+            },
+            {
+              "value": "evolve",
+              "label": "Evolving my style - ready for moderate changes"
+            },
+            {
+              "value": "transform",
+              "label": "Complete transformation - starting fresh"
+            },
+            {
+              "value": "explore",
+              "label": "Exploring - not sure yet, want to experiment"
+            }
+          ],
+          "required": true
+        },
+        {
+          "id": "confidence_areas",
+          "type": "text",
+          "question": "What do you love about your current style?",
+          "placeholder": "What already works well for you...",
+          "required": false,
+          "multiline": true,
+          "help_text": "This helps me know what to preserve"
+        },
+        {
+          "id": "pain_points",
+          "type": "text",
+          "question": "What are your biggest style challenges?",
+          "placeholder": "Finding the right fit, knowing what occasions call for, staying on budget...",
+          "required": false,
+          "multiline": true,
+          "help_text": "Be specific - this guides my recommendations"
+        },
+        {
+          "id": "aspiration_mapping",
+          "type": "text",
+          "question": "Complete this sentence: 'I want to be seen as...'",
+          "placeholder": "Confident, approachable, creative, authoritative, effortless...",
+          "required": true,
+          "multiline": true
+        }
+      ]
+    },
+    {
+      "step_id": "lifestyle_context",
+      "title": "Your Lifestyle",
+      "description": "The practical context for your style",
+      "order": 4,
+      "questions": [
+        {
+          "id": "life_stage",
+          "type": "multi_select",
+          "question": "Which describe your current life stage? (Select all that apply)",
+          "options": [
+            "Student",
+            "Early Career Professional",
+            "Established Professional",
+            "Creative/Freelancer",
+            "Entrepreneur",
+            "Parent",
+            "Career Changer",
+            "Retired/Semi-retired"
+          ],
+          "allow_custom": true,
+          "max_selections": 3,
+          "required": true
+        },
+        {
+          "id": "workplace_context",
+          "type": "multiple_choice",
+          "question": "What's your typical work environment?",
+          "options": [
+            {
+              "value": "formal_office",
+              "label": "Formal office (suits, business attire)"
+            },
+            {
+              "value": "business_casual",
+              "label": "Business casual"
+            },
+            {
+              "value": "casual",
+              "label": "Casual/Creative workplace"
+            },
+            {
+              "value": "remote",
+              "label": "Remote work (flexible)"
+            },
+            {
+              "value": "no_workplace",
+              "label": "No traditional workplace"
+            },
+            {
+              "value": "varies",
+              "label": "Varies significantly"
+            }
+          ],
+          "required": true
+        },
+        {
+          "id": "social_occasions",
+          "type": "multi_select",
+          "question": "What occasions do you dress for regularly?",
+          "options": [
+            "Work/Professional",
+            "Casual Daily",
+            "Date Nights",
+            "Social Events",
+            "Formal Events",
+            "Creative/Networking",
+            "Athletic/Active",
+            "Travel",
+            "Cultural/Religious Events"
+          ],
+          "allow_custom": true,
+          "min_selections": 2,
+          "required": true
+        },
+        {
+          "id": "style_motivation",
+          "type": "multi_select",
+          "question": "What motivates your style choices? (Select up to 3)",
+          "options": [
+            "Professional advancement",
+            "Self-expression",
+            "Confidence building",
+            "Social belonging",
+            "Creative exploration",
+            "Comfort",
+            "Attracting romantic interest",
+            "Standing out",
+            "Blending in"
+          ],
+          "max_selections": 3,
+          "required": true
+        }
+      ]
+    },
+    {
+      "step_id": "values_shopping",
+      "title": "Values & Shopping",
+      "description": "What matters to you beyond aesthetics",
+      "order": 5,
+      "questions": [
+        {
+          "id": "values_alignment",
+          "type": "multi_select",
+          "question": "What values are important in your clothing choices?",
+          "options": [
+            "Sustainability",
+            "Ethical manufacturing",
+            "Local/small designers",
+            "Quality over quantity",
+            "Affordability",
+            "Trendiness",
+            "Versatility",
+            "Brand heritage",
+            "Innovation/tech fabrics"
+          ],
+          "allow_custom": true,
+          "min_selections": 2,
+          "max_selections": 5,
+          "required": true
+        },
+        {
+          "id": "shopping_behavior",
+          "type": "multiple_choice",
+          "question": "How do you typically shop?",
+          "options": [
+            {
+              "value": "planned_online",
+              "label": "Planned purchases, mostly online"
+            },
+            {
+              "value": "planned_instore",
+              "label": "Planned purchases, prefer in-store"
+            },
+            {
+              "value": "impulse_online",
+              "label": "Impulse buyer, online"
+            },
+            {
+              "value": "impulse_instore",
+              "label": "Impulse buyer, in-store"
+            },
+            {
+              "value": "mixed",
+              "label": "Mix of both planned and impulse"
+            }
+          ],
+          "required": true
+        },
+        {
+          "id": "brand_loyalty",
+          "type": "slider",
+          "question": "How do you approach brands?",
+          "scale": {
+            "min": 1,
+            "max": 10,
+            "min_label": "Very brand loyal",
+            "max_label": "Always exploring new brands",
+            "default": 5
+          },
+          "required": true
+        },
+        {
+          "id": "shopping_frequency",
+          "type": "multiple_choice",
+          "question": "How often do you add to your wardrobe?",
+          "options": [
+            {
+              "value": "seasonal",
+              "label": "Seasonal overhauls (2-4 times/year)"
+            },
+            {
+              "value": "monthly",
+              "label": "Monthly additions"
+            },
+            {
+              "value": "continuous",
+              "label": "Continuous small additions"
+            },
+            {
+              "value": "minimal",
+              "label": "Rarely - very minimal wardrobe"
+            }
+          ],
+          "required": true
+        }
+      ]
+    },
+    {
+      "step_id": "budget",
+      "title": "Budget & Investment",
+      "description": "Your spending comfort zones",
+      "order": 6,
+      "questions": [
+        {
+          "id": "monthly_budget",
+          "type": "range",
+          "question": "What's your comfortable monthly clothing budget?",
+          "range": {
+            "min": 0,
+            "max": 2000,
+            "step": 50,
+            "currency": "USD",
+            "default_min": 100,
+            "default_max": 500
+          },
+          "required": true,
+          "help_text": "This helps me show you realistic options"
+        },
+        {
+          "id": "item_investment",
+          "type": "segmented",
+          "question": "For different item types, what would you typically spend?",
+          "segments": [
+            {
+              "category": "Tops/Shirts",
+              "options": ["<$30", "$30-75", "$75-150", "$150-300", "$300+"]
+            },
+            {
+              "category": "Bottoms/Pants",
+              "options": ["<$50", "$50-100", "$100-200", "$200-400", "$400+"]
+            },
+            {
+              "category": "Outerwear",
+              "options": ["<$100", "$100-250", "$250-500", "$500-1000", "$1000+"]
+            },
+            {
+              "category": "Shoes",
+              "options": ["<$50", "$50-150", "$150-300", "$300-600", "$600+"]
+            }
+          ],
+          "required": true
+        },
+        {
+          "id": "splurge_save_preference",
+          "type": "text",
+          "question": "Where do you prefer to splurge vs save?",
+          "placeholder": "e.g., 'Splurge on shoes, save on basics' or 'Investment outerwear, affordable accessories'",
+          "required": false,
+          "multiline": true
+        },
+        {
+          "id": "value_perception",
+          "type": "slider",
+          "question": "What's your approach to clothing as an investment?",
+          "scale": {
+            "min": 1,
+            "max": 10,
+            "min_label": "Trendy finds, rotate often",
+            "max_label": "Timeless pieces, keep for years",
+            "default": 5
+          },
+          "required": true
+        }
+      ]
+    },
+    {
+      "step_id": "demographics_contact",
+      "title": "Just a Few More Details",
+      "description": "Basic info to complete your profile",
+      "order": 7,
+      "questions": [
+        {
+          "id": "age_range",
+          "type": "dropdown",
+          "question": "Age range",
+          "options": [
+            "18-24",
+            "25-34",
+            "35-44",
+            "45-54",
+            "55-64",
+            "65+"
+          ],
+          "required": true
+        },
+        {
+          "id": "location",
+          "type": "text",
+          "question": "Location (City, Country)",
+          "placeholder": "e.g., New York, USA",
+          "required": true,
+          "help_text": "This helps with seasonal recommendations and availability"
+        },
+        {
+          "id": "email",
+          "type": "email",
+          "question": "Email",
+          "placeholder": "your@email.com",
+          "required": true,
+          "validation": "email"
+        },
+        {
+          "id": "social_handles",
+          "type": "composite",
+          "question": "Social handles (optional - helps us understand your aesthetic)",
+          "fields": [
+            {
+              "name": "instagram",
+              "placeholder": "@yourhandle",
+              "required": false
+            },
+            {
+              "name": "pinterest",
+              "placeholder": "@yourhandle",
+              "required": false
+            },
+            {
+              "name": "tiktok",
+              "placeholder": "@yourhandle",
+              "required": false
+            }
+          ],
+          "required": false,
+          "help_text": "We won't post anything - just used to understand your style inspiration"
+        }
+      ]
+    }
+  ],
+  "completion": {
+    "title": "Your Style Profile is Ready!",
+    "message": "Thanks for sharing! I now have a great sense of how we'll work together. Let's find you something amazing.",
+    "cta": "Start Styling"
+  },
+  "data_model": {
+    "description": "Defines how onboarding responses map to Neo4j schema",
+    "note": "All spectrum questions track BOTH stated (from onboarding) and observed (from behavior)",
+    "dual_tracking_fields": [
+      {
+        "field_name": "expression_spectrum",
+        "question_id": "expression_spectrum",
+        "stored_as": {
+          "stated": "stated_expression_spectrum",
+          "observed": "observed_expression_spectrum",
+          "observed_confidence": "observed_confidence",
+          "preference_drift": "preference_drift"
+        },
+        "type": "float",
+        "range": "1-10",
+        "description": "Style aesthetic spectrum - Structured ↔ Fluid ↔ Soft"
+      },
+      {
+        "field_name": "advice_receptiveness",
+        "question_id": "advice_receptiveness",
+        "stored_as": {
+          "stated": "stated_advice_receptiveness",
+          "observed": "observed_advice_receptiveness"
+        },
+        "type": "float",
+        "range": "1-10",
+        "description": "New ideas ↔ Refine existing - Can observe if user explores vs filters to familiar"
+      },
+      {
+        "field_name": "risk_tolerance",
+        "question_id": "risk_tolerance",
+        "stored_as": {
+          "stated": "stated_risk_tolerance",
+          "observed": "observed_risk_tolerance"
+        },
+        "type": "float",
+        "range": "1-10",
+        "description": "Experimental ↔ Comfort zone - Observe by tracking unconventional purchases"
+      }
+    ],
+    "observation_triggers": {
+      "expression_spectrum": [
+        "product_views: map category to spectrum (blazers=3, dresses=8)",
+        "product_saves: stronger signal than views",
+        "product_purchases: strongest signal",
+        "search_queries: extract style keywords",
+        "filter_usage: fit preferences (tailored vs flowing)"
+      ],
+      "advice_receptiveness": [
+        "explores_new_categories: signal for low score (wants new ideas)",
+        "filters_to_familiar: signal for high score (refine existing)",
+        "clicks_ARI_suggestions: trusts recommendations"
+      ],
+      "risk_tolerance": [
+        "purchases_unconventional_items: low score (experimental)",
+        "stays_in_safe_categories: high score (comfort zone)",
+        "tries_new_brands: experimental behavior"
+      ]
+    }
+  },
+  "metrics": {
+    "track_completion_rate": true,
+    "track_time_per_step": true,
+    "track_skip_patterns": true,
+    "track_custom_inputs": true,
+    "track_preference_clarity": true,
+    "track_stated_vs_observed_drift": true,
+    "track_observation_confidence": true
+  },
+  "personalization_rules": {
+    "high_autonomy": {
+      "condition": "advice_receptiveness > 7 AND creative_control > 7",
+      "adjustments": {
+        "show_more_options": true,
+        "explanation_depth": "detailed",
+        "recommendation_count": 8
+      }
+    },
+    "low_autonomy": {
+      "condition": "advice_receptiveness < 4 AND creative_control < 4",
+      "adjustments": {
+        "show_more_options": false,
+        "explanation_depth": "concise",
+        "recommendation_count": 2
+      }
+    },
+    "experimental": {
+      "condition": "risk_tolerance < 4 AND change_readiness == 'transform'",
+      "adjustments": {
+        "bold_suggestions": true,
+        "explanation_depth": "reassuring"
+      }
+    }
+  }
+}
