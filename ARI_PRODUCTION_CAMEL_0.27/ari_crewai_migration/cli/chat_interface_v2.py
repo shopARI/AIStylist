@@ -1,0 +1,429 @@
+"""
+Enhanced Chat Interface V2
+
+User-aware chat interface with onboarding and personalization.
+Integrates with user graph for personalized fashion recommendations.
+
+Usage:
+    python cli/chat_interface_v2.py
+"""
+
+import asyncio
+import sys
+import uuid
+from datetime import datetime
+from typing import Optional, Dict, Any
+
+# Add parent directory to path
+sys.path.insert(0, '/home/leo/AIStylist/ARI_PRODUCTION_CAMEL_0.27/ari_crewai_migration')
+
+from services.user_service import UserService
+from services.onboarding_service import OnboardingService
+from cli.onboarding_cli import OnboardingCLI
+from crews.crewai_orchestrator import create_crewai_orchestrator
+from models.user_models import User
+
+
+class EnhancedChatInterface:
+    """Enhanced chat interface with user awareness."""
+
+    def __init__(self):
+        """Initialize chat interface."""
+        self.user_service = UserService()
+        self.onboarding_service = OnboardingService()
+        self.onboarding_cli = OnboardingCLI(self.onboarding_service)
+
+        self.orchestrator = None
+        self.current_user: Optional[User] = None
+        self.session_id = f"session_{uuid.uuid4().hex[:8]}"
+
+    def close(self):
+        """Close services."""
+        self.user_service.close()
+        self.onboarding_service.close()
+
+    # ======================
+    # USER AUTHENTICATION
+    # ======================
+
+    async def authenticate(self):
+        """Authenticate user or run onboarding for new users."""
+        print("\n" + "="*70)
+        print("ARI FASHION RECOMMENDATION SYSTEM")
+        print("="*70)
+        print()
+
+        while True:
+            username = input("Username: ").strip()
+
+            if not username:
+                print("  Username cannot be empty")
+                continue
+
+            # Check if user exists
+            user = self.user_service.get_user_by_username(username)
+
+            if user is None:
+                # New user
+                print(f"\nWelcome, {username}! You're new here.")
+                email = input("Email: ").strip()
+
+                if not email or '@' not in email:
+                    print("  Please enter a valid email")
+                    continue
+
+                print("\nLet's set up your style profile (takes about 3 minutes)...")
+
+                # Run onboarding
+                user = await self.onboarding_cli.run_full_onboarding(username, email)
+
+                print(f"\nProfile complete! Welcome to ARI, {username}!")
+
+            else:
+                # Existing user
+                if not user.onboarding_completed:
+                    print(f"\nWelcome back, {username}!")
+                    print("Let's finish your profile setup...")
+
+                    # Resume onboarding
+                    user = await self.onboarding_cli.run_full_onboarding(username, user.email)
+
+                else:
+                    print(f"\nWelcome back, {username}!")
+
+            self.current_user = user
+            break
+
+    # ======================
+    # PERSONALIZATION
+    # ======================
+
+    def get_personalized_limit(self) -> int:
+        """Get personalized result limit based on decision-making style."""
+        if not self.current_user:
+            return 5
+
+        style = self.current_user.decision_making_style
+
+        if style == "tell_me":
+            return 2
+        elif style == "curated_options":
+            return 5
+        else:  # many_options
+            return 8
+
+    async def get_user_style_context(self) -> Dict[str, Any]:
+        """Get user style context for personalized search."""
+        if not self.current_user:
+            return {}
+
+        # Get full profile
+        profile = self.user_service.get_user_profile(self.current_user.id)
+
+        if not profile:
+            return {}
+
+        return {
+            "user_id": self.current_user.id,
+            "username": self.current_user.username,
+            "style_adjectives": [adj.name for adj in profile.style_adjectives],
+            "fit_preferences": profile.fit_preferences,
+            "occasions": [occ.name for occ in profile.occasions],
+            "values": [val.name for val in profile.values],
+            "budget_range": {
+                "min": self.current_user.monthly_budget_min or 0,
+                "max": self.current_user.monthly_budget_max or 1000
+            },
+            "risk_tolerance": self.current_user.stated_risk_tolerance or 5.0,
+            "expression_spectrum": self.current_user.stated_expression_spectrum or 5.0,
+            "aspiration": self.current_user.aspiration_text or "",
+            "change_readiness": self.current_user.change_readiness or "evolve"
+        }
+
+    def apply_user_filters(self) -> Dict[str, Any]:
+        """Apply user-specific filters."""
+        if not self.current_user:
+            return {}
+
+        filters = {}
+
+        # Budget constraints
+        if self.current_user.monthly_budget_max:
+            # Rough per-item budget (monthly budget / 4)
+            filters['max_price'] = self.current_user.monthly_budget_max // 4
+
+        return filters
+
+    # ======================
+    # INTERACTION TRACKING
+    # ======================
+
+    async def track_search(self, query: str, result: Dict[str, Any]):
+        """Track search interaction."""
+        if not self.current_user:
+            return
+
+        products = result.get("products", [])
+
+        # Track search
+        self.user_service.track_search(
+            user_id=self.current_user.id,
+            query=query,
+            category=result.get("metadata", {}).get("primary_category", ""),
+            result_count=len(products)
+        )
+
+        # Track product views
+        for product in products:
+            self.user_service.track_product_view(
+                user_id=self.current_user.id,
+                product_id=product.get("id", ""),
+                session_id=self.session_id,
+                product_title=product.get("title", ""),
+                product_category=product.get("category", "")
+            )
+
+    # ======================
+    # CHAT LOOP
+    # ======================
+
+    async def start_chat(self):
+        """Start the chat loop."""
+        # Initialize orchestrator
+        print("\nInitializing ARI recommendation system...")
+
+        try:
+            from nlp.hybrid_intent_detector import DetectionStrategy
+
+            self.orchestrator = create_crewai_orchestrator(
+                process_type="sequential",
+                intent_strategy=DetectionStrategy.LLM_FIRST
+            )
+
+            print("System ready!")
+
+        except Exception as e:
+            print(f"Error initializing system: {e}")
+            return
+
+        # Show user info
+        print("\n" + "="*70)
+        print("YOUR PROFILE")
+        print("="*70)
+        print(f"Username: {self.current_user.username}")
+
+        if self.current_user.stated_expression_spectrum:
+            print(f"Style Expression: {self.current_user.stated_expression_spectrum:.1f}/10")
+
+        if self.current_user.decision_making_style:
+            print(f"Decision Style: {self.current_user.decision_making_style}")
+
+        if self.current_user.monthly_budget_max:
+            print(f"Monthly Budget: ${self.current_user.monthly_budget_min}-${self.current_user.monthly_budget_max}")
+
+        print("="*70)
+        print()
+        print("Commands:")
+        print("  'profile' - View your complete profile")
+        print("  'stats' - View your usage statistics")
+        print("  'quit' or 'exit' - Exit")
+        print()
+        print("="*70)
+        print()
+
+        # Chat loop
+        while True:
+            try:
+                query = input("You: ").strip()
+
+                if not query:
+                    continue
+
+                # Handle commands
+                if query.lower() in ['quit', 'exit', 'q']:
+                    print("\nThanks for using ARI! Goodbye!")
+                    break
+
+                if query.lower() == 'profile':
+                    await self.show_profile()
+                    continue
+
+                if query.lower() == 'stats':
+                    await self.show_stats()
+                    continue
+
+                # Execute search
+                print(f"\n  Searching...")
+
+                result = await self.orchestrator.execute_search(
+                    query=query,
+                    limit=self.get_personalized_limit(),
+                    user_context=await self.get_user_style_context(),
+                    filters=self.apply_user_filters(),
+                    conversation_context={
+                        "session_id": self.session_id,
+                        "user_id": self.current_user.id
+                    }
+                )
+
+                # Track interaction
+                await self.track_search(query, result)
+
+                # Display results
+                self.display_results(result)
+
+                # Update observed preferences periodically
+                if self.current_user.total_searches % 5 == 0:
+                    self.user_service.update_observed_preferences(self.current_user.id)
+
+            except KeyboardInterrupt:
+                print("\n\nThanks for using ARI! Goodbye!")
+                break
+
+            except Exception as e:
+                print(f"\nError: {e}")
+                continue
+
+    # ======================
+    # DISPLAY METHODS
+    # ======================
+
+    def display_results(self, result: Dict[str, Any]):
+        """Display search results."""
+        products = result.get("products", [])
+
+        print("\n" + "="*70)
+        print(f"RESULTS ({len(products)} products)")
+        print("="*70)
+
+        if not products:
+            print("\nNo products found. Try a different query.")
+            print()
+            return
+
+        for i, product in enumerate(products, 1):
+            print(f"\n{i}. {product.get('title', 'Unknown Product')}")
+            print(f"   Price: ${product.get('price', 0):.2f}")
+
+            if 'category' in product:
+                print(f"   Category: {product['category']}")
+
+            if 'brand' in product and product['brand']:
+                print(f"   Brand: {product['brand']}")
+
+            # Show agent scores if available
+            if 'cypher_score' in product:
+                print(f"   Scores: Graph={product.get('cypher_score', 0):.2f} "
+                      f"Vector={product.get('vibe_score', 0):.2f} "
+                      f"Visual={product.get('visual_score', 0):.2f}")
+
+        # Show reasoning
+        if 'reasoning' in result:
+            print(f"\n  {result['reasoning'][:200]}")
+
+        print("\n" + "="*70)
+        print()
+
+    async def show_profile(self):
+        """Display user profile."""
+        profile = self.user_service.get_user_profile(self.current_user.id)
+
+        if not profile:
+            print("\nProfile not found.")
+            return
+
+        print("\n" + "="*70)
+        print("YOUR COMPLETE PROFILE")
+        print("="*70)
+
+        user = profile.user
+
+        print(f"\nUsername: {user.username}")
+        print(f"Email: {user.email}")
+        print(f"Member since: {user.created_at.strftime('%Y-%m-%d')}")
+
+        if user.age_range:
+            print(f"Age Range: {user.age_range}")
+
+        if user.location:
+            print(f"Location: {user.location}")
+
+        print("\n--- STYLE PREFERENCES ---")
+
+        if profile.style_adjectives:
+            print("Style: " + ", ".join([adj.name for adj in profile.style_adjectives[:3]]))
+
+        if profile.fit_preferences:
+            print("Fit: " + ", ".join(profile.fit_preferences))
+
+        if profile.occasions:
+            print("Occasions: " + ", ".join([occ.name for occ in profile.occasions[:3]]))
+
+        print("\n--- SHOPPING ---")
+
+        if user.shopping_behavior:
+            print(f"Shopping Style: {user.shopping_behavior}")
+
+        if user.monthly_budget_min and user.monthly_budget_max:
+            print(f"Monthly Budget: ${user.monthly_budget_min}-${user.monthly_budget_max}")
+
+        if user.aspiration_text:
+            print(f"\nYour Goal: \"{user.aspiration_text}\"")
+
+        print("\n" + "="*70)
+        print()
+
+    async def show_stats(self):
+        """Display user statistics."""
+        stats = self.user_service.get_user_stats(self.current_user.id)
+
+        print("\n" + "="*70)
+        print("YOUR STATISTICS")
+        print("="*70)
+
+        print(f"\nTotal Searches: {stats.get('total_searches', 0)}")
+        print(f"Products Viewed: {stats.get('total_products_viewed', 0)}")
+        print(f"Products Saved: {stats.get('total_products_saved', 0)}")
+        print(f"Purchases: {stats.get('total_purchases', 0)}")
+
+        drift = stats.get('preference_drift', 0)
+        confidence = stats.get('observation_confidence', 0)
+
+        if confidence > 0.3:
+            print(f"\nPreference Learning: {confidence*100:.0f}% confidence")
+
+            if drift < 1.0:
+                print("  Your choices match your stated preferences well!")
+            elif drift < 2.0:
+                print("  Minor differences between stated and observed preferences.")
+            else:
+                print("  Your style may be evolving! Consider updating your profile.")
+
+        print("\n" + "="*70)
+        print()
+
+    # ======================
+    # MAIN ENTRY POINT
+    # ======================
+
+    async def run(self):
+        """Main entry point."""
+        try:
+            # Authenticate
+            await self.authenticate()
+
+            # Start chat
+            await self.start_chat()
+
+        finally:
+            self.close()
+
+
+async def main():
+    """Main function."""
+    interface = EnhancedChatInterface()
+    await interface.run()
+
+
+if __name__ == "__main__":
+    asyncio.run(main())

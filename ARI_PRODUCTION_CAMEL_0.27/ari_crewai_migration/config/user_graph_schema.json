@@ -1,0 +1,219 @@
+{
+  "database": "productionbackup2_user",
+  "purpose": "User profiles, onboarding data, style preferences, and behavioral tracking",
+  "nodes": {
+    "User": {
+      "description": "Core user profile with onboarding data and preference tracking",
+      "properties": {
+        "id": "str (UUID, unique)",
+        "username": "str (unique)",
+        "email": "str (unique)",
+        "created_at": "datetime",
+        "updated_at": "datetime",
+        "last_active": "datetime",
+        "onboarding_completed": "bool",
+        "onboarding_completed_at": "datetime",
+        "age_range": "str (18-24|25-34|35-44|45-54|55-64|65+)",
+        "location": "str (City, Country)",
+        "instagram_handle": "str",
+        "pinterest_handle": "str",
+        "tiktok_handle": "str",
+        "stated_advice_receptiveness": "float (1-10)",
+        "stated_creative_control": "float (1-10)",
+        "stated_risk_tolerance": "float (1-10)",
+        "decision_making_style": "str (tell_me|curated_options|many_options)",
+        "observed_advice_receptiveness": "float (1-10)",
+        "observed_creative_control": "float (1-10)",
+        "observed_risk_tolerance": "float (1-10)",
+        "observation_confidence": "float (0-1)",
+        "preference_drift": "float",
+        "stated_expression_spectrum": "float (1-10)",
+        "observed_expression_spectrum": "float (1-10)",
+        "statement_level": "float (1-10)",
+        "change_readiness": "str (refine|evolve|transform|explore)",
+        "aspiration_text": "str",
+        "workplace_context": "str (formal_office|business_casual|casual|remote|no_workplace|varies)",
+        "occasion_flexibility": "float (1-10)",
+        "shopping_behavior": "str (planned_online|planned_instore|impulse_online|impulse_instore|mixed)",
+        "brand_loyalty": "float (1-10)",
+        "shopping_frequency": "str (seasonal|monthly|continuous|minimal)",
+        "monthly_budget_min": "int",
+        "monthly_budget_max": "int",
+        "value_perception": "float (1-10)",
+        "total_searches": "int",
+        "total_products_viewed": "int",
+        "total_products_saved": "int",
+        "total_purchases": "int",
+        "confidence_areas": "str",
+        "pain_points": "str",
+        "inspiration_sources": "str",
+        "splurge_save_preference": "str"
+      }
+    },
+    "StyleAdjective": {
+      "description": "Style descriptors from onboarding (Androgynous, Edgy, Classic, etc.)",
+      "properties": {
+        "name": "str (unique)"
+      }
+    },
+    "FitPreference": {
+      "description": "Clothing fit preferences (Oversized, Tailored, Relaxed, etc.)",
+      "properties": {
+        "name": "str (unique)"
+      }
+    },
+    "LifeStage": {
+      "description": "User life stage (Student, Professional, Parent, etc.)",
+      "properties": {
+        "name": "str (unique)"
+      }
+    },
+    "Occasion": {
+      "description": "Occasions user dresses for (Work, Casual, Formal, etc.)",
+      "properties": {
+        "name": "str (unique)"
+      }
+    },
+    "ValuePriority": {
+      "description": "Shopping values (Sustainability, Quality, Affordability, etc.)",
+      "properties": {
+        "name": "str (unique)"
+      }
+    },
+    "StyleMotivation": {
+      "description": "Style motivations (Self-expression, Confidence, Professional advancement, etc.)",
+      "properties": {
+        "name": "str (unique)"
+      }
+    },
+    "BudgetCategory": {
+      "description": "Per-category budget ranges (Tops, Bottoms, Outerwear, Shoes)",
+      "properties": {
+        "user_id": "str",
+        "category": "str (Tops/Shirts|Bottoms/Pants|Outerwear|Shoes)",
+        "min_price": "int",
+        "max_price": "int"
+      }
+    },
+    "ProductRef": {
+      "description": "Reference to products in productionbackup2 database",
+      "properties": {
+        "product_id": "str (UUID from productionbackup2)",
+        "product_title": "str (cached)",
+        "product_category": "str (cached)"
+      }
+    }
+  },
+  "relationships": {
+    "IDENTIFIES_WITH": {
+      "from": "User",
+      "to": "StyleAdjective",
+      "properties": {
+        "priority": "int (1=highest priority)"
+      },
+      "description": "User identifies with this style adjective"
+    },
+    "PREFERS_FIT": {
+      "from": "User",
+      "to": "FitPreference",
+      "properties": {},
+      "description": "User prefers this clothing fit"
+    },
+    "IN_LIFE_STAGE": {
+      "from": "User",
+      "to": "LifeStage",
+      "properties": {},
+      "description": "User is in this life stage"
+    },
+    "DRESSES_FOR": {
+      "from": "User",
+      "to": "Occasion",
+      "properties": {
+        "frequency": "str (daily|weekly|monthly|rarely)"
+      },
+      "description": "User dresses for this occasion"
+    },
+    "VALUES": {
+      "from": "User",
+      "to": "ValuePriority",
+      "properties": {
+        "importance": "int (1=most important)"
+      },
+      "description": "User values this priority when shopping"
+    },
+    "MOTIVATED_BY": {
+      "from": "User",
+      "to": "StyleMotivation",
+      "properties": {},
+      "description": "User is motivated by this factor"
+    },
+    "HAS_BUDGET": {
+      "from": "User",
+      "to": "BudgetCategory",
+      "properties": {},
+      "description": "User has budget for this category"
+    },
+    "VIEWED": {
+      "from": "User",
+      "to": "ProductRef",
+      "properties": {
+        "timestamp": "datetime",
+        "session_id": "str",
+        "count": "int (number of times viewed)"
+      },
+      "description": "User viewed this product"
+    },
+    "SAVED": {
+      "from": "User",
+      "to": "ProductRef",
+      "properties": {
+        "timestamp": "datetime",
+        "collection": "str (optional collection name)"
+      },
+      "description": "User saved/favorited this product"
+    },
+    "PURCHASED": {
+      "from": "User",
+      "to": "ProductRef",
+      "properties": {
+        "timestamp": "datetime",
+        "price": "float",
+        "occasion": "str (optional occasion for purchase)"
+      },
+      "description": "User purchased this product"
+    },
+    "SEARCHED_FOR": {
+      "from": "User",
+      "to": "ProductRef",
+      "properties": {
+        "query": "str (search query text)",
+        "timestamp": "datetime",
+        "found_products": "int (number of results)"
+      },
+      "description": "User searched and this product was in results"
+    }
+  },
+  "cross_database_references": {
+    "description": "This database stores references to products in productionbackup2",
+    "product_database": "productionbackup2",
+    "reference_method": "ProductRef nodes store product_id from productionbackup2",
+    "query_pattern": "Application-level joins using product IDs"
+  },
+  "indexes": [
+    "user_created_at",
+    "user_last_active",
+    "user_onboarding_completed"
+  ],
+  "constraints": [
+    "user_id_unique",
+    "user_username_unique",
+    "user_email_unique",
+    "style_adjective_name_unique",
+    "fit_preference_name_unique",
+    "life_stage_name_unique",
+    "occasion_name_unique",
+    "value_priority_name_unique",
+    "style_motivation_name_unique",
+    "budget_category_composite (user_id, category)"
+  ]
+}
