@@ -5,6 +5,7 @@ Orchestrates the entire user onboarding flow. Manages step progression,
 stores responses in Neo4j, and coordinates with user service.
 """
 
+import re
 import uuid
 from typing import Dict, List, Any, Optional
 from datetime import datetime
@@ -329,7 +330,7 @@ class OnboardingService:
 
     def _parse_price_range(self, price_str: str) -> tuple[int, int]:
         """
-        Parse price range string.
+        Parse price range string using robust regex patterns.
 
         Examples:
             "<$30" -> (0, 30)
@@ -340,22 +341,27 @@ class OnboardingService:
         # Remove $ and spaces
         price_str = price_str.replace('$', '').replace(' ', '')
 
-        if '<' in price_str:
-            # Less than format: "<30"
-            max_price = int(price_str.replace('<', ''))
-            return (0, max_price)
-        elif '+' in price_str:
-            # Greater than format: "300+"
-            min_price = int(price_str.replace('+', ''))
-            return (min_price, 10000)
-        elif '-' in price_str:
-            # Range format: "30-75"
-            parts = price_str.split('-')
-            return (int(parts[0]), int(parts[1]))
-        else:
-            # Single value
-            value = int(price_str)
+        # Try to match different patterns using regex
+        # Pattern 1: Less than format "<30"
+        if match := re.match(r'<(\d+)', price_str):
+            return (0, int(match.group(1)))
+
+        # Pattern 2: Greater than format "300+"
+        elif match := re.match(r'(\d+)\+', price_str):
+            return (int(match.group(1)), 10000)
+
+        # Pattern 3: Range format "30-75"
+        elif match := re.match(r'(\d+)-(\d+)', price_str):
+            return (int(match.group(1)), int(match.group(2)))
+
+        # Pattern 4: Single value "50"
+        elif match := re.match(r'^(\d+)$', price_str):
+            value = int(match.group(1))
             return (value, value)
+
+        # If no pattern matches, raise an error
+        else:
+            raise ValueError(f"Unable to parse price range: '{price_str}'")
 
     # ======================
     # PROGRESS MANAGEMENT

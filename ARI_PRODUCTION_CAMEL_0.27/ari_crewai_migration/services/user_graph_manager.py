@@ -37,6 +37,34 @@ class UserGraphManager:
             self.driver.close()
 
     # ======================
+    # INPUT VALIDATION
+    # ======================
+
+    @staticmethod
+    def _validate_string_list(value: Any, param_name: str) -> None:
+        """Validate that a parameter is a list of strings."""
+        if not isinstance(value, list):
+            raise TypeError(f"{param_name} must be a list, got {type(value).__name__}")
+        if not all(isinstance(item, str) for item in value):
+            raise TypeError(f"All items in {param_name} must be strings")
+
+    @staticmethod
+    def _validate_int_list(value: Any, param_name: str) -> None:
+        """Validate that a parameter is a list of integers."""
+        if not isinstance(value, list):
+            raise TypeError(f"{param_name} must be a list, got {type(value).__name__}")
+        if not all(isinstance(item, int) for item in value):
+            raise TypeError(f"All items in {param_name} must be integers")
+
+    @staticmethod
+    def _validate_user_id(user_id: Any) -> None:
+        """Validate that user_id is a string."""
+        if not isinstance(user_id, str):
+            raise TypeError(f"user_id must be a string, got {type(user_id).__name__}")
+        if not user_id.strip():
+            raise ValueError("user_id cannot be empty")
+
+    # ======================
     # USER CREATION
     # ======================
 
@@ -113,8 +141,15 @@ class UserGraphManager:
 
     def add_style_adjectives(self, user_id: str, adjectives: List[str], priorities: Optional[List[int]] = None):
         """Add style adjectives with priorities."""
+        self._validate_user_id(user_id)
+        self._validate_string_list(adjectives, "adjectives")
+
         if priorities is None:
             priorities = list(range(1, len(adjectives) + 1))
+        else:
+            self._validate_int_list(priorities, "priorities")
+            if len(priorities) != len(adjectives):
+                raise ValueError(f"priorities length ({len(priorities)}) must match adjectives length ({len(adjectives)})")
 
         with self.driver.session(database=self.database) as session:
             for adj, priority in zip(adjectives, priorities):
@@ -127,6 +162,9 @@ class UserGraphManager:
 
     def add_fit_preferences(self, user_id: str, fits: List[str]):
         """Add fit preferences."""
+        self._validate_user_id(user_id)
+        self._validate_string_list(fits, "fits")
+
         with self.driver.session(database=self.database) as session:
             for fit in fits:
                 session.run("""
@@ -137,6 +175,9 @@ class UserGraphManager:
 
     def add_life_stages(self, user_id: str, life_stages: List[str]):
         """Add life stages."""
+        self._validate_user_id(user_id)
+        self._validate_string_list(life_stages, "life_stages")
+
         with self.driver.session(database=self.database) as session:
             for stage in life_stages:
                 session.run("""
@@ -147,8 +188,15 @@ class UserGraphManager:
 
     def add_occasions(self, user_id: str, occasions: List[str], frequencies: Optional[List[str]] = None):
         """Add occasions with optional frequencies."""
+        self._validate_user_id(user_id)
+        self._validate_string_list(occasions, "occasions")
+
         if frequencies is None:
             frequencies = ['weekly'] * len(occasions)
+        else:
+            self._validate_string_list(frequencies, "frequencies")
+            if len(frequencies) != len(occasions):
+                raise ValueError(f"frequencies length ({len(frequencies)}) must match occasions length ({len(occasions)})")
 
         with self.driver.session(database=self.database) as session:
             for occasion, frequency in zip(occasions, frequencies):
@@ -161,8 +209,15 @@ class UserGraphManager:
 
     def add_values(self, user_id: str, values: List[str], importance: Optional[List[int]] = None):
         """Add value priorities with importance rankings."""
+        self._validate_user_id(user_id)
+        self._validate_string_list(values, "values")
+
         if importance is None:
             importance = list(range(1, len(values) + 1))
+        else:
+            self._validate_int_list(importance, "importance")
+            if len(importance) != len(values):
+                raise ValueError(f"importance length ({len(importance)}) must match values length ({len(values)})")
 
         with self.driver.session(database=self.database) as session:
             for value, imp in zip(values, importance):
@@ -175,6 +230,9 @@ class UserGraphManager:
 
     def add_motivations(self, user_id: str, motivations: List[str]):
         """Add style motivations."""
+        self._validate_user_id(user_id)
+        self._validate_string_list(motivations, "motivations")
+
         with self.driver.session(database=self.database) as session:
             for motivation in motivations:
                 session.run("""
@@ -190,6 +248,25 @@ class UserGraphManager:
         Args:
             budgets: List of dicts with keys: category, min_price, max_price
         """
+        self._validate_user_id(user_id)
+        if not isinstance(budgets, list):
+            raise TypeError(f"budgets must be a list, got {type(budgets).__name__}")
+
+        # Validate each budget dict
+        for i, budget in enumerate(budgets):
+            if not isinstance(budget, dict):
+                raise TypeError(f"budgets[{i}] must be a dict, got {type(budget).__name__}")
+            required_keys = ['category', 'min_price', 'max_price']
+            for key in required_keys:
+                if key not in budget:
+                    raise ValueError(f"budgets[{i}] missing required key: {key}")
+            if not isinstance(budget['category'], str):
+                raise TypeError(f"budgets[{i}]['category'] must be a string")
+            if not isinstance(budget['min_price'], (int, float)):
+                raise TypeError(f"budgets[{i}]['min_price'] must be a number")
+            if not isinstance(budget['max_price'], (int, float)):
+                raise TypeError(f"budgets[{i}]['max_price'] must be a number")
+
         with self.driver.session(database=self.database) as session:
             for budget in budgets:
                 session.run("""

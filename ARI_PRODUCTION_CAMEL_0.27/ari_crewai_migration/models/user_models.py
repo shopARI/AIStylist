@@ -67,13 +67,13 @@ class User(BaseModel):
     onboarding_completed_at: Optional[datetime] = None
 
     # Demographics
-    age_range: Optional[str] = None
-    location: Optional[str] = None
+    age_range: Optional[str] = Field(None, max_length=50)
+    location: Optional[str] = Field(None, max_length=100)
 
     # Social (optional)
-    instagram_handle: Optional[str] = None
-    pinterest_handle: Optional[str] = None
-    tiktok_handle: Optional[str] = None
+    instagram_handle: Optional[str] = Field(None, max_length=50)
+    pinterest_handle: Optional[str] = Field(None, max_length=50)
+    tiktok_handle: Optional[str] = Field(None, max_length=50)
 
     # Style Autonomy - Stated
     stated_advice_receptiveness: Optional[float] = Field(None, ge=1, le=10)
@@ -95,7 +95,7 @@ class User(BaseModel):
     # Self Expression
     statement_level: Optional[float] = Field(None, ge=1, le=10)
     change_readiness: Optional[ChangeReadiness] = None
-    aspiration_text: Optional[str] = None
+    aspiration_text: Optional[str] = Field(None, max_length=500)
 
     # Lifestyle
     workplace_context: Optional[WorkplaceContext] = None
@@ -118,10 +118,10 @@ class User(BaseModel):
     total_purchases: int = 0
 
     # Free text fields
-    confidence_areas: Optional[str] = None
-    pain_points: Optional[str] = None
-    inspiration_sources: Optional[str] = None
-    splurge_save_preference: Optional[str] = None
+    confidence_areas: Optional[str] = Field(None, max_length=500)
+    pain_points: Optional[str] = Field(None, max_length=500)
+    inspiration_sources: Optional[str] = Field(None, max_length=500)
+    splurge_save_preference: Optional[str] = Field(None, max_length=500)
 
     class Config:
         use_enum_values = True

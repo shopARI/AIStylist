@@ -74,7 +74,7 @@ class Question(BaseModel):
 
     # Type-specific fields
     scale: Optional[QuestionScale] = None
-    options: Optional[List[QuestionOption]] = None
+    options: Optional[List[Any]] = None  # Can be str or QuestionOption
     range: Optional[QuestionRange] = None
     segments: Optional[List[SegmentedOption]] = None
     fields: Optional[List[CompositeField]] = None

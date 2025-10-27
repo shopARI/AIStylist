@@ -128,7 +128,18 @@ def validate_step_responses(step: OnboardingStep, responses: Dict[str, Any]) -> 
             if not isinstance(response, str):
                 errors.append(f"Question '{question.id}': Expected string, got {type(response)}")
             elif question.options:
-                valid_values = [opt.value for opt in question.options]
+                # Extract valid values from options (can be str, dict, or object)
+                valid_values = []
+                for opt in question.options:
+                    if isinstance(opt, str):
+                        valid_values.append(opt)
+                    elif isinstance(opt, dict):
+                        valid_values.append(opt.get('value', opt.get('label', str(opt))))
+                    elif hasattr(opt, 'value'):
+                        valid_values.append(opt.value)
+                    elif hasattr(opt, 'label'):
+                        valid_values.append(opt.label)
+
                 if response not in valid_values:
                     errors.append(
                         f"Question '{question.id}': Invalid option '{response}'. "
@@ -153,7 +164,18 @@ def validate_step_responses(step: OnboardingStep, responses: Dict[str, Any]) -> 
 
                 # Check valid options
                 if question.options:
-                    valid_values = [opt.label if hasattr(opt, 'label') else opt for opt in question.options]
+                    # Extract valid values from options (can be str, dict, or object)
+                    valid_values = []
+                    for opt in question.options:
+                        if isinstance(opt, str):
+                            valid_values.append(opt)
+                        elif isinstance(opt, dict):
+                            valid_values.append(opt.get('label', opt.get('value', str(opt))))
+                        elif hasattr(opt, 'label'):
+                            valid_values.append(opt.label)
+                        else:
+                            valid_values.append(str(opt))
+
                     for item in response:
                         if item not in valid_values:
                             warnings.append(
