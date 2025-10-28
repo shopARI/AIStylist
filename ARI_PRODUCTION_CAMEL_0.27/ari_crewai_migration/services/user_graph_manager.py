@@ -656,3 +656,292 @@ class UserGraphManager:
             """, user_id=user_id)
 
             return result.single() is not None
+
+    # ======================
+    # RECOMMENDATION TRACKING
+    # ======================
+
+    def record_recommendation(self, user_id: str, product_id: str, source: str,
+                            context: str = "", confidence_score: float = None,
+                            product_title: str = "", product_category: str = "",
+                            product_price: float = None) -> str:
+        """
+        Record a recommendation shown to the user.
+
+        Args:
+            user_id: User ID
+            product_id: Product ID
+            source: Recommendation source (e.g., "ari_agent", "curated", "personalized")
+            context: Context for recommendation (e.g., search query, occasion)
+            confidence_score: System confidence in recommendation (0-1)
+            product_title: Product title
+            product_category: Product category
+            product_price: Product price
+
+        Returns:
+            recommendation_id: Unique ID for this recommendation
+        """
+        import uuid
+        rec_id = str(uuid.uuid4())
+
+        with self.driver.session(database=self.database) as session:
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                MERGE (p:ProductRef {product_id: $product_id})
+                ON CREATE SET p.product_title = $product_title,
+                              p.product_category = $product_category,
+                              p.product_price = $product_price
+
+                CREATE (r:Recommendation {
+                    id: $rec_id,
+                    user_id: $user_id,
+                    product_id: $product_id,
+                    source: $source,
+                    context: $context,
+                    confidence_score: $confidence_score,
+                    timestamp: datetime(),
+                    accepted: false,
+                    user_rating: null
+                })
+                CREATE (u)-[:RECEIVED_RECOMMENDATION]->(r)
+                CREATE (r)-[:RECOMMENDS]->(p)
+            """, user_id=user_id, product_id=product_id, rec_id=rec_id,
+                source=source, context=context, confidence_score=confidence_score,
+                product_title=product_title, product_category=product_category,
+                product_price=product_price)
+
+        return rec_id
+
+    def record_recommendation_acceptance(self, recommendation_id: str,
+                                        action: str = "saved") -> bool:
+        """
+        Record that a user accepted a recommendation.
+
+        Args:
+            recommendation_id: Recommendation ID
+            action: Type of acceptance ("saved", "purchased", "clicked")
+
+        Returns:
+            Success boolean
+        """
+        with self.driver.session(database=self.database) as session:
+            result = session.run("""
+                MATCH (r:Recommendation {id: $rec_id})
+                SET r.accepted = true,
+                    r.acceptance_action = $action,
+                    r.acceptance_timestamp = datetime()
+                RETURN r
+            """, rec_id=recommendation_id, action=action)
+
+            return result.single() is not None
+
+    def record_recommendation_rating(self, recommendation_id: str,
+                                    rating: int, feedback: str = "") -> bool:
+        """
+        Record user's rating of a recommendation.
+
+        Args:
+            recommendation_id: Recommendation ID
+            rating: Rating (1-5 stars or 1-10 scale)
+            feedback: Optional text feedback
+
+        Returns:
+            Success boolean
+        """
+        with self.driver.session(database=self.database) as session:
+            result = session.run("""
+                MATCH (r:Recommendation {id: $rec_id})
+                SET r.user_rating = $rating,
+                    r.user_feedback = $feedback,
+                    r.rating_timestamp = datetime()
+                RETURN r
+            """, rec_id=recommendation_id, rating=rating, feedback=feedback)
+
+            return result.single() is not None
+
+    # ======================
+    # METRICS CALCULATION
+    # ======================
+
+    def calculate_recommendation_acceptance_rate(self, user_id: str,
+                                                source: str = None) -> float:
+        """
+        Calculate the percentage of recommendations the user accepted.
+
+        Args:
+            user_id: User ID
+            source: Optional filter by recommendation source
+
+        Returns:
+            Acceptance rate (0.0 to 1.0)
+        """
+        with self.driver.session(database=self.database) as session:
+            if source:
+                result = session.run("""
+                    MATCH (u:User {id: $user_id})-[:RECEIVED_RECOMMENDATION]->(r:Recommendation {source: $source})
+                    WITH count(r) as total,
+                         sum(CASE WHEN r.accepted THEN 1 ELSE 0 END) as accepted
+                    RETURN total, accepted
+                """, user_id=user_id, source=source)
+            else:
+                result = session.run("""
+                    MATCH (u:User {id: $user_id})-[:RECEIVED_RECOMMENDATION]->(r:Recommendation)
+                    WITH count(r) as total,
+                         sum(CASE WHEN r.accepted THEN 1 ELSE 0 END) as accepted
+                    RETURN total, accepted
+                """, user_id=user_id)
+
+            record = result.single()
+            if not record or record['total'] == 0:
+                return 0.0
+
+            return float(record['accepted']) / float(record['total'])
+
+    def calculate_average_style_match_score(self, user_id: str) -> Optional[float]:
+        """
+        Calculate average style match score from user ratings.
+
+        Returns:
+            Average rating (or None if no ratings)
+        """
+        with self.driver.session(database=self.database) as session:
+            result = session.run("""
+                MATCH (u:User {id: $user_id})-[:RECEIVED_RECOMMENDATION]->(r:Recommendation)
+                WHERE r.user_rating IS NOT NULL
+                RETURN avg(r.user_rating) as avg_rating, count(r) as rating_count
+            """, user_id=user_id)
+
+            record = result.single()
+            if not record or record['rating_count'] == 0:
+                return None
+
+            return float(record['avg_rating'])
+
+    def calculate_preference_consistency_score(self, user_id: str) -> Dict[str, Any]:
+        """
+        Calculate how consistently user behavior matches stated preferences.
+
+        Compares:
+        - Stated vs observed expression spectrum
+        - Stated vs observed risk tolerance
+        - Decision-making style vs actual interaction patterns
+
+        Returns:
+            Dictionary with consistency metrics
+        """
+        user_data = self.get_user_by_id(user_id)
+        if not user_data:
+            return {}
+
+        consistency_scores = {}
+
+        # Expression spectrum consistency
+        stated_expression = user_data.get('stated_expression_spectrum')
+        observed_expression = user_data.get('observed_expression_spectrum')
+        if stated_expression and observed_expression:
+            diff = abs(stated_expression - observed_expression)
+            # Convert difference to consistency score (closer = more consistent)
+            consistency_scores['expression_spectrum_consistency'] = max(0, 1 - (diff / 10))
+
+        # Risk tolerance consistency
+        stated_risk = user_data.get('stated_risk_tolerance')
+        observed_risk = user_data.get('observed_risk_tolerance')
+        if stated_risk and observed_risk:
+            diff = abs(stated_risk - observed_risk)
+            consistency_scores['risk_tolerance_consistency'] = max(0, 1 - (diff / 10))
+
+        # Decision-making style consistency
+        decision_style = user_data.get('decision_making_style')
+        if decision_style:
+            # Calculate interaction pattern
+            with self.driver.session(database=self.database) as session:
+                result = session.run("""
+                    MATCH (u:User {id: $user_id})-[v:VIEWED]->(p:ProductRef)
+                    WITH count(DISTINCT p) as products_viewed
+                    MATCH (u)-[s:SAVED]->(p2:ProductRef)
+                    WITH products_viewed, count(DISTINCT p2) as products_saved
+                    RETURN products_viewed, products_saved
+                """, user_id=user_id)
+
+                record = result.single()
+                if record:
+                    viewed = record['products_viewed']
+                    saved = record['products_saved']
+
+                    # Analyze interaction pattern
+                    if viewed > 0:
+                        save_rate = saved / viewed
+
+                        # Match to decision style
+                        if decision_style == 'tell_me':
+                            # Should have high save rate (takes recommendations)
+                            expected_rate = 0.3
+                        elif decision_style == 'curated_options':
+                            # Moderate save rate (selective)
+                            expected_rate = 0.15
+                        else:  # many_options
+                            # Low save rate (browses extensively)
+                            expected_rate = 0.05
+
+                        diff = abs(save_rate - expected_rate)
+                        consistency_scores['decision_style_consistency'] = max(0, 1 - (diff * 2))
+
+        # Overall consistency score
+        if consistency_scores:
+            consistency_scores['overall_consistency'] = sum(consistency_scores.values()) / len(consistency_scores)
+
+        return consistency_scores
+
+    def calculate_budget_alignment_score(self, user_id: str) -> Dict[str, Any]:
+        """
+        Calculate how well recommendations align with user's budget.
+
+        Returns:
+            Dictionary with budget alignment metrics
+        """
+        user_data = self.get_user_by_id(user_id)
+        if not user_data:
+            return {}
+
+        budget_min = user_data.get('monthly_budget_min')
+        budget_max = user_data.get('monthly_budget_max')
+
+        if not budget_min or not budget_max:
+            return {}
+
+        with self.driver.session(database=self.database) as session:
+            # Get recommendation prices
+            result = session.run("""
+                MATCH (u:User {id: $user_id})-[:RECEIVED_RECOMMENDATION]->(r:Recommendation)
+                      -[:RECOMMENDS]->(p:ProductRef)
+                WHERE p.product_price IS NOT NULL
+                RETURN p.product_price as price, r.accepted as accepted
+            """, user_id=user_id)
+
+            records = list(result)
+            if not records:
+                return {}
+
+            prices = [rec['price'] for rec in records]
+            accepted_prices = [rec['price'] for rec in records if rec['accepted']]
+
+            # Calculate metrics
+            total_recs = len(prices)
+            within_budget = sum(1 for p in prices if budget_min <= p <= budget_max)
+            above_budget = sum(1 for p in prices if p > budget_max)
+            below_budget = sum(1 for p in prices if p < budget_min)
+
+            metrics = {
+                'total_recommendations': total_recs,
+                'within_budget_count': within_budget,
+                'above_budget_count': above_budget,
+                'below_budget_count': below_budget,
+                'within_budget_rate': within_budget / total_recs if total_recs > 0 else 0,
+                'average_recommended_price': sum(prices) / len(prices) if prices else 0
+            }
+
+            if accepted_prices:
+                metrics['average_accepted_price'] = sum(accepted_prices) / len(accepted_prices)
+                metrics['accepted_within_budget'] = sum(1 for p in accepted_prices if budget_min <= p <= budget_max)
+
+            return metrics

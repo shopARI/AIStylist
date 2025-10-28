@@ -47,6 +47,86 @@ class OnboardingCrew:
         self.extracted_data: Dict[str, Any] = {}
         self.step_completion: Dict[str, bool] = {}
 
+        # Conversation adaptation
+        self.conversation_style: Optional[str] = None  # "directive" | "exploratory" | "balanced"
+
+    def _determine_conversation_style(self) -> str:
+        """
+        Determine conversation style based on user's autonomy preferences.
+
+        Returns:
+            "directive", "exploratory", or "balanced"
+        """
+        # Check if we have autonomy data from first step
+        if 'style_autonomy' not in self.extracted_data:
+            return "balanced"  # Default for first step
+
+        autonomy_data = self.extracted_data['style_autonomy']
+
+        # Extract key indicators
+        advice_receptiveness = autonomy_data.get('advice_receptiveness', 5)
+        creative_control = autonomy_data.get('creative_control', 5)
+        decision_style = autonomy_data.get('decision_making_style', 'curated_options')
+
+        # Calculate autonomy score (1-10, lower = wants more guidance)
+        autonomy_score = (advice_receptiveness + creative_control) / 2
+
+        # Determine style
+        if autonomy_score <= 4 or decision_style == 'tell_me':
+            return "directive"  # User wants guidance
+        elif autonomy_score >= 7 or decision_style == 'many_options':
+            return "exploratory"  # User wants to explore
+        else:
+            return "balanced"  # Moderate approach
+
+    def _get_style_guidance(self) -> str:
+        """
+        Get conversation style guidance for the agent.
+
+        Returns:
+            Style guidance string
+        """
+        style = self.conversation_style or self._determine_conversation_style()
+
+        if style == "directive":
+            return """
+CONVERSATION STYLE ADAPTATION:
+Based on this user's preferences, they want more guidance and direction.
+
+Adjust your approach:
+- Be more direct and specific in your questions
+- Offer concrete examples and suggestions
+- Guide them toward decisions with your expertise
+- Don't overwhelm with too many options
+- Be reassuring and confident in your recommendations
+- Example: "Based on what you've shared, I'd recommend focusing on..."
+            """
+        elif style == "exploratory":
+            return """
+CONVERSATION STYLE ADAPTATION:
+Based on this user's preferences, they want creative freedom and exploration.
+
+Adjust your approach:
+- Ask more open-ended questions
+- Let them lead the conversation
+- Encourage exploration and experimentation
+- Present multiple perspectives and options
+- Be curious about their unique vision
+- Example: "Tell me more about what draws you to that style..."
+            """
+        else:  # balanced
+            return """
+CONVERSATION STYLE ADAPTATION:
+This user prefers a balanced approach - some guidance with room for input.
+
+Adjust your approach:
+- Mix directed questions with open exploration
+- Offer curated options (not too many, not just one)
+- Guide while respecting their preferences
+- Be collaborative in tone
+- Example: "Here are a few directions we could explore, which resonates with you?"
+            """
+
     def start_step(self, step_id: str) -> str:
         """
         Start a new onboarding step.
@@ -156,11 +236,16 @@ Return ONLY valid JSON. No other text.
         )
 
         # Task 2: Generate conversational response
+        # Inject style guidance based on user's autonomy level
+        style_guidance = self._get_style_guidance()
+
         conversation_task = Task(
             description=f"""
 Continue the conversation naturally based on the user's response.
 
 {context}
+
+{style_guidance}
 
 The user just said: "{user_message}"
 
@@ -170,6 +255,7 @@ Your response should:
 - Explore deeper if they seemed uncertain or hesitant
 - Move to summary/transition if this topic feels complete
 - Stay warm and conversational
+- IMPORTANT: Adapt your questioning style based on the style guidance above
 
 DECISION POINT:
 - If you feel you have good understanding of all the focus areas, you can offer to move on
