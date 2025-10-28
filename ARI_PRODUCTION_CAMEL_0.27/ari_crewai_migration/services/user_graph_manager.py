@@ -24,7 +24,7 @@ class UserGraphManager:
         self.uri = os.getenv("NEO4J_USER_URI", os.getenv("NEO4J_URI"))
         self.username = os.getenv("NEO4J_USER_USERNAME", os.getenv("NEO4J_USERNAME"))
         self.password = os.getenv("NEO4J_USER_PASSWORD", os.getenv("NEO4J_PASSWORD"))
-        self.database = os.getenv("NEO4J_USER_DATABASE", "productionbackup2_user")
+        self.database = os.getenv("NEO4J_USER_DATABASE", "users")
 
         self.driver = GraphDatabase.driver(
             self.uri,
