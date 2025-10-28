@@ -16,5 +16,9 @@ export OPENAI_API_KEY="sk-proj-6VZ5JJP0VEFQgH2G2nGb34H3J_88wBFWQ-yvhwHTzD5xUBZ_K
 echo "Starting ARI - User-Aware Fashion Recommendation System..."
 echo ""
 
-# Use the enhanced chat interface with onboarding and personalization
+# Set PYTHONPATH with ari_crewai_migration first, then parent for shared models
+export PYTHONPATH="/home/leo/AIStylist/ARI_PRODUCTION_CAMEL_0.27/ari_crewai_migration:/home/leo/AIStylist/ARI_PRODUCTION_CAMEL_0.27"
+
+# Change to our directory and run
+cd "$(dirname "$0")"
 ../crewai_env/bin/python cli/chat_interface_v2.py

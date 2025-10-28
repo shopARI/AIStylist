@@ -14,11 +14,21 @@ import uuid
 from datetime import datetime
 from typing import Optional, Dict, Any
 
-# Add parent directory to path
+# Add parent directory to path - ensure it's at the front to avoid conflicts
 import os
-_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-if _parent not in sys.path:
-    sys.path.insert(0, _parent)
+_current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ari_crewai_migration
+_parent_dir = os.path.dirname(_current_dir)  # ARI_PRODUCTION_CAMEL_0.27
+
+# Remove both from path if present
+while _current_dir in sys.path:
+    sys.path.remove(_current_dir)
+while _parent_dir in sys.path:
+    sys.path.remove(_parent_dir)
+
+# Add current directory first (for our modules like agents, crews)
+# Then parent directory (for shared models.types, etc.)
+sys.path.insert(0, _parent_dir)
+sys.path.insert(0, _current_dir)
 
 from services.user_service import UserService
 from services.onboarding_service import OnboardingService
