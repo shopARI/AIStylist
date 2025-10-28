@@ -215,7 +215,7 @@ class ConversationalOnboarding:
                 'onboarding_completed_at': datetime.now()
             })
 
-            print("✓ Your style profile has been saved!")
+            print("Your style profile has been saved!")
             print("\nYou're all set! Let's find you some amazing pieces.\n")
 
         except Exception as e:

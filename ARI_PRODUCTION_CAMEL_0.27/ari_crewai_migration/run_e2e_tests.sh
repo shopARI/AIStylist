@@ -11,10 +11,10 @@ echo ""
 
 # Load environment variables if available
 if [ -f .env.e2e ]; then
-    echo "✅ Loading .env.e2e configuration..."
+    echo "Loading .env.e2e configuration..."
     export $(cat .env.e2e | grep -v '^#' | xargs)
 else
-    echo "⚠️  .env.e2e not found. Copy .env.e2e.template and configure."
+    echo "WARNING: .env.e2e not found. Copy .env.e2e.template and configure."
     echo ""
 fi
 
@@ -24,37 +24,37 @@ echo "----------------------------------------"
 
 # Neo4j
 if [ -n "$NEO4J_URI" ] && [ -n "$NEO4J_USER" ] && [ -n "$NEO4J_PASSWORD" ]; then
-    echo "✅ Neo4j:        Configured"
+    echo "Neo4j:        Configured"
     NEO4J_OK=true
 else
-    echo "❌ Neo4j:        Not configured"
+    echo "Neo4j:        Not configured"
     NEO4J_OK=false
 fi
 
 # Qdrant
 if [ -n "$QDRANT_URL" ] && [ -n "$QDRANT_API_KEY" ]; then
-    echo "✅ Qdrant:       Configured"
+    echo "Qdrant:       Configured"
     QDRANT_OK=true
 else
-    echo "❌ Qdrant:       Not configured"
+    echo "Qdrant:       Not configured"
     QDRANT_OK=false
 fi
 
 # OpenAI
 if [ -n "$OPENAI_API_KEY" ]; then
-    echo "✅ OpenAI:       Configured"
+    echo "OpenAI:       Configured"
     OPENAI_OK=true
 else
-    echo "❌ OpenAI:       Not configured"
+    echo "OpenAI:       Not configured"
     OPENAI_OK=false
 fi
 
 # FashionSigLIP
 if [ -n "$FASHIONSIG_MODEL_PATH" ] && [ -d "$FASHIONSIG_MODEL_PATH" ]; then
-    echo "✅ FashionSigLIP: Available"
+    echo "FashionSigLIP: Available"
     FASHIONSIG_OK=true
 else
-    echo "⚠️  FashionSigLIP: Not available (optional)"
+    echo "WARNING: FashionSigLIP: Not available (optional)"
     FASHIONSIG_OK=false
 fi
 
@@ -65,9 +65,9 @@ echo ""
 CAN_RUN_FULL=false
 if [ "$NEO4J_OK" = true ] && [ "$QDRANT_OK" = true ] && [ "$OPENAI_OK" = true ]; then
     CAN_RUN_FULL=true
-    echo "✅ All required services available - Running full E2E tests"
+    echo "All required services available - Running full E2E tests"
 else
-    echo "⚠️  Some services unavailable - Running limited tests"
+    echo "WARNING: Some services unavailable - Running limited tests"
 fi
 
 echo ""
@@ -93,9 +93,9 @@ echo "E2E Test Summary"
 echo "============================================================"
 
 if [ $EXIT_CODE -eq 0 ]; then
-    echo "✅ All available tests passed!"
+    echo "All available tests passed!"
 else
-    echo "❌ Some tests failed (exit code: $EXIT_CODE)"
+    echo "Some tests failed (exit code: $EXIT_CODE)"
 fi
 
 echo ""

@@ -61,7 +61,7 @@ Sample conversation starters:
         "conversation_guide": """
 You're exploring the user's relationship with gendered style and self-expression.
 
-⚠️ CRITICAL: This is sensitive territory. Never assume or label.
+CRITICAL: This is sensitive territory. Never assume or label.
 
 Key areas to discover:
 - Where they fall on structured <-> fluid <-> soft spectrum
@@ -246,7 +246,7 @@ Common value_priorities:
         "conversation_guide": """
 You're understanding their budget and how they think about value.
 
-⚠️ SENSITIVE: Budget is personal. Be respectful.
+SENSITIVE: Budget is personal. Be respectful.
 
 Key areas to discover:
 - Realistic monthly budget for clothing
