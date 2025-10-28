@@ -105,7 +105,10 @@ NEVER:
         "focus": [
             "statement_level",
             "change_readiness",
-            "aspiration_text"
+            "aspiration_text",
+            "confidence_areas",
+            "pain_points",
+            "inspiration_sources"
         ],
         "conversation_guide": """
 You're exploring how the user sees style in relation to their identity and goals.
@@ -114,23 +117,32 @@ Key areas to discover:
 - How much they want their style to "say something"
 - Whether they want change or refinement
 - Their style aspirations and inspirations
+- What they love about their current style (confidence areas)
+- Specific challenges they face (pain points)
+- Who or what inspires their style
 
 Conversation approach:
 - Explore what role style plays in their life
 - Understand if they're happy where they are or seeking change
-- Discover what they admire in others' style
+- Discover what they admire in others' style (inspiration sources)
 - Find out what they're moving toward or away from
+- Identify what's working vs what's frustrating (confidence areas vs pain points)
 
 Extract to:
 - statement_level (1-10): How bold/statement-making (1=blend in, 10=stand out)
 - change_readiness: "refine" | "evolve" | "transform" | "explore"
 - aspiration_text: Free-form description of style goals/inspiration
+- confidence_areas: What they love about their current style (free text)
+- pain_points: Specific challenges with clothing/styling (free text)
+- inspiration_sources: Style icons, influences, inspiration (free text)
 
 Sample conversation starters:
 - "When you see someone with amazing style, what is it that catches your eye?"
 - "Are you looking to refine your current style or try something new?"
 - "How do you want to feel when you walk into a room?"
 - "What's working in your wardrobe right now? What isn't?"
+- "Tell me about someone whose style you admire - who inspires you?"
+- "What parts of getting dressed feel easy vs frustrating?"
 
 Extract change_readiness based on:
 - "refine": Happy with style, just want to dial it in
@@ -195,6 +207,7 @@ Common life_stages:
             "value_priorities",
             "style_motivations",
             "shopping_behavior",
+            "shopping_frequency",
             "brand_loyalty"
         ],
         "conversation_guide": """
@@ -203,26 +216,36 @@ You're exploring what drives their style and shopping decisions.
 Key areas to discover:
 - What values matter (sustainability, ethics, local, quality)
 - What motivates their style choices
-- How they prefer to shop
+- How they prefer to shop (online, in-store, planned, impulse)
+- How often they shop for clothes
 - Relationship with brands
 
 Conversation approach:
 - Understand what they care about beyond aesthetics
 - Discover deal-breakers (e.g., won't buy fast fashion)
 - Learn their shopping habits and preferences
+- Find out shopping frequency and patterns
 - Find out about brand relationships
 
 Extract to:
 - value_priorities: Ranked list (e.g., ["Sustainability", "Quality", "Local"])
 - style_motivations: List (e.g., ["Confidence", "Self-expression", "Professional credibility"])
 - shopping_behavior: "planned_online" | "planned_instore" | "impulse_online" | "impulse_instore" | "mixed"
+- shopping_frequency: "seasonal" | "monthly" | "continuous" | "minimal"
 - brand_loyalty (1-10): Stick to favorites or always trying new?
 
 Sample conversation starters:
 - "What matters to you when you're deciding what to buy?"
 - "Are there things you won't compromise on - like sustainability or quality?"
 - "How do you typically shop? Online? In stores? Both?"
+- "How often do you find yourself shopping for clothes? Seasonal hauls, monthly additions, or ongoing?"
 - "Do you have favorite brands you stick with, or do you like discovering new ones?"
+
+Extract shopping_frequency based on:
+- "seasonal": Shops in seasonal cycles (spring/fall wardrobe refreshes)
+- "monthly": Regular monthly clothing purchases
+- "continuous": Always adding new pieces
+- "minimal": Rarely shops, only when needed
 
 Common value_priorities:
 - Sustainability, Ethical production, Quality/longevity, Supporting local
