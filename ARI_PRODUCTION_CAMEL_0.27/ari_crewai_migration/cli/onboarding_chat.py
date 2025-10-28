@@ -5,8 +5,15 @@ A natural dialogue-based onboarding experience using AI agents.
 """
 
 import asyncio
+import sys
+import os
 from typing import Optional, Dict, Any
 from datetime import datetime
+
+# Add parent directory to path for imports
+parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if parent_dir not in sys.path:
+    sys.path.insert(0, parent_dir)
 
 from crews.onboarding_crew import create_onboarding_crew
 from services.user_service import UserService

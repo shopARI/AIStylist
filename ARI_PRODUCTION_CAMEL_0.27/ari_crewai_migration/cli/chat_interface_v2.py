@@ -15,13 +15,17 @@ from datetime import datetime
 from typing import Optional, Dict, Any
 
 # Add parent directory to path
-sys.path.insert(0, '/home/leo/AIStylist/ARI_PRODUCTION_CAMEL_0.27/ari_crewai_migration')
+import os
+_parent = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _parent not in sys.path:
+    sys.path.insert(0, _parent)
 
 from services.user_service import UserService
 from services.onboarding_service import OnboardingService
-from cli.onboarding_cli import OnboardingCLI
+from crews.onboarding_crew import create_onboarding_crew
 from crews.crewai_orchestrator import create_crewai_orchestrator
 from models.user_models import User
+from prompts.onboarding_prompts import get_all_step_ids
 
 
 class EnhancedChatInterface:
@@ -31,7 +35,6 @@ class EnhancedChatInterface:
         """Initialize chat interface."""
         self.user_service = UserService()
         self.onboarding_service = OnboardingService()
-        self.onboarding_cli = OnboardingCLI(self.onboarding_service)
 
         self.orchestrator = None
         self.current_user: Optional[User] = None
@@ -41,6 +44,119 @@ class EnhancedChatInterface:
         """Close services."""
         self.user_service.close()
         self.onboarding_service.close()
+
+    # ======================
+    # ONBOARDING FLOW
+    # ======================
+
+    async def run_conversational_onboarding(self, username: str, email: str = None) -> Optional[User]:
+        """
+        Run conversational onboarding flow using AI agents.
+
+        Args:
+            username: Username
+            email: Optional email (will be collected if not provided)
+
+        Returns:
+            User object if successful, None otherwise
+        """
+        print("\n" + "=" * 70)
+        print(" Welcome to ARI - Your Personal Style Discovery Experience")
+        print("=" * 70)
+        print("\nI'm here to help you discover and articulate your style identity.")
+        print("This isn't a form or quiz - it's a conversation.")
+        print("\nTake your time. There are no wrong answers.")
+        print("=" * 70 + "\n")
+
+        # Collect email if not provided
+        if not email:
+            while True:
+                email = input("What's your email address? ").strip()
+                if email and '@' in email:
+                    break
+                print("Please enter a valid email address.\n")
+
+        # Create user
+        try:
+            user = self.user_service.create_user(username, email)
+            user_id = user.id
+        except Exception as e:
+            print(f"\nError creating user: {e}")
+            return None
+
+        # Create onboarding crew
+        crew = create_onboarding_crew()
+
+        # Run through all onboarding steps
+        all_steps = get_all_step_ids()
+
+        for step_id in all_steps:
+            print(f"\n{'=' * 70}")
+            print(f" Topic {all_steps.index(step_id) + 1}/{len(all_steps)}")
+            print(f"{'=' * 70}\n")
+
+            # Start step
+            opening_message = crew.start_step(step_id)
+            print(f"ARI: {opening_message}\n")
+
+            step_complete = False
+
+            while not step_complete:
+                # Get user input
+                user_input = input("You: ").strip()
+
+                if not user_input:
+                    print("(Please share your thoughts, or type 'skip' to move on)\n")
+                    continue
+
+                #  Handle skip
+                if user_input.lower() in ['skip', 'next']:
+                    crew.complete_step()
+                    break
+
+                # Process response
+                try:
+                    result = crew.process_user_response(user_input)
+                    agent_response = result.get('agent_response', '')
+                    completeness = result.get('completeness', 0.0)
+
+                    print(f"\nARI: {agent_response}\n")
+
+                    # Auto-complete if agent suggests moving on
+                    if completeness >= 0.8 or 'move on' in agent_response.lower():
+                        crew.complete_step()
+                        step_complete = True
+
+                except Exception as e:
+                    print(f"\n(Could you rephrase that?)\n")
+
+        # Save data to Neo4j
+        print("\n" + "=" * 70)
+        print(" Saving Your Style Profile...")
+        print("=" * 70 + "\n")
+
+        all_data = crew.get_all_extracted_data()
+
+        for step_id, step_data in all_data.items():
+            try:
+                await self.onboarding_service.store_step_responses(
+                    user_id=user_id,
+                    step_id=step_id,
+                    responses=step_data
+                )
+            except Exception as e:
+                print(f"Warning: Error saving {step_id}: {e}")
+
+        # Mark complete
+        self.user_service.update_user_profile(user_id, {
+            'onboarding_completed': True,
+            'onboarding_completed_at': datetime.now()
+        })
+
+        print("Your style profile has been saved!\n")
+
+        # Return updated user
+        return self.user_service.get_user_by_username(username)
 
     # ======================
     # USER AUTHENTICATION
@@ -64,20 +180,24 @@ class EnhancedChatInterface:
             user = self.user_service.get_user_by_username(username)
 
             if user is None:
-                # New user
+                # New user - run conversational onboarding
                 print(f"\nWelcome, {username}! You're new here.")
-                email = input("Email: ").strip()
 
-                if not email or '@' not in email:
-                    print("  Please enter a valid email")
+                try:
+                    user = await self.run_conversational_onboarding(username)
+
+                    if user and user.onboarding_completed:
+                        print(f"\nProfile complete! Welcome to ARI, {username}!")
+                    else:
+                        print("\nOnboarding incomplete. Please complete it to continue.")
+                        continue
+
+                except Exception as e:
+                    print(f"\nError during onboarding: {e}")
+                    print("Please try again.")
+                    import traceback
+                    traceback.print_exc()
                     continue
-
-                print("\nLet's set up your style profile (takes about 3 minutes)...")
-
-                # Run onboarding
-                user = await self.onboarding_cli.run_full_onboarding(username, email)
-
-                print(f"\nProfile complete! Welcome to ARI, {username}!")
 
             else:
                 # Existing user
@@ -85,8 +205,19 @@ class EnhancedChatInterface:
                     print(f"\nWelcome back, {username}!")
                     print("Let's finish your profile setup...")
 
-                    # Resume onboarding
-                    user = await self.onboarding_cli.run_full_onboarding(username, user.email)
+                    try:
+                        user = await self.run_conversational_onboarding(username, user.email)
+
+                        if not user or not user.onboarding_completed:
+                            print("\nOnboarding incomplete. Please complete it to continue.")
+                            continue
+
+                    except Exception as e:
+                        print(f"\nError during onboarding: {e}")
+                        print("Please try again.")
+                        import traceback
+                        traceback.print_exc()
+                        continue
 
                 else:
                     print(f"\nWelcome back, {username}!")

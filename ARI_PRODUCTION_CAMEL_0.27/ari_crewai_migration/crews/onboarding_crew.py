@@ -4,6 +4,14 @@ Onboarding Crew
 Manages the conversational onboarding flow using specialized agents.
 """
 
+import sys
+import os
+
+# Ensure parent directory is in path for imports
+_parent_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+if _parent_dir not in sys.path:
+    sys.path.insert(0, _parent_dir)
+
 from crewai import Crew, Task, Process
 from typing import Dict, List, Any, Optional
 import json

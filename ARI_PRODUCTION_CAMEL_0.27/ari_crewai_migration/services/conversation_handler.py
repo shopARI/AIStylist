@@ -17,15 +17,16 @@ import hashlib
 import os
 
 from openai import AsyncOpenAI
-from services.cache.redis_client import RedisService, FallbackRedisService
 
 logger = logging.getLogger("services.conversation.handler")
 
-from config.prompts import (
-    MEMORY_HANDLER_PROMPT,
-    GREETING_HANDLER_PROMPT,
-    PRODUCT_RESPONSE_PROMPT
-)
+# NOTE: These prompts are not currently defined in the codebase
+# Commented out to allow module to load
+# from config.prompts import (
+#     MEMORY_HANDLER_PROMPT,
+#     GREETING_HANDLER_PROMPT,
+#     PRODUCT_RESPONSE_PROMPT
+# )
 
 
 class ConversationState(Enum):
@@ -401,7 +402,7 @@ class ConversationHandler:
         neo4j_service: Optional[Any] = None,
         qdrant_service: Optional[Any] = None,
         agent_factory: Optional[Any] = None,
-        redis_client: Optional[Union[RedisService, FallbackRedisService]] = None,
+        redis_client: Optional[Any] = None,
         enable_persistence: bool = True,
         persistence_interval: int = 300,
         enable_optimization: bool = True,
