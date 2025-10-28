@@ -11,9 +11,33 @@ import uuid
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from neo4j import GraphDatabase, AsyncGraphDatabase
+from neo4j.time import DateTime as Neo4jDateTime
 from dotenv import load_dotenv
 
 load_dotenv()
+
+
+def convert_neo4j_datetimes(data: Dict[str, Any]) -> Dict[str, Any]:
+    """
+    Convert Neo4j DateTime objects to Python datetime objects.
+
+    Args:
+        data: Dictionary potentially containing Neo4j DateTime objects
+
+    Returns:
+        Dictionary with converted datetime objects
+    """
+    if not data:
+        return data
+
+    converted = {}
+    for key, value in data.items():
+        if isinstance(value, Neo4jDateTime):
+            # Convert Neo4j DateTime to Python datetime
+            converted[key] = value.to_native()
+        else:
+            converted[key] = value
+    return converted
 
 
 class UserGraphManager:
@@ -616,7 +640,10 @@ class UserGraphManager:
             """, username=username)
 
             record = result.single()
-            return dict(record['u']) if record else None
+            if record:
+                user_data = dict(record['u'])
+                return convert_neo4j_datetimes(user_data)
+            return None
 
     def get_user_by_id(self, user_id: str) -> Optional[Dict[str, Any]]:
         """Get user by ID."""
@@ -627,7 +654,10 @@ class UserGraphManager:
             """, user_id=user_id)
 
             record = result.single()
-            return dict(record['u']) if record else None
+            if record:
+                user_data = dict(record['u'])
+                return convert_neo4j_datetimes(user_data)
+            return None
 
     def user_exists(self, username: str) -> bool:
         """Check if user exists."""
