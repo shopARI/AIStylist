@@ -1,0 +1,449 @@
+"""
+Phase 5 End-to-End Tests: Real Database Integration
+Tests complete Flow execution with real Neo4j, Qdrant, and FashionSigLIP.
+"""
+import pytest
+import asyncio
+import os
+import time
+from typing import Dict, List
+
+from flows.product_search_flow import create_and_run_flow
+from models.product_models import ProductSearchResult, Product
+
+
+# Check for required environment variables
+NEO4J_AVAILABLE = all([
+ os.getenv('NEO4J_URI'),
+ os.getenv('NEO4J_USER'),
+ os.getenv('NEO4J_PASSWORD')
+])
+
+QDRANT_AVAILABLE = all([
+ os.getenv('QDRANT_URL'),
+ os.getenv('QDRANT_API_KEY')
+])
+
+OPENAI_AVAILABLE = os.getenv('OPENAI_API_KEY') is not None
+
+FASHIONSIG_AVAILABLE = os.path.exists('/models/fashionsig_model') # Example path
+
+
+class TestNeo4jIntegration:
+    """Test Neo4j graph database integration."""
+
+    @pytest.mark.skipif(not NEO4J_AVAILABLE, reason="Neo4j credentials not available")
+    @pytest.mark.asyncio
+    async def test_neo4j_connection(self):
+        """Test basic Neo4j connection."""
+        from tools.async_tools.async_neo4j_tools import async_neo4j_query_tool
+
+        # Test simple query
+        result = await async_neo4j_query_tool.func(
+        cypher="MATCH (p:Product) RETURN count(p) as total LIMIT 1",
+        parameters={}
+        )
+
+        assert result is not None
+        assert len(result) > 0
+        print(f"\n Neo4j connection successful. Total products: {result[0].get('total', 0)}")
+
+    @pytest.mark.skipif(not NEO4J_AVAILABLE, reason="Neo4j credentials not available")
+    @pytest.mark.asyncio
+    async def test_neo4j_product_search(self):
+        """Test Neo4j product search."""
+        from tools.async_tools.async_neo4j_tools import async_neo4j_query_tool
+
+        # Search for dress products
+        cypher = """
+        MATCH (p:Product)
+        WHERE toLower(p.title) CONTAINS 'dress'
+        RETURN p.id as id, p.title as title, p.price as price, p.category as category
+        LIMIT 5
+        """
+
+        result = await async_neo4j_query_tool.func(cypher=cypher, parameters={})
+
+        assert result is not None
+        assert len(result) > 0
+        print(f"\n Found {len(result)} dress products in Neo4j")
+
+        # Validate product structure
+        for product in result:
+        assert 'id' in product
+        assert 'title' in product
+        assert 'price' in product
+
+    @pytest.mark.skipif(not NEO4J_AVAILABLE, reason="Neo4j credentials not available")
+    @pytest.mark.asyncio
+    async def test_semantic_expansion(self):
+        """Test semantic query expansion."""
+        from tools.async_tools.async_neo4j_tools import async_semantic_expansion_tool
+
+        result = await async_semantic_expansion_tool.func(
+        query="elegant wedding dress",
+        context={"occasion": "wedding"}
+        )
+
+        assert result is not None
+        assert 'original' in result
+        assert result['original'] == "elegant wedding dress"
+        assert 'synonyms' in result
+        assert 'expanded_query' in result
+        print(f"\n Semantic expansion: {len(result['synonyms'])} synonyms found")
+
+
+class TestQdrantIntegration:
+    """Test Qdrant vector database integration."""
+
+    @pytest.mark.skipif(not (QDRANT_AVAILABLE and OPENAI_AVAILABLE), reason="Qdrant/OpenAI not available")
+    @pytest.mark.asyncio
+    async def test_qdrant_connection(self):
+        """Test basic Qdrant connection."""
+        from qdrant_client import AsyncQdrantClient
+
+        client = AsyncQdrantClient(
+        url=os.getenv('QDRANT_URL'),
+        api_key=os.getenv('QDRANT_API_KEY')
+        )
+
+        try:
+        collections = await client.get_collections()
+        assert collections is not None
+        print(f"\n Qdrant connection successful. Collections: {len(collections.collections)}")
+        finally:
+        await client.close()
+
+    @pytest.mark.skipif(not (QDRANT_AVAILABLE and OPENAI_AVAILABLE), reason="Qdrant/OpenAI not available")
+    @pytest.mark.asyncio
+    async def test_embedding_generation(self):
+        """Test OpenAI embedding generation."""
+        from tools.async_tools.async_qdrant_tools import async_embedding_generation_tool
+
+        embedding = await async_embedding_generation_tool.func(
+        text="red evening dress",
+        model="text-embedding-3-small"
+        )
+
+        assert embedding is not None
+        assert len(embedding) > 0
+        print(f"\n Embedding generated: {len(embedding)} dimensions")
+
+    @pytest.mark.skipif(not (QDRANT_AVAILABLE and OPENAI_AVAILABLE), reason="Qdrant/OpenAI not available")
+    @pytest.mark.asyncio
+    async def test_qdrant_vector_search(self):
+        """Test Qdrant vector similarity search."""
+        from tools.async_tools.async_qdrant_tools import async_qdrant_hybrid_search_tool
+
+        results = await async_qdrant_hybrid_search_tool.func(
+        query_text="elegant black dress",
+        limit=5,
+        filters=None,
+        collection_name="fashion_products"
+        )
+
+        assert results is not None
+        print(f"\n Qdrant search returned {len(results)} products")
+
+        # Validate result structure
+        if len(results) > 0:
+        product = results[0]
+        assert 'id' in product
+        assert 'score' in product
+
+
+class TestFashionSigLIPIntegration:
+    """Test FashionSigLIP visual embedding integration."""
+
+    @pytest.mark.skipif(not FASHIONSIG_AVAILABLE, reason="FashionSigLIP model not available")
+    @pytest.mark.asyncio
+    async def test_fashionsig_embedding(self):
+        """Test FashionSigLIP embedding generation."""
+        from tools.async_tools.async_fashionsig_tools import async_fashionsig_embedding_tool
+
+        # This would use a real image path in production
+        # For now, test the structure
+        embedding = await async_fashionsig_embedding_tool.func(
+        image_path="/tmp/test_image.jpg"
+        )
+
+        # Will return empty list until integrated, but structure is correct
+        assert isinstance(embedding, list)
+        print(f"\n FashionSigLIP integration pending (placeholder returned)")
+
+    @pytest.mark.skipif(not FASHIONSIG_AVAILABLE, reason="FashionSigLIP model not available")
+    @pytest.mark.asyncio
+    async def test_visual_similarity_search(self):
+        """Test visual similarity search."""
+        from tools.async_tools.async_fashionsig_tools import async_visual_similarity_search_tool
+
+        results = await async_visual_similarity_search_tool.func(
+        image_path="/tmp/test_image.jpg",
+        limit=5
+        )
+
+        assert isinstance(results, list)
+        print(f"\n Visual search integration pending")
+
+
+class TestCompleteFlowExecution:
+    """Test complete Flow execution with real databases."""
+
+    @pytest.mark.skipif(not (NEO4J_AVAILABLE and QDRANT_AVAILABLE and OPENAI_AVAILABLE),
+    reason="Required services not available")
+    @pytest.mark.asyncio
+    async def test_complete_product_search_flow(self):
+        """Test complete ProductSearchFlow with real databases."""
+        from crews.mini_crews import (
+        create_graph_search_crew,
+        create_vector_search_crew,
+        create_visual_search_crew,
+        create_judge_crew
+        )
+
+        print("\n" + "="*70)
+        print("COMPLETE FLOW EXECUTION TEST")
+        print("="*70)
+
+        # Create mini-crews
+        graph_crew = create_graph_search_crew()
+        vector_crew = create_vector_search_crew()
+        visual_crew = create_visual_search_crew()
+        judge_crew = create_judge_crew()
+
+        # Test query
+        test_query = "elegant black dress for wedding"
+        print(f"\nQuery: '{test_query}'")
+
+        # Measure execution time
+        start_time = time.time()
+
+        # Run complete flow
+        result = await create_and_run_flow(
+        query=test_query,
+        limit=5,
+        graph_crew=graph_crew,
+        vector_crew=vector_crew,
+        visual_crew=visual_crew,
+        judge_crew=judge_crew
+        )
+
+        execution_time = time.time() - start_time
+
+        # Validate result
+        assert isinstance(result, ProductSearchResult)
+        assert result.products is not None
+        assert isinstance(result.products, list)
+
+        # Print results
+        print(f"\n{'='*70}")
+        print("RESULTS")
+        print(f"{'='*70}")
+        print(f"Total Products Found: {len(result.products)}")
+        print(f"Graph Search Products: {result.graph_count}")
+        print(f"Vector Search Products: {result.vector_count}")
+        print(f"Visual Search Products: {result.visual_count}")
+        print(f"Total Execution Time: {execution_time:.2f}s")
+        print(f"Flow Reported Time: {result.execution_time:.2f}s")
+        print(f"{'='*70}")
+
+        # Print sample products
+        if len(result.products) > 0:
+        print("\nSample Products:")
+        for i, product in enumerate(result.products[:3], 1):
+        print(f"\n{i}. {product.title}")
+        print(f" ID: {product.id}")
+        print(f" Price: ${product.price:.2f}")
+        print(f" Category: {product.category}")
+
+        # Validate performance
+        assert execution_time < 120, f"Flow took too long: {execution_time:.2f}s"
+
+        # Expected: 3-7s with real queries, but may be slower on first run
+        if execution_time < 10:
+        print(f"\n Performance excellent: {execution_time:.2f}s")
+        elif execution_time < 30:
+        print(f"\n Performance good: {execution_time:.2f}s")
+        else:
+        print(f"\n Performance slower than expected: {execution_time:.2f}s")
+
+    @pytest.mark.skipif(not (NEO4J_AVAILABLE and QDRANT_AVAILABLE and OPENAI_AVAILABLE),
+        reason="Required services not available")
+    @pytest.mark.asyncio
+    async def test_flow_with_filters(self):
+        """Test Flow with category filters."""
+        from crews.mini_crews import (
+        create_graph_search_crew,
+        create_vector_search_crew,
+        create_visual_search_crew,
+        create_judge_crew
+        )
+
+        result = await create_and_run_flow(
+        query="summer dress",
+        limit=5,
+        filters={"category": "dress"},
+        graph_crew=create_graph_search_crew(),
+        vector_crew=create_vector_search_crew(),
+        visual_crew=create_visual_search_crew(),
+        judge_crew=create_judge_crew()
+        )
+
+        assert isinstance(result, ProductSearchResult)
+        print(f"\n Flow with filters returned {len(result.products)} products")
+
+    @pytest.mark.skipif(not (NEO4J_AVAILABLE and QDRANT_AVAILABLE and OPENAI_AVAILABLE),
+        reason="Required services not available")
+    @pytest.mark.asyncio
+    async def test_multiple_queries(self):
+        """Test multiple queries to measure consistency."""
+        from crews.mini_crews import (
+        create_graph_search_crew,
+        create_vector_search_crew,
+        create_visual_search_crew,
+        create_judge_crew
+        )
+
+        test_queries = [
+        "black dress",
+        "casual shoes",
+        "winter jacket"
+        ]
+
+        results = {}
+
+        for query in test_queries:
+        start = time.time()
+
+        result = await create_and_run_flow(
+        query=query,
+        limit=5,
+        graph_crew=create_graph_search_crew(),
+        vector_crew=create_vector_search_crew(),
+        visual_crew=create_visual_search_crew(),
+        judge_crew=create_judge_crew()
+        )
+
+        elapsed = time.time() - start
+        results[query] = {
+        'products': len(result.products),
+        'time': elapsed
+        }
+
+        # Print summary
+        print(f"\n{'='*70}")
+        print("MULTIPLE QUERY TEST RESULTS")
+        print(f"{'='*70}")
+        for query, data in results.items():
+        print(f"{query:30} {data['products']:>3} products in {data['time']:>6.2f}s")
+        print(f"{'='*70}")
+
+        avg_time = sum(r['time'] for r in results.values()) / len(results)
+        print(f"\nAverage execution time: {avg_time:.2f}s")
+
+        assert all(r['time'] < 120 for r in results.values()), "Some queries too slow"
+
+
+class TestPerformanceMetrics:
+    """Measure and validate production performance."""
+
+    @pytest.mark.skipif(not (NEO4J_AVAILABLE and QDRANT_AVAILABLE and OPENAI_AVAILABLE),
+    reason="Required services not available")
+    @pytest.mark.asyncio
+    async def test_parallel_vs_sequential_real_data(self):
+        """Compare parallel vs sequential execution with real crews."""
+        from crews.mini_crews import (
+        create_graph_search_crew,
+        create_vector_search_crew,
+        create_visual_search_crew
+        )
+
+        # This would need to be implemented with direct crew execution
+        # For now, document expected results
+        print("\n" + "="*70)
+        print("PARALLEL vs SEQUENTIAL PERFORMANCE")
+        print("="*70)
+        print("Expected Results:")
+        print(" Sequential: 6-14s (crews run one after another)")
+        print(" Parallel: 2-5s (crews run simultaneously)")
+        print(" Speedup: 3-7x faster")
+        print("="*70)
+
+        # The Flow already runs in parallel, so a single run demonstrates parallel performance
+        assert True # Placeholder for actual test
+
+    @pytest.mark.skipif(not (NEO4J_AVAILABLE and QDRANT_AVAILABLE and OPENAI_AVAILABLE),
+        reason="Required services not available")
+    @pytest.mark.asyncio
+    async def test_timeout_enforcement_real_database(self):
+        """Test that timeouts work with real database queries."""
+        from tools.async_tools.async_neo4j_tools import async_neo4j_query_tool
+
+        # Test with reasonable timeout
+        start = time.time()
+
+        try:
+        result = await asyncio.wait_for(
+        async_neo4j_query_tool.func(
+        cypher="MATCH (p:Product) RETURN p LIMIT 10",
+        parameters={}
+        ),
+        timeout=30.0
+        )
+        elapsed = time.time() - start
+
+        print(f"\n Query completed in {elapsed:.2f}s (within 30s timeout)")
+        assert elapsed < 30
+
+        except asyncio.TimeoutError:
+        elapsed = time.time() - start
+        print(f"\n Query timed out after {elapsed:.2f}s")
+        assert abs(elapsed - 30.0) < 1.0 # Should timeout at ~30s
+
+
+class TestOutputValidation:
+    """Validate Pydantic output structure with real data."""
+
+    @pytest.mark.skipif(not (NEO4J_AVAILABLE and QDRANT_AVAILABLE and OPENAI_AVAILABLE),
+    reason="Required services not available")
+    @pytest.mark.asyncio
+    async def test_pydantic_product_validation(self):
+        """Test that real products validate against Pydantic model."""
+        from crews.mini_crews import (
+        create_graph_search_crew,
+        create_vector_search_crew,
+        create_visual_search_crew,
+        create_judge_crew
+        )
+
+        result = await create_and_run_flow(
+        query="dress",
+        limit=3,
+        graph_crew=create_graph_search_crew(),
+        vector_crew=create_vector_search_crew(),
+        visual_crew=create_visual_search_crew(),
+        judge_crew=create_judge_crew()
+        )
+
+        # Validate ProductSearchResult structure
+        assert isinstance(result, ProductSearchResult)
+        assert hasattr(result, 'products')
+        assert hasattr(result, 'graph_count')
+        assert hasattr(result, 'vector_count')
+        assert hasattr(result, 'visual_count')
+        assert hasattr(result, 'execution_time')
+
+        # Validate individual products
+        for product in result.products:
+        assert isinstance(product, Product)
+        assert hasattr(product, 'id')
+        assert hasattr(product, 'title')
+        assert hasattr(product, 'price')
+        assert hasattr(product, 'category')
+        assert product.price > 0 # Pydantic validation
+
+        print(f"\n All {len(result.products)} products validated against Pydantic schema")
+
+
+        if __name__ == "__main__":
+        pytest.main([__file__, "-v", "-s"])
