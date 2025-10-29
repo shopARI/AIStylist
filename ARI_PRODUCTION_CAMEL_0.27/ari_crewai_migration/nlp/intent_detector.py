@@ -57,7 +57,7 @@ class IntentDetector:
                 r"what did i tell you",
                 r"my first question",
                 r"earlier i asked",
-                r"at the beginning", 
+                r"at the beginning",
                 r"what were we talking about",
                 r"before this",
                 r"what was my original",
@@ -66,7 +66,14 @@ class IntentDetector:
                 r".*what did i tell.*",
                 r".*what was i asking.*",
                 r".*said to you.*",
-                r".*told you.*"
+                r".*told you.*",
+                r"previous queries",
+                r"my search history",
+                r"what did i look for before",
+                r"show my past searches",
+                r"past searches",
+                r"earlier searches",
+                r"search history"
             ],
             SearchIntent.MEMORY_QUERY: [
                 r"do you remember",
@@ -75,7 +82,15 @@ class IntentDetector:
                 r"you mentioned earlier",
                 r"i told you before",
                 r"my favorite.*that i mentioned",
-                r"the.*i said i prefer"
+                r"the.*i said i prefer",
+                r"what'?s my preferred",
+                r"what'?s my favorite",
+                r"my favorite",
+                r"my preferred",
+                r"remember my preferences",
+                r"remember my.*preference",
+                r"what i like",
+                r"my style.*remember"
             ],
             SearchIntent.CLARIFICATION: [
                 r"what do you mean by",
@@ -143,7 +158,13 @@ class IntentDetector:
                 r"suggest",
                 r"what should i wear",
                 r"help me choose",
-                r"not sure what"
+                r"not sure what",
+                r"outfit ideas",
+                r"what to wear",
+                r"clothing recommendations",
+                r"fashion advice",
+                r"dress code",
+                r"style suggestions"
             ],
             SearchIntent.COMPARISON: [
                 r"compare",
@@ -152,7 +173,7 @@ class IntentDetector:
                 r"vs\.",
                 r"better than",
                 r"which is better",
-                r"or"
+                r"\bor\b"  # Word boundary to avoid matching "for"
             ],
             SearchIntent.GIFT: [
                 r"gift",
@@ -170,7 +191,12 @@ class IntentDetector:
                 r"match with",
                 r"coordinate",
                 r"style with",
-                r"wear together"
+                r"wear together",
+                r"full look",
+                r"entire ensemble",
+                r"matching set",
+                r"complete outfit",
+                r"whole outfit"
             ],
             SearchIntent.BRAND: [
                 r"from (\w+)",
@@ -355,12 +381,34 @@ class IntentDetector:
         if re.search(self.price_patterns["under"], query) or re.search(self.price_patterns["between"], query):
             intent_scores[SearchIntent.SALE] = intent_scores.get(SearchIntent.SALE, 0) + 0.5
         
-        if " or " in query or " vs " in query:
+        if re.search(r"\bor\b", query) or re.search(r"\bvs\b", query):
             intent_scores[SearchIntent.COMPARISON] = intent_scores.get(SearchIntent.COMPARISON, 0) + 0.5
         
         if "outfit" in query or "complete look" in query:
             intent_scores[SearchIntent.OUTFIT] = intent_scores.get(SearchIntent.OUTFIT, 0) + 0.5
-        
+
+        # Boost conversation/memory intents to prioritize them over product search
+        conversation_intents = [
+            SearchIntent.CONVERSATION_HISTORY,
+            SearchIntent.MEMORY_QUERY,
+            SearchIntent.CLARIFICATION,
+            SearchIntent.SYSTEM_STATUS,
+            SearchIntent.GENERAL_CONVERSATION
+        ]
+        for intent in conversation_intents:
+            if intent in intent_scores and intent_scores[intent] > 0:
+                intent_scores[intent] = intent_scores[intent] * 1.5  # 50% boost
+
+        # Extra boost for memory queries with "my favorite" or "my preferred"
+        if re.search(r"my (favorite|preferred|style)", query):
+            if SearchIntent.MEMORY_QUERY in intent_scores:
+                intent_scores[SearchIntent.MEMORY_QUERY] = intent_scores[SearchIntent.MEMORY_QUERY] * 1.5
+
+        # Boost gift intent when "gift" or "present" explicitly mentioned
+        if re.search(r"\b(gift|present)\b", query):
+            if SearchIntent.GIFT in intent_scores:
+                intent_scores[SearchIntent.GIFT] = intent_scores[SearchIntent.GIFT] * 1.3
+
         # Get highest scoring intent
         if intent_scores:
             best_intent = max(intent_scores.items(), key=lambda x: x[1])
