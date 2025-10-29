@@ -146,9 +146,10 @@ class IntentDetector:
                 r"could you (?:help me )?find",
                 r"recommend (?:some |a |an )?(\w+)",
                 r"suggest (?:some |a |an )?(\w+)",
-                # Direct product mentions - CRITICAL FIX
-                r"\b(?:black|white|red|blue|green|navy|gray|grey)\s+(?:shirt|t-?shirt|tee|blouse|top)",
-                r"\b(?:shirt|t-?shirt|tee|blouse|top|dress|pants|jeans|jacket|coat|shoes|boots)\b",
+                # Direct product mentions with color + item
+                r"\b(?:black|white|red|blue|green|navy|gray|grey|yellow|pink|brown)\s+(?:shirt|t-?shirt|tee|blouse|top|dress|pants|jeans|jacket|coat|shoes|boots|sneakers|sweater|suit)",
+                # Just items (when specific context like "for gym", "winter", "professional")
+                r"\b(?:shirt|t-?shirt|tee|blouse|top|dress|pants|jeans|jacket|coat|shoes|boots|sneakers|sweater|suit)\s+(?:for|in|during|winter|summer|gym|work|professional)",
                 r"\b(?:any|some)\s+(?:black|white|red|blue)\s+(?:shirt|t-?shirt|tee)"
             ],
             SearchIntent.INSPIRATION: [
@@ -173,7 +174,10 @@ class IntentDetector:
                 r"vs\.",
                 r"better than",
                 r"which is better",
-                r"\bor\b"  # Word boundary to avoid matching "for"
+                r"\bor\b",  # Word boundary to avoid matching "for"
+                r"contrast",
+                r"compare.*with",
+                r"compare.*to"
             ],
             SearchIntent.GIFT: [
                 r"gift",
@@ -203,7 +207,11 @@ class IntentDetector:
                 r"by (\w+)",
                 r"(\w+) brand",
                 r"anything from (\w+)",
-                r"show me (\w+)"
+                r"show me (\w+) products",
+                r"show me (\w+) items",
+                # Standalone brand names (common brands)
+                r"\b(nike|adidas|puma|gucci|zara|h&m|uniqlo|gap)\b(?:\s+(?:clothing|products|items|gear|shoes|apparel))?",
+                r"^(nike|adidas|puma|gucci|zara|h&m|uniqlo|gap)\s"
             ],
             SearchIntent.SALE: [
                 r"sale",
@@ -402,12 +410,25 @@ class IntentDetector:
         # Extra boost for memory queries with "my favorite" or "my preferred"
         if re.search(r"my (favorite|preferred|style)", query):
             if SearchIntent.MEMORY_QUERY in intent_scores:
-                intent_scores[SearchIntent.MEMORY_QUERY] = intent_scores[SearchIntent.MEMORY_QUERY] * 1.5
+                intent_scores[SearchIntent.MEMORY_QUERY] = intent_scores[SearchIntent.MEMORY_QUERY] * 2.0  # Strong boost
 
         # Boost gift intent when "gift" or "present" explicitly mentioned
         if re.search(r"\b(gift|present)\b", query):
             if SearchIntent.GIFT in intent_scores:
                 intent_scores[SearchIntent.GIFT] = intent_scores[SearchIntent.GIFT] * 1.3
+
+        # Boost inspiration over outfit when "ideas" or "suggestions" present
+        if re.search(r"\b(ideas|suggestions|recommendations|advice)\b", query):
+            if SearchIntent.INSPIRATION in intent_scores:
+                intent_scores[SearchIntent.INSPIRATION] = intent_scores[SearchIntent.INSPIRATION] * 2.0
+            # Reduce outfit score when ideas/suggestions present
+            if SearchIntent.OUTFIT in intent_scores:
+                intent_scores[SearchIntent.OUTFIT] = intent_scores[SearchIntent.OUTFIT] * 0.5
+
+        # Boost specific_item for color + item patterns
+        if re.search(r"\b(?:black|white|red|blue|green|navy|gray|grey|yellow|pink|brown)\s+(?:shirt|t-?shirt|tee|blouse|top|dress|pants|jeans|jacket|coat|shoes|boots|sneakers|sweater|suit)", query):
+            if SearchIntent.SPECIFIC_ITEM in intent_scores:
+                intent_scores[SearchIntent.SPECIFIC_ITEM] = intent_scores[SearchIntent.SPECIFIC_ITEM] * 1.3
 
         # Get highest scoring intent
         if intent_scores:
