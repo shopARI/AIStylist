@@ -36,6 +36,7 @@ from crews.onboarding_crew import create_onboarding_crew
 from crews.crewai_orchestrator import create_crewai_orchestrator
 from models.user_models import User
 from prompts.onboarding_prompts import get_all_step_ids
+from memory.mem0_memory_provider import create_mem0_memory_provider
 
 
 class EnhancedChatInterface:
@@ -49,6 +50,7 @@ class EnhancedChatInterface:
         self.orchestrator = None
         self.current_user: Optional[User] = None
         self.session_id = f"session_{uuid.uuid4().hex[:8]}"
+        self.mem0 = None  # Initialized after user authentication
 
     def close(self):
         """Close services."""
@@ -94,6 +96,15 @@ class EnhancedChatInterface:
             print(f"\nError creating user: {e}")
             return None
 
+        # Initialize Mem0 for this user
+        mem0 = create_mem0_memory_provider(user_id, f"onboarding_{self.session_id}")
+
+        # Track onboarding start
+        await mem0.add_episodic(
+            f"Started onboarding for user {username}",
+            metadata={"event": "onboarding_start", "email": email}
+        )
+
         # Create onboarding crew
         crew = create_onboarding_crew()
 
@@ -109,6 +120,12 @@ class EnhancedChatInterface:
             opening_message = crew.start_step(step_id)
             print(f"ARI: {opening_message}\n")
 
+            # Track opening message
+            await mem0.add_episodic(
+                f"ARI: {opening_message}",
+                metadata={"step": step_id, "turn_type": "opening"}
+            )
+
             step_complete = False
 
             while not step_complete:
@@ -119,9 +136,19 @@ class EnhancedChatInterface:
                     print("(Please share your thoughts, or type 'skip' to move on)\n")
                     continue
 
+                # Track user input
+                await mem0.add_episodic(
+                    f"User: {user_input}",
+                    metadata={"step": step_id, "turn_type": "user_input"}
+                )
+
                 #  Handle skip
                 if user_input.lower() in ['skip', 'next']:
                     crew.complete_step()
+                    await mem0.add_episodic(
+                        f"User skipped step: {step_id}",
+                        metadata={"step": step_id, "action": "skip"}
+                    )
                     break
 
                 # Process response
@@ -131,6 +158,12 @@ class EnhancedChatInterface:
                     completeness = result.get('completeness', 0.0)
 
                     print(f"\nARI: {agent_response}\n")
+
+                    # Track agent response
+                    await mem0.add_episodic(
+                        f"ARI: {agent_response}",
+                        metadata={"step": step_id, "turn_type": "agent_response", "completeness": completeness}
+                    )
 
                     # Auto-complete if agent suggests moving on
                     if completeness >= 0.8 or 'move on' in agent_response.lower():
@@ -157,16 +190,149 @@ class EnhancedChatInterface:
             except Exception as e:
                 print(f"Warning: Error saving {step_id}: {e}")
 
+        # Store onboarding data in Mem0
+        await self._store_onboarding_in_mem0(mem0, all_data)
+
         # Mark complete
         self.user_service.update_user_profile(user_id, {
             'onboarding_completed': True,
             'onboarding_completed_at': datetime.now()
         })
 
+        # Track onboarding completion
+        await mem0.add_episodic(
+            f"Completed onboarding successfully",
+            metadata={"event": "onboarding_complete", "steps_completed": len(all_data)}
+        )
+
         print("Your style profile has been saved!\n")
 
         # Return updated user
         return self.user_service.get_user_by_username(username)
+
+    async def _store_onboarding_in_mem0(self, mem0, all_data: Dict[str, Any]):
+        """
+        Store onboarding data in Mem0 factual and semantic memories.
+
+        Args:
+            mem0: Mem0 provider instance
+            all_data: Extracted onboarding data
+        """
+        # Style autonomy data
+        if 'style_autonomy' in all_data:
+            data = all_data['style_autonomy']
+
+            if 'decision_making_style' in data:
+                await mem0.add_factual(
+                    f"Decision-making style: {data['decision_making_style']}",
+                    category="preferences"
+                )
+
+            if 'risk_tolerance' in data:
+                await mem0.add_factual(
+                    f"Style risk tolerance: {data['risk_tolerance']}/10",
+                    category="preferences"
+                )
+
+            if 'advice_receptiveness' in data:
+                await mem0.add_semantic(
+                    f"User prefers {'guided recommendations' if data['advice_receptiveness'] < 5 else 'independent exploration'} when shopping"
+                )
+
+        # Gender expression data
+        if 'gender_expression' in all_data:
+            data = all_data['gender_expression']
+
+            if 'expression_spectrum' in data:
+                await mem0.add_factual(
+                    f"Gender expression spectrum: {data['expression_spectrum']}/10",
+                    category="identity"
+                )
+
+        # Self-expression data
+        if 'self_expression' in all_data:
+            data = all_data['self_expression']
+
+            if 'aspiration' in data:
+                await mem0.add_factual(
+                    f"Style aspiration: {data['aspiration']}",
+                    category="goals"
+                )
+
+            if 'style_adjectives' in data and data['style_adjectives']:
+                adjectives = ', '.join(data['style_adjectives'])
+                await mem0.add_factual(
+                    f"Preferred style adjectives: {adjectives}",
+                    category="style_preference"
+                )
+
+                # Semantic relationships for each adjective
+                for adj in data['style_adjectives']:
+                    await mem0.add_semantic(
+                        f"User identifies with {adj} aesthetic",
+                        metadata={"entity_type": "style", "entity_value": adj}
+                    )
+
+        # Lifestyle context data
+        if 'lifestyle_context' in all_data:
+            data = all_data['lifestyle_context']
+
+            if 'occasions' in data and data['occasions']:
+                occasions = ', '.join(data['occasions'])
+                await mem0.add_factual(
+                    f"Typical occasions: {occasions}",
+                    category="lifestyle"
+                )
+
+        # Values and shopping data
+        if 'values_shopping' in all_data:
+            data = all_data['values_shopping']
+
+            if 'shopping_behavior' in data:
+                await mem0.add_factual(
+                    f"Shopping behavior: {data['shopping_behavior']}",
+                    category="behavior"
+                )
+
+            if 'values' in data and data['values']:
+                values = ', '.join(data['values'])
+                await mem0.add_factual(
+                    f"Shopping values: {values}",
+                    category="values"
+                )
+
+                # Semantic relationships for values
+                for value in data['values']:
+                    await mem0.add_semantic(
+                        f"User prioritizes {value} when shopping",
+                        metadata={"entity_type": "value", "entity_value": value}
+                    )
+
+        # Budget data
+        if 'budget' in all_data:
+            data = all_data['budget']
+
+            if 'budget_min' in data and 'budget_max' in data:
+                await mem0.add_factual(
+                    f"Monthly budget: ${data['budget_min']}-${data['budget_max']}",
+                    category="budget"
+                )
+
+        # Demographics data
+        if 'demographics_contact' in all_data:
+            data = all_data['demographics_contact']
+
+            if 'age_range' in data:
+                await mem0.add_factual(
+                    f"Age range: {data['age_range']}",
+                    category="demographics"
+                )
+
+            if 'location' in data:
+                await mem0.add_factual(
+                    f"Location: {data['location']}",
+                    category="demographics"
+                )
 
     # ======================
     # USER AUTHENTICATION
@@ -233,6 +399,16 @@ class EnhancedChatInterface:
                     print(f"\nWelcome back, {username}!")
 
             self.current_user = user
+
+            # Initialize Mem0 for authenticated user
+            self.mem0 = create_mem0_memory_provider(user.id, self.session_id)
+
+            # Track login
+            await self.mem0.add_episodic(
+                f"User {username} logged in",
+                metadata={"event": "login", "session_id": self.session_id}
+            )
+
             break
 
     # ======================
@@ -264,7 +440,7 @@ class EnhancedChatInterface:
         if not profile:
             return {}
 
-        return {
+        context = {
             "user_id": self.current_user.id,
             "username": self.current_user.username,
             "style_adjectives": [adj.name for adj in profile.style_adjectives],
@@ -280,6 +456,16 @@ class EnhancedChatInterface:
             "aspiration": self.current_user.aspiration_text or "",
             "change_readiness": self.current_user.change_readiness or "evolve"
         }
+
+        # Add recent conversation context from Mem0
+        if self.mem0:
+            recent_searches = await self.mem0.get_episodic(limit=5)
+            if recent_searches:
+                context["recent_activity"] = [
+                    mem["content"] for mem in recent_searches
+                ]
+
+        return context
 
     def apply_user_filters(self) -> Dict[str, Any]:
         """Apply user-specific filters."""
@@ -393,6 +579,12 @@ class EnhancedChatInterface:
                     await self.show_stats()
                     continue
 
+                # Track user query in Mem0
+                await self.mem0.add_episodic(
+                    f"User searched: {query}",
+                    metadata={"interaction_type": "search", "query": query}
+                )
+
                 # Execute search
                 print(f"\n  Searching...")
 
@@ -407,8 +599,35 @@ class EnhancedChatInterface:
                     }
                 )
 
-                # Track interaction
+                # Track interaction in Neo4j
                 await self.track_search(query, result)
+
+                # Track search results in Mem0
+                products = result.get("products", [])
+                if products:
+                    product_summary = f"Showed {len(products)} products: " + ", ".join(
+                        [p.get('title', '')[:30] for p in products[:3]]
+                    )
+                    await self.mem0.add_episodic(
+                        product_summary,
+                        metadata={
+                            "interaction_type": "search_results",
+                            "product_count": len(products),
+                            "query": query
+                        }
+                    )
+
+                    # Track semantic relationships with products
+                    for product in products[:3]:  # Top 3 products
+                        if 'brand' in product and product['brand']:
+                            await self.mem0.add_semantic(
+                                f"User saw {product['brand']} {product.get('category', 'product')} when searching for {query}",
+                                metadata={
+                                    "brand": product['brand'],
+                                    "category": product.get('category', ''),
+                                    "product_id": product.get('id', '')
+                                }
+                            )
 
                 # Display results
                 self.display_results(result)

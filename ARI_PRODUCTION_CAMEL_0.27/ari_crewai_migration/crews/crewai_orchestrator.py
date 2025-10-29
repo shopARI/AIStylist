@@ -24,7 +24,7 @@ from crews.mini_crews import (
     create_judge_crew
 )
 from flows import create_and_run_flow
-from memory.redis_memory_provider import create_redis_memory_provider
+from memory.mem0_memory_provider import create_mem0_memory_provider
 from nlp.hybrid_intent_detector import get_hybrid_intent_detector, DetectionStrategy
 from models.types import SearchIntent
 
