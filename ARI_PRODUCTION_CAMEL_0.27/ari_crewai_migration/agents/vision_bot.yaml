@@ -34,7 +34,6 @@ agent:
     You leverage FashionSigLIP embeddings for accurate visual similarity matching.
   llm:
     model: gpt-5
-    temperature: 0.6
     timeout: 30
   tools:
     - async_fashionsig_embedding_tool

@@ -138,10 +138,9 @@ def create_agent_from_config(config: Dict) -> Agent:
         # Create LLM configuration
         llm_config = config.get('llm', {})
         llm = LLM(
-            model=llm_config.get('model', 'gpt-5'),
-            temperature=llm_config.get('temperature', 0.7)
-            # Note: GPT-5 doesn't support max_tokens, uses max_completion_tokens
-            # Omitting for compatibility
+            model=llm_config.get('model', 'gpt-5')
+            # Note: GPT-5 only supports default temperature (1.0)
+            # and max_completion_tokens (not max_tokens)
         )
 
         # Load tools

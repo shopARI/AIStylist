@@ -34,7 +34,6 @@ agent:
     You have access to a 6.4M product graph with comprehensive relationship data.
   llm:
     model: gpt-5
-    temperature: 0.7
     timeout: 30
   tools:
     - async_neo4j_query_tool

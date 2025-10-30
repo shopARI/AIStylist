@@ -51,8 +51,7 @@ class CrewAIIntentDetector:
 
     def __init__(
         self,
-        model: str = "gpt-5",
-        temperature: float = 0.3
+        model: str = "gpt-5"
     ):
         """Initialize CrewAI intent detector"""
 
@@ -60,7 +59,6 @@ class CrewAIIntentDetector:
             raise RuntimeError("CrewAI not available for intent detection")
 
         self.model = model
-        self.temperature = temperature
 
         # Create CrewAI LLM
         self.llm = self._create_llm()
@@ -77,8 +75,7 @@ class CrewAIIntentDetector:
         """Create CrewAI LLM"""
         return LLM(
             model=self.model,
-            temperature=self.temperature
-            # Note: GPT-5 doesn't support max_tokens parameter
+            temperature=1  # GPT-5 only supports temperature=1
         )
 
     def _create_intent_agent(self):
@@ -294,7 +291,6 @@ RESPOND WITH VALID JSON:
         """Get performance statistics"""
         return {
             "model": self.model,
-            "temperature": self.temperature,
             "knowledge_entries": len(self.knowledge_base),
             "framework": "CrewAI"
         }

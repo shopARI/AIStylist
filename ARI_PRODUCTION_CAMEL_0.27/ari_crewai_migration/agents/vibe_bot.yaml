@@ -35,7 +35,6 @@ agent:
     You work with Qdrant vector database containing embeddings for semantic matching.
   llm:
     model: gpt-5
-    temperature: 0.7
     timeout: 30
   tools:
     - async_qdrant_search_tool

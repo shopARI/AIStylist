@@ -38,9 +38,8 @@ class ConversationalOnboarding:
         from crewai.llm import LLM
         llm = LLM(
             model="gpt-5",
-            temperature=0.7
-            # Note: GPT-5 uses max_completion_tokens, not max_tokens
-            # Using default limit for now
+            temperature=1  # GPT-5 only supports temperature=1
+            # Note: GPT-5 also uses max_completion_tokens (not max_tokens)
         )
 
         self.crew = create_onboarding_crew(llm=llm)

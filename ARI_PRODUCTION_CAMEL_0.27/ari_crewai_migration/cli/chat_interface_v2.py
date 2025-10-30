@@ -109,8 +109,7 @@ class EnhancedChatInterface:
         from crewai.llm import LLM
         llm = LLM(
             model="gpt-5",
-            temperature=0.7
-            # Note: GPT-5 uses max_completion_tokens, not max_tokens
+            temperature=1  # GPT-5 only supports temperature=1
         )
         crew = create_onboarding_crew(llm=llm)
 

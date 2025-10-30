@@ -37,7 +37,6 @@ agent:
     Your judgment is independent and unbiased by individual agent scores.
   llm:
     model: gpt-5
-    temperature: 0.6
     timeout: 30
   tools:
     - quality_scoring_tool
