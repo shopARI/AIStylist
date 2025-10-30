@@ -51,7 +51,7 @@ class CrewAIIntentDetector:
 
     def __init__(
         self,
-        model: str = "gpt-4o-mini",
+        model: str = "gpt-5",
         temperature: float = 0.3,
         max_tokens: int = 2000
     ):
