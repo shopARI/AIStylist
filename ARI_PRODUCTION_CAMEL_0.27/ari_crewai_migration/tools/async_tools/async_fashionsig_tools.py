@@ -25,28 +25,23 @@ async def _generate_fashionsig_embedding(image_path: str) -> List[float]:
     """
     try:
         # Import FashionSigLIP encoder from existing services
-        # This would typically import from the original codebase
-        # For now, returning placeholder structure
+        from services.ml.fashionsig_encoder import get_fashionsig_encoder
 
         logger.info(f"Generating async FashionSigLIP embedding for {image_path}")
 
-        # TODO: Integrate with actual FashionSigLIP encoder
-        # This would be wrapped in asyncio.to_thread() if the encoder is sync:
-        #
-        # from services.ml.fashionsig_encoder import FashionSigLIPEncoder
-        # encoder = FashionSigLIPEncoder()
-        #
-        # # Run sync encoder in thread pool to avoid blocking
-        # embedding = await asyncio.to_thread(encoder.encode_image, image_path)
-        # return embedding.tolist()
+        # Get singleton encoder instance
+        encoder = get_fashionsig_encoder()
 
-        # For now, simulate async work
-        await asyncio.sleep(0.01)  # Simulate async I/O
+        # Encoder's encode_image is already async, just await it
+        embedding = await encoder.encode_image(image_path)
 
-        # Placeholder - return empty for now
+        # Convert numpy array to list
+        return embedding.tolist()
+
+    except ImportError as e:
+        logger.error(f"Failed to import FashionSigLIP encoder: {e}")
         logger.warning("FashionSigLIP integration pending - returning placeholder")
         return []
-
     except Exception as e:
         logger.error(f"Async FashionSigLIP embedding generation failed: {e}")
         return []
@@ -212,21 +207,19 @@ async def async_fashionsig_multimodal_search_tool(
     try:
         logger.info(f"Generating async multimodal embedding for: '{query_text}'")
 
-        # TODO: Integrate with FashionSigLIP text encoder
-        # This would use the multimodal aspect of SigLIP:
-        #
-        # from services.ml.fashionsig_encoder import FashionSigLIPEncoder
-        # encoder = FashionSigLIPEncoder()
-        #
-        # # Run sync encoder in thread pool
-        # embedding = await asyncio.to_thread(encoder.encode_text, query_text)
+        # Import FashionSigLIP encoder from existing services
+        from services.ml.fashionsig_encoder import get_fashionsig_encoder
 
-        # For now, simulate async work
-        await asyncio.sleep(0.01)
-        embedding = []  # Placeholder
+        try:
+            # Get singleton encoder instance
+            encoder = get_fashionsig_encoder()
 
-        if not embedding:
-            logger.warning("FashionSigLIP multimodal integration pending")
+            # Encoder's encode_text is already async, just await it
+            embedding_np = await encoder.encode_text(query_text)
+            embedding = embedding_np.tolist()
+
+        except (ImportError, RuntimeError) as e:
+            logger.warning(f"FashionSigLIP multimodal integration pending: {e}")
             # Fallback to text embedding from OpenAI (use internal function)
             embedding = await _generate_embedding(query_text)
 

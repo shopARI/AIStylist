@@ -26,21 +26,33 @@ def fashionsig_embedding_tool(image_path: str) -> List[float]:
     """
     try:
         # Import FashionSigLIP encoder from existing services
-        # This would typically import from the original codebase
-        # For now, returning placeholder structure
+        from services.ml.fashionsig_encoder import get_fashionsig_encoder
+        import asyncio
 
         logger.info(f"Generating FashionSigLIP embedding for {image_path}")
 
-        # TODO: Integrate with actual FashionSigLIP encoder
-        # from services.ml.fashionsig_encoder import FashionSigLIPEncoder
-        # encoder = FashionSigLIPEncoder()
-        # embedding = encoder.encode_image(image_path)
-        # return embedding.tolist()
+        # Get singleton encoder instance
+        encoder = get_fashionsig_encoder()
 
-        # Placeholder - return empty for now
+        # Encoder's encode_image is async, so we need to run it in event loop
+        # Check if we're already in an async context
+        try:
+            loop = asyncio.get_running_loop()
+            # We're in async context, but this is a sync tool, so we can't await
+            # Create a new task that will run in the background
+            logger.warning("Running async encoder in sync context - may block")
+            embedding = loop.run_until_complete(encoder.encode_image(image_path))
+        except RuntimeError:
+            # No running loop, create one
+            embedding = asyncio.run(encoder.encode_image(image_path))
+
+        # Convert numpy array to list
+        return embedding.tolist()
+
+    except ImportError as e:
+        logger.error(f"Failed to import FashionSigLIP encoder: {e}")
         logger.warning("FashionSigLIP integration pending")
         return []
-
     except Exception as e:
         logger.error(f"FashionSigLIP embedding generation failed: {e}")
         return []
