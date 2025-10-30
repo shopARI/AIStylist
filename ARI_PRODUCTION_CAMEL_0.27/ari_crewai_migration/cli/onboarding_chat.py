@@ -34,7 +34,15 @@ class ConversationalOnboarding:
 
     def __init__(self):
         """Initialize conversational onboarding."""
-        self.crew = create_onboarding_crew()
+        # Create GPT-5 LLM for onboarding agents
+        from crewai.llm import LLM
+        llm = LLM(
+            model="gpt-5",
+            temperature=0.7,
+            max_tokens=2000
+        )
+
+        self.crew = create_onboarding_crew(llm=llm)
         self.user_service = UserService()
         self.onboarding_service = OnboardingService()
 

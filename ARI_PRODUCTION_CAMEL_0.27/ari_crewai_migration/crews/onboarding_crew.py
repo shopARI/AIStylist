@@ -291,14 +291,32 @@ Give ONLY your next message to the user. Nothing else.
         try:
             # Extraction result is from first task
             extraction_result = extraction_task.output.raw
-            extracted_info = json.loads(extraction_result)
+            print(f"\n[DEBUG] Raw extraction output: {extraction_result}\n")
+
+            # Try to parse JSON - handle markdown code blocks
+            json_str = str(extraction_result).strip()
+
+            # Handle markdown code blocks (```json ... ``` or ``` ... ```)
+            if "```json" in json_str:
+                start = json_str.find("```json") + 7
+                end = json_str.find("```", start)
+                json_str = json_str[start:end].strip()
+            elif "```" in json_str:
+                start = json_str.find("```") + 3
+                end = json_str.rfind("```")
+                json_str = json_str[start:end].strip()
+
+            extracted_info = json.loads(json_str)
+            print(f"[DEBUG] Successfully parsed extraction: {extracted_info}\n")
 
             # Update extracted data
             if self.current_step_id not in self.extracted_data:
                 self.extracted_data[self.current_step_id] = {}
             self.extracted_data[self.current_step_id].update(extracted_info)
 
-        except json.JSONDecodeError:
+        except json.JSONDecodeError as e:
+            print(f"[DEBUG] JSON parse failed: {e}")
+            print(f"[DEBUG] Failed content: {extraction_result}\n")
             extracted_info = {}
 
         # Conversation response is from second task

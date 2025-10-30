@@ -105,8 +105,14 @@ class EnhancedChatInterface:
             metadata={"event": "onboarding_start", "email": email}
         )
 
-        # Create onboarding crew
-        crew = create_onboarding_crew()
+        # Create onboarding crew with GPT-5
+        from crewai.llm import LLM
+        llm = LLM(
+            model="gpt-5",
+            temperature=0.7,
+            max_tokens=2000
+        )
+        crew = create_onboarding_crew(llm=llm)
 
         # Run through all onboarding steps
         all_steps = get_all_step_ids()
