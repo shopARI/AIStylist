@@ -26,41 +26,41 @@ ARI's conversational onboarding system uses AI agents to discover user preferenc
 ### Components
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                 Conversational Onboarding                    │
-│                                                               │
-│  ┌──────────────┐         ┌────────────────┐                │
-│  │  User Chat   │────────▶│ OnboardingCrew │                │
-│  │  Interface   │◀────────│                │                │
-│  └──────────────┘         └────────────────┘                │
-│                                  │                           │
-│                                  │                           │
-│                    ┌─────────────┴─────────────┐            │
-│                    │                             │            │
-│           ┌────────▼────────┐       ┌───────────▼────────┐  │
-│           │ Onboarding      │       │ Information        │  │
-│           │ Agent           │       │ Extraction Agent   │  │
-│           │                 │       │                    │  │
-│           │ - Conversation  │       │ - Data Parsing     │  │
-│           │ - Empathy       │       │ - Validation       │  │
-│           │ - Follow-ups    │       │ - Completeness     │  │
-│           └─────────────────┘       └────────────────────┘  │
-│                                                               │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │            Conversation Prompts                       │   │
-│  │  - 7 topic-specific guidelines                        │   │
-│  │  - Sensitivity notes                                  │   │
-│  │  - Sample conversation starters                       │   │
-│  └──────────────────────────────────────────────────────┘   │
-│                                                               │
-│                         │                                     │
-│                         ▼                                     │
-│  ┌──────────────────────────────────────────────────────┐   │
-│  │            User Graph Manager                         │   │
-│  │  - Store extracted data in Neo4j                      │   │
-│  │  - Track onboarding progress                          │   │
-│  └──────────────────────────────────────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
+
+                 Conversational Onboarding                    
+                                                               
+                           
+    User Chat    OnboardingCrew                 
+    Interface                                   
+                           
+                                                             
+                                                             
+                                
+                                                             
+                    
+            Onboarding              Information          
+            Agent                   Extraction Agent     
+                                                         
+            - Conversation          - Data Parsing       
+            - Empathy               - Validation         
+            - Follow-ups            - Completeness       
+                    
+                                                               
+     
+              Conversation Prompts                          
+    - 7 topic-specific guidelines                           
+    - Sensitivity notes                                     
+    - Sample conversation starters                          
+     
+                                                               
+                                                              
+                                                              
+     
+              User Graph Manager                            
+    - Store extracted data in Neo4j                         
+    - Track onboarding progress                             
+     
+
 ```
 
 ### Key Files
@@ -113,7 +113,7 @@ ARI's conversational onboarding system uses AI agents to discover user preferenc
 - Fits that make them feel confident
 - How much style varies by occasion
 
-**⚠️ CRITICAL Sensitivity:**
+** CRITICAL Sensitivity:**
 - NEVER ask "are you more masculine or feminine?"
 - Let user define their own terms
 - Use gender-neutral language unless user specifies
@@ -179,7 +179,7 @@ ARI's conversational onboarding system uses AI agents to discover user preferenc
 - What "value" means to them
 - Splurge vs save preferences
 
-**⚠️ SENSITIVE:**
+** SENSITIVE:**
 - Budget is personal - never judge
 - Frame as practical planning
 - Validate all budget ranges

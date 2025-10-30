@@ -55,7 +55,7 @@ async def example_conversation_flow():
     for i, mem in enumerate(history, 1):
         print(f"  {i}. {mem['content']}")
 
-    print("\n✓ Episodic memory captures conversation flow")
+    print("\n Episodic memory captures conversation flow")
 
 
 async def example_user_preferences():
@@ -107,7 +107,7 @@ async def example_user_preferences():
     for b in budget:
         print(f"  - {b['content']}")
 
-    print("\n✓ Factual memory stores stable user preferences")
+    print("\n Factual memory stores stable user preferences")
 
 
 async def example_style_relationships():
@@ -154,7 +154,7 @@ async def example_style_relationships():
     for res in results:
         print(f"  - {res['content']} (relevance: {res['score']:.2f})")
 
-    print("\n✓ Semantic memory captures relationships between concepts")
+    print("\n Semantic memory captures relationships between concepts")
     print("  (Neo4j graph stores: User → likes → Brand X → has → minimalist aesthetic)")
 
 
@@ -190,7 +190,7 @@ async def example_contextual_search():
     for mem in results["semantic"]:
         print(f"  - {mem['content']} (score: {mem['score']:.2f})")
 
-    print("\n✓ Unified search finds relevant context across all memory types")
+    print("\n Unified search finds relevant context across all memory types")
     print("  → Agent can now recommend sustainable brands aligned with user values")
 
 
@@ -251,7 +251,7 @@ async def example_integration_with_product_search():
         metadata={"brand": "Brand Y", "category": "t-shirts"}
     )
 
-    print("\n✓ Mem0 provides context for personalization and learns from interactions")
+    print("\n Mem0 provides context for personalization and learns from interactions")
 
 
 async def run_all_examples():

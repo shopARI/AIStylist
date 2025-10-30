@@ -4,7 +4,7 @@ This guide shows where to customize the onboarding experience **without touching
 
 ---
 
-## 🎨 1. CONVERSATION CONTENT (Primary Customization Point)
+##  1. CONVERSATION CONTENT (Primary Customization Point)
 
 ### File: `prompts/onboarding_prompts.py`
 
@@ -64,7 +64,7 @@ The topics are processed in this order:
 
 ---
 
-## 🎭 2. DYNAMIC STYLE ADAPTATION
+##  2. DYNAMIC STYLE ADAPTATION
 
 ### File: `crews/onboarding_crew.py` (Lines 91-128)
 
@@ -123,7 +123,7 @@ elif autonomy_score >= 7 or decision_style == 'many_options':
 
 ---
 
-## 📝 3. UI TEXT & MESSAGES
+##  3. UI TEXT & MESSAGES
 
 ### File: `cli/chat_interface_v2.py`
 
@@ -174,7 +174,7 @@ if user_input.lower() in ['skip', 'next']:  # ← Add more keywords
 
 ---
 
-## 🎯 4. CONVERSATION FLOW LOGIC
+##  4. CONVERSATION FLOW LOGIC
 
 ### File: `cli/chat_interface_v2.py` (Lines 115-128)
 
@@ -198,7 +198,7 @@ if 'move on' in agent_response.lower():  # ← Add more phrases
 
 ---
 
-## 📊 5. DATA FIELDS COLLECTED
+##  5. DATA FIELDS COLLECTED
 
 ### File: `prompts/onboarding_prompts.py`
 
@@ -223,7 +223,7 @@ Each topic has a `"focus"` array defining what data is collected:
 
 ---
 
-## 🚦 QUICK REFERENCE: What to Edit Where
+##  QUICK REFERENCE: What to Edit Where
 
 | **What You Want to Change** | **File to Edit** | **Lines** |
 |------------------------------|------------------|-----------|
@@ -240,7 +240,7 @@ Each topic has a `"focus"` array defining what data is collected:
 
 ---
 
-## ⚠️ WHAT NOT TO TOUCH (For Non-Developers)
+##  WHAT NOT TO TOUCH (For Non-Developers)
 
 **Files to avoid editing:**
 - `services/user_graph_manager.py` - Database operations
@@ -256,7 +256,7 @@ Each topic has a `"focus"` array defining what data is collected:
 
 ---
 
-## 🧪 TESTING YOUR CHANGES
+##  TESTING YOUR CHANGES
 
 After making changes:
 
@@ -277,7 +277,7 @@ python -c "from prompts.onboarding_prompts import get_all_step_ids; print(get_al
 
 ---
 
-## 💡 COMMON CUSTOMIZATIONS
+##  COMMON CUSTOMIZATIONS
 
 ### Make conversations shorter:
 - Reduce number of topics in `prompts/onboarding_prompts.py`
@@ -301,7 +301,7 @@ This requires Python code changes - consult a developer
 
 ---
 
-## 📞 NEED HELP?
+##  NEED HELP?
 
 **For conversation content changes:** Edit `prompts/onboarding_prompts.py` directly
 **For UI text changes:** Edit `cli/chat_interface_v2.py` carefully
@@ -310,7 +310,7 @@ This requires Python code changes - consult a developer
 
 ---
 
-## 🎨 EXAMPLE: Adding a New Topic
+##  EXAMPLE: Adding a New Topic
 
 ```python
 # In prompts/onboarding_prompts.py, add to ONBOARDING_STEP_PROMPTS:

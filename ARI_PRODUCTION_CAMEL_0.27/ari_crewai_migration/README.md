@@ -20,38 +20,38 @@ This folder contains the complete CrewAI implementation that replaces the CAMEL-
 
 ```
 ari_crewai_migration/
-├── tools/                  # CrewAI tools wrapping backend services
-│   ├── neo4j_tools.py      # Graph database tools
-│   ├── qdrant_tools.py     # Vector search tools
-│   ├── fashionsig_tools.py # Visual similarity tools
-│   ├── quality_tools.py    # Quality assessment tools
-│   └── cache_tools.py      # Redis caching tools
-│
-├── agents/                 # Agent YAML configurations
-│   ├── cypher_bot.yaml     # Graph search agent
-│   ├── vibe_bot.yaml       # Vector search agent
-│   ├── vision_bot.yaml     # Visual search agent
-│   └── judge_ari.yaml      # Judgment agent
-│
-├── tasks/                  # Task YAML definitions
-│   ├── intelligence_generation.yaml
-│   ├── graph_search.yaml
-│   ├── vector_search.yaml
-│   ├── visual_search.yaml
-│   └── result_evaluation.yaml
-│
-├── crews/                  # Crew assembly
-│   ├── product_search_crew.py
-│   └── crewai_orchestrator.py
-│
-├── memory/                 # Memory providers
-│   └── redis_memory_provider.py
-│
-├── utils/                  # Utilities
-│   ├── agent_loader.py
-│   └── task_loader.py
-│
-└── config/                 # Configuration files
+ tools/                  # CrewAI tools wrapping backend services
+    neo4j_tools.py      # Graph database tools
+    qdrant_tools.py     # Vector search tools
+    fashionsig_tools.py # Visual similarity tools
+    quality_tools.py    # Quality assessment tools
+    cache_tools.py      # Redis caching tools
+
+ agents/                 # Agent YAML configurations
+    cypher_bot.yaml     # Graph search agent
+    vibe_bot.yaml       # Vector search agent
+    vision_bot.yaml     # Visual search agent
+    judge_ari.yaml      # Judgment agent
+
+ tasks/                  # Task YAML definitions
+    intelligence_generation.yaml
+    graph_search.yaml
+    vector_search.yaml
+    visual_search.yaml
+    result_evaluation.yaml
+
+ crews/                  # Crew assembly
+    product_search_crew.py
+    crewai_orchestrator.py
+
+ memory/                 # Memory providers
+    redis_memory_provider.py
+
+ utils/                  # Utilities
+    agent_loader.py
+    task_loader.py
+
+ config/                 # Configuration files
 ```
 
 ## Installation

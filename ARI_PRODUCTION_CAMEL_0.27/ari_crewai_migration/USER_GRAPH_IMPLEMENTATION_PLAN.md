@@ -20,21 +20,21 @@
 
 ### Pros of Using Meta Graph API
 
-✅ **Rich data instantly** - Users connect Facebook/Instagram, we get their profile
-✅ **Social proof** - Real brand preferences from what they follow
-✅ **Visual style analysis** - Analyze their Instagram aesthetic
-✅ **Network effects** - "Users like you also like..." recommendations
-✅ **Inspiration** - Learn from Meta's graph structure
+ **Rich data instantly** - Users connect Facebook/Instagram, we get their profile
+ **Social proof** - Real brand preferences from what they follow
+ **Visual style analysis** - Analyze their Instagram aesthetic
+ **Network effects** - "Users like you also like..." recommendations
+ **Inspiration** - Learn from Meta's graph structure
 
 ### Cons of Using Meta Graph API
 
-❌ **Privacy concerns** - Users might not want to share social data
-❌ **OAuth complexity** - Facebook OAuth is notoriously difficult
-❌ **API limitations** - Strict rate limits, limited data access post-Cambridge Analytica
-❌ **Dependency** - Reliant on Meta's API availability
-❌ **Development time** - MCP server + OAuth = 2-3 weeks extra
-❌ **Approval required** - Facebook App Review process (can take weeks)
-❌ **Not fashion-specific** - Generic interests, not style preferences
+ **Privacy concerns** - Users might not want to share social data
+ **OAuth complexity** - Facebook OAuth is notoriously difficult
+ **API limitations** - Strict rate limits, limited data access post-Cambridge Analytica
+ **Dependency** - Reliant on Meta's API availability
+ **Development time** - MCP server + OAuth = 2-3 weeks extra
+ **Approval required** - Facebook App Review process (can take weeks)
+ **Not fashion-specific** - Generic interests, not style preferences
 
 ### My Recommendation: **Skip Meta Graph API for MVP**
 
@@ -570,7 +570,7 @@ Q5: Upload 1-3 inspiration photos
 **Step 7: Review & Submit**
 ```
 Review your style profile:
-- Demographics: ✓
+- Demographics: 
 - Style: Minimalist, loves Everlane & COS
 - Colors: Black, white, navy
 - Occasions: Work, casual
@@ -643,14 +643,14 @@ class ProductSearchFlow(Flow[ProductSearchState]):
 
 ### Start WITHOUT Meta Graph API
 
-✅ **Start with:**
+ **Start with:**
 - Enhanced Neo4j schema (circular diagram)
 - Simple onboarding quiz (5-7 questions)
 - Direct style preferences
 - Vector embeddings for similarity
 - User-aware product search
 
-✅ **Add LATER if needed:**
+ **Add LATER if needed:**
 - Pinterest integration (more fashion-focused)
 - Instagram public profile scraping
 - Image upload + vision analysis

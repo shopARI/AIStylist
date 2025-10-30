@@ -385,44 +385,44 @@ async def fetch_user_interests(user_id: str) -> list[dict]:
 ## 5. Technical Architecture Diagram
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                    User Onboarding Flow                      │
-└────────────────────────┬────────────────────────────────────┘
+
+                    User Onboarding Flow                      
+
                          ↓
-        ┌────────────────┴────────────────┐
-        │                                 │
+        
+                                         
         ↓                                 ↓
-┌──────────────────┐            ┌──────────────────┐
-│  Frontend Form   │            │  Facebook OAuth  │
-│  Demographics    │            │  (MCP Server)    │
-│  Style Quiz      │            │  Social Data     │
-└────────┬─────────┘            └────────┬─────────┘
-         │                               │
-         └───────────┬───────────────────┘
+            
+  Frontend Form                 Facebook OAuth  
+  Demographics                  (MCP Server)    
+  Style Quiz                    Social Data     
+            
+                                        
+         
                      ↓
-         ┌───────────────────────┐
-         │  ARI Backend API      │
-         │  - Validation         │
-         │  - Data enrichment    │
-         │  - Embedding gen      │
-         └───────────┬───────────┘
+         
+           ARI Backend API      
+           - Validation         
+           - Data enrichment    
+           - Embedding gen      
+         
                      ↓
-         ┌───────────┴───────────┐
-         │                       │
+         
+                                
          ↓                       ↓
-┌────────────────┐      ┌────────────────┐
-│  Neo4j         │      │  Qdrant        │
-│  User Profile  │      │  User Vector   │
-│  Graph         │      │  Embeddings    │
-└────────┬───────┘      └────────┬───────┘
-         │                       │
-         └───────────┬───────────┘
+      
+  Neo4j                 Qdrant        
+  User Profile          User Vector   
+  Graph                 Embeddings    
+      
+                                
+         
                      ↓
-         ┌───────────────────────┐
-         │  ARI CrewAI System    │
-         │  + User Context       │
-         │  = Personalized Recs  │
-         └───────────────────────┘
+         
+           ARI CrewAI System    
+           + User Context       
+           = Personalized Recs  
+         
 ```
 
 ---

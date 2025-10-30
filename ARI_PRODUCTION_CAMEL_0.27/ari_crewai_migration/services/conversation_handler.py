@@ -657,7 +657,7 @@ class ConversationHandler:
         if self._is_goodbye(message):
             context.state = ConversationState.ENDED
             await self._persist_session(session_id, context)  # Final persist
-            return ("goodbye", {"response": "It was lovely helping you today! Come back anytime you need style advice. 💕"})
+            return ("goodbye", {"response": "It was lovely helping you today! Come back anytime you need style advice. "})
         
         # Update state based on message
         new_state = self._determine_state_transition(context, message)

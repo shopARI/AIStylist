@@ -277,16 +277,16 @@ def calculate_confidence(interactions_count: int, variance: float) -> float:
 ## When to Use Stated vs Observed
 
 ### Use Stated Preference:
-- ✅ First recommendations (no behavioral data yet)
-- ✅ User explicitly wants to change style
-- ✅ Respecting user's self-identification
-- ✅ Low confidence in observed data (<0.5)
+-  First recommendations (no behavioral data yet)
+-  User explicitly wants to change style
+-  Respecting user's self-identification
+-  Low confidence in observed data (<0.5)
 
 ### Use Observed Preference:
-- ✅ After 20+ interactions
-- ✅ High confidence (>0.7)
-- ✅ Stated preference conflicts with behavior
-- ✅ User gave ambiguous or skipped stated preference
+-  After 20+ interactions
+-  High confidence (>0.7)
+-  Stated preference conflicts with behavior
+-  User gave ambiguous or skipped stated preference
 
 ### Use Blended Approach:
 ```python
@@ -342,8 +342,8 @@ def get_effective_expression_spectrum(user_id: str) -> float:
 Your Style Profile
 
 Expression Spectrum:
-  What you told us: "Fluid & Balanced" (5/10) ━━━━━●━━━━━
-  What we've learned: "Soft & Flowing" (7.2/10) ━━━━━━━●━━━
+  What you told us: "Fluid & Balanced" (5/10) 
+  What we've learned: "Soft & Flowing" (7.2/10) 
 
   Notice a difference? Your choices lean more toward flowing styles.
   [Use my stated preference] [Trust what you've learned] [Update my stated preference]

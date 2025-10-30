@@ -7,22 +7,22 @@
 Your codebase **already has a user knowledge graph system** at `/services/user/knowledge_graph.py`!
 
 **Existing Infrastructure:**
-- ✅ `UserKnowledgeGraphService` - Async Neo4j service (878 lines)
-- ✅ User nodes with basic profile data
-- ✅ Product interaction tracking (VIEWED, PURCHASED, etc.)
-- ✅ User preference system (categories, brands, colors, budget)
-- ✅ User segments (BELONGS_TO relationships)
-- ✅ Style profiles (HAS_STYLE relationships)
-- ✅ Connection pooling, retry logic, health checks
-- ✅ Schema creation with constraints and indexes
+-  `UserKnowledgeGraphService` - Async Neo4j service (878 lines)
+-  User nodes with basic profile data
+-  Product interaction tracking (VIEWED, PURCHASED, etc.)
+-  User preference system (categories, brands, colors, budget)
+-  User segments (BELONGS_TO relationships)
+-  Style profiles (HAS_STYLE relationships)
+-  Connection pooling, retry logic, health checks
+-  Schema creation with constraints and indexes
 
 **Current Schema:**
 ```cypher
 (:User)
-  ├─[:HAS_PREFERENCE]→(:UserPreference)
-  ├─[:HAS_INTERACTION]→(:ProductInteraction)
-  ├─[:BELONGS_TO]→(:UserSegment)
-  └─[:HAS_STYLE]→(:StyleProfile)
+  [:HAS_PREFERENCE]→(:UserPreference)
+  [:HAS_INTERACTION]→(:ProductInteraction)
+  [:BELONGS_TO]→(:UserSegment)
+  [:HAS_STYLE]→(:StyleProfile)
 ```
 
 **User Properties Currently Tracked:**
@@ -35,26 +35,26 @@ Your codebase **already has a user knowledge graph system** at `/services/user/k
 Comparing to the circular diagram schema, you need:
 
 **Missing Nodes:**
-- ❌ `:Demographic` (income, education, occupation, marital_status)
-- ❌ `:Personality` (style_archetype, fashion_confidence, values)
-- ❌ Separate `:Brand`, `:Color`, `:Occasion` nodes (currently just preferences)
-- ❌ `:SocialProfile` (Instagram, Facebook connections)
+-  `:Demographic` (income, education, occupation, marital_status)
+-  `:Personality` (style_archetype, fashion_confidence, values)
+-  Separate `:Brand`, `:Color`, `:Occasion` nodes (currently just preferences)
+-  `:SocialProfile` (Instagram, Facebook connections)
 
 **Missing Relationships:**
-- ❌ `User-[:FOLLOWS]→User` (social graph)
-- ❌ `User-[:INSPIRED_BY]→User`
-- ❌ `User-[:SIMILAR_TO {score}]→User` (for recommendations)
-- ❌ `User-[:CONNECTED_TO {platform}]→SocialProfile`
-- ❌ `User-[:LOVES_BRAND]→Brand`
-- ❌ `User-[:AVOIDS_BRAND]→Brand`
-- ❌ `User-[:DRESSES_FOR]→Occasion`
+-  `User-[:FOLLOWS]→User` (social graph)
+-  `User-[:INSPIRED_BY]→User`
+-  `User-[:SIMILAR_TO {score}]→User` (for recommendations)
+-  `User-[:CONNECTED_TO {platform}]→SocialProfile`
+-  `User-[:LOVES_BRAND]→Brand`
+-  `User-[:AVOIDS_BRAND]→Brand`
+-  `User-[:DRESSES_FOR]→Occasion`
 
 **Missing Features:**
-- ❌ Vector embeddings (style_embedding, profile_embedding)
-- ❌ Social auth integration (Facebook/Instagram OAuth)
-- ❌ Onboarding flow (multi-step wizard)
-- ❌ MCP server for Meta Graph API
-- ❌ Integration with ProductSearchFlow (user_id parameter)
+-  Vector embeddings (style_embedding, profile_embedding)
+-  Social auth integration (Facebook/Instagram OAuth)
+-  Onboarding flow (multi-step wizard)
+-  MCP server for Meta Graph API
+-  Integration with ProductSearchFlow (user_id parameter)
 
 ---
 
@@ -65,16 +65,16 @@ Comparing to the circular diagram schema, you need:
 **Approach:** Build enhanced schema in parallel, test, then migrate.
 
 **Pros:**
-- ✅ Zero risk to production system
-- ✅ Can test and iterate quickly
-- ✅ Validate design before committing
-- ✅ Side-by-side comparison with existing system
-- ✅ Easy rollback if issues arise
+-  Zero risk to production system
+-  Can test and iterate quickly
+-  Validate design before committing
+-  Side-by-side comparison with existing system
+-  Easy rollback if issues arise
 
 **Cons:**
-- ⏱️ Takes slightly longer (2-3 weeks extra)
-- 🔄 Requires migration step afterward
-- 💾 Duplicate code during transition
+- ⏱ Takes slightly longer (2-3 weeks extra)
+-  Requires migration step afterward
+-  Duplicate code during transition
 
 **Timeline:** 8-10 weeks total
 - Weeks 1-3: Prototype enhanced schema
@@ -89,16 +89,16 @@ Comparing to the circular diagram schema, you need:
 **Approach:** Extend existing `UserKnowledgeGraphService` directly.
 
 **Pros:**
-- ⚡ Faster to production (6-8 weeks)
-- 🔧 Single codebase, no duplication
-- 💰 Lower development cost
-- 🚀 Immediate benefits
+-  Faster to production (6-8 weeks)
+-  Single codebase, no duplication
+-  Lower development cost
+-  Immediate benefits
 
 **Cons:**
-- ⚠️ Risk to existing user data
-- 🐛 Harder to debug issues
-- 🔄 Can't easily rollback
-- 📊 No A/B testing capability
+-  Risk to existing user data
+-  Harder to debug issues
+-  Can't easily rollback
+-  No A/B testing capability
 
 **Timeline:** 6-8 weeks total
 - Weeks 1-2: Extend schema in place
@@ -112,15 +112,15 @@ Comparing to the circular diagram schema, you need:
 **Approach:** Prototype new features, integrate incrementally.
 
 **Pros:**
-- ✅ Balanced risk/speed
-- 🔄 Can deploy features progressively
-- 📊 Test each feature independently
-- ↩️ Easy rollback per feature
+-  Balanced risk/speed
+-  Can deploy features progressively
+-  Test each feature independently
+- ↩ Easy rollback per feature
 
 **Cons:**
-- 🧩 More complex planning
-- 🔀 Requires feature flags
-- 📝 More testing scenarios
+-  More complex planning
+-  Requires feature flags
+-  More testing scenarios
 
 **Timeline:** 7-9 weeks total
 - Phase 1: Demographics & Personality (2 weeks)
@@ -148,17 +148,17 @@ Comparing to the circular diagram schema, you need:
 
 ```
 ari_crewai_migration/
-├── services/
-│   ├── user_profile_service.py         # NEW: Enhanced user service
-│   └── onboarding_service.py           # NEW: Onboarding orchestration
-├── models/
-│   ├── user_models.py                  # NEW: Enhanced Pydantic models
-│   └── onboarding_models.py            # NEW: Onboarding flow models
-├── tools/
-│   ├── user_profile_tools.py           # NEW: CrewAI tools for user data
-│   └── social_auth_tools.py            # NEW: Facebook/Instagram tools
-└── mcp/
-    └── meta_graph_server.py            # NEW: MCP server (optional)
+ services/
+    user_profile_service.py         # NEW: Enhanced user service
+    onboarding_service.py           # NEW: Onboarding orchestration
+ models/
+    user_models.py                  # NEW: Enhanced Pydantic models
+    onboarding_models.py            # NEW: Onboarding flow models
+ tools/
+    user_profile_tools.py           # NEW: CrewAI tools for user data
+    social_auth_tools.py            # NEW: Facebook/Instagram tools
+ mcp/
+     meta_graph_server.py            # NEW: MCP server (optional)
 ```
 
 **Tasks:**
@@ -292,30 +292,30 @@ class UserSchemaMigration:
 
 ```
 ARI_PRODUCTION_CAMEL_0.27/
-├── services/
-│   └── user/
-│       ├── knowledge_graph.py          # LEGACY: Keep for backward compatibility
-│       ├── enhanced_profile.py         # NEW: Enhanced user service
-│       └── migration.py                # NEW: Migration utilities
-│
-└── ari_crewai_migration/
-    ├── services/
-    │   ├── onboarding_service.py       # NEW: Onboarding orchestration
-    │   └── user_similarity.py          # NEW: User similarity engine
-    ├── models/
-    │   ├── user_models.py              # NEW: Enhanced Pydantic models
-    │   └── onboarding_models.py        # NEW: Onboarding models
-    ├── tools/
-    │   ├── user_profile_tools.py       # NEW: User data tools for agents
-    │   └── social_auth_tools.py        # NEW: OAuth tools
-    ├── flows/
-    │   ├── product_search_flow.py      # MODIFIED: Now user-aware
-    │   └── onboarding_flow.py          # NEW: Onboarding as a flow
-    ├── crews/
-    │   └── crewai_orchestrator.py      # MODIFIED: User context injection
-    └── mcp/
-        ├── meta_graph_server.py        # OPTIONAL: MCP server for Meta API
-        └── user_profile_server.py      # OPTIONAL: MCP server for user data
+ services/
+    user/
+        knowledge_graph.py          # LEGACY: Keep for backward compatibility
+        enhanced_profile.py         # NEW: Enhanced user service
+        migration.py                # NEW: Migration utilities
+
+ ari_crewai_migration/
+     services/
+        onboarding_service.py       # NEW: Onboarding orchestration
+        user_similarity.py          # NEW: User similarity engine
+     models/
+        user_models.py              # NEW: Enhanced Pydantic models
+        onboarding_models.py        # NEW: Onboarding models
+     tools/
+        user_profile_tools.py       # NEW: User data tools for agents
+        social_auth_tools.py        # NEW: OAuth tools
+     flows/
+        product_search_flow.py      # MODIFIED: Now user-aware
+        onboarding_flow.py          # NEW: Onboarding as a flow
+     crews/
+        crewai_orchestrator.py      # MODIFIED: User context injection
+     mcp/
+         meta_graph_server.py        # OPTIONAL: MCP server for Meta API
+         user_profile_server.py      # OPTIONAL: MCP server for user data
 ```
 
 ---
@@ -323,25 +323,25 @@ ARI_PRODUCTION_CAMEL_0.27/
 ## Decision Criteria
 
 ### Choose Option A (Prototype) If:
-- ✅ You want zero risk to production
-- ✅ You have 2-3 months timeline
-- ✅ You want to test with real users first
-- ✅ Performance at scale is unknown
-- ✅ Team has bandwidth for prototyping
+-  You want zero risk to production
+-  You have 2-3 months timeline
+-  You want to test with real users first
+-  Performance at scale is unknown
+-  Team has bandwidth for prototyping
 
 ### Choose Option B (Direct Integration) If:
-- ⚡ You need it ASAP (< 2 months)
-- ⚡ You're comfortable with production changes
-- ⚡ You have strong rollback plan
-- ⚡ Schema changes are well understood
-- ⚡ Small user base currently
+-  You need it ASAP (< 2 months)
+-  You're comfortable with production changes
+-  You have strong rollback plan
+-  Schema changes are well understood
+-  Small user base currently
 
 ### Choose Option C (Hybrid) If:
-- 🔄 You want progressive rollout
-- 🔄 You can deploy features independently
-- 🔄 You have feature flag infrastructure
-- 🔄 You want to A/B test each addition
-- 🔄 You need some features urgently, others later
+-  You want progressive rollout
+-  You can deploy features independently
+-  You have feature flag infrastructure
+-  You want to A/B test each addition
+-  You need some features urgently, others later
 
 ---
 

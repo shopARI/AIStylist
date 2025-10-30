@@ -39,16 +39,16 @@ class EnhancedUserService(UserKnowledgeGraphService):
 
         Schema Structure:
         (:User) - Center node
-          ├─[:HAS_AUTONOMY_PROFILE]→(:StyleAutonomy)
-          ├─[:HAS_EXPRESSION_PROFILE]→(:GenderExpression)
-          ├─[:HAS_SELF_EXPRESSION]→(:SelfExpression)
-          ├─[:HAS_LIFESTYLE]→(:LifestyleContext)
-          ├─[:HAS_VALUES]→(:ValuesProfile)
-          ├─[:HAS_BUDGET]→(:BudgetProfile)
-          ├─[:CONNECTED_TO {platform}]→(:SocialHandle)
-          ├─[:LOVES_BRAND]→(:Brand)
-          ├─[:PREFERS_COLOR]→(:Color)
-          └─[:DRESSES_FOR]→(:Occasion)
+          [:HAS_AUTONOMY_PROFILE]→(:StyleAutonomy)
+          [:HAS_EXPRESSION_PROFILE]→(:GenderExpression)
+          [:HAS_SELF_EXPRESSION]→(:SelfExpression)
+          [:HAS_LIFESTYLE]→(:LifestyleContext)
+          [:HAS_VALUES]→(:ValuesProfile)
+          [:HAS_BUDGET]→(:BudgetProfile)
+          [:CONNECTED_TO {platform}]→(:SocialHandle)
+          [:LOVES_BRAND]→(:Brand)
+          [:PREFERS_COLOR]→(:Color)
+          [:DRESSES_FOR]→(:Occasion)
         """
 
         constraints = [

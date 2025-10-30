@@ -96,12 +96,12 @@ User gets recommendations aligned with Tan France's aesthetic
 ### Privacy & Legal Compliance
 
 **Safe Practices:**
-- ✅ Only public data (no authentication required)
-- ✅ Comply with platform ToS (rate limits, no scraping APIs)
-- ✅ Clear user disclosure: "We analyze public profiles you mention"
-- ✅ Allow users to remove connections
-- ✅ Don't store scraped images, only analysis results
-- ✅ Respect robots.txt and scraping guidelines
+-  Only public data (no authentication required)
+-  Comply with platform ToS (rate limits, no scraping APIs)
+-  Clear user disclosure: "We analyze public profiles you mention"
+-  Allow users to remove connections
+-  Don't store scraped images, only analysis results
+-  Respect robots.txt and scraping guidelines
 
 **Risk Mitigation:**
 - Don't violate Instagram ToS (no automated scraping of private accounts)
@@ -146,9 +146,9 @@ Generate style tags automatically
 
 #### Phase 4: Automated Scraping (High Risk)
 ```
-⚠️ Only if legal team approves
-⚠️ Only for public accounts
-⚠️ With strict rate limits
+ Only if legal team approves
+ Only for public accounts
+ With strict rate limits
 ```
 
 ### Benefits of This Approach
@@ -277,18 +277,18 @@ class ExternalProfileService:
 ### Risk Assessment
 
 **Low Risk (Start Here):**
-- ✅ Manual curation of top influencers
-- ✅ User-provided screenshots
-- ✅ Text-based inspiration sources
+-  Manual curation of top influencers
+-  User-provided screenshots
+-  Text-based inspiration sources
 
 **Medium Risk:**
-- ⚠️ Scraping public profile data only
-- ⚠️ Using official APIs with auth
+-  Scraping public profile data only
+-  Using official APIs with auth
 
 **High Risk (Avoid Initially):**
-- ❌ Automated scraping without user consent
-- ❌ Storing scraped images
-- ❌ Bypassing rate limits
+-  Automated scraping without user consent
+-  Storing scraped images
+-  Bypassing rate limits
 
 ### Competitive Advantage
 
