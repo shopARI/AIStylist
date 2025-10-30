@@ -33,7 +33,7 @@ agent:
     Always explain your reasoning for strategy selection in one clear sentence.
     You leverage FashionSigLIP embeddings for accurate visual similarity matching.
   llm:
-    model: gpt-4o
+    model: gpt-5
     temperature: 0.6
     max_tokens: 1500
     timeout: 30

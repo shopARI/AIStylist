@@ -34,7 +34,7 @@ agent:
     Focus on AESTHETIC and STYLE-BASED recommendations enhanced by intelligent vibe reasoning.
     You work with Qdrant vector database containing embeddings for semantic matching.
   llm:
-    model: gpt-4o
+    model: gpt-5
     temperature: 0.7
     max_tokens: 1500
     timeout: 30

@@ -14,7 +14,7 @@ def create_product_search_crew(
     agents: Dict[str, Any],
     tasks: Dict[str, Any],
     process_type: str = "hierarchical",
-    manager_llm_model: str = "gpt-4o",
+    manager_llm_model: str = "gpt-5",
     verbose: bool = False
 ) -> Crew:
     """

@@ -138,7 +138,7 @@ def create_agent_from_config(config: Dict) -> Agent:
         # Create LLM configuration
         llm_config = config.get('llm', {})
         llm = LLM(
-            model=llm_config.get('model', 'gpt-4o'),
+            model=llm_config.get('model', 'gpt-5'),
             temperature=llm_config.get('temperature', 0.7),
             max_tokens=llm_config.get('max_tokens', 2000)
         )

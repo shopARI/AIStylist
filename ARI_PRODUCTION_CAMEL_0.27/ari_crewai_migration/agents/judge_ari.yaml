@@ -36,7 +36,7 @@ agent:
     Focus on creating a balanced, high-quality selection that demonstrates both intelligent reasoning about the occasion and excellent fashion judgment.
     Your judgment is independent and unbiased by individual agent scores.
   llm:
-    model: gpt-4o
+    model: gpt-5
     temperature: 0.6
     max_tokens: 1500
     timeout: 30
