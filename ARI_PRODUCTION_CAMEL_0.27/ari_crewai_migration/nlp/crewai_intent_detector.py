@@ -52,8 +52,7 @@ class CrewAIIntentDetector:
     def __init__(
         self,
         model: str = "gpt-5",
-        temperature: float = 0.3,
-        max_tokens: int = 2000
+        temperature: float = 0.3
     ):
         """Initialize CrewAI intent detector"""
 
@@ -62,7 +61,6 @@ class CrewAIIntentDetector:
 
         self.model = model
         self.temperature = temperature
-        self.max_tokens = max_tokens
 
         # Create CrewAI LLM
         self.llm = self._create_llm()
@@ -79,8 +77,8 @@ class CrewAIIntentDetector:
         """Create CrewAI LLM"""
         return LLM(
             model=self.model,
-            temperature=self.temperature,
-            max_tokens=self.max_tokens
+            temperature=self.temperature
+            # Note: GPT-5 doesn't support max_tokens parameter
         )
 
     def _create_intent_agent(self):
@@ -297,7 +295,6 @@ RESPOND WITH VALID JSON:
         return {
             "model": self.model,
             "temperature": self.temperature,
-            "max_tokens": self.max_tokens,
             "knowledge_entries": len(self.knowledge_base),
             "framework": "CrewAI"
         }
