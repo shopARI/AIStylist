@@ -197,9 +197,9 @@ class ConversationalOnboarding:
 
                 except Exception as e:
                     print(f"\n(Oops, I had trouble processing that. Could you rephrase?)")
-                    print(f"Error: {e}")
+                    print(f"[DEBUG] Error: {e}")
                     import traceback
-                    print(f"Traceback:\n{traceback.format_exc()}\n")
+                    print(f"[DEBUG] Traceback:\n{traceback.format_exc()}\n")
 
             # Move to next step
             current_step = self.crew.get_next_step()

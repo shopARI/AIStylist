@@ -100,10 +100,13 @@ class EnhancedChatInterface:
         mem0 = create_mem0_memory_provider(user_id, f"onboarding_{self.session_id}")
 
         # Track onboarding start
-        await mem0.add_episodic(
-            f"Started onboarding for user {username}",
-            metadata={"event": "onboarding_start", "email": email}
-        )
+        try:
+            await mem0.add_episodic(
+                f"Started onboarding for user {username}",
+                metadata={"event": "onboarding_start", "email": email}
+            )
+        except Exception as mem_error:
+            print(f"[DEBUG] Warning: Memory storage failed: {mem_error}")
 
         # Create onboarding crew with GPT-5
         from crewai.llm import LLM
@@ -126,10 +129,13 @@ class EnhancedChatInterface:
             print(f"ARI: {opening_message}\n")
 
             # Track opening message
-            await mem0.add_episodic(
-                f"ARI: {opening_message}",
-                metadata={"step": step_id, "turn_type": "opening"}
-            )
+            try:
+                await mem0.add_episodic(
+                    f"ARI: {opening_message}",
+                    metadata={"step": step_id, "turn_type": "opening"}
+                )
+            except Exception as mem_error:
+                print(f"[DEBUG] Warning: Memory storage failed: {mem_error}")
 
             step_complete = False
 
@@ -142,18 +148,24 @@ class EnhancedChatInterface:
                     continue
 
                 # Track user input
-                await mem0.add_episodic(
-                    f"User: {user_input}",
-                    metadata={"step": step_id, "turn_type": "user_input"}
-                )
+                try:
+                    await mem0.add_episodic(
+                        f"User: {user_input}",
+                        metadata={"step": step_id, "turn_type": "user_input"}
+                    )
+                except Exception as mem_error:
+                    print(f"[DEBUG] Warning: Memory storage failed: {mem_error}")
 
                 #  Handle skip
                 if user_input.lower() in ['skip', 'next']:
                     crew.complete_step()
-                    await mem0.add_episodic(
-                        f"User skipped step: {step_id}",
-                        metadata={"step": step_id, "action": "skip"}
-                    )
+                    try:
+                        await mem0.add_episodic(
+                            f"User skipped step: {step_id}",
+                            metadata={"step": step_id, "action": "skip"}
+                        )
+                    except Exception as mem_error:
+                        print(f"[DEBUG] Warning: Memory storage failed: {mem_error}")
                     break
 
                 # Process response
@@ -164,11 +176,14 @@ class EnhancedChatInterface:
 
                     print(f"\nARI: {agent_response}\n")
 
-                    # Track agent response
-                    await mem0.add_episodic(
-                        f"ARI: {agent_response}",
-                        metadata={"step": step_id, "turn_type": "agent_response", "completeness": completeness}
-                    )
+                    # Track agent response (non-blocking)
+                    try:
+                        await mem0.add_episodic(
+                            f"ARI: {agent_response}",
+                            metadata={"step": step_id, "turn_type": "agent_response", "completeness": completeness}
+                        )
+                    except Exception as mem_error:
+                        print(f"[DEBUG] Warning: Memory storage failed: {mem_error}")
 
                     # Auto-complete if agent suggests moving on
                     if completeness >= 0.8 or 'move on' in agent_response.lower():
@@ -177,6 +192,9 @@ class EnhancedChatInterface:
 
                 except Exception as e:
                     print(f"\n(Could you rephrase that?)\n")
+                    print(f"[DEBUG] Error processing response: {e}")
+                    import traceback
+                    print(f"[DEBUG] Traceback:\n{traceback.format_exc()}")
 
         # Save data to Neo4j
         print("\n" + "=" * 70)
@@ -195,8 +213,11 @@ class EnhancedChatInterface:
             except Exception as e:
                 print(f"Warning: Error saving {step_id}: {e}")
 
-        # Store onboarding data in Mem0
-        await self._store_onboarding_in_mem0(mem0, all_data)
+        # Store onboarding data in Mem0 (non-blocking)
+        try:
+            await self._store_onboarding_in_mem0(mem0, all_data)
+        except Exception as mem_error:
+            print(f"[DEBUG] Warning: Memory storage failed: {mem_error}")
 
         # Mark complete
         self.user_service.update_user_profile(user_id, {
@@ -204,11 +225,14 @@ class EnhancedChatInterface:
             'onboarding_completed_at': datetime.now()
         })
 
-        # Track onboarding completion
-        await mem0.add_episodic(
-            f"Completed onboarding successfully",
-            metadata={"event": "onboarding_complete", "steps_completed": len(all_data)}
-        )
+        # Track onboarding completion (non-blocking)
+        try:
+            await mem0.add_episodic(
+                f"Completed onboarding successfully",
+                metadata={"event": "onboarding_complete", "steps_completed": len(all_data)}
+            )
+        except Exception as mem_error:
+            print(f"[DEBUG] Warning: Memory storage failed: {mem_error}")
 
         print("Your style profile has been saved!\n")
 
