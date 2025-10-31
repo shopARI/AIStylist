@@ -211,7 +211,7 @@ Agent: "TikTok? If you follow style content, that helps me understand what you'r
 ## File Changes Required
 
 ### New Files
-- `prompts/onboarding_prompts_v2.py` ✅ CREATED
+- `prompts/onboarding_prompts_v2.py`  CREATED
 - `crews/onboarding_crew_v2.py` (in progress)
 - `services/onboarding_service_v2.py` (optional - may update existing)
 
