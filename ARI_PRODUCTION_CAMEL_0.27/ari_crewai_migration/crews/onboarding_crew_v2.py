@@ -159,7 +159,7 @@ class OnboardingCrewV2:
 
         has_fashion_context = any(keyword in response_lower for keyword in fashion_keywords + personal_keywords)
 
-        if not has_fashion_context and len(user_response.split()) > 5:
+        if not has_fashion_context and len(user_response.split()) >= 5:
             return 'generic'
 
         return None
