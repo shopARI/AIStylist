@@ -289,7 +289,7 @@ class ConversationalOnboardingV2:
                     step_id=node_id,  # Using node_id as step_id for now
                     responses=node_data
                 )
-                print(f"✓ Saved {node_id} data")
+                print(f"Saved {node_id} data")
             except Exception as e:
                 print(f"✗ Error saving {node_id}: {e}")
 
@@ -302,7 +302,7 @@ class ConversationalOnboardingV2:
                     step_id="root_values",
                     responses={"values": all_data["root_values"]}
                 )
-                print(f"✓ Saved root values")
+                print(f"Saved root values")
             except Exception as e:
                 print(f"✗ Error saving root values: {e}")
 
@@ -313,7 +313,7 @@ class ConversationalOnboardingV2:
                 step_id="onboarding_metadata",
                 responses=all_data["metadata"]
             )
-            print(f"✓ Saved metadata")
+            print(f"Saved metadata")
         except Exception as e:
             print(f"✗ Error saving metadata: {e}")
 
@@ -323,7 +323,7 @@ class ConversationalOnboardingV2:
             'onboarding_completed_at': datetime.now()
         })
 
-        print("\n✓ Your style profile has been saved!\n")
+        print("\nYour style profile has been saved!\n")
 
     async def run(self):
         """Run the full onboarding experience."""
