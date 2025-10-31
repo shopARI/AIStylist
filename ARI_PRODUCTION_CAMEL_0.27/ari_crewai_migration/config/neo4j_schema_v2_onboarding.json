@@ -1,0 +1,257 @@
+{
+  "database": "users",
+  "description": "Extended schema for Onboarding V2 - Node-based structure with root values",
+  "nodes": {
+    "User": {
+      "properties": {
+        "id": "str",
+        "username": "str",
+        "email": "str",
+        "created_at": "DateTime",
+        "updated_at": "DateTime",
+        "last_active": "DateTime",
+        "onboarding_completed": "bool",
+        "onboarding_completed_at": "DateTime",
+        "onboarding_version": "str"
+      },
+      "indexes": ["id", "username", "email"]
+    },
+
+    "OnboardingDataNode": {
+      "description": "Stores data from each onboarding node",
+      "properties": {
+        "node_id": "str",
+        "tier": "str",
+        "data": "json",
+        "completed_at": "DateTime",
+        "skip_count": "int"
+      }
+    },
+
+    "RootValue": {
+      "description": "Core values discovered during onboarding",
+      "properties": {
+        "value": "str",
+        "source_node": "str",
+        "discovered_at": "DateTime",
+        "confidence": "str"
+      },
+      "indexes": ["value"]
+    },
+
+    "PersonalIdentity": {
+      "description": "Personal node data - who the user is",
+      "properties": {
+        "age": "int",
+        "location_city": "str",
+        "location_region": "str",
+        "location_type": "str",
+        "occupation": "str",
+        "occupation_industry": "str",
+        "typical_occasions": "json",
+        "gender_identity": "str",
+        "ethnicity": "str",
+        "relationship_status": "str",
+        "parental_status": "json",
+        "sexuality": "str",
+        "income_level": "str",
+        "education": "str",
+        "religious_cultural_background": "json"
+      }
+    },
+
+    "TasteProfile": {
+      "description": "Taste node data - aesthetic preferences",
+      "properties": {
+        "gender_expression": "json",
+        "brand_preferences": "json",
+        "shape_preferences": "json",
+        "fit_preferences": "json",
+        "style_loves": "str",
+        "style_wants": "str",
+        "style_avoids": "str",
+        "occasion_styles": "json",
+        "style_icons": "json"
+      }
+    },
+
+    "ProcessProfile": {
+      "description": "Process node data - how they make decisions",
+      "properties": {
+        "style_motivations": "json",
+        "creative_control": "int",
+        "style_goals": "str",
+        "brand_loyalty": "int",
+        "style_adventurousness": "int",
+        "validation_sources": "json",
+        "exploration_style": "str",
+        "social_influences": "json"
+      }
+    },
+
+    "PracticalityProfile": {
+      "description": "Practicality node data - constraints",
+      "properties": {
+        "monthly_budget_min": "float",
+        "monthly_budget_max": "float",
+        "yearly_budget": "float",
+        "budget_flexibility": "str",
+        "category_budgets": "json"
+      }
+    },
+
+    "BodyData": {
+      "description": "Body/visual data from photos",
+      "properties": {
+        "face_photo_id": "str",
+        "face_photo_url": "str",
+        "body_photo_id": "str",
+        "body_photo_url": "str",
+        "coloring_verbal": "str",
+        "body_verbal": "str",
+        "body_insecurities": "json",
+        "favorite_features": "json",
+        "captured_at": "DateTime"
+      }
+    },
+
+    "SocialMediaProfile": {
+      "description": "Connected social media accounts",
+      "properties": {
+        "instagram_handle": "str",
+        "instagram_connected_at": "DateTime",
+        "pinterest_handle": "str",
+        "pinterest_connected_at": "DateTime",
+        "tiktok_handle": "str",
+        "tiktok_connected_at": "DateTime"
+      }
+    },
+
+    "OnboardingMetadata": {
+      "description": "Metadata about the onboarding session",
+      "properties": {
+        "total_skip_count": "int",
+        "skip_counts_by_node": "json",
+        "completion_time_minutes": "int",
+        "tiers_completed": "json",
+        "started_at": "DateTime",
+        "completed_at": "DateTime",
+        "conversation_quality_score": "float"
+      }
+    }
+  },
+
+  "relationships": {
+    "HAS_PERSONAL_IDENTITY": {
+      "from": "User",
+      "to": "PersonalIdentity",
+      "properties": {
+        "created_at": "DateTime",
+        "updated_at": "DateTime"
+      }
+    },
+
+    "HAS_TASTE_PROFILE": {
+      "from": "User",
+      "to": "TasteProfile",
+      "properties": {
+        "created_at": "DateTime",
+        "updated_at": "DateTime"
+      }
+    },
+
+    "HAS_PROCESS_PROFILE": {
+      "from": "User",
+      "to": "ProcessProfile",
+      "properties": {
+        "created_at": "DateTime",
+        "updated_at": "DateTime"
+      }
+    },
+
+    "HAS_PRACTICALITY_PROFILE": {
+      "from": "User",
+      "to": "PracticalityProfile",
+      "properties": {
+        "created_at": "DateTime",
+        "updated_at": "DateTime"
+      }
+    },
+
+    "HAS_BODY_DATA": {
+      "from": "User",
+      "to": "BodyData",
+      "properties": {
+        "created_at": "DateTime",
+        "updated_at": "DateTime"
+      }
+    },
+
+    "HAS_SOCIAL_MEDIA": {
+      "from": "User",
+      "to": "SocialMediaProfile",
+      "properties": {
+        "created_at": "DateTime",
+        "updated_at": "DateTime"
+      }
+    },
+
+    "HAS_ROOT_VALUE": {
+      "from": "User",
+      "to": "RootValue",
+      "properties": {
+        "discovered_at": "DateTime",
+        "strength": "float"
+      }
+    },
+
+    "HAS_ONBOARDING_METADATA": {
+      "from": "User",
+      "to": "OnboardingMetadata",
+      "properties": {
+        "created_at": "DateTime"
+      }
+    },
+
+    "HAS_DATA_NODE": {
+      "from": "User",
+      "to": "OnboardingDataNode",
+      "properties": {
+        "created_at": "DateTime"
+      }
+    },
+
+    "RELATES_TO_VALUE": {
+      "description": "Connect profile nodes to their discovered root values",
+      "from": ["PersonalIdentity", "TasteProfile", "ProcessProfile"],
+      "to": "RootValue",
+      "properties": {
+        "connection_strength": "float"
+      }
+    }
+  },
+
+  "migration_notes": {
+    "v1_to_v2": [
+      "Old step-based structure (style_autonomy, gender_expression, etc.) maps to new nodes",
+      "Create migration script to convert existing v1 data to v2 structure",
+      "Root values need to be extracted from existing conversation histories",
+      "Photo and social media data are new in v2"
+    ],
+    "backward_compatibility": [
+      "Keep old OnboardingResponse nodes for reference",
+      "Create views/queries that work with both v1 and v2 data",
+      "Flag users with onboarding_version: 'v1' or 'v2'"
+    ]
+  },
+
+  "example_queries": {
+    "get_user_complete_profile": "MATCH (u:User {id: $user_id})-[:HAS_PERSONAL_IDENTITY]->(p:PersonalIdentity), (u)-[:HAS_TASTE_PROFILE]->(t:TasteProfile), (u)-[:HAS_PROCESS_PROFILE]->(proc:ProcessProfile), (u)-[:HAS_PRACTICALITY_PROFILE]->(prac:PracticalityProfile) OPTIONAL MATCH (u)-[:HAS_ROOT_VALUE]->(rv:RootValue) RETURN u, p, t, proc, prac, collect(rv) as root_values",
+
+    "get_root_values_by_node": "MATCH (u:User {id: $user_id})-[r:HAS_ROOT_VALUE]->(rv:RootValue) WHERE rv.source_node = $node_id RETURN rv.value, rv.confidence ORDER BY r.strength DESC",
+
+    "find_users_by_root_value": "MATCH (u:User)-[:HAS_ROOT_VALUE]->(rv:RootValue {value: $value}) RETURN u",
+
+    "get_onboarding_metadata": "MATCH (u:User {id: $user_id})-[:HAS_ONBOARDING_METADATA]->(m:OnboardingMetadata) RETURN m"
+  }
+}
