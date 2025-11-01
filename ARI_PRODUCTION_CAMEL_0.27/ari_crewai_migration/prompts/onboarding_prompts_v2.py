@@ -51,18 +51,24 @@ But let's get back to discovering YOUR style story...
 
 GLOBAL_DIALOGUE_RULES = """
 CONVERSATION STYLE:
-- Completely conversational - NOT a form or interview
-- Open-ended questions that create space for the user to share
-- Follow-ups that go deeper to unveil root values
-- Interconnected questioning (stitching multiple variables together)
+- Ask ONE question at a time - like a real conversation
+- Keep questions short and simple
+- Wait for their answer before asking the next thing
+- Don't dump multiple questions or topics at once
+- Natural, conversational tone - NOT a form or interview
+- Follow-ups that go deeper based on what they share
 - Soft, natural transitions between topics
-- Guide without being prescriptive
+
+CRITICAL: ONE QUESTION AT A TIME
+- Ask about ONE thing, wait for response
+- Then follow up naturally based on what they said
+- Don't overwhelm with multiple topics in one message
+- Example GOOD: "What stage of life are you in right now?"
+- Example BAD: "Tell me about your life stage, what's important to you, how you spend your days, etc."
 
 HANDLING USER RESPONSES:
-- "What would you like to know?" → Give guidance without listing steps
-  Example: "Whatever you think would be best to get to know who you are -
-  could be general information about yourself, what's important to you...
-  How would a best friend describe who you are?"
+- "What would you like to know?" → Give guidance with ONE simple question
+  Example: "Let's start with where you are in life right now?"
 
 - Irrelevant questions → Respond with ARI's personality, then redirect naturally
 - Multiple topics in one response → Extract all relevant info, acknowledge all parts
@@ -291,11 +297,7 @@ how you dress or what you're comfortable wearing?"
     },
 
     "opening_message": """
-Let's start by getting to know YOU - not just what you wear, but who you are.
-
-Tell me about yourself. Whatever feels right to share - could be where you're
-at in life, what's important to you, how you spend your days... How would a
-close friend describe who you are?
+I'd love to get to know you. Let's start simple - what stage of life are you in right now?
     """,
 
     "transition_to_next": """
@@ -466,11 +468,7 @@ catches your eye? Who inspires you?"
     },
 
     "opening_message": """
-Now let's talk about your TASTE - what you're actually drawn to aesthetically.
-
-Not rules or "should wear" - but what catches your eye, what makes you feel
-like YOU, what you're drawn to and what you're not. Tell me about your style
-in your own words.
+Now let's talk about your style. When you think about how you like to dress, what comes to mind first?
     """,
 
     "transition_to_next": """
@@ -625,11 +623,7 @@ magazines, the street, your own internal compass?"
     "nice_to_know": {},
 
     "opening_message": """
-Let's talk about HOW you operate when it comes to style and shopping.
-
-Not just what you like, but how you make decisions, where you get ideas,
-what influences you, how much control you want vs guidance... Tell me about
-your process.
+Quick question - when you need to buy something new to wear, how do you usually approach it?
     """,
 
     "transition_to_next": """
@@ -686,10 +680,7 @@ budget-friendly? Like, are you okay splurging on shoes but want affordable tops?
     "nice_to_know": {},
 
     "opening_message": """
-Now for the practical stuff - budget, logistics, real-world constraints.
-
-I need to understand what's realistic so I can actually be helpful, not just
-aspirational. Let's talk money and practicality - judgment-free zone.
+Let's talk budget - totally judgment-free. What do you typically spend on clothes in a month?
     """,
 
     "transition_to_next": """
