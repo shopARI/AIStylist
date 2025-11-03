@@ -664,7 +664,21 @@ magazines, the street, your own internal compass?"
     "nice_to_know": {},
 
     "opening_message": """
-Quick question - when you need to buy something new to wear, how do you usually approach it?
+I'd love to get a sense of your ideal shopping process - how you like to explore options, weigh choices, the kind of feedback that helps. Tell me - how do you typically shop, and how could it be better?
+    """,
+
+    "conversation_guide": """
+ADAPTIVE PROCESS QUESTIONS:
+1. Start with their current process and ideal state (opening question covers this)
+2. Then ask: "Are there any specific things you'd like to get out of our process together?"
+   - This reveals their goals and expectations
+3. Dig into specifics based on what they share:
+   - If they mention "overwhelmed by options": dig into exploration_preference
+   - If they mention "never sure if it's right": dig into validation_sources
+   - If they mention "want to try new things": dig into adventurousness
+4. Don't ask all the fields as separate questions - weave them into natural conversation
+
+CRITICAL: Let their responses guide which aspects of process to explore deeper.
     """,
 
     "transition_to_next": """
@@ -721,7 +735,20 @@ budget-friendly? Like, are you okay splurging on shoes but want affordable tops?
     "nice_to_know": {},
 
     "opening_message": """
-Let's talk budget - totally judgment-free. What do you typically spend on clothes in a month?
+Lastly - let me get a sense of budget. Is there a specific budget you'd like for me to stick within?
+    """,
+
+    "conversation_guide": """
+ADAPTIVE BUDGET QUESTIONS:
+1. Start with overall budget (opening question covers this)
+2. Then ask about category variation: "Are there specific types of clothing or accessories you tend to splurge on vs bargain?"
+   - This reveals their value priorities
+3. Based on their response, dig deeper:
+   - If they mention "investment pieces": Ask what makes something worth investing in
+   - If they mention being flexible: Ask about their decision-making process for stretching budget
+   - If they're very budget-conscious: Reassure them and ask about splurge categories
+
+CRITICAL: Keep this section short and judgment-free. Money is sensitive.
     """,
 
     "transition_to_next": """
