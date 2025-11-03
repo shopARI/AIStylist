@@ -297,7 +297,23 @@ how you dress or what you're comfortable wearing?"
     },
 
     "opening_message": """
-I'd love to get to know you. Let's start simple - what stage of life are you in right now?
+Tell me about yourself.
+    """,
+
+    "conversation_guide": """
+ADAPTIVE DIALOGUE PATTERN:
+1. Open broad: "Tell me about yourself" - let them share what comes naturally
+2. Identify the obvious: Notice what they mentioned first (these are usually important to them)
+   - Example: "You mentioned [job/location/kids] - that's clearly a big part of your life"
+3. Dig deeper for non-obvious factors: Ask about what they DIDN'T mention
+   - If they mentioned work but not location: "Where are you based?"
+   - If they mentioned kids but not relationship: "Tell me about this chapter of your life"
+   - If they mentioned age/stage but not work: "What do you do?"
+4. Make connections: Stitch multiple datapoints together
+   - "Being a lawyer in NYC with young kids - I can imagine that's a lot of competing priorities. How does that show up in how you want to dress?"
+5. Store occasions mentioned: Pay attention to any activities/events they mention - you'll use these later for dynamic taste questions
+
+CRITICAL: Don't ask pre-scripted questions. Listen, identify patterns, dig into gaps, make connections.
     """,
 
     "transition_to_next": """
@@ -438,16 +454,20 @@ that just aren't you?"
             "field": "occasion_styles",
             "type": "object",  # {occasion: style_description}
             "required": True,
-            "sensitivity": "CRITICAL - People often answer with ONE occasion in mind",
+            "sensitivity": "CRITICAL - Use THEIR actual occasions, not generic ones",
             "conversation_approach": """
-EXPLICITLY address this variation risk.
-Example: "This is important - how does your style change across different
-parts of your life? Your everyday look vs formal events vs creative spaces...
-Are they different versions of you, or all the same?"
+Use the specific occasions they mentioned earlier:
+- If they mentioned "park with my 2-year-old": "Picture yourself at the park with [name]. What are you wearing?"
+- If they mentioned "work meetings": "You're heading into a work meeting. Walk me through that look."
+- If they mentioned "date nights": "It's date night. How are you showing up?"
+
+Then ask: "Do these feel like different versions of you, or all the same person?"
+
+DON'T use generic hypotheticals. Use THEIR real life.
             """,
             "follow_up_prompts": [
-                "Tell me about your [casual/formal/work/creative] style specifically",
-                "Do you feel like the same person across these contexts?"
+                "Tell me more about your [specific occasion they mentioned] style",
+                "Do you feel like the same person across these contexts, or does it shift?"
             ],
             "root_value_connection": "Identity integration vs code-switching, authenticity across contexts"
         }
@@ -469,6 +489,27 @@ catches your eye? Who inspires you?"
 
     "opening_message": """
 Now let's talk about your style. When you think about how you like to dress, what comes to mind first?
+    """,
+
+    "conversation_guide": """
+DYNAMIC OCCASION-BASED QUESTIONS:
+1. Pull from previous conversation: Look at what occasions/activities the user mentioned in Personal node
+   - Did they mention "going to the park with Max"? Use that.
+   - Did they mention "formal wedding coming up"? Use that.
+   - Did they mention "Friday nights out"? Use that.
+
+2. Generate scenarios from THEIR life, not generic ones:
+   - BAD: "Imagine you're going to a formal event" (generic, not theirs)
+   - GOOD: "You mentioned you're going to [specific wedding they mentioned]. What are you wearing?"
+   - GOOD: "Picture yourself at [park with Max]. What are you throwing on?"
+
+3. If they haven't mentioned specific occasions yet, ask them about typical ones:
+   - "Walk me through a typical week - what are you usually dressing for?"
+   - Then use those for follow-up style questions
+
+4. For style across occasions - use THEIR actual occasions, not hypothetical ones
+
+CRITICAL: Don't create fake scenarios. Use what they've already told you about their real life.
     """,
 
     "transition_to_next": """
@@ -914,6 +955,9 @@ GLOBAL DIALOGUE RULES:
 
 NODE-SPECIFIC CONTEXT:
 {node.get('opening_message', '')}
+
+CONVERSATION GUIDE FOR THIS NODE:
+{node.get('conversation_guide', '')}
 
 """
 
