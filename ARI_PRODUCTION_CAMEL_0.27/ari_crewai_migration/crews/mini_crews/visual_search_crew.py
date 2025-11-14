@@ -68,7 +68,7 @@ def create_visual_search_crew(agents_dir: str = None, tasks_dir: str = None) -> 
         agents=[vision_agent],
         tasks=[task],
         process=Process.sequential,
-        verbose=True,
+        verbose=False,  # Disabled for clean chat output
         memory=False,
         cache=False
     )

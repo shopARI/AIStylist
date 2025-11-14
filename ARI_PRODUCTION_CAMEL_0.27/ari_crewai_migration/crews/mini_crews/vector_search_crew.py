@@ -68,7 +68,7 @@ def create_vector_search_crew(agents_dir: str = None, tasks_dir: str = None) -> 
         agents=[vibe_agent],
         tasks=[task],
         process=Process.sequential,
-        verbose=True,
+        verbose=False,  # Disabled for clean chat output
         memory=False,
         cache=False
     )

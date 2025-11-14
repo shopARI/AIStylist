@@ -40,7 +40,7 @@ agent:
     - async_visual_similarity_search_tool
     - async_multi_image_search_tool
   memory: false
-  verbose: true
+  verbose: false
   allow_delegation: false
   max_iter: 1
   max_execution_time: 30

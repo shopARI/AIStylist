@@ -68,7 +68,7 @@ def create_graph_search_crew(agents_dir: str = None, tasks_dir: str = None) -> C
         agents=[cypher_agent],
         tasks=[task],
         process=Process.sequential,
-        verbose=True,  # Enable for debugging
+        verbose=False,  # Disabled for clean chat output
         memory=False,  # Disabled for mini-crews
         cache=False  # Disabled to prevent stale data
     )

@@ -41,7 +41,7 @@ agent:
     - async_embedding_generation_tool
     - async_qdrant_hybrid_search_tool
   memory: false
-  verbose: true
+  verbose: false
   allow_delegation: false
   max_iter: 1
   max_execution_time: 30

@@ -43,7 +43,7 @@ agent:
     - consensus_detection_tool
     - learning_analysis_tool
   memory: false
-  verbose: true
+  verbose: false
   allow_delegation: false
   max_iter: 1
   max_execution_time: 30
