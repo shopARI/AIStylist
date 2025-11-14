@@ -8,6 +8,7 @@ and calculating observed preferences.
 
 import os
 import uuid
+import logging
 from typing import List, Dict, Optional, Any
 from datetime import datetime
 from neo4j import GraphDatabase, AsyncGraphDatabase
@@ -15,6 +16,10 @@ from neo4j.time import DateTime as Neo4jDateTime
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Suppress Neo4j notification warnings for cleaner output
+logging.getLogger("neo4j.notifications").setLevel(logging.ERROR)
+logging.getLogger("neo4j").setLevel(logging.WARNING)
 
 
 def convert_neo4j_datetimes(data: Dict[str, Any]) -> Dict[str, Any]:
@@ -369,18 +374,19 @@ class UserGraphManager:
     def record_search(self, user_id: str, query: str, category: str = "", result_count: int = 0):
         """Record a search query."""
         with self.driver.session(database=self.database) as session:
-            session.run("""
+            cypher_query = """
                 MATCH (u:User {id: $user_id})
                 SET u.total_searches = u.total_searches + 1
 
                 CREATE (s:Search {
                     user_id: $user_id,
-                    query: $query,
+                    query: $search_query,
                     category: $category,
                     result_count: $result_count,
                     timestamp: datetime()
                 })
-            """, user_id=user_id, query=query, category=category, result_count=result_count)
+            """
+            session.run(cypher_query, user_id=user_id, search_query=query, category=category, result_count=result_count)
 
     # ======================
     # OBSERVED PREFERENCES CALCULATION
