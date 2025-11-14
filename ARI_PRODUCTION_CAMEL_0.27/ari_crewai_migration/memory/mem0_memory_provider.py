@@ -112,6 +112,7 @@ class Mem0MemoryProvider:
             List of episodic memories
         """
         try:
+            # Try with filters first
             if query:
                 # Search memories with query
                 results = self.memory.search(
@@ -140,8 +141,34 @@ class Mem0MemoryProvider:
             return memories
 
         except Exception as e:
-            logger.error(f"Failed to get episodic memories: {e}")
-            return []
+            # If filter fails (missing index), try without filters
+            if "Index required" in str(e) or "not found for" in str(e):
+                logger.warning(f"Qdrant index missing for memory_type filter, fetching without filter")
+                try:
+                    if query:
+                        results = self.memory.search(query=query, user_id=self.user_id, limit=limit)
+                    else:
+                        results = self.memory.get_all(user_id=self.user_id, limit=limit)
+
+                    # Filter episodic manually
+                    memories = []
+                    for result in results.get("results", []):
+                        metadata = result.get("metadata", {})
+                        if metadata.get("memory_type") == "episodic":
+                            memories.append({
+                                "content": result.get("memory"),
+                                "metadata": metadata,
+                                "timestamp": result.get("created_at")
+                            })
+
+                    logger.debug(f"Retrieved {len(memories)} episodic memories (manual filter)")
+                    return memories
+                except Exception as e2:
+                    logger.error(f"Failed to get episodic memories even without filter: {e2}")
+                    return []
+            else:
+                logger.error(f"Failed to get episodic memories: {e}")
+                return []
 
     # ======================
     # FACTUAL MEMORY

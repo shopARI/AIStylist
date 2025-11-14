@@ -4,12 +4,14 @@ Replaces BattleOrchestrator with CrewAI-based implementation.
 Maintains API compatibility with existing ApplicationService.
 
 Now includes intent detection and routing to appropriate crews.
+Supports both V1 (agent-based) and V2 (pure flow) implementations.
 """
 import logging
 import time
 import hashlib
 import json
 import sys
+import os
 from typing import Dict, List, Any, Optional, Union
 
 # Add parent directory to path for imports
@@ -24,6 +26,7 @@ from crews.mini_crews import (
     create_judge_crew
 )
 from flows import create_and_run_flow
+from flows.product_search_flow_v2 import create_and_run_flow_v2
 from memory.mem0_memory_provider import create_mem0_memory_provider
 from nlp.hybrid_intent_detector import get_hybrid_intent_detector, DetectionStrategy
 from models.types import SearchIntent
@@ -65,7 +68,8 @@ class CrewAIOrchestrator:
         process_type: str = "sequential",  # Changed from hierarchical to fix infinite loop
         intent_strategy: DetectionStrategy = DetectionStrategy.LLM_FIRST,
         intelligence_coordinator: Optional[Any] = None,
-        enable_ml_intelligence: bool = True
+        enable_ml_intelligence: bool = True,
+        use_flow_v2: bool = None  # None = check env var, True/False = explicit override
     ):
         """
         Initialize CrewAI orchestrator with intent detection and ML intelligence.
@@ -79,11 +83,20 @@ class CrewAIOrchestrator:
             intent_strategy: Intent detection strategy (LLM_FIRST recommended)
             intelligence_coordinator: Optional ML Intelligence Coordinator
             enable_ml_intelligence: Enable ML intelligence generation (default: True)
+            use_flow_v2: Use V2 pure flow (no agent overhead). None = check USE_FLOW_V2 env var
         """
         self.cache = cache_service
         self.metrics = metrics_service
         self.redis = redis_client
         self.process_type = process_type
+
+        # Determine flow version (V1 agent-based or V2 pure flow)
+        if use_flow_v2 is None:
+            self.use_flow_v2 = os.getenv("USE_FLOW_V2", "false").lower() in ("true", "1", "yes")
+        else:
+            self.use_flow_v2 = use_flow_v2
+
+        logger.info(f"Flow version: {'V2 (pure flow - no agent overhead)' if self.use_flow_v2 else 'V1 (agent-based)'}")
 
         # Initialize intent detector
         logger.info(f"Initializing intent detector with strategy: {intent_strategy.value}")
@@ -116,20 +129,28 @@ class CrewAIOrchestrator:
         else:
             logger.warning("ConversationHandler unavailable - will use fallback responses")
 
-        # Initialize mini-crews for Flow-based execution
-        logger.info("Initializing mini-crews for ProductSearchFlow...")
-        self.graph_crew = create_graph_search_crew()
-        self.vector_crew = create_vector_search_crew()
-        self.visual_crew = create_visual_search_crew()
-        self.judge_crew = create_judge_crew()
+        # Initialize mini-crews for Flow-based execution (only needed for V1)
+        if not self.use_flow_v2:
+            logger.info("Initializing mini-crews for ProductSearchFlow V1 (agent-based)...")
+            self.graph_crew = create_graph_search_crew()
+            self.vector_crew = create_vector_search_crew()
+            self.visual_crew = create_visual_search_crew()
+            self.judge_crew = create_judge_crew()
 
-        # Keep old crew for backward compatibility (deprecated)
-        if crew:
-            self.product_crew = crew
+            # Keep old crew for backward compatibility (deprecated)
+            if crew:
+                self.product_crew = crew
+            else:
+                logger.info(f"Loading legacy {process_type} product search crew (deprecated)")
+                base_crew = load_and_create_crew(process_type=process_type)
+                self.product_crew = ProductSearchCrew(base_crew)
         else:
-            logger.info(f"Loading legacy {process_type} product search crew (deprecated)")
-            base_crew = load_and_create_crew(process_type=process_type)
-            self.product_crew = ProductSearchCrew(base_crew)
+            logger.info("Using ProductSearchFlow V2 (pure flow) - no agent/crew initialization needed")
+            self.graph_crew = None
+            self.vector_crew = None
+            self.visual_crew = None
+            self.judge_crew = None
+            self.product_crew = None
 
         # Conversation crew will be created when needed (lazy loading)
         self._conversation_crew = None
@@ -252,24 +273,39 @@ class CrewAIOrchestrator:
                 )
             else:
                 self.routing_stats["product_intents"] += 1
-                logger.info(f"Routing to PRODUCT SEARCH FLOW for: {intent_result.primary_intent.name}")
+                flow_version = "V2 (pure flow)" if self.use_flow_v2 else "V1 (agent-based)"
+                logger.info(f"Routing to PRODUCT SEARCH FLOW {flow_version} for: {intent_result.primary_intent.name}")
 
                 # Merge detected parameters with provided filters
                 merged_filters = self._merge_filters(filters, intent_result.extracted_parameters)
 
-                # Use Flow-based execution with mini-crews and parallel search
-                flow_result = await create_and_run_flow(
-                    query=query,
-                    filters=merged_filters,
-                    limit=limit,
-                    user_context=user_context,
-                    ml_intelligence=generated_intelligence,
-                    conversation_context=conversation_context,
-                    graph_crew=self.graph_crew,
-                    vector_crew=self.vector_crew,
-                    visual_crew=self.visual_crew,
-                    judge_crew=self.judge_crew
-                )
+                # Choose flow implementation based on configuration
+                if self.use_flow_v2:
+                    # V2: Pure flow (no agent overhead)
+                    logger.info("Executing V2 pure flow...")
+                    flow_result = await create_and_run_flow_v2(
+                        query=query,
+                        filters=merged_filters,
+                        limit=limit,
+                        user_context=user_context,
+                        ml_intelligence=generated_intelligence,
+                        conversation_context=conversation_context
+                    )
+                else:
+                    # V1: Agent-based flow with mini-crews
+                    logger.info("Executing V1 agent-based flow...")
+                    flow_result = await create_and_run_flow(
+                        query=query,
+                        filters=merged_filters,
+                        limit=limit,
+                        user_context=user_context,
+                        ml_intelligence=generated_intelligence,
+                        conversation_context=conversation_context,
+                        graph_crew=self.graph_crew,
+                        vector_crew=self.vector_crew,
+                        visual_crew=self.visual_crew,
+                        judge_crew=self.judge_crew
+                    )
 
                 # Convert Pydantic result to dict for compatibility
                 result = {
@@ -282,6 +318,7 @@ class CrewAIOrchestrator:
                 result["metadata"]["visual_count"] = flow_result.visual_count
                 result["metadata"]["consensus_count"] = flow_result.consensus_count
                 result["metadata"]["quality_controlled"] = flow_result.quality_controlled
+                result["metadata"]["flow_version"] = "v2" if self.use_flow_v2 else "v1"
 
             # Add execution time and intent metadata
             execution_time = time.time() - search_start

@@ -381,6 +381,57 @@ class EnhancedChatInterface:
                 print("  Username cannot be empty")
                 continue
 
+            # ✅ BYPASS: user0 skips onboarding for testing
+            if username.lower() == "user0":
+                print("\n🚀 Test mode: Bypassing onboarding, going straight to recommendations...\n")
+
+                # Check if user0 already exists
+                user = self.user_service.get_user_by_username(username)
+
+                if user is None:
+                    # Create minimal test user
+                    try:
+                        user = self.user_service.create_user(
+                            username=username,
+                            email="user0@test.com"
+                        )
+
+                        # Update profile with test defaults
+                        profile_data = {
+                            'onboarding_completed': True,
+                            'decision_making_style': 'curated_options',
+                            'monthly_budget_max': 500,
+                            'monthly_budget_min': 0
+                        }
+
+                        user = self.user_service.update_user_profile(user.id, profile_data)
+
+                        if user:
+                            print(f"✓ Test user '{username}' created and ready!")
+                        else:
+                            print(f"✗ Failed to configure test user")
+                            continue
+
+                    except Exception as e:
+                        print(f"Error creating test user: {e}")
+                        import traceback
+                        traceback.print_exc()
+                        continue
+                else:
+                    # Existing user0 - ensure onboarding is marked complete
+                    if not user.onboarding_completed:
+                        self.user_service.mark_onboarding_complete(user.id)
+                        user = self.user_service.get_user_by_id(user.id)
+
+                    print(f"✓ Welcome back, test user '{username}'!")
+
+                self.current_user = user
+
+                # Initialize Mem0 for test user
+                self.mem0 = create_mem0_memory_provider(user.id, self.session_id)
+
+                break
+
             # Check if user exists
             user = self.user_service.get_user_by_username(username)
 

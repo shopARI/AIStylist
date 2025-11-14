@@ -137,10 +137,18 @@ def create_agent_from_config(config: Dict) -> Agent:
     try:
         # Create LLM configuration
         llm_config = config.get('llm', {})
+        model = llm_config.get('model', 'gpt-4o')  # Default: gpt-4o (best for CrewAI agents)
+
+        # Configure temperature based on model
+        # o-series models (gpt-5, o1, o3) only support temperature=1.0
+        if model.startswith(('gpt-5', 'o1', 'o3', 'o4')):
+            temperature = 1.0
+        else:
+            temperature = llm_config.get('temperature', 0.7)
+
         llm = LLM(
-            model=llm_config.get('model', 'gpt-5')
-            # Note: GPT-5 only supports default temperature (1.0)
-            # and max_completion_tokens (not max_tokens)
+            model=model,
+            temperature=temperature
         )
 
         # Load tools

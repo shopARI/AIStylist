@@ -9,10 +9,12 @@ import time
 from typing import Dict, Any, List, Optional, Tuple
 from dataclasses import dataclass
 from enum import Enum
+from pathlib import Path
 
 # Import from parent directory for SearchIntent
 import sys
-sys.path.append('/home/leo/AIStylist/ARI_PRODUCTION_CAMEL_0.27')
+# Use relative path instead of hardcoded absolute path
+sys.path.append(str(Path(__file__).parent.parent.parent))
 from models.types import SearchIntent
 
 # Import from local nlp module

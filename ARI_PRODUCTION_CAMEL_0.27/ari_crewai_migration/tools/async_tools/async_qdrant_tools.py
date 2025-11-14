@@ -94,9 +94,10 @@ async def _search_qdrant(
             await client.close()
 
 
-async def _generate_embedding(text: str, model: str = "text-embedding-3-small") -> List[float]:
+async def _generate_embedding(text: str, model: str = "text-embedding-ada-002") -> List[float]:
     """
     Core implementation: Generate text embedding using OpenAI (internal use).
+    ✅ Using text-embedding-ada-002 to match Qdrant collection embeddings.
     """
     try:
         from openai import AsyncOpenAI
@@ -152,9 +153,10 @@ async def async_qdrant_search_tool(
 
 
 @tool("Generate Text Embedding (Async)")
-async def async_embedding_generation_tool(text: str, model: str = "text-embedding-3-small") -> List[float]:
+async def async_embedding_generation_tool(text: str, model: str = "text-embedding-ada-002") -> List[float]:
     """
     Generate embedding vector for text query using OpenAI (async, non-blocking).
+    ✅ Using text-embedding-ada-002 to match Qdrant collection embeddings.
 
     Args:
         text: Text to embed

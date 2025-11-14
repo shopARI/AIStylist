@@ -103,9 +103,10 @@ def qdrant_search_tool(
 
 
 @tool("Generate Text Embedding")
-def embedding_generation_tool(text: str, model: str = "text-embedding-3-small") -> List[float]:
+def embedding_generation_tool(text: str, model: str = "text-embedding-ada-002") -> List[float]:
     """
     Generate embedding vector for text query using OpenAI.
+    ✅ Using text-embedding-ada-002 to match Qdrant collection embeddings.
 
     Args:
         text: Text to embed
