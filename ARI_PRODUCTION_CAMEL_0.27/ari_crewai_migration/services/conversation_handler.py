@@ -1099,9 +1099,16 @@ class ConversationHandler:
         current_date = now.strftime("%A, %B %d, %Y")
         current_time = now.strftime("%I:%M %p")
 
-        # DEBUG: Print to verify interpolation
-        print(f"[DEBUG ConversationHandler] Current Date: {current_date}")
-        print(f"[DEBUG ConversationHandler] Current Time: {current_time}")
+        # Build conversation history context
+        history_summary = ""
+        if conversation_history:
+            recent_exchanges = conversation_history[-3:]  # Last 3 exchanges
+            history_items = []
+            for msg in recent_exchanges:
+                role_name = "User" if msg.role == MessageRole.USER else "ARI"
+                history_items.append(f"{role_name}: {msg.content[:100]}")
+            if history_items:
+                history_summary = "\n\nRECENT CONVERSATION:\n" + "\n".join(history_items)
 
         # Build conversation context - only include last 5 exchanges to stay within token limits
         messages = [
@@ -1111,13 +1118,19 @@ class ConversationHandler:
 
 When users ask about non-fashion topics (like science, philosophy, general knowledge, etc.), engage naturally and provide helpful information while maintaining your warm personality.
 
+IMPORTANT - CONVERSATION CONTINUITY:
+- You have memory of this conversation session
+- Reference previous messages naturally when relevant
+- If the user asks "what did I ask before" or similar, refer to the recent conversation history provided below
+- Maintain context across multiple turns
+
 Keep responses concise and friendly. If the conversation naturally flows back to fashion or style, you can mention your expertise in that area, but don't force it.
 
-IMPORTANT - REAL-TIME INFORMATION:
+REAL-TIME INFORMATION:
 The current date is: {current_date}
 The current time is: {current_time}
 
-When users ask "what time is it" or "what's the date", you MUST use the information above. Do not say you don't have access to real-time information - you have it right here."""
+When users ask "what time is it" or "what's the date", you MUST use the information above. Do not say you don't have access to real-time information - you have it right here.{history_summary}"""
             }
         ]
 

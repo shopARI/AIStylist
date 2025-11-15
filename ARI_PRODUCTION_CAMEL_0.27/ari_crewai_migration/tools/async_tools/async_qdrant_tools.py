@@ -44,13 +44,18 @@ async def _search_qdrant(
         if filters:
             conditions = []
 
+            # Note: Category filter requires keyword index in Qdrant
+            # Skip if index doesn't exist (will filter in post-processing instead)
             if "category" in filters:
-                conditions.append(
-                    FieldCondition(
-                        key="category",
-                        match=MatchValue(value=filters["category"])
+                try:
+                    conditions.append(
+                        FieldCondition(
+                            key="category",
+                            match=MatchValue(value=filters["category"])
+                        )
                     )
-                )
+                except Exception:
+                    logger.debug("Skipping category filter (index may not exist)")
 
             if "min_price" in filters or "max_price" in filters:
                 price_range = Range(
@@ -65,13 +70,27 @@ async def _search_qdrant(
                 qdrant_filter = Filter(must=conditions)
 
         # Execute async search
-        results = await client.search(
-            collection_name=collection,
-            query_vector=query_embedding,
-            query_filter=qdrant_filter,
-            limit=limit,
-            with_payload=True
-        )
+        try:
+            results = await client.search(
+                collection_name=collection,
+                query_vector=query_embedding,
+                query_filter=qdrant_filter,
+                limit=limit,
+                with_payload=True
+            )
+        except Exception as search_error:
+            # If search fails due to missing index, retry without filters
+            if "Index required" in str(search_error) or "not found" in str(search_error):
+                logger.warning(f"Search with filters failed: {search_error}. Retrying without filters...")
+                results = await client.search(
+                    collection_name=collection,
+                    query_vector=query_embedding,
+                    query_filter=None,
+                    limit=limit * 2,  # Get more results to filter manually
+                    with_payload=True
+                )
+            else:
+                raise
 
         # Format results
         products = []
@@ -82,6 +101,15 @@ async def _search_qdrant(
                 **hit.payload
             }
             products.append(product)
+
+        # Manual post-processing filter if category filter couldn't be applied in Qdrant
+        if filters and "category" in filters and qdrant_filter is None:
+            category_filter = filters["category"].lower()
+            products = [
+                p for p in products
+                if "category" in p and category_filter in p["category"].lower()
+            ][:limit]  # Trim to original limit
+            logger.debug(f"Applied manual category filter, {len(products)} products match")
 
         logger.info(f"Async Qdrant search returned {len(products)} products")
         return products

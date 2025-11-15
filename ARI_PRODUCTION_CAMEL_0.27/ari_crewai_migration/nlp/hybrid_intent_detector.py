@@ -107,47 +107,60 @@ class HybridIntentDetector:
             "average_processing_time": 0.0
         }
     
-    async def detect_intent_and_extract(self, query: str) -> HybridResult:
+    async def detect_intent_and_extract(
+        self,
+        query: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> HybridResult:
         """
         Main detection method using the configured strategy.
-        
+
         Args:
             query: User's natural language query
-            
+            conversation_history: Recent conversation messages for context (optional)
+
         Returns:
             HybridResult with intent, parameters, and method metadata
         """
         start_time = time.time()
         self.stats["total_queries"] += 1
-        
+
         try:
             if self.strategy == DetectionStrategy.LLM_FIRST:
-                return await self._llm_first_strategy(query, start_time)
+                return await self._llm_first_strategy(query, start_time, conversation_history)
             elif self.strategy == DetectionStrategy.HARDCODED_FIRST:
-                return await self._hardcoded_first_strategy(query, start_time)
+                return await self._hardcoded_first_strategy(query, start_time, conversation_history)
             elif self.strategy == DetectionStrategy.LLM_ONLY:
-                return await self._llm_only_strategy(query, start_time)
+                return await self._llm_only_strategy(query, start_time, conversation_history)
             elif self.strategy == DetectionStrategy.HARDCODED_ONLY:
                 return await self._hardcoded_only_strategy(query, start_time)
             elif self.strategy == DetectionStrategy.PARALLEL:
-                return await self._parallel_strategy(query, start_time)
+                return await self._parallel_strategy(query, start_time, conversation_history)
             else:
                 raise ValueError(f"Unknown strategy: {self.strategy}")
-                
+
         except Exception as e:
             logger.error(f"Hybrid detection failed: {e}", exc_info=True)
             # Emergency fallback to hardcoded
             return await self._emergency_fallback(query, start_time)
     
-    async def _llm_first_strategy(self, query: str, start_time: float) -> HybridResult:
+    async def _llm_first_strategy(
+        self,
+        query: str,
+        start_time: float,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> HybridResult:
         """Try CrewAI first, fallback to hardcoded if confidence too low"""
-        
+
         if not self.crewai_detector:
             return await self._hardcoded_only_strategy(query, start_time)
-        
+
         try:
-            # Try CrewAI detection
-            crewai_result = await self.crewai_detector.detect_intent_and_extract(query)
+            # Try CrewAI detection (with conversation context)
+            crewai_result = await self.crewai_detector.detect_intent_and_extract(
+                query,
+                conversation_history=conversation_history
+            )
             self.stats["crewai_used"] += 1
             
             # Check if CrewAI result is confident enough
@@ -184,7 +197,12 @@ class HybridIntentDetector:
             # Fallback to hardcoded
             return await self._hardcoded_only_strategy(query, start_time)
     
-    async def _hardcoded_first_strategy(self, query: str, start_time: float) -> HybridResult:
+    async def _hardcoded_first_strategy(
+        self,
+        query: str,
+        start_time: float,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> HybridResult:
         """Try hardcoded first, use CrewAI for complex queries"""
         
         # Try hardcoded detection
@@ -209,7 +227,10 @@ class HybridIntentDetector:
         # Hardcoded results weak, try CrewAI if available
         if self.crewai_detector:
             try:
-                crewai_result = await self.crewai_detector.detect_intent_and_extract(query)
+                crewai_result = await self.crewai_detector.detect_intent_and_extract(
+                    query,
+                    conversation_history=conversation_history
+                )
                 self.stats["crewai_used"] += 1
                 
                 return HybridResult(
@@ -237,12 +258,20 @@ class HybridIntentDetector:
             fallback_used=False
         )
     
-    async def _llm_only_strategy(self, query: str, start_time: float) -> HybridResult:
+    async def _llm_only_strategy(
+        self,
+        query: str,
+        start_time: float,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> HybridResult:
         """Use CrewAI only"""
         if not self.crewai_detector:
             raise RuntimeError("CrewAI detector not available for LLM_ONLY strategy")
-        
-        crewai_result = await self.crewai_detector.detect_intent_and_extract(query)
+
+        crewai_result = await self.crewai_detector.detect_intent_and_extract(
+            query,
+            conversation_history=conversation_history
+        )
         self.stats["crewai_used"] += 1
         
         return HybridResult(
@@ -271,17 +300,22 @@ class HybridIntentDetector:
             fallback_used=False
         )
     
-    async def _parallel_strategy(self, query: str, start_time: float) -> HybridResult:
+    async def _parallel_strategy(
+        self,
+        query: str,
+        start_time: float,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> HybridResult:
         """Run both methods in parallel and compare"""
-        
+
         tasks = []
-        
+
         # Always run hardcoded
         tasks.append(asyncio.create_task(self._run_hardcoded(query)))
-        
-        # Run CrewAI if available
+
+        # Run CrewAI if available (with conversation history)
         if self.crewai_detector:
-            tasks.append(asyncio.create_task(self._run_llm(query)))
+            tasks.append(asyncio.create_task(self._run_llm(query, conversation_history)))
         
         # Wait for all results
         results = await asyncio.gather(*tasks, return_exceptions=True)
@@ -322,9 +356,16 @@ class HybridIntentDetector:
         params = self.parameter_extractor.extract_parameters(query)
         return intent_result, params
     
-    async def _run_llm(self, query: str) -> CrewAIIntentResult:
+    async def _run_llm(
+        self,
+        query: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> CrewAIIntentResult:
         """Run CrewAI detection"""
-        return await self.crewai_detector.detect_intent_and_extract(query)
+        return await self.crewai_detector.detect_intent_and_extract(
+            query,
+            conversation_history=conversation_history
+        )
     
     def _choose_best_result(
         self,

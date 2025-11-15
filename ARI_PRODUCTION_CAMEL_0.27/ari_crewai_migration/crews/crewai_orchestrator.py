@@ -198,10 +198,35 @@ class CrewAIOrchestrator:
         self.routing_stats["total_queries"] += 1
 
         try:
-            # Step 1: Detect intent
+            # Step 1: Detect intent (with conversation context for continuity)
             logger.info(f"Detecting intent for query: '{query[:50]}...'")
             intent_start = time.time()
-            intent_result = await self.intent_detector.detect_intent_and_extract(query)
+
+            # Get conversation history for context-aware intent detection
+            conversation_hist = []
+            if self.conversation_handler and conversation_context:
+                session_id = conversation_context.get('session_id', 'default')
+                # Get last few messages from conversation handler
+                session_messages = self.conversation_handler.conversations.get(session_id, [])
+                if session_messages:
+                    # Convert Message objects to dicts for intent detector
+                    conversation_hist = [
+                        {"role": msg.role.value, "content": msg.content}
+                        for msg in session_messages[-5:]  # Last 5 messages
+                    ]
+
+            # Suppress EventBus errors from CrewAI's internal task tracking
+            import sys
+            import io
+            import contextlib
+
+            # Create a context manager that suppresses both stdout and stderr
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                intent_result = await self.intent_detector.detect_intent_and_extract(
+                    query,
+                    conversation_history=conversation_hist
+                )
+
             intent_time = time.time() - intent_start
             self.routing_stats["intent_detection_time"].append(intent_time)
 
@@ -320,6 +345,38 @@ class CrewAIOrchestrator:
                 result["metadata"]["quality_controlled"] = flow_result.quality_controlled
                 result["metadata"]["flow_version"] = "v2" if self.use_flow_v2 else "v1"
 
+                # Track product search in conversation history (for memory continuity)
+                if self.conversation_handler and conversation_context:
+                    from services.conversation_handler import Message, MessageRole
+                    from datetime import datetime
+
+                    session_id = conversation_context.get('session_id', 'default')
+
+                    # Add user search query
+                    user_message = Message(
+                        role=MessageRole.USER,
+                        content=query,
+                        timestamp=datetime.now(),
+                        metadata={"intent": intent_result.primary_intent.name, "type": "product_search"}
+                    )
+                    await self.conversation_handler._add_message(session_id, user_message)
+
+                    # Add system response summarizing results
+                    product_count = len(result["products"])
+                    if product_count > 0:
+                        top_products = [p.get('title', 'Unknown') for p in result["products"][:3]]
+                        summary = f"Found {product_count} products: {', '.join(top_products[:2])}" + (f", and {product_count-2} more" if product_count > 2 else "")
+                    else:
+                        summary = "No products found for that search."
+
+                    assistant_message = Message(
+                        role=MessageRole.ASSISTANT,
+                        content=summary,
+                        timestamp=datetime.now(),
+                        metadata={"intent": intent_result.primary_intent.name, "type": "product_search_result", "count": product_count}
+                    )
+                    await self.conversation_handler._add_message(session_id, assistant_message)
+
             # Add execution time and intent metadata
             execution_time = time.time() - search_start
             result['execution_time'] = execution_time
@@ -422,6 +479,18 @@ class CrewAIOrchestrator:
         session_id = conversation_context.get('session_id', 'default') if conversation_context else 'default'
         user_id = user_context.get('user_id') if user_context else None
 
+        # Add user message to conversation history (for memory continuity)
+        from services.conversation_handler import Message, MessageRole
+        from datetime import datetime
+
+        user_message = Message(
+            role=MessageRole.USER,
+            content=query,
+            timestamp=datetime.now(),
+            metadata={"intent": intent_name, "confidence": intent_result.confidence}
+        )
+        await self.conversation_handler._add_message(session_id, user_message)
+
         # Generate natural conversational response using GPT
         # Let exceptions propagate - fail fast instead of silent fallback
         response_text = await self.conversation_handler.generate_conversational_response(
@@ -429,6 +498,15 @@ class CrewAIOrchestrator:
             message=query,
             user_id=user_id
         )
+
+        # Add assistant response to conversation history
+        assistant_message = Message(
+            role=MessageRole.ASSISTANT,
+            content=response_text,
+            timestamp=datetime.now(),
+            metadata={"intent": intent_name}
+        )
+        await self.conversation_handler._add_message(session_id, assistant_message)
 
         logger.info(f"ConversationHandler generated response for: '{query[:50]}...'")
 

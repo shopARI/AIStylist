@@ -101,11 +101,12 @@ async def async_visual_similarity_search_tool(
             return []
 
         # Search Qdrant with visual embedding asynchronously (use internal function)
+        visual_collection = os.getenv("QDRANT_VISUAL_COLLECTION_NAME", "fashion_multimodal_embeddings")
         results = await _search_qdrant(
             query_embedding=embedding,
             limit=limit,
             filters=filters,
-            collection_name="fashion_visual_embeddings"
+            collection_name=visual_collection
         )
 
         logger.info(f"Async visual search returned {len(results)} similar products")
@@ -165,11 +166,12 @@ async def async_multi_image_search_tool(
         avg_embedding = np.mean(valid_embeddings, axis=0).tolist()
 
         # Search with averaged embedding asynchronously (use internal function)
+        visual_collection = os.getenv("QDRANT_VISUAL_COLLECTION_NAME", "fashion_multimodal_embeddings")
         results = await _search_qdrant(
             query_embedding=avg_embedding,
             limit=limit,
             filters=filters,
-            collection_name="fashion_visual_embeddings"
+            collection_name=visual_collection
         )
 
         logger.info(f"Async multi-image search returned {len(results)} products")
@@ -228,11 +230,12 @@ async def async_fashionsig_multimodal_search_tool(
             return []
 
         # Search with embedding (use internal function)
+        visual_collection = os.getenv("QDRANT_VISUAL_COLLECTION_NAME", "fashion_multimodal_embeddings")
         results = await _search_qdrant(
             query_embedding=embedding,
             limit=limit,
             filters=filters,
-            collection_name="fashion_visual_embeddings"
+            collection_name=visual_collection
         )
 
         logger.info(f"Async multimodal search returned {len(results)} products")

@@ -334,11 +334,13 @@ Generate the main query and optional fallback query with your chosen strategy.""
                 embedding = embedding_np.tolist()
 
                 # Search with visual embedding
+                import os
+                visual_collection = os.getenv("QDRANT_VISUAL_COLLECTION_NAME", "fashion_multimodal_embeddings")
                 visual_results = await _search_qdrant(
                     query_embedding=embedding,
                     limit=self.state.limit * 2,
                     filters=self.state.filters,
-                    collection_name="fashion_visual_embeddings"
+                    collection_name=visual_collection
                 )
 
             except (ImportError, RuntimeError, AttributeError) as e:

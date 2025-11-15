@@ -119,17 +119,28 @@ You're great at extracting details like colors, categories, occasions, and style
         # Return top matches
         return relevant_knowledge[:top_k]
 
-    async def detect_intent_and_extract(self, query: str) -> CrewAIIntentResult:
+    async def detect_intent_and_extract(
+        self,
+        query: str,
+        conversation_history: Optional[List[Dict[str, str]]] = None
+    ) -> CrewAIIntentResult:
         """
         Main method: detect intent and extract parameters using CrewAI agent + common sense
 
         Args:
             query: User's natural language query
+            conversation_history: Recent conversation messages for context (optional)
 
         Returns:
             CrewAIIntentResult with intent, parameters, and metadata
         """
         start_time = time.time()
+
+        # Suppress CrewAI's EventBus warnings by redirecting stderr for the entire method
+        import sys
+        import io
+        stderr_backup = sys.stderr
+        sys.stderr = io.StringIO()
 
         try:
             # Step 1: Get relevant fashion knowledge for context
@@ -140,16 +151,27 @@ You're great at extracting details like colors, categories, occasions, and style
             if relevant_knowledge:
                 knowledge_context = "\n\nFASHION KNOWLEDGE CONTEXT:\n" + "\n".join(relevant_knowledge[:3])
 
-            # Step 3: Create task for intent detection
-            task_description = self._build_task_description(query, knowledge_context)
+            # Build conversation context
+            conversation_context = ""
+            if conversation_history:
+                context_items = []
+                for msg in conversation_history[-3:]:  # Last 3 messages
+                    role = msg.get('role', 'user')
+                    content = msg.get('content', '')[:150]  # Truncate long messages
+                    context_items.append(f"{role.upper()}: {content}")
+                if context_items:
+                    conversation_context = "\n\nRECENT CONVERSATION:\n" + "\n".join(context_items)
 
+            # Step 3: Create task for intent detection
+            task_description = self._build_task_description(query, knowledge_context, conversation_context)
+
+            # Step 4: Execute task (EventBus errors suppressed via stderr redirection)
             task = Task(
                 description=task_description,
                 agent=self.intent_agent,
                 expected_output="JSON object with intent, confidence, parameters, and reasoning"
             )
 
-            # Step 4: Execute task
             result = await asyncio.to_thread(task.execute_sync)
 
             # Step 5: Parse result
@@ -163,12 +185,16 @@ You're great at extracting details like colors, categories, occasions, and style
             logger.error(f"CrewAI intent detection failed: {e}", exc_info=True)
             return self._fallback_result(start_time)
 
-    def _build_task_description(self, query: str, knowledge_context: str) -> str:
+        finally:
+            # Restore stderr
+            sys.stderr = stderr_backup
+
+    def _build_task_description(self, query: str, knowledge_context: str, conversation_context: str = "") -> str:
         """Build task description with common sense instructions"""
 
         return f"""Analyze this customer query using COMMON SENSE and classify the intent.
 
-CUSTOMER QUERY: "{query}"{knowledge_context}
+CUSTOMER QUERY: "{query}"{knowledge_context}{conversation_context}
 
 INTENTS (choose the most appropriate):
 - SPECIFIC_ITEM: User wants specific clothing/accessories ("black shirt", "need shoes", "dress for wedding")
@@ -184,23 +210,46 @@ INTENTS (choose the most appropriate):
 - SALE: Looking for deals ("on sale", "discount", "cheap")
 - COMPARISON: Comparing options ("which is better", "compare these")
 
+CRITICAL - CONTEXT AWARENESS:
+⚠️ If RECENT CONVERSATION shows a recent product search or fashion question, AND the current query is a CONTINUATION like:
+  - "any other recommendation"
+  - "show me more"
+  - "what else"
+  - "anything else"
+  - "other options"
+  - "more like that"
+  Then use the SAME fashion intent as the previous query (SPECIFIC_ITEM, INSPIRATION, OUTFIT, etc.)
+  Extract parameters from BOTH the previous context AND current query.
+
+⚠️ Example:
+  RECENT: USER: "outfit for interview at fashion institute" → ASSISTANT: "Found 4 products..."
+  CURRENT: "any other recommendation"
+  INTENT: INSPIRATION (continuing previous outfit search)
+  PARAMETERS: occasions=["interview"], categories=["professional attire"]
+
 COMMON SENSE DECISION MAKING:
-1. Is this about fashion, clothing, or shopping?  Use fashion intents (SPECIFIC_ITEM, BROWSE, INSPIRATION)
-2. Is this asking about our past conversation?  CONVERSATION_HISTORY
-3. Is this asking about their stored preferences?  MEMORY_QUERY
-4. Is this asking me to explain how I work?  CLARIFICATION
-5. Is this completely unrelated to fashion?  GENERAL_CONVERSATION
+1. CHECK RECENT CONVERSATION FIRST - Is this a continuation of a previous search? Use the same fashion intent!
+2. Is this about fashion, clothing, or shopping? Use fashion intents (SPECIFIC_ITEM, BROWSE, INSPIRATION)
+3. Is this asking about our past conversation? CONVERSATION_HISTORY
+4. Is this asking about their stored preferences? MEMORY_QUERY
+5. Is this asking me to explain how I work? CLARIFICATION
+6. Is this completely unrelated to fashion? GENERAL_CONVERSATION
 
 EXAMPLES:
-- "what day is it"  GENERAL_CONVERSATION (not fashion related)
-- "explain quantum physics"  GENERAL_CONVERSATION (not fashion related)
-- "how do you work"  CLARIFICATION (asking about my system)
-- "do you remember my size"  MEMORY_QUERY (asking about stored info)
-- "what did I ask earlier"  CONVERSATION_HISTORY (about past conversation)
-- "need a black shirt"  SPECIFIC_ITEM (fashion item)
-- "outfit for interview"  INSPIRATION (fashion advice)
-- "gift for mom"  GIFT (shopping for someone)
-- "anything on sale"  SALE (looking for deals)
+- "what day is it" → GENERAL_CONVERSATION (not fashion related)
+- "explain quantum physics" → GENERAL_CONVERSATION (not fashion related)
+- "how do you work" → CLARIFICATION (asking about my system)
+- "do you remember my size" → MEMORY_QUERY (asking about stored info)
+- "what did I ask earlier" → CONVERSATION_HISTORY (about past conversation)
+- "need a black shirt" → SPECIFIC_ITEM (fashion item)
+- "outfit for interview" → INSPIRATION (fashion advice)
+- "gift for mom" → GIFT (shopping for someone)
+- "anything on sale" → SALE (looking for deals)
+
+CONTINUATION EXAMPLES:
+- Previous: "show me red dresses" → Current: "any other options" → SPECIFIC_ITEM (continuing dress search, extract: colors=["red"], categories=["dresses"])
+- Previous: "outfit for wedding" → Current: "show me more" → INSPIRATION (continuing wedding outfit search, extract: occasions=["wedding"])
+- Previous: "black shoes" → Current: "what else do you have" → SPECIFIC_ITEM (continuing shoe search, extract: colors=["black"], categories=["shoes"])
 
 For fashion queries, extract FROM THE CUSTOMER QUERY ONLY: categories, colors, occasions, style_preferences, price_range, brand_preferences
 **IMPORTANT:** DO NOT extract parameters from the FASHION KNOWLEDGE CONTEXT - only from the CUSTOMER QUERY!

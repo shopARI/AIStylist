@@ -92,11 +92,12 @@ def visual_similarity_search_tool(
         # Search Qdrant with visual embedding
         from tools.qdrant_tools import qdrant_search_tool
 
+        visual_collection = os.getenv("QDRANT_VISUAL_COLLECTION_NAME", "fashion_multimodal_embeddings")
         results = qdrant_search_tool(
             query_embedding=embedding,
             limit=limit,
             filters=filters,
-            collection_name="fashion_visual_embeddings"
+            collection_name=visual_collection
         )
 
         logger.info(f"Visual search returned {len(results)} similar products")
@@ -151,11 +152,12 @@ def multi_image_search_tool(
         # Search with averaged embedding
         from tools.qdrant_tools import qdrant_search_tool
 
+        visual_collection = os.getenv("QDRANT_VISUAL_COLLECTION_NAME", "fashion_multimodal_embeddings")
         results = qdrant_search_tool(
             query_embedding=avg_embedding,
             limit=limit,
             filters=filters,
-            collection_name="fashion_visual_embeddings"
+            collection_name=visual_collection
         )
 
         logger.info(f"Multi-image search returned {len(results)} products")

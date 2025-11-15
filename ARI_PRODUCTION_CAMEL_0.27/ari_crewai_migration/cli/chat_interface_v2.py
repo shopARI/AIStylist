@@ -729,8 +729,18 @@ class EnhancedChatInterface:
     # ======================
 
     def display_results(self, result: Dict[str, Any]):
-        """Display search results."""
+        """Display search results or conversation response."""
         products = result.get("products", [])
+
+        # Check if this is a conversation response (not a product search)
+        if "response" in result and result.get("metadata", {}).get("is_conversation", False):
+            print("\n" + "="*70)
+            print("ARI")
+            print("="*70)
+            print(f"\n{result['response']}\n")
+            print("="*70)
+            print()
+            return
 
         print("\n" + "="*70)
         print(f"RESULTS ({len(products)} products)")
@@ -743,19 +753,35 @@ class EnhancedChatInterface:
 
         for i, product in enumerate(products, 1):
             print(f"\n{i}. {product.get('title', 'Unknown Product')}")
-            print(f"   Price: ${product.get('price', 0):.2f}")
 
-            if 'category' in product:
+            # Handle price display with None check
+            price = product.get('price', 0)
+            if price is not None:
+                print(f"   Price: ${price:.2f}")
+            else:
+                print(f"   Price: N/A")
+
+            if 'category' in product and product['category']:
                 print(f"   Category: {product['category']}")
 
             if 'brand' in product and product['brand']:
                 print(f"   Brand: {product['brand']}")
 
-            # Show agent scores if available
-            if 'cypher_score' in product:
-                print(f"   Scores: Graph={product.get('cypher_score', 0):.2f} "
-                      f"Vector={product.get('vibe_score', 0):.2f} "
-                      f"Visual={product.get('visual_score', 0):.2f}")
+            # Show agent scores if available (with None checks)
+            cypher_score = product.get('cypher_score')
+            vibe_score = product.get('vibe_score')
+            visual_score = product.get('visual_score')
+
+            if cypher_score is not None or vibe_score is not None or visual_score is not None:
+                scores = []
+                if cypher_score is not None:
+                    scores.append(f"Graph={cypher_score:.2f}")
+                if vibe_score is not None:
+                    scores.append(f"Vector={vibe_score:.2f}")
+                if visual_score is not None:
+                    scores.append(f"Visual={visual_score:.2f}")
+                if scores:
+                    print(f"   Scores: {' '.join(scores)}")
 
         # Show reasoning
         if 'reasoning' in result:
