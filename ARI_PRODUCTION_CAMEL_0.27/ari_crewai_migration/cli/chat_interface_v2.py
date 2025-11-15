@@ -11,8 +11,12 @@ Usage:
 import asyncio
 import sys
 import uuid
+import warnings
 from datetime import datetime
 from typing import Optional, Dict, Any
+
+# Suppress deprecation warnings for cleaner output
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Add parent directory to path - ensure it's at the front to avoid conflicts
 import os
@@ -381,9 +385,9 @@ class EnhancedChatInterface:
                 print("  Username cannot be empty")
                 continue
 
-            # ✅ BYPASS: user0 skips onboarding for testing
+            # BYPASS: user0 skips onboarding for testing
             if username.lower() == "user0":
-                print("\n🚀 Test mode: Bypassing onboarding, going straight to recommendations...\n")
+                print("\nTest mode: Bypassing onboarding, going straight to recommendations...\n")
 
                 # Check if user0 already exists
                 user = self.user_service.get_user_by_username(username)
@@ -767,17 +771,17 @@ class EnhancedChatInterface:
         if graph_count > 0:
             bot_summary.append(f"CypherBot: {graph_count} ({graph_time:.2f}s)")
         else:
-            bot_summary.append(f"CypherBot: ∅ ({graph_time:.2f}s)")
+            bot_summary.append(f"CypherBot: 0 ({graph_time:.2f}s)")
 
         if vector_count > 0:
             bot_summary.append(f"VibeBot: {vector_count} ({vector_time:.2f}s)")
         else:
-            bot_summary.append(f"VibeBot: ∅ ({vector_time:.2f}s)")
+            bot_summary.append(f"VibeBot: 0 ({vector_time:.2f}s)")
 
         if visual_count > 0:
             bot_summary.append(f"VisionBot: {visual_count} ({visual_time:.2f}s)")
         else:
-            bot_summary.append(f"VisionBot: ∅ ({visual_time:.2f}s)")
+            bot_summary.append(f"VisionBot: 0 ({visual_time:.2f}s)")
 
         print(f"Bot Contributions: {' | '.join(bot_summary)}")
 

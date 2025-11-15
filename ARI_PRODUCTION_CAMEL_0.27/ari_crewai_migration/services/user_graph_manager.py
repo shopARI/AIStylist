@@ -629,7 +629,7 @@ class UserGraphManager:
             budgets = [dict(r) for r in budgets_result]
 
             return {
-                'user': convert_neo4j_datetimes(user_node),  # ✅ Convert datetimes
+                'user': convert_neo4j_datetimes(user_node),  # Convert datetimes
                 'style_adjectives': adjectives,
                 'fit_preferences': fits,
                 'occasions': occasions,

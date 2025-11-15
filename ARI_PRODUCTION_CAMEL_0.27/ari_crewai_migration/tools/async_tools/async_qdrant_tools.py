@@ -4,10 +4,14 @@ Phase 2: True async tools using AsyncQdrantClient.
 """
 import os
 import logging
+import warnings
 from typing import Dict, List, Any, Optional
 from crewai.tools import tool
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
+
+# Suppress deprecation warnings
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 logger = logging.getLogger("crewai.tools.async_qdrant")
 
@@ -125,7 +129,7 @@ async def _search_qdrant(
 async def _generate_embedding(text: str, model: str = "text-embedding-ada-002") -> List[float]:
     """
     Core implementation: Generate text embedding using OpenAI (internal use).
-    ✅ Using text-embedding-ada-002 to match Qdrant collection embeddings.
+    Using text-embedding-ada-002 to match Qdrant collection embeddings.
     """
     try:
         from openai import AsyncOpenAI
@@ -184,7 +188,7 @@ async def async_qdrant_search_tool(
 async def async_embedding_generation_tool(text: str, model: str = "text-embedding-ada-002") -> List[float]:
     """
     Generate embedding vector for text query using OpenAI (async, non-blocking).
-    ✅ Using text-embedding-ada-002 to match Qdrant collection embeddings.
+    Using text-embedding-ada-002 to match Qdrant collection embeddings.
 
     Args:
         text: Text to embed

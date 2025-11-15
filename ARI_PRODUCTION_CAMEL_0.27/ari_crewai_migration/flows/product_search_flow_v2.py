@@ -151,7 +151,7 @@ Generate the main query and optional fallback query with your chosen strategy.""
                 model=model,
                 temperature=temperature,
                 timeout=30,
-                response_format=CypherQueries  # ✅ Correct: in constructor
+                response_format=CypherQueries  # Correct: in constructor
             )
 
             # Direct LLM call - returns Pydantic model directly
@@ -483,7 +483,7 @@ Return your evaluation with:
                 model=model,
                 temperature=temperature,
                 timeout=30,
-                response_format=JudgeEvaluation  # ✅ Correct: in constructor
+                response_format=JudgeEvaluation  # Correct: in constructor
             )
 
             # Direct LLM call

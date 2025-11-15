@@ -211,7 +211,7 @@ INTENTS (choose the most appropriate):
 - COMPARISON: Comparing options ("which is better", "compare these")
 
 CRITICAL - CONTEXT AWARENESS:
-⚠️ If RECENT CONVERSATION shows a recent product search or fashion question, AND the current query is a CONTINUATION like:
+If RECENT CONVERSATION shows a recent product search or fashion question, AND the current query is a CONTINUATION like:
   - "any other recommendation"
   - "show me more"
   - "what else"
@@ -221,7 +221,7 @@ CRITICAL - CONTEXT AWARENESS:
   Then use the SAME fashion intent as the previous query (SPECIFIC_ITEM, INSPIRATION, OUTFIT, etc.)
   Extract parameters from BOTH the previous context AND current query.
 
-⚠️ Example:
+Example:
   RECENT: USER: "outfit for interview at fashion institute" → ASSISTANT: "Found 4 products..."
   CURRENT: "any other recommendation"
   INTENT: INSPIRATION (continuing previous outfit search)
