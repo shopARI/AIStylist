@@ -128,66 +128,66 @@ CONTEXT:
 - ML Intelligence: {self.state.ml_intelligence}
 - User Context: {self.state.user_context}
 
-PRODUCT NODE SCHEMA (4.6M products):
-Properties:
+PRODUCT NODE SCHEMA (6.4M products):
+ACTUAL Properties (these are the ONLY properties that exist):
   - id (string): Product UUID
   - title (string): Product name/title
   - description (string): Product description
-  - price (number): Price in cents (e.g., 4999 = $49.99)
-  - brand (string): Brand name
-  - category (string): Hierarchical category (e.g., "Apparel & Accessories > Clothing > Shirts & Tops")
-  - fashion_category (string): Simplified category (e.g., "clothing", "footwear", "fashion jewelry")
-  - images (list): Product image URLs
-  - active (boolean): Whether product is available
-  - is_fashion (boolean): AI classification as fashion item
-
-Top Categories (use these for category matching):
-  - "Apparel & Accessories > Clothing > Shirts & Tops" (800K products)
-  - "Apparel & Accessories > Clothing > Pants" (73K products)
-  - "Apparel & Accessories > Clothing > Dresses" (63K products)
-  - "Apparel & Accessories > Clothing > Outerwear > Coats & Jackets" (107K products)
-  - "Apparel & Accessories > Shoes" (249K products)
+  - price (number): Price (e.g., 49.99)
+  - images (string): JSON string of image URLs
+  - visited_num (number): Visit count
+  - extracted_brand (string): AI-extracted brand name
+  - extracted_colors (list): AI-extracted color tags (e.g., ["black", "white"])
+  - extracted_styles (list): AI-extracted style tags (e.g., ["classic", "casual"])
 
 AVAILABLE INDEXES:
   - Product.id (RANGE)
   - Product.title (RANGE)
-  - Product.brand (RANGE)
   - Product.price (RANGE)
 
-IMPORTANT CONSTRAINTS:
-  - NO 'color' property exists - extract colors from title/description using CONTAINS
-  - NO fulltext indexes exist - use CONTAINS for text search
-  - Categories are hierarchical with ">" separators
-  - Always use toLower() for case-insensitive matching
-  - Database has 4.6M products - MUST use LIMIT (10-20 max)
+CRITICAL CONSTRAINTS:
+  - NO 'brand' property - use 'extracted_brand' instead
+  - NO 'category' or 'fashion_category' properties - use 'extracted_styles' or title/description matching
+  - NO 'color' property - use 'extracted_colors' array or title/description matching
+  - NO fulltext indexes - use CONTAINS for text search
+  - Colors are in 'extracted_colors' array - use 'black' IN p.extracted_colors
+  - Styles are in 'extracted_styles' array - use 'shirt' IN p.extracted_styles OR title matching
+  - Database has 6.4M products - MUST use LIMIT (10-20 max)
+  - Always use toLower() for case-insensitive text matching
 
 WORKING QUERY PATTERNS:
 
-1. Text Search (color, style, keywords):
+1. Color Search (using extracted_colors array):
+MATCH (p:Product)
+WHERE 'black' IN p.extracted_colors
+RETURN p
+LIMIT 20
+
+2. Color + Style Search (combining arrays and title):
+MATCH (p:Product)
+WHERE 'black' IN p.extracted_colors
+  AND (toLower(p.title) CONTAINS 'shirt' OR toLower(p.description) CONTAINS 'shirt')
+RETURN p
+LIMIT 20
+
+3. Text Search (title/description matching):
 MATCH (p:Product)
 WHERE toLower(p.title) CONTAINS 'black'
   AND toLower(p.title) CONTAINS 'dress'
 RETURN p
 LIMIT 20
 
-2. Category + Text Search:
+4. Brand + Color Search:
 MATCH (p:Product)
-WHERE toLower(p.category) CONTAINS 'shirts'
-  AND toLower(p.title) CONTAINS 'black'
+WHERE toLower(p.extracted_brand) CONTAINS 'nike'
+  AND 'black' IN p.extracted_colors
 RETURN p
 LIMIT 20
 
-3. Brand Search:
+5. Price Range + Color:
 MATCH (p:Product)
-WHERE toLower(p.brand) = 'nike'
-  AND toLower(p.category) CONTAINS 'shoes'
-RETURN p
-LIMIT 20
-
-4. Price Range:
-MATCH (p:Product)
-WHERE p.price >= 5000 AND p.price <= 15000
-  AND toLower(p.title) CONTAINS 'dress'
+WHERE p.price >= 50 AND p.price <= 150
+  AND 'blue' IN p.extracted_colors
 RETURN p
 ORDER BY p.price ASC
 LIMIT 20
