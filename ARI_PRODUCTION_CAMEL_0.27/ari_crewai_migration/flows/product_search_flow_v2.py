@@ -128,23 +128,75 @@ CONTEXT:
 - ML Intelligence: {self.state.ml_intelligence}
 - User Context: {self.state.user_context}
 
+PRODUCT NODE SCHEMA (4.6M products):
+Properties:
+  - id (string): Product UUID
+  - title (string): Product name/title
+  - description (string): Product description
+  - price (number): Price in cents (e.g., 4999 = $49.99)
+  - brand (string): Brand name
+  - category (string): Hierarchical category (e.g., "Apparel & Accessories > Clothing > Shirts & Tops")
+  - fashion_category (string): Simplified category (e.g., "clothing", "footwear", "fashion jewelry")
+  - images (list): Product image URLs
+  - active (boolean): Whether product is available
+  - is_fashion (boolean): AI classification as fashion item
+
+Top Categories (use these for category matching):
+  - "Apparel & Accessories > Clothing > Shirts & Tops" (800K products)
+  - "Apparel & Accessories > Clothing > Pants" (73K products)
+  - "Apparel & Accessories > Clothing > Dresses" (63K products)
+  - "Apparel & Accessories > Clothing > Outerwear > Coats & Jackets" (107K products)
+  - "Apparel & Accessories > Shoes" (249K products)
+
+AVAILABLE INDEXES:
+  - Product.id (RANGE)
+  - Product.title (RANGE)
+  - Product.brand (RANGE)
+  - Product.price (RANGE)
+
+IMPORTANT CONSTRAINTS:
+  - NO 'color' property exists - extract colors from title/description using CONTAINS
+  - NO fulltext indexes exist - use CONTAINS for text search
+  - Categories are hierarchical with ">" separators
+  - Always use toLower() for case-insensitive matching
+  - Database has 4.6M products - MUST use LIMIT (10-20 max)
+
+WORKING QUERY PATTERNS:
+
+1. Text Search (color, style, keywords):
+MATCH (p:Product)
+WHERE toLower(p.title) CONTAINS 'black'
+  AND toLower(p.title) CONTAINS 'dress'
+RETURN p.id, p.title, p.description, p.price, p.category, p.brand, p.images
+LIMIT 20
+
+2. Category + Text Search:
+MATCH (p:Product)
+WHERE toLower(p.category) CONTAINS 'shirts'
+  AND toLower(p.title) CONTAINS 'black'
+RETURN p.id, p.title, p.description, p.price, p.category, p.brand, p.images
+LIMIT 20
+
+3. Brand Search:
+MATCH (p:Product)
+WHERE toLower(p.brand) = 'nike'
+  AND toLower(p.category) CONTAINS 'shoes'
+RETURN p.id, p.title, p.description, p.price, p.category, p.brand, p.images
+LIMIT 20
+
+4. Price Range:
+MATCH (p:Product)
+WHERE p.price >= 5000 AND p.price <= 15000
+  AND toLower(p.title) CONTAINS 'dress'
+RETURN p.id, p.title, p.description, p.price, p.category, p.brand, p.images
+ORDER BY p.price ASC
+LIMIT 20
+
 TASK:
-Generate optimized Neo4j Cypher queries for this product search.
+Generate an optimized Cypher query for this search. Use CONTAINS for text matching.
+Return: p.id, p.title, p.description, p.price, p.category, p.brand, p.images
 
-STRATEGIES:
-- COLLABORATIVE: Users who bought X also bought Y (relationship-based)
-- CATEGORY_FOCUSED: Category hierarchy and grouping
-- BRAND_RELATIONSHIPS: Brand and designer relationships
-- OCCASION_PATTERNS: Occasion-based product matching
-- GENERAL: Fulltext search fallback
-
-CRITICAL:
-- Database is 6.4M+ nodes - use indexes and LIMIT properly
-- Production environment - queries must be efficient
-- Limit to 10-20 products per query
-- Return: p.id, p.title, p.description, p.price, p.category, p.brand, p.images
-
-Generate the main query and optional fallback query with your chosen strategy."""
+Generate main_query (your best query) and fallback_query (simpler/broader query if main fails)."""
 
             # Create LLM with response_format in constructor
             cypher_llm = LLM(
