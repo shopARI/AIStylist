@@ -784,8 +784,16 @@ class EnhancedChatInterface:
                     print(f"   Scores: {' '.join(scores)}")
 
         # Show reasoning
-        if 'reasoning' in result:
-            print(f"\n  {result['reasoning'][:200]}")
+        if 'reasoning' in result and result['reasoning']:
+            reasoning = result['reasoning']
+            # Show full reasoning, but format nicely for long text
+            if len(reasoning) > 500:
+                # For very long reasoning, wrap text nicely
+                import textwrap
+                wrapped = textwrap.fill(reasoning, width=68, initial_indent='  ', subsequent_indent='  ')
+                print(f"\n{wrapped}")
+            else:
+                print(f"\n  {reasoning}")
 
         print("\n" + "="*70)
         print()
