@@ -167,34 +167,39 @@ WORKING QUERY PATTERNS:
 MATCH (p:Product)
 WHERE toLower(p.title) CONTAINS 'black'
   AND toLower(p.title) CONTAINS 'dress'
-RETURN p.id, p.title, p.description, p.price, p.category, p.brand, p.images
+RETURN p
 LIMIT 20
 
 2. Category + Text Search:
 MATCH (p:Product)
 WHERE toLower(p.category) CONTAINS 'shirts'
   AND toLower(p.title) CONTAINS 'black'
-RETURN p.id, p.title, p.description, p.price, p.category, p.brand, p.images
+RETURN p
 LIMIT 20
 
 3. Brand Search:
 MATCH (p:Product)
 WHERE toLower(p.brand) = 'nike'
   AND toLower(p.category) CONTAINS 'shoes'
-RETURN p.id, p.title, p.description, p.price, p.category, p.brand, p.images
+RETURN p
 LIMIT 20
 
 4. Price Range:
 MATCH (p:Product)
 WHERE p.price >= 5000 AND p.price <= 15000
   AND toLower(p.title) CONTAINS 'dress'
-RETURN p.id, p.title, p.description, p.price, p.category, p.brand, p.images
+RETURN p
 ORDER BY p.price ASC
 LIMIT 20
 
+CRITICAL RETURN FORMAT:
+- ALWAYS return the full node: RETURN p
+- DO NOT return individual properties like: RETURN p.id, p.title (this breaks parsing!)
+- The node 'p' contains all properties we need
+
 TASK:
 Generate an optimized Cypher query for this search. Use CONTAINS for text matching.
-Return: p.id, p.title, p.description, p.price, p.category, p.brand, p.images
+IMPORTANT: RETURN p (the full Product node), NOT individual properties!
 
 Generate main_query (your best query) and fallback_query (simpler/broader query if main fails)."""
 

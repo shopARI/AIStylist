@@ -26,13 +26,14 @@ async def _execute_neo4j_query(cypher: str, parameters: Dict[str, Any] = None) -
         neo4j_uri = os.getenv("NEO4J_URI") or os.getenv("NEO4J_URL", "bolt://localhost:7687")
         neo4j_user = os.getenv("NEO4J_USER") or os.getenv("NEO4J_USERNAME", "neo4j")
         neo4j_password = os.getenv("NEO4J_PASSWORD", "")
+        neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")  # Default to "neo4j" if not specified
 
         driver = AsyncGraphDatabase.driver(
             neo4j_uri,
             auth=(neo4j_user, neo4j_password)
         )
 
-        async with driver.session() as session:
+        async with driver.session(database=neo4j_database) as session:
             result = await session.run(cypher, parameters or {})
             records = []
             async for record in result:
