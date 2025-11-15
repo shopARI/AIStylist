@@ -742,8 +742,33 @@ class EnhancedChatInterface:
             print()
             return
 
+        # Get bot contribution stats from metadata
+        metadata = result.get("metadata", {})
+        graph_count = metadata.get("graph_count", 0)
+        vector_count = metadata.get("vector_count", 0)
+        visual_count = metadata.get("visual_count", 0)
+
         print("\n" + "="*70)
         print(f"RESULTS ({len(products)} products)")
+
+        # Show bot contributions
+        bot_summary = []
+        if graph_count > 0:
+            bot_summary.append(f"CypherBot: {graph_count}")
+        else:
+            bot_summary.append("CypherBot: ∅")
+
+        if vector_count > 0:
+            bot_summary.append(f"VibeBot: {vector_count}")
+        else:
+            bot_summary.append("VibeBot: ∅")
+
+        if visual_count > 0:
+            bot_summary.append(f"VisionBot: {visual_count}")
+        else:
+            bot_summary.append("VisionBot: ∅")
+
+        print(f"Bot Contributions: {' | '.join(bot_summary)}")
         print("="*70)
 
         if not products:
@@ -767,11 +792,24 @@ class EnhancedChatInterface:
             if 'brand' in product and product['brand']:
                 print(f"   Brand: {product['brand']}")
 
-            # Show agent scores if available (with None checks)
+            # Show which bot(s) found this product and their scores
             cypher_score = product.get('cypher_score')
             vibe_score = product.get('vibe_score')
             visual_score = product.get('visual_score')
 
+            # Determine source bots
+            source_bots = []
+            if cypher_score is not None:
+                source_bots.append("CypherBot")
+            if vibe_score is not None:
+                source_bots.append("VibeBot")
+            if visual_score is not None:
+                source_bots.append("VisionBot")
+
+            if source_bots:
+                print(f"   Found by: {', '.join(source_bots)}")
+
+            # Show scores
             if cypher_score is not None or vibe_score is not None or visual_score is not None:
                 scores = []
                 if cypher_score is not None:
