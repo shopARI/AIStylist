@@ -742,33 +742,51 @@ class EnhancedChatInterface:
             print()
             return
 
-        # Get bot contribution stats from metadata
+        # Get bot contribution stats and timing from metadata
         metadata = result.get("metadata", {})
         graph_count = metadata.get("graph_count", 0)
         vector_count = metadata.get("vector_count", 0)
         visual_count = metadata.get("visual_count", 0)
 
+        # Get execution times
+        graph_time = metadata.get("graph_execution_time", 0)
+        vector_time = metadata.get("vector_execution_time", 0)
+        visual_time = metadata.get("visual_execution_time", 0)
+        judge_time = metadata.get("judge_execution_time", 0)
+        total_time = result.get("execution_time", 0)
+
+        # Get intent detection time if available
+        intent_info = result.get("intent", {})
+        intent_time = intent_info.get("detection_time", 0)
+
         print("\n" + "="*70)
         print(f"RESULTS ({len(products)} products)")
 
-        # Show bot contributions
+        # Show bot contributions with timing
         bot_summary = []
         if graph_count > 0:
-            bot_summary.append(f"CypherBot: {graph_count}")
+            bot_summary.append(f"CypherBot: {graph_count} ({graph_time:.2f}s)")
         else:
-            bot_summary.append("CypherBot: ∅")
+            bot_summary.append(f"CypherBot: ∅ ({graph_time:.2f}s)")
 
         if vector_count > 0:
-            bot_summary.append(f"VibeBot: {vector_count}")
+            bot_summary.append(f"VibeBot: {vector_count} ({vector_time:.2f}s)")
         else:
-            bot_summary.append("VibeBot: ∅")
+            bot_summary.append(f"VibeBot: ∅ ({vector_time:.2f}s)")
 
         if visual_count > 0:
-            bot_summary.append(f"VisionBot: {visual_count}")
+            bot_summary.append(f"VisionBot: {visual_count} ({visual_time:.2f}s)")
         else:
-            bot_summary.append("VisionBot: ∅")
+            bot_summary.append(f"VisionBot: ∅ ({visual_time:.2f}s)")
 
         print(f"Bot Contributions: {' | '.join(bot_summary)}")
+
+        # Show timing breakdown
+        if judge_time > 0:
+            print(f"Judge: {judge_time:.2f}s | Intent: {intent_time:.2f}s | Total: {total_time:.2f}s")
+        else:
+            print(f"Intent: {intent_time:.2f}s | Total: {total_time:.2f}s")
+
         print("="*70)
 
         if not products:
