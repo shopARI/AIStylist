@@ -67,14 +67,18 @@ Neo4j Server (neo4j://34.135.40.119:7687)
 
 ## Product Graph Schema & Ontology
 
+> **SEE ALSO:** [ONTOLOGY_SPECIFICATION.md](./ONTOLOGY_SPECIFICATION.md) for the complete planned ontology specification.
+
+**IMPORTANT NOTE:** There is a **significant gap** between the PLANNED ontology (documented in ONTOLOGY_SPECIFICATION.md) and the CURRENT ACTUAL schema (discovered via database inspection). This section documents BOTH.
+
 ### Database Details
 - **Database Name:** `productionbackup2`
 - **Node Count:** 6,416,804 products
 - **Primary Label:** `Product`
 
-### Actual Product Node Properties
+### Current ACTUAL Product Node Properties (As of Nov 2025)
 
-**CRITICAL:** The product schema uses AI-extracted properties, NOT raw merchant data.
+**CRITICAL:** The product schema uses AI-extracted properties, NOT the structured ontology yet.
 
 ```cypher
 (:Product {
@@ -146,6 +150,49 @@ Product.price (RANGE)   // Price filtering
 
 **NOTE:** No fulltext indexes exist. All text search uses `CONTAINS` operations.
 
+### PLANNED Product Ontology (From ONTOLOGY_SPECIFICATION.md)
+
+The complete planned ontology includes:
+
+**Nodes:**
+- `Product` (with full merchant data: price, description, images, etc.)
+- `Brand` (brand hierarchy, aesthetics, sustainability ratings)
+- `Category` (hierarchical category tree)
+- `StyleDescriptor` (aesthetic tags with color palettes, formality levels)
+- `ProductVisualEmbedding` (visual similarity vectors)
+- `OccasionType` (formality levels, dress codes)
+- `StylingRule` (outfit combination rules)
+
+**Relationships:**
+- `Product -[MADE_BY]-> Brand`
+- `Product -[BELONGS_TO]-> Category`
+- `Product -[HAS_AESTHETIC]-> StyleDescriptor`
+- `Product -[SUITED_FOR]-> OccasionType`
+- `Product -[OFTEN_BOUGHT_TOGETHER]-> Product`
+- `Product -[SIMILAR_STYLE]-> Product`
+- And 9 more relationship types...
+
+**See [ONTOLOGY_SPECIFICATION.md](./ONTOLOGY_SPECIFICATION.md) lines 355-504 for full specification.**
+
+### Schema Migration Status
+
+| Feature | PLANNED (ONTOLOGY_SPECIFICATION.md) | ACTUAL (Current DB) | Migration Needed? |
+|---------|-------------------------------------|---------------------|-------------------|
+| Product Core | Full properties | ✓ Basic properties | Partial |
+| Brand Nodes | Separate Brand nodes with hierarchy | ✗ Flat `extracted_brand` string | YES |
+| Category Tree | Hierarchical Category nodes | ✗ No category property at all! | YES |
+| Style Descriptors | StyleDescriptor nodes with palettes | △ `extracted_styles` array | YES (upgrade) |
+| Color Properties | Structured color nodes | △ `extracted_colors` array | Partial |
+| Visual Embeddings | ProductVisualEmbedding nodes | ? Unknown (not in sample) | Maybe |
+| Relationships | 15 relationship types | ✗ None discovered | YES |
+
+**Migration Priority:**
+1. **URGENT:** Add Brand nodes (currently just strings)
+2. **URGENT:** Add Category tree (missing completely!)
+3. **HIGH:** Convert extracted_styles to StyleDescriptor nodes
+4. **MEDIUM:** Add product relationships (SIMILAR_STYLE, OFTEN_BOUGHT_TOGETHER)
+5. **LOW:** Add OccasionType and StylingRule nodes
+
 ### Product Graph Growth
 
 **Products are relatively STATIC:**
@@ -163,29 +210,83 @@ Product.price (RANGE)   // Price filtering
 
 ## User Graph Schema & Ontology
 
+> **SEE ALSO:** [ONTOLOGY_SPECIFICATION.md](./ONTOLOGY_SPECIFICATION.md) lines 15-353 for the complete User Graph ontology specification.
+
+**IMPORTANT NOTE:** The User Graph has a much more detailed PLANNED ontology than what may be currently implemented. This section covers both.
+
 ### Database Details
 - **Database Name:** `users`
-- **Node Types:** User, Preference, Interaction, Style, BodyType, Occasion
-- **Relationship Types:** PREFERS, LIKES, DISLIKES, MATCHES, WORN_FOR
+- **Primary Architecture:** User-centric star schema with preference relationships
 
-### User Node Structure
+### PLANNED User Ontology (From ONTOLOGY_SPECIFICATION.md)
 
+The complete planned ontology includes **16 node types:**
+
+**Current Nodes (Implemented):**
+1. `User` - Core user identity
+2. `PersonalIdentity` - Demographics, location, occupation
+3. `TasteProfile` - Style preferences, brand loves, fit preferences
+4. `ProcessProfile` - Decision-making style, motivations, goals
+5. `PracticalityProfile` - Budget ranges, category budgets
+6. `BodyData` - Photos, body shape, coloring, insecurities
+7. `SocialMediaProfile` - Instagram, Pinterest, TikTok handles
+8. `RootValue` - Core values extracted from preferences
+9. `OnboardingMetadata` - Onboarding completion stats
+10. `OnboardingDataNode` - Tier-specific onboarding data
+
+**Proposed Nodes (Future):**
+11. `UserOccasion` - User-specific occasions with formality levels
+12. `ConversationPattern` - Detected patterns from chats
+13. `UserVisualEmbedding` - Visual style embeddings from user photos
+14. `UserProductInteraction` - Product clicks, views, purchases
+15. `RecommendationSession` - Search sessions with bot contributions
+16. `UserOutfit` - Saved outfits with harmony scores
+
+**See [ONTOLOGY_SPECIFICATION.md](./ONTOLOGY_SPECIFICATION.md) lines 17-213 for full node specifications.**
+
+### User Relationships (Planned)
+
+**Current (13 relationships):**
+- `User -[HAS_PERSONAL_IDENTITY]-> PersonalIdentity`
+- `User -[HAS_TASTE_PROFILE]-> TasteProfile`
+- `User -[HAS_PROCESS_PROFILE]-> ProcessProfile`
+- `User -[HAS_PRACTICALITY_PROFILE]-> PracticalityProfile`
+- `User -[HAS_BODY_DATA]-> BodyData`
+- `User -[HAS_SOCIAL_MEDIA]-> SocialMediaProfile`
+- `User -[HAS_ROOT_VALUE]-> RootValue` (with strength)
+- `User -[HAS_ONBOARDING_METADATA]-> OnboardingMetadata`
+- And 5 more...
+
+**Proposed (10 additional relationships):**
+- `User -[MENTIONED_OCCASION]-> UserOccasion` (with importance_score)
+- `User -[INTERACTED_WITH]-> UserProductInteraction`
+- `User -[HAD_SESSION]-> RecommendationSession`
+- `User -[HAS_OUTFIT]-> UserOutfit`
+- And 6 more...
+
+**See [ONTOLOGY_SPECIFICATION.md](./ONTOLOGY_SPECIFICATION.md) lines 246-324 for full relationship specifications.**
+
+### Cross-Graph Preference Relationships
+
+**These bridge User Graph → Product Graph:**
 ```cypher
-(:User {
-  id: String              // UUID
-  username: String        // Unique identifier
-  created_at: DateTime    // Onboarding timestamp
+User -[PREFERS_BRAND]-> Brand (Product Graph)
+  preference_strength: float
+  confidence: float
 
-  // Profile Metadata
-  last_active: DateTime
-  total_interactions: Integer
-  preference_strength: Float  // Confidence in preference model
-})
+User -[AVOIDS_BRAND]-> Brand (Product Graph)
+  reason: text
+
+User -[EXHIBITS_STYLE]-> StyleDescriptor (Product Graph)
+  confidence: float
+  occasions: string[]
 ```
 
-### User Ontology: Growing Preference Graph
+**See [ONTOLOGY_SPECIFICATION.md](./ONTOLOGY_SPECIFICATION.md) lines 326-351 for cross-graph relationships.**
 
-**Philosophy:** Users are NOT static profiles. They are **growing relationship networks** that learn over time.
+### User Ontology Philosophy: Growing Preference Graph
+
+**Core Insight:** Users are NOT static profiles. They are **growing relationship networks** that learn over time.
 
 #### Core Ontology Structure
 
@@ -1175,6 +1276,142 @@ results = await asyncio.gather(
 
 **Lesson:**
 Independent searches should ALWAYS run in parallel. The speedup is dramatic.
+
+---
+
+## Ontology Gap Analysis & Migration Strategy
+
+### The Schema Gap Problem
+
+**Discovery (Nov 2025):** There is a significant discrepancy between:
+1. **PLANNED Ontology** (documented in ONTOLOGY_SPECIFICATION.md)
+2. **ACTUAL Schema** (discovered via database inspection)
+
+This gap is causing CypherBot to return 0 products when using ontology-based queries!
+
+### Product Graph Gap
+
+| Feature | Planned | Actual | Impact |
+|---------|---------|--------|---------|
+| Brand Hierarchy | Separate `Brand` nodes with aesthetics | Flat `extracted_brand` strings | Can't filter by brand attributes |
+| Category Tree | Hierarchical `Category` nodes | NO category property! | Can't filter by product type! |
+| Style Tags | `StyleDescriptor` nodes with palettes | Simple `extracted_styles` array | Limited style understanding |
+| Product Relations | 15 relationship types | NONE | No collaborative filtering |
+
+**Why This Matters:**
+```cypher
+# PLANNED QUERY (doesn't work!):
+MATCH (p:Product)-[:BELONGS_TO]->(c:Category {name: "Shirts"})
+WHERE (p)-[:MADE_BY]->(:Brand {name: "Nike"})
+RETURN p
+
+# ACTUAL QUERY (what works now):
+MATCH (p:Product)
+WHERE toLower(p.extracted_brand) CONTAINS 'nike'
+  AND toLower(p.title) CONTAINS 'shirt'
+RETURN p
+```
+
+### User Graph Gap
+
+The User Graph is closer to the ontology specification but still missing:
+
+**Missing Nodes:**
+- `UserProductInteraction` (no interaction tracking yet!)
+- `RecommendationSession` (sessions not persisted)
+- `UserOutfit` (no outfit saving)
+- `ConversationPattern` (no pattern detection)
+
+**Impact:**
+- No learning from user interactions
+- No collaborative filtering
+- No preference drift detection
+- No outfit recommendations
+
+### Migration Strategy
+
+**Phase 1: Product Graph Foundation (URGENT)**
+```cypher
+// 1. Create Brand nodes from extracted_brand strings
+MATCH (p:Product)
+WHERE p.extracted_brand IS NOT NULL
+MERGE (b:Brand {name: p.extracted_brand})
+CREATE (p)-[:MADE_BY]->(b)
+
+// 2. Create Category nodes from title patterns
+// (Requires NLP extraction or manual mapping)
+
+// 3. Convert extracted_styles to StyleDescriptor nodes
+MATCH (p:Product)
+WHERE p.extracted_styles IS NOT NULL
+UNWIND p.extracted_styles as style
+MERGE (s:StyleDescriptor {term: style})
+CREATE (p)-[:HAS_AESTHETIC]->(s)
+```
+
+**Phase 2: User Interaction Tracking**
+```cypher
+// Add interaction tracking
+MATCH (u:User)
+CREATE (u)-[:INTERACTED_WITH]->(i:UserProductInteraction {
+  product_id: "prod-123",
+  interaction_type: "VIEW",
+  timestamp: datetime()
+})
+
+// Add session tracking
+MATCH (u:User)
+CREATE (u)-[:HAD_SESSION]->(s:RecommendationSession {
+  session_id: randomUUID(),
+  timestamp: datetime(),
+  cypher_bot_recommendations: [],
+  final_selections: []
+})
+```
+
+**Phase 3: Product Relationships**
+```cypher
+// Find similar products (requires similarity computation)
+MATCH (p1:Product), (p2:Product)
+WHERE p1 <> p2
+  AND size([x IN p1.extracted_styles WHERE x IN p2.extracted_styles]) > 2
+CREATE (p1)-[:SIMILAR_STYLE {similarity_score: 0.8}]->(p2)
+
+// Co-purchase patterns (requires transaction data)
+```
+
+### Temporary Workarounds (Current State)
+
+Until migration is complete, the system uses workarounds:
+
+**1. String Matching Instead of Relationships:**
+```python
+# Instead of: MATCH (p)-[:MADE_BY]->(:Brand {name: "Nike"})
+# We use:
+WHERE toLower(p.extracted_brand) CONTAINS 'nike'
+```
+
+**2. Array Membership Instead of Node Relationships:**
+```python
+# Instead of: MATCH (p)-[:HAS_AESTHETIC]->(:StyleDescriptor {term: "casual"})
+# We use:
+WHERE 'casual' IN p.extracted_styles
+```
+
+**3. Title/Description Text Search:**
+```python
+# For missing category property:
+WHERE toLower(p.title) CONTAINS 'shirt'
+  OR toLower(p.description) CONTAINS 'shirt'
+```
+
+### Ontology Specification References
+
+For detailed specifications, see:
+- **User Ontology:** [ONTOLOGY_SPECIFICATION.md](./ONTOLOGY_SPECIFICATION.md) lines 15-353
+- **Product Ontology:** [ONTOLOGY_SPECIFICATION.md](./ONTOLOGY_SPECIFICATION.md) lines 355-504
+- **Agent Mapping:** [ONTOLOGY_SPECIFICATION.md](./ONTOLOGY_SPECIFICATION.md) lines 508-529
+- **Summary Stats:** [ONTOLOGY_SPECIFICATION.md](./ONTOLOGY_SPECIFICATION.md) lines 532-557
 
 ---
 
