@@ -390,72 +390,159 @@ User -[EXHIBITS_STYLE]-> StyleDescriptor (Product Graph)
 
 ---
 
-## Onboarding Flow
+## Onboarding Flow V2
 
 ### Purpose
-Build initial user preference model to enable first search.
+Discover deep style preferences and root values through conversational inference to build sophisticated user profile.
 
 ### Implementation
-**File:** `cli/onboarding_chat.py`
+**Files:**
+- `cli/onboarding_chat_v2.py` - Main conversational interface
+- `crews/onboarding_crew_v2.py` - Onboarding logic and agents
+- `prompts/onboarding_prompts_v2.py` - Node definitions
+- `services/onboarding_service.py` - Data persistence
+- `services/user_graph_manager.py` - Neo4j ontology creation
 
-### Onboarding Conversation Structure
+### V2 Node Structure
+
+V2 uses a **6-node architecture** (4 required + 2 optional):
 
 ```python
-ONBOARDING_STAGES = [
-    "greeting",           # Welcome and username
-    "style_preferences",  # Basic style (casual, formal, etc.)
-    "body_type",         # Body shape and fit preferences
-    "occasions",         # Common use cases (work, weekend, etc.)
-    "color_preferences", # Favorite/avoided colors
-    "brand_preferences", # Preferred/avoided brands
-    "budget",           # Price range comfort
-    "finalization"      # Confirm and save
+ONBOARDING_NODES = [
+    "personal",      # PersonalIdentity: Identity, expression, heritage
+    "taste",         # TasteProfile: Style language, aesthetics, references
+    "process",       # ProcessProfile: Decision-making, control, autonomy
+    "practicality",  # PracticalityProfile: Budget, occasions, lifestyle
+    "body",          # BodyData: Measurements, fit prefs (OPTIONAL)
+    "external"       # SocialMediaProfile: Handles, photos (OPTIONAL)
 ]
 ```
 
-### LLM-Driven Conversational Onboarding
+### Two-Tier Questioning System
 
-**Model Used:** GPT-4o with structured output
-**Temperature:** 1.0 (creative, conversational)
+Each node has **two conversational tiers**:
+
+1. **need_to_ask** - Essential information (always asked)
+2. **nice_to_know** - Deep-dive questions (user can opt in/out)
 
 **Example Flow:**
 ```
-ARI: "Hi! I'm ARI, your fashion stylist. What should I call you?"
-User: "Call me Sarah"
+[Personal Node - need_to_ask tier]
+ARI: "Let's start with you. How would you describe your personal style
+      in a few words?"
+User: "Classic with a modern edge"
 
-ARI: "Nice to meet you, Sarah! Let's get to know your style.
-      How would you describe your everyday look?
-      (casual, professional, sporty, elegant, or something else?)"
-User: "I'm pretty casual but like to look put together"
+ARI: "I love that! And when you think about getting dressed, what matters
+      most to you?"
+User: "Feeling confident and looking professional"
 
-ARI: "Love that! Smart-casual vibes. What about your body type?
-      This helps me suggest flattering fits."
-User: "I'm petite with an athletic build"
+[Tier complete - offer nice_to_know]
+ARI: "Got it! Would you like to explore this area more deeply, or
+      should we move on?"
+User: "Let's go deeper"
 
-[... continues through all stages ...]
+[Personal Node - nice_to_know tier]
+ARI: "Tell me about a time when an outfit made you feel amazing..."
 ```
 
-### Data Extraction and Storage
+### Skip Handling: 3-Strike System
 
-After onboarding, the system:
+V2 implements **graceful skip handling** with escalating responses:
 
-1. **Extracts structured preferences** using LLM
-2. **Creates User node** in Neo4j
-3. **Builds initial preference graph**:
-   ```cypher
-   CREATE (u:User {username: "Sarah"})
-   CREATE (u)-[:HAS_BODY_TYPE]->(b:BodyType {shape: "athletic-petite"})
-   CREATE (u)-[:PREFERS_STYLE {confidence: 0.7}]->(s:Style {name: "smart-casual"})
-   CREATE (u)-[:PREFERS_COLOR {strength: 0.8}]->(c:Color {name: "navy"})
-   ```
+**Strike 1:** "No worries at all! We can skip this..."
+**Strike 2:** "That's completely fine. Let's move on..."
+**Strike 3:** "I notice you've passed on a few topics. Want to take a break or wrap up?"
+**Strike 4+:** "Would you like to take a raincheck and come back later?"
 
-4. **Stores conversation** for future context
+After 3 consecutive skips, system checks if user wants to continue or exit.
 
-### Critical Feature: Progressive Disclosure
-Users can skip questions, and the system adapts:
-- Minimum viable profile: Username + 1 style preference
-- Detailed profile: All 7 stages completed
-- System fills gaps over time through search interactions
+### Root Value Discovery
+
+**CRITICAL V2 FEATURE:** ARI infers root values conversationally (not direct questions)
+
+Example inference:
+```
+User: "I hate feeling like I'm trying too hard"
+ARI extracts: root_value = "authenticity"
+
+User: "I want to look powerful in meetings"
+ARI extracts: root_value = "confidence"
+
+User: "Fashion should express who I really am"
+ARI extracts: root_value = "self_expression"
+```
+
+Root values stored as `RootValue` nodes linked to User.
+
+### Data Extraction and Neo4j Ontology
+
+V2 creates **proper ontology nodes** per ONTOLOGY_SPECIFICATION.md:
+
+```cypher
+# 1. Create User node
+CREATE (u:User {id: $user_id, username: "Sarah"})
+
+# 2. Create ontology nodes and relationships
+CREATE (u)-[:HAS_PERSONAL_IDENTITY]->(pi:PersonalIdentity {
+    style_descriptors: ["classic", "modern"],
+    expression_priorities: ["confidence", "professionalism"],
+    cultural_influences: []
+})
+
+CREATE (u)-[:HAS_TASTE_PROFILE]->(tp:TasteProfile {
+    style_language: ["minimalist", "structured"],
+    aesthetic_references: ["old money", "quiet luxury"],
+    silhouette_preferences: ["tailored", "clean lines"]
+})
+
+CREATE (u)-[:HAS_PROCESS_PROFILE]->(pp:ProcessProfile {
+    decision_style: "curated_options",
+    creative_control: 7.5,
+    advice_receptiveness: 6.0
+})
+
+CREATE (u)-[:HAS_PRACTICALITY_PROFILE]->(prp:PracticalityProfile {
+    monthly_budget_min: 200,
+    monthly_budget_max: 500,
+    primary_occasions: ["work", "dinner"]
+})
+
+# 3. Create root value nodes
+CREATE (rv1:RootValue {name: "authenticity"})
+CREATE (rv2:RootValue {name: "confidence"})
+CREATE (u)-[:HAS_ROOT_VALUE]->(rv1)
+CREATE (u)-[:HAS_ROOT_VALUE]->(rv2)
+
+# 4. Create preference nodes (V1-compatible)
+CREATE (u)-[:IDENTIFIES_WITH {priority: 1}]->(s1:StyleAdjective {name: "classic"})
+CREATE (u)-[:DRESSES_FOR {frequency: "daily"}]->(o1:Occasion {name: "work"})
+CREATE (u)-[:VALUES {importance: 1}]->(v1:ValuePriority {name: "quality"})
+```
+
+### ARI's Conversational Personality
+
+V2 enforces **specific conversation guidelines**:
+
+**DO:**
+- Keep responses concise (2-3 sentences max)
+- Use "you" language to center the user
+- Ask one question at a time
+- Acknowledge answers before moving forward
+- Use natural, warm tone
+
+**DON'T:**
+- Give unsolicited fashion advice
+- Talk about yourself or "I feel/think"
+- Use emojis
+- Apologize excessively
+- Use judgmental language
+
+### Progressive Disclosure & Flexibility
+
+- **Minimum profile:** Username + 1 node (personal)
+- **Complete profile:** All 6 nodes with nice_to_know tiers
+- **Optional nodes:** Body and External can be skipped entirely
+- **Async growth:** Profile improves over time through search interactions
 
 ---
 
