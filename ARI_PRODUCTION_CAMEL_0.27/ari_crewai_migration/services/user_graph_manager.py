@@ -313,6 +313,116 @@ class UserGraphManager:
                     max_price=budget['max_price'])
 
     # ======================
+    # V2 ONTOLOGY NODES
+    # ======================
+
+    def create_personal_identity(self, user_id: str, data: Dict[str, Any]) -> bool:
+        """Create PersonalIdentity node for user from V2 onboarding."""
+        self._validate_user_id(user_id)
+
+        with self.driver.session(database=self.database) as session:
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                MERGE (u)-[r:HAS_PERSONAL_IDENTITY]->(p:PersonalIdentity {user_id: $user_id})
+                SET p += $data,
+                    p.created_at = COALESCE(p.created_at, datetime()),
+                    p.updated_at = datetime()
+                RETURN p
+            """, user_id=user_id, data=data)
+            return True
+
+    def create_taste_profile(self, user_id: str, data: Dict[str, Any]) -> bool:
+        """Create TasteProfile node for user from V2 onboarding."""
+        self._validate_user_id(user_id)
+
+        with self.driver.session(database=self.database) as session:
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                MERGE (u)-[r:HAS_TASTE_PROFILE]->(t:TasteProfile {user_id: $user_id})
+                SET t += $data,
+                    t.created_at = COALESCE(t.created_at, datetime()),
+                    t.updated_at = datetime()
+                RETURN t
+            """, user_id=user_id, data=data)
+            return True
+
+    def create_process_profile(self, user_id: str, data: Dict[str, Any]) -> bool:
+        """Create ProcessProfile node for user from V2 onboarding."""
+        self._validate_user_id(user_id)
+
+        with self.driver.session(database=self.database) as session:
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                MERGE (u)-[r:HAS_PROCESS_PROFILE]->(p:ProcessProfile {user_id: $user_id})
+                SET p += $data,
+                    p.created_at = COALESCE(p.created_at, datetime()),
+                    p.updated_at = datetime()
+                RETURN p
+            """, user_id=user_id, data=data)
+            return True
+
+    def create_practicality_profile(self, user_id: str, data: Dict[str, Any]) -> bool:
+        """Create PracticalityProfile node for user from V2 onboarding."""
+        self._validate_user_id(user_id)
+
+        with self.driver.session(database=self.database) as session:
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                MERGE (u)-[r:HAS_PRACTICALITY_PROFILE]->(p:PracticalityProfile {user_id: $user_id})
+                SET p += $data,
+                    p.created_at = COALESCE(p.created_at, datetime()),
+                    p.updated_at = datetime()
+                RETURN p
+            """, user_id=user_id, data=data)
+            return True
+
+    def create_body_data(self, user_id: str, data: Dict[str, Any]) -> bool:
+        """Create BodyData node for user from V2 onboarding."""
+        self._validate_user_id(user_id)
+
+        with self.driver.session(database=self.database) as session:
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                MERGE (u)-[r:HAS_BODY_DATA]->(b:BodyData {user_id: $user_id})
+                SET b += $data,
+                    b.created_at = COALESCE(b.created_at, datetime()),
+                    b.updated_at = datetime()
+                RETURN b
+            """, user_id=user_id, data=data)
+            return True
+
+    def create_social_media_profile(self, user_id: str, data: Dict[str, Any]) -> bool:
+        """Create SocialMediaProfile node for user from V2 onboarding."""
+        self._validate_user_id(user_id)
+
+        with self.driver.session(database=self.database) as session:
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                MERGE (u)-[r:HAS_SOCIAL_MEDIA_PROFILE]->(s:SocialMediaProfile {user_id: $user_id})
+                SET s += $data,
+                    s.created_at = COALESCE(s.created_at, datetime()),
+                    s.updated_at = datetime()
+                RETURN s
+            """, user_id=user_id, data=data)
+            return True
+
+    def add_root_values(self, user_id: str, values: List[str]) -> bool:
+        """Add root values discovered during onboarding."""
+        self._validate_user_id(user_id)
+        self._validate_string_list(values, "values")
+
+        with self.driver.session(database=self.database) as session:
+            for value in values:
+                session.run("""
+                    MATCH (u:User {id: $user_id})
+                    MERGE (rv:RootValue {name: $value})
+                    MERGE (u)-[r:HAS_ROOT_VALUE]->(rv)
+                    SET r.discovered_at = COALESCE(r.discovered_at, datetime()),
+                        r.updated_at = datetime()
+                """, user_id=user_id, value=value)
+            return True
+
+    # ======================
     # BEHAVIORAL TRACKING
     # ======================
 

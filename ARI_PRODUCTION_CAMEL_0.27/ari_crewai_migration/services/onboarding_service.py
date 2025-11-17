@@ -7,6 +7,7 @@ stores responses in Neo4j, and coordinates with user service.
 
 import re
 import uuid
+import asyncio
 from typing import Dict, List, Any, Optional
 from datetime import datetime
 
@@ -427,3 +428,66 @@ class OnboardingService:
             return self.user_service.get_user_by_id(user_id)
 
         return None
+
+    # ======================
+    # V2 ONBOARDING SUPPORT
+    # ======================
+
+    async def store_step_responses(self, user_id: str, step_id: str, responses: Dict[str, Any]) -> bool:
+        """
+        Store V2 onboarding responses to Neo4j ontology nodes.
+
+        Args:
+            user_id: User ID
+            step_id: V2 node ID (personal, taste, process, practicality, body, external, root_values, onboarding_metadata)
+            responses: Extracted data from conversation
+
+        Returns:
+            Success boolean
+        """
+        try:
+            # Map V2 node_ids to ontology nodes
+            if step_id == "personal":
+                # PersonalIdentity node
+                self.graph_manager.create_personal_identity(user_id, responses)
+
+            elif step_id == "taste":
+                # TasteProfile node
+                self.graph_manager.create_taste_profile(user_id, responses)
+
+            elif step_id == "process":
+                # ProcessProfile node
+                self.graph_manager.create_process_profile(user_id, responses)
+
+            elif step_id == "practicality":
+                # PracticalityProfile node
+                self.graph_manager.create_practicality_profile(user_id, responses)
+
+            elif step_id == "body":
+                # BodyData node (optional)
+                self.graph_manager.create_body_data(user_id, responses)
+
+            elif step_id == "external":
+                # SocialMediaProfile node (optional)
+                self.graph_manager.create_social_media_profile(user_id, responses)
+
+            elif step_id == "root_values":
+                # RootValue nodes
+                if "values" in responses and isinstance(responses["values"], list):
+                    self.graph_manager.add_root_values(user_id, responses["values"])
+
+            elif step_id == "onboarding_metadata":
+                # Store metadata as User properties
+                self.user_service.update_user_profile(user_id, responses)
+
+            else:
+                # Unknown step_id - store as generic user properties
+                self.user_service.update_user_profile(user_id, responses)
+
+            return True
+
+        except Exception as e:
+            print(f"Error storing {step_id} responses: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
