@@ -4,15 +4,16 @@ Quick SAM3 test - minimal example for single image segmentation
 """
 
 import torch
-from transformers import Sam3Model, Sam3Processor
 from PIL import Image
 import requests
 from io import BytesIO
+from sam3.model_builder import build_sam3_image_model
+from sam3.model.sam3_image_processor import Sam3Processor
 
 # Load model
 print("Loading SAM3...")
-model = Sam3Model.from_pretrained("facebook/sam3", device_map="auto")
-processor = Sam3Processor.from_pretrained("facebook/sam3")
+model = build_sam3_image_model()
+processor = Sam3Processor(model)
 print("✓ Model loaded")
 
 # Load a test image (cats on couch from COCO dataset)
@@ -24,18 +25,16 @@ print(f"✓ Image loaded: {image.size}")
 text_prompt = "cat"
 print(f"✓ Segmenting: '{text_prompt}'")
 
-inputs = processor(image, text=[text_prompt], return_tensors="pt")
-inputs = {k: v.to(model.device) for k, v in inputs.items()}
+# Step 1: Set image
+inference_state = processor.set_image(image)
 
-with torch.no_grad():
-    outputs = model(**inputs)
+# Step 2: Set text prompt
+output = processor.set_text_prompt(state=inference_state, prompt=text_prompt)
 
-masks = processor.post_process_masks(
-    outputs.pred_masks,
-    inputs["original_sizes"],
-    inputs["reshaped_input_sizes"]
-)
+# Step 3: Extract results
+masks, boxes, scores = output["masks"], output["boxes"], output["scores"]
 
-print(f"✓ Found {len(masks[0])} masks")
-print(f"✓ Scores: {outputs.iou_scores[0].cpu().numpy()}")
+print(f"✓ Found {len(masks)} masks")
+print(f"✓ Scores: {scores}")
+
 print("\n✓ SAM3 is working correctly!")
