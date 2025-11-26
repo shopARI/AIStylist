@@ -25,7 +25,8 @@ from neo4j import GraphDatabase, AsyncGraphDatabase
 from dotenv import load_dotenv
 
 # SAM3 imports
-from transformers import Sam3Model, Sam3Processor
+from sam3.model_builder import build_sam3_image_model
+from sam3.model.sam3_image_processor import Sam3Processor as Sam3ImageProcessor
 
 # Configure paths
 PROJECT_ROOT = Path("/home/leo/AIStylist/ARI_PRODUCTION_CAMEL_0.27")
@@ -106,8 +107,8 @@ class SAM3Processor:
 
     def __init__(self):
         print("\n[SAM3] Loading model...")
-        self.model = Sam3Model.from_pretrained("facebook/sam3", device_map="auto")
-        self.processor = Sam3Processor.from_pretrained("facebook/sam3")
+        self.model = build_sam3_image_model()
+        self.processor = Sam3ImageProcessor(self.model)
         self.device = "cuda" if torch.cuda.is_available() else "cpu"
         print(f"[SAM3] Model loaded on {self.device}")
 
@@ -124,43 +125,55 @@ class SAM3Processor:
             text_prompts: Optional list of text prompts (e.g., ["clothing", "dress", "shirt"])
 
         Returns:
-            Dictionary with masks, scores, embeddings, and other outputs
+            Dictionary with masks, scores, boxes, and other outputs
         """
         if text_prompts is None:
             # Default prompts for fashion products
             text_prompts = ["clothing", "garment", "product"]
 
-        # Prepare inputs
-        inputs = self.processor(image, text=text_prompts, return_tensors="pt")
-        inputs = {k: v.to(self.model.device) for k, v in inputs.items()}
+        all_masks = []
+        all_boxes = []
+        all_scores = []
 
-        # Run inference
-        with torch.no_grad():
-            outputs = self.model(**inputs)
+        # Process each text prompt separately
+        for prompt in text_prompts:
+            # Step 1: Set image
+            inference_state = self.processor.set_image(image)
 
-        # Post-process masks
-        masks = self.processor.post_process_masks(
-            outputs.pred_masks,
-            inputs["original_sizes"],
-            inputs["reshaped_input_sizes"]
-        )
+            # Step 2: Set text prompt
+            output = self.processor.set_text_prompt(state=inference_state, prompt=prompt)
+
+            # Step 3: Extract results
+            masks = output["masks"]
+            boxes = output["boxes"]
+            scores = output["scores"]
+
+            # Convert to numpy if tensors
+            if torch.is_tensor(masks):
+                masks = masks.cpu().numpy()
+            if torch.is_tensor(boxes):
+                boxes = boxes.cpu().numpy()
+            if torch.is_tensor(scores):
+                scores = scores.cpu().numpy()
+
+            all_masks.append(masks)
+            all_boxes.append(boxes)
+            all_scores.append(scores)
+
+        # Combine results from all prompts
+        combined_masks = np.concatenate(all_masks, axis=0) if all_masks else np.array([])
+        combined_boxes = np.concatenate(all_boxes, axis=0) if all_boxes else np.array([])
+        combined_scores = np.concatenate(all_scores, axis=0) if all_scores else np.array([])
 
         # Extract all outputs
         results = {
-            "masks": masks[0].cpu().numpy(),  # Segmentation masks
-            "iou_scores": outputs.iou_scores[0].cpu().numpy(),  # IoU confidence scores
-            "pred_masks": outputs.pred_masks[0].cpu().numpy(),  # Raw predicted masks
+            "masks": combined_masks,
+            "boxes": combined_boxes,
+            "iou_scores": combined_scores,
             "image_size": image.size,
-            "num_masks": len(masks[0]),
+            "num_masks": len(combined_masks) if len(combined_masks) > 0 else 0,
             "text_prompts": text_prompts
         }
-
-        # Include embeddings if available
-        if hasattr(outputs, 'vision_embeddings') and outputs.vision_embeddings is not None:
-            results["vision_embeddings"] = outputs.vision_embeddings[0].cpu().numpy()
-
-        if hasattr(outputs, 'image_embeddings') and outputs.image_embeddings is not None:
-            results["image_embeddings"] = outputs.image_embeddings[0].cpu().numpy()
 
         return results
 
