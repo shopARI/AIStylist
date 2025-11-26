@@ -71,26 +71,48 @@ class Neo4jConnection:
         if self.driver:
             self.driver.close()
 
-    def query_products_with_images(self, limit: int = 10) -> List[Dict[str, Any]]:
+    def query_products_with_images(self, limit: int = 10, category_filter: str = None) -> List[Dict[str, Any]]:
         """
         Query products that have image URLs (full HTTP URLs only)
+
+        Args:
+            limit: Number of products to return
+            category_filter: Optional category filter (e.g., 'shirt', 'dress', 'suit')
         """
-        query = """
-        MATCH (p:Product)
-        WHERE p.images IS NOT NULL
-        AND p.images CONTAINS 'http'
-        RETURN p.id AS product_id,
-               p.title AS title,
-               p.images AS images,
-               p.category AS category,
-               p.brand AS brand,
-               p.price AS price,
-               p.description AS description
-        LIMIT $limit
-        """
+        if category_filter:
+            query = f"""
+            MATCH (p:Product)
+            WHERE p.images IS NOT NULL
+            AND p.images CONTAINS 'http'
+            AND (toLower(p.title) CONTAINS $filter OR toLower(p.category) CONTAINS $filter)
+            RETURN p.id AS product_id,
+                   p.title AS title,
+                   p.images AS images,
+                   p.category AS category,
+                   p.brand AS brand,
+                   p.price AS price,
+                   p.description AS description
+            LIMIT $limit
+            """
+            params = {"limit": limit, "filter": category_filter.lower()}
+        else:
+            query = """
+            MATCH (p:Product)
+            WHERE p.images IS NOT NULL
+            AND p.images CONTAINS 'http'
+            RETURN p.id AS product_id,
+                   p.title AS title,
+                   p.images AS images,
+                   p.category AS category,
+                   p.brand AS brand,
+                   p.price AS price,
+                   p.description AS description
+            LIMIT $limit
+            """
+            params = {"limit": limit}
 
         with self.driver.session(database=self.database) as session:
-            result = session.run(query, limit=limit)
+            result = session.run(query, params)
             products = []
             for record in result:
                 # Parse images JSON string
@@ -402,8 +424,12 @@ async def main():
 
     # Configuration
     NUM_PRODUCTS = int(os.getenv("NUM_PRODUCTS", "10"))  # Number of products to process
+    CATEGORY_FILTER = os.getenv("CATEGORY_FILTER", None)  # Optional category filter
 
-    print(f"\n[CONFIG] Processing {NUM_PRODUCTS} products")
+    if CATEGORY_FILTER:
+        print(f"\n[CONFIG] Processing {NUM_PRODUCTS} products (filtering for: {CATEGORY_FILTER})")
+    else:
+        print(f"\n[CONFIG] Processing {NUM_PRODUCTS} products")
 
     # Step 1: Connect to Neo4j
     print("\n[1/5] Connecting to Neo4j...")
@@ -412,7 +438,7 @@ async def main():
     try:
         # Step 2: Query products with images
         print(f"[2/5] Querying {NUM_PRODUCTS} products with images...")
-        products = neo4j_conn.query_products_with_images(limit=NUM_PRODUCTS)
+        products = neo4j_conn.query_products_with_images(limit=NUM_PRODUCTS, category_filter=CATEGORY_FILTER)
         print(f"✓ Found {len(products)} products with images")
 
         if not products:
