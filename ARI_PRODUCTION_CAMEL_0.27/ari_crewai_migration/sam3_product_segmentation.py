@@ -154,14 +154,14 @@ class SAM3Processor:
         text_prompts: Optional[List[str]] = None
     ) -> Dict[str, Any]:
         """
-        Segment image with SAM3 and return all outputs
+        Segment image with SAM3 and return ALL available outputs
 
         Args:
             image: PIL Image
             text_prompts: Optional list of text prompts (e.g., ["clothing", "dress", "shirt"])
 
         Returns:
-            Dictionary with masks, scores, boxes, and other outputs
+            Dictionary with masks, scores, boxes, vision features, and ALL SAM3 outputs
         """
         if text_prompts is None:
             # Default prompts for fashion products
@@ -170,19 +170,45 @@ class SAM3Processor:
         all_masks = []
         all_boxes = []
         all_scores = []
+        all_masks_logits = []
 
-        # Process each text prompt separately
+        # Step 1: Set image (do this once to extract backbone features)
+        inference_state = self.processor.set_image(image)
+
+        # Extract backbone features (these are constant for the image)
+        vision_features = None
+        vision_pos_enc = None
+        backbone_fpn = None
+
+        if "backbone_out" in inference_state:
+            backbone_out = inference_state["backbone_out"]
+
+            # Extract vision features (256-dim embeddings at 72x72)
+            if "vision_features" in backbone_out and torch.is_tensor(backbone_out["vision_features"]):
+                vision_features = backbone_out["vision_features"].cpu().numpy()
+
+            # Extract position encodings
+            if "vision_pos_enc" in backbone_out:
+                vision_pos_enc_list = backbone_out["vision_pos_enc"]
+                if isinstance(vision_pos_enc_list, list):
+                    vision_pos_enc = [v.cpu().numpy() if torch.is_tensor(v) else v for v in vision_pos_enc_list]
+
+            # Extract FPN features (Feature Pyramid Network - multi-scale features)
+            if "backbone_fpn" in backbone_out:
+                fpn_list = backbone_out["backbone_fpn"]
+                if isinstance(fpn_list, list):
+                    backbone_fpn = [f.cpu().numpy() if torch.is_tensor(f) else f for f in fpn_list]
+
+        # Step 2: Process each text prompt
         for prompt in text_prompts:
-            # Step 1: Set image
-            inference_state = self.processor.set_image(image)
-
-            # Step 2: Set text prompt
+            # Set text prompt (reuses the same inference_state)
             output = self.processor.set_text_prompt(state=inference_state, prompt=prompt)
 
             # Step 3: Extract results
             masks = output["masks"]
             boxes = output["boxes"]
             scores = output["scores"]
+            masks_logits = output.get("masks_logits", None)
 
             # Convert to numpy if tensors
             if torch.is_tensor(masks):
@@ -191,24 +217,36 @@ class SAM3Processor:
                 boxes = boxes.cpu().numpy()
             if torch.is_tensor(scores):
                 scores = scores.cpu().numpy()
+            if masks_logits is not None and torch.is_tensor(masks_logits):
+                masks_logits = masks_logits.cpu().numpy()
 
             all_masks.append(masks)
             all_boxes.append(boxes)
             all_scores.append(scores)
+            if masks_logits is not None:
+                all_masks_logits.append(masks_logits)
 
         # Combine results from all prompts
         combined_masks = np.concatenate(all_masks, axis=0) if all_masks else np.array([])
         combined_boxes = np.concatenate(all_boxes, axis=0) if all_boxes else np.array([])
         combined_scores = np.concatenate(all_scores, axis=0) if all_scores else np.array([])
+        combined_masks_logits = np.concatenate(all_masks_logits, axis=0) if all_masks_logits else np.array([])
 
         # Extract all outputs
         results = {
+            # Segmentation outputs
             "masks": combined_masks,
             "boxes": combined_boxes,
             "iou_scores": combined_scores,
+            "masks_logits": combined_masks_logits,
             "image_size": image.size,
             "num_masks": len(combined_masks) if len(combined_masks) > 0 else 0,
-            "text_prompts": text_prompts
+            "text_prompts": text_prompts,
+
+            # Vision backbone features
+            "vision_features": vision_features,  # Shape: [1, 256, H/16, W/16] - high-level features
+            "vision_pos_enc": vision_pos_enc,    # Position encodings
+            "backbone_fpn": backbone_fpn,        # Multi-scale FPN features
         }
 
         return results
@@ -368,24 +406,47 @@ class ResultSaver:
         sam3_results: Dict[str, Any],
         mask_files: List[str],
         overlay_file: str,
+        feature_files: Dict[str, str],
         output_dir: Path
     ):
         """Save comprehensive metadata as JSON"""
+
+        # Build feature shapes dict
+        feature_shapes = {}
+        if sam3_results.get("vision_features") is not None:
+            feature_shapes["vision_features"] = list(sam3_results["vision_features"].shape)
+        if sam3_results.get("vision_pos_enc") is not None:
+            feature_shapes["vision_pos_enc"] = [
+                list(p.shape) if hasattr(p, 'shape') else str(type(p))
+                for p in sam3_results["vision_pos_enc"]
+            ]
+        if sam3_results.get("backbone_fpn") is not None:
+            feature_shapes["backbone_fpn"] = [
+                list(fpn.shape) if hasattr(fpn, 'shape') else str(type(fpn))
+                for fpn in sam3_results["backbone_fpn"]
+            ]
+        if sam3_results.get("masks_logits") is not None and len(sam3_results["masks_logits"]) > 0:
+            feature_shapes["masks_logits"] = list(sam3_results["masks_logits"].shape)
+
         metadata = {
             "product_info": product_info,
             "segmentation_results": {
                 "num_masks": sam3_results["num_masks"],
                 "image_size": sam3_results["image_size"],
                 "text_prompts": sam3_results["text_prompts"],
-                "iou_scores": sam3_results["iou_scores"].tolist(),
+                "iou_scores": sam3_results["iou_scores"].tolist() if len(sam3_results["iou_scores"]) > 0 else [],
                 "mask_files": mask_files,
                 "overlay_file": overlay_file
             },
-            "embeddings": {
-                "has_vision_embeddings": "vision_embeddings" in sam3_results,
-                "has_image_embeddings": "image_embeddings" in sam3_results,
-                "vision_embedding_shape": sam3_results.get("vision_embeddings", np.array([])).shape,
-                "image_embedding_shape": sam3_results.get("image_embeddings", np.array([])).shape
+            "sam3_features": {
+                "feature_files": feature_files,
+                "feature_shapes": feature_shapes,
+                "description": {
+                    "vision_features": "High-level 256-dim vision features at 1/16 resolution",
+                    "vision_pos_enc": "Positional encodings for vision features",
+                    "backbone_fpn": "Feature Pyramid Network features at multiple scales",
+                    "masks_logits": "Raw mask logits before sigmoid activation"
+                }
             },
             "timestamp": datetime.now().isoformat(),
             "model": "facebook/sam3"
@@ -403,20 +464,46 @@ class ResultSaver:
         product_id: str,
         output_dir: Path
     ):
-        """Save embeddings as .npy files for later use"""
-        embedding_files = {}
+        """Save ALL SAM3 features as .npy files for later inspection"""
+        feature_files = {}
 
-        if "vision_embeddings" in sam3_results:
-            emb_file = output_dir / f"{product_id}_vision_embeddings.npy"
-            np.save(emb_file, sam3_results["vision_embeddings"])
-            embedding_files["vision"] = str(emb_file)
+        # Save vision features (256-dim at 72x72)
+        if sam3_results.get("vision_features") is not None:
+            feat_file = output_dir / f"{product_id}_vision_features.npy"
+            np.save(feat_file, sam3_results["vision_features"])
+            feature_files["vision_features"] = str(feat_file)
+            print(f"    • Vision features shape: {sam3_results['vision_features'].shape}")
 
-        if "image_embeddings" in sam3_results:
-            emb_file = output_dir / f"{product_id}_image_embeddings.npy"
-            np.save(emb_file, sam3_results["image_embeddings"])
-            embedding_files["image"] = str(emb_file)
+        # Save position encodings (save as pickle due to variable shapes)
+        if sam3_results.get("vision_pos_enc") is not None:
+            import pickle
+            pos_file = output_dir / f"{product_id}_vision_pos_enc.pkl"
+            with open(pos_file, 'wb') as f:
+                pickle.dump(sam3_results["vision_pos_enc"], f)
+            feature_files["vision_pos_enc"] = str(pos_file)
+            print(f"    • Position encodings: {len(sam3_results['vision_pos_enc'])} levels")
+            for i, pos in enumerate(sam3_results["vision_pos_enc"]):
+                print(f"      - Level {i}: {pos.shape}")
 
-        return embedding_files
+        # Save FPN features (multi-scale, save as pickle due to variable shapes)
+        if sam3_results.get("backbone_fpn") is not None:
+            import pickle
+            fpn_file = output_dir / f"{product_id}_backbone_fpn.pkl"
+            with open(fpn_file, 'wb') as f:
+                pickle.dump(sam3_results["backbone_fpn"], f)
+            feature_files["backbone_fpn"] = str(fpn_file)
+            print(f"    • FPN features: {len(sam3_results['backbone_fpn'])} scales")
+            for i, fpn in enumerate(sam3_results["backbone_fpn"]):
+                print(f"      - Scale {i}: {fpn.shape}")
+
+        # Save mask logits (raw probabilities)
+        if sam3_results.get("masks_logits") is not None and len(sam3_results["masks_logits"]) > 0:
+            logits_file = output_dir / f"{product_id}_masks_logits.npy"
+            np.save(logits_file, sam3_results["masks_logits"])
+            feature_files["masks_logits"] = str(logits_file)
+            print(f"    • Mask logits shape: {sam3_results['masks_logits'].shape}")
+
+        return feature_files
 
 
 async def main():
@@ -515,15 +602,15 @@ async def main():
             )
             print(f"  ✓ Saved overlay to {overlay_file}")
 
-            # Save embeddings
-            print("  • Saving embeddings...")
-            embedding_files = saver.save_embeddings(
+            # Save all SAM3 features
+            print("  • Saving SAM3 features...")
+            feature_files = saver.save_embeddings(
                 sam3_results,
                 product_id,
                 RESULTS_DIR
             )
-            if embedding_files:
-                print(f"  ✓ Saved {len(embedding_files)} embedding files")
+            if feature_files:
+                print(f"  ✓ Saved {len(feature_files)} feature files")
 
             # Save metadata
             print("  • Saving metadata...")
@@ -532,6 +619,7 @@ async def main():
                 sam3_results,
                 mask_files,
                 overlay_file,
+                feature_files,
                 METADATA_DIR
             )
             print(f"  ✓ Saved metadata to {metadata_file}")
