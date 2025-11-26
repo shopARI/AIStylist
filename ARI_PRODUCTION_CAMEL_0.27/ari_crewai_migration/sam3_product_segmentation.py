@@ -14,6 +14,7 @@ import torch
 import asyncio
 import requests
 import numpy as np
+import re
 from pathlib import Path
 from typing import List, Dict, Any, Optional
 from datetime import datetime
@@ -47,7 +48,8 @@ load_dotenv(PROJECT_ROOT / ".env")
 NEO4J_URI = os.getenv("NEO4J_URL", "neo4j://34.135.40.119:7687")
 NEO4J_USERNAME = os.getenv("NEO4J_USERNAME", "neo4j")
 NEO4J_PASSWORD = os.getenv("NEO4J_PASSWORD")
-NEO4J_DATABASE = os.getenv("NEO4J_DATABASE", "productionbackup2")
+# Use 'neo4j' database which has full HTTP URLs (not relative paths)
+NEO4J_DATABASE = os.getenv("SAM3_NEO4J_DATABASE", "neo4j")
 
 print("="*80)
 print("SAM3 Product Image Segmentation Pipeline")
@@ -71,14 +73,15 @@ class Neo4jConnection:
 
     def query_products_with_images(self, limit: int = 10) -> List[Dict[str, Any]]:
         """
-        Query products that have image URLs
+        Query products that have image URLs (full HTTP URLs only)
         """
         query = """
         MATCH (p:Product)
-        WHERE p.image_url IS NOT NULL
+        WHERE p.images IS NOT NULL
+        AND p.images CONTAINS 'http'
         RETURN p.id AS product_id,
                p.title AS title,
-               p.image_url AS image_url,
+               p.images AS images,
                p.category AS category,
                p.brand AS brand,
                p.price AS price,
@@ -90,15 +93,26 @@ class Neo4jConnection:
             result = session.run(query, limit=limit)
             products = []
             for record in result:
-                products.append({
-                    "product_id": record["product_id"],
-                    "title": record["title"],
-                    "image_url": record["image_url"],
-                    "category": record.get("category"),
-                    "brand": record.get("brand"),
-                    "price": record.get("price"),
-                    "description": record.get("description")
-                })
+                # Parse images JSON string
+                images_str = record["images"]
+                try:
+                    images_list = json.loads(images_str) if images_str else []
+                    # Use first image if available
+                    image_url = images_list[0] if images_list else None
+                except (json.JSONDecodeError, IndexError):
+                    image_url = None
+
+                if image_url:  # Only add products with valid image URLs
+                    products.append({
+                        "product_id": record["product_id"],
+                        "title": record["title"],
+                        "image_url": image_url,
+                        "images_all": images_list,
+                        "category": record.get("category"),
+                        "brand": record.get("brand"),
+                        "price": record.get("price"),
+                        "description": record.get("description")
+                    })
             return products
 
 
@@ -178,6 +192,62 @@ class SAM3Processor:
         return results
 
 
+class ProductKeywordExtractor:
+    """Extract product-specific keywords for SAM3 prompts"""
+
+    # Fashion product keywords to look for
+    FASHION_KEYWORDS = [
+        # Clothing
+        'dress', 'shirt', 'blouse', 'top', 'sweater', 'hoodie', 'jacket', 'coat',
+        'jeans', 'pants', 'trousers', 'shorts', 'skirt', 'suit', 'blazer',
+        'cardigan', 'vest', 'turtleneck', 't-shirt', 'polo', 'sweatshirt',
+        # Footwear
+        'shoes', 'sneakers', 'boots', 'sandals', 'heels', 'flats', 'loafers',
+        'sneaker', 'boot', 'sandal',
+        # Accessories
+        'sunglasses', 'glasses', 'eyewear', 'bag', 'purse', 'wallet', 'belt',
+        'scarf', 'hat', 'cap', 'gloves', 'watch', 'jewelry', 'earrings',
+        'necklace', 'bracelet', 'ring',
+        # Generic fallbacks
+        'clothing', 'garment', 'apparel', 'fashion', 'wear'
+    ]
+
+    @staticmethod
+    def extract_keywords(title: str, description: str = None) -> List[str]:
+        """
+        Extract product keywords from title and description
+
+        Args:
+            title: Product title
+            description: Product description (optional)
+
+        Returns:
+            List of extracted keywords (most specific first)
+        """
+        text = (title + " " + (description or "")).lower()
+
+        # Find all matching keywords
+        found_keywords = []
+        for keyword in ProductKeywordExtractor.FASHION_KEYWORDS:
+            if keyword in text:
+                found_keywords.append(keyword)
+
+        # Remove duplicates while preserving order
+        seen = set()
+        unique_keywords = []
+        for kw in found_keywords:
+            if kw not in seen:
+                seen.add(kw)
+                unique_keywords.append(kw)
+
+        # If no keywords found, use generic fallbacks
+        if not unique_keywords:
+            unique_keywords = ['clothing', 'product', 'item']
+
+        # Limit to top 4 keywords
+        return unique_keywords[:4]
+
+
 class ImageDownloader:
     """Download and validate product images"""
 
@@ -213,8 +283,19 @@ class ResultSaver:
         mask_files = []
         for idx, mask in enumerate(masks):
             mask_file = output_dir / f"{product_id}_mask_{idx}.png"
+
+            # Squeeze to 2D if needed (remove single dimensions)
+            mask_2d = np.squeeze(mask)
+
+            # Ensure it's 2D
+            if mask_2d.ndim != 2:
+                print(f"  [WARNING] Unexpected mask shape: {mask.shape}, squeezed to {mask_2d.shape}")
+                # Take first channel if still 3D
+                if mask_2d.ndim == 3:
+                    mask_2d = mask_2d[0]
+
             # Convert boolean mask to image
-            mask_img = Image.fromarray((mask * 255).astype(np.uint8))
+            mask_img = Image.fromarray((mask_2d * 255).astype(np.uint8))
             mask_img.save(mask_file)
             mask_files.append(str(mask_file))
         return mask_files
@@ -242,8 +323,13 @@ class ResultSaver:
         # Masks
         for idx, (mask, score) in enumerate(zip(masks[:3], scores[:3])):
             if idx + 1 < len(axes):
+                # Squeeze mask to 2D
+                mask_2d = np.squeeze(mask)
+                if mask_2d.ndim == 3:
+                    mask_2d = mask_2d[0]
+
                 axes[idx + 1].imshow(image)
-                axes[idx + 1].imshow(mask, alpha=0.5, cmap='jet')
+                axes[idx + 1].imshow(mask_2d, alpha=0.5, cmap='jet')
                 axes[idx + 1].set_title(f'Mask {idx+1} (Score: {score:.3f})')
                 axes[idx + 1].axis('off')
 
@@ -367,11 +453,18 @@ async def main():
             downloader.save_image(image, image_file)
             print(f"  ✓ Saved to {image_file}")
 
-            # Segment with SAM3
+            # Extract keywords from product title/description
+            keywords = ProductKeywordExtractor.extract_keywords(
+                product['title'],
+                product.get('description')
+            )
+            print(f"  • Extracted keywords: {keywords}")
+
+            # Segment with SAM3 using extracted keywords
             print("  • Running SAM3 segmentation...")
             sam3_results = sam3_processor.segment_image(
                 image,
-                text_prompts=["clothing", "product", "garment", "item"]
+                text_prompts=keywords
             )
             print(f"  ✓ Generated {sam3_results['num_masks']} masks")
             print(f"  ✓ IoU scores: {sam3_results['iou_scores']}")
