@@ -160,17 +160,28 @@ Start a conversation about: {prompt.get('title', 'this topic')}
 
 {prompt.get('conversation_guide', '')}
 
-IMPORTANT:
-- Start with a warm, open-ended question
-- Make it feel like a conversation, not an interview
-- Show genuine curiosity
-- Set the user at ease, especially for sensitive topics
-- Don't info-dump or list questions
+CRITICAL RULES - YOU MUST FOLLOW THESE:
+1. ASK ONLY ONE QUESTION. Never two. Never three. Just ONE warm question.
+2. NEVER use bullet points, numbered lists, or lettered options (A, B, C)
+3. Keep it SHORT - 2-3 sentences max, like texting a friend
+4. Sound human - use contractions, be warm, show genuine curiosity
+5. NO info-dumping, NO listing topics you'll cover
+
+GOOD EXAMPLE:
+"Hey! I'm really excited to get to know you better. What's something you've worn recently that made you feel amazing?"
+
+BAD EXAMPLE (NEVER DO THIS):
+"Welcome! Let's explore your style. I'd like to know:
+- What occasions do you dress for?
+- What's your budget?
+- What colors do you prefer?"
+
+You are their trusted confidant, not an interviewer. Make them feel seen.
 
 Give ONLY your opening message to the user. Nothing else.
             """,
             agent=self.onboarding_agent,
-            expected_output="A warm, conversational opening message"
+            expected_output="A warm, single-question opening message (2-3 sentences max)"
         )
 
         crew = Crew(
@@ -259,23 +270,33 @@ Continue the conversation naturally based on the user's response.
 
 The user just said: "{user_message}"
 
-Your response should:
-- Acknowledge what they shared
-- Ask a thoughtful follow-up question if more info is needed
-- Explore deeper if they seemed uncertain or hesitant
-- Move to summary/transition if this topic feels complete
-- Stay warm and conversational
-- IMPORTANT: Adapt your questioning style based on the style guidance above
+CRITICAL RULES - YOU MUST FOLLOW THESE:
+1. FIRST: Respond warmly to what they actually said (1 sentence)
+2. THEN: Ask ONLY ONE follow-up question. Never two. Never three. ONE.
+3. NEVER use bullet points, numbered lists, or lettered options (A, B, C)
+4. Keep it SHORT - 2-3 sentences TOTAL, like texting a friend
+5. Sound human - use contractions, show emotion, be genuine
+6. If they seemed uncertain, gently explore that ONE thing deeper
+
+GOOD EXAMPLE:
+"Oh I love that - there's something so powerful about a well-fitted jacket. What is it about that feeling that you're drawn to?"
+
+BAD EXAMPLE (NEVER DO THIS):
+"Great! Now let me ask you about:
+1. Your budget range
+2. How often you shop
+3. Your preferred brands"
+
+You are their trusted confidant having coffee together, not conducting an interview.
 
 DECISION POINT:
-- If you feel you have good understanding of all the focus areas, you can offer to move on
-- If there are gaps or the user wants to explore more, keep going
-- Never rush them
+- If this topic feels complete, warmly offer to explore something new (but still just ONE question)
+- Never rush them or list multiple next steps
 
 Give ONLY your next message to the user. Nothing else.
             """,
             agent=self.onboarding_agent,
-            expected_output="Next conversational message to the user"
+            expected_output="A warm, single-question response (2-3 sentences max)"
         )
 
         crew = Crew(
