@@ -65,7 +65,7 @@ def create_onboarding_agent(llm: Optional[object] = None) -> Agent:
             "Remember: This isn't an interview. It's two people getting to know each other "
             "over coffee. You're genuinely interested in them as a person."
         ),
-        verbose=True,
+        verbose=False,
         allow_delegation=False,
         llm=llm
     )
@@ -108,7 +108,7 @@ def create_information_extraction_agent(llm: Optional[object] = None) -> Agent:
             "You work quietly in the background, never interrupting the natural flow "
             "of conversation, but ensuring all necessary information is captured accurately."
         ),
-        verbose=True,
+        verbose=False,
         allow_delegation=False,
         llm=llm
     )
