@@ -233,6 +233,9 @@ Give ONLY your opening message to the user. Nothing else.
         )
 
         # Task 1: Extract information from the response
+        # Count exchanges to influence completeness scoring
+        exchange_count = len(self.conversation_history.get(self.current_step_id, []))
+
         extraction_task = Task(
             description=f"""
 Analyze the user's response and extract relevant information.
@@ -241,6 +244,19 @@ Analyze the user's response and extract relevant information.
 
 Based on the user's responses in this conversation, extract:
 {json.dumps(step_prompt.get('focus', []), indent=2)}
+
+EXCHANGE COUNT: {exchange_count}
+
+COMPLETENESS SCORING RULES:
+- If exchange_count >= 4: Set completeness to at least 0.8 (time to move on)
+- If user shows frustration ('tired', 'move on', 'skip'): Set completeness to 1.0
+- If user asks for recommendations/products: Set completeness to 1.0
+- If user gives very short answers ('normal', 'fine', 'idk'): Set completeness to 0.8+
+- Even with incomplete info, after 4 exchanges we have ENOUGH - set completeness high
+
+FRUSTRATION DETECTION:
+If the user message contains: "tired", "exhausting", "move on", "skip", "don't know",
+"whatever", "you decide", "show me", "recommend", "products" → completeness = 1.0
 
 Output a JSON object with any information you can extract from the conversation.
 For items not yet mentioned or unclear, use null.
@@ -251,9 +267,11 @@ Example output format:
     "creative_control": 5,
     "risk_tolerance": null,
     "decision_making_style": "curated_options",
-    "completeness": 0.65,
+    "completeness": 0.85,
     "missing_info": ["risk_tolerance"],
-    "confidence": "medium"
+    "confidence": "medium",
+    "user_frustrated": false,
+    "user_requested_action": false
 }}
 
 Return ONLY valid JSON. No other text.
@@ -266,6 +284,9 @@ Return ONLY valid JSON. No other text.
         # Inject style guidance based on user's autonomy level
         style_guidance = self._get_style_guidance()
 
+        # Count exchanges in this step to detect when to move on
+        exchange_count = len(self.conversation_history.get(self.current_step_id, []))
+
         conversation_task = Task(
             description=f"""
 Continue the conversation naturally based on the user's response.
@@ -276,28 +297,47 @@ Continue the conversation naturally based on the user's response.
 
 The user just said: "{user_message}"
 
+EXCHANGE COUNT: {exchange_count} (if >= 4, strongly consider moving to next topic)
+
 CRITICAL RULES - YOU MUST FOLLOW THESE:
 1. FIRST: Respond warmly to what they actually said (1 sentence)
 2. THEN: Ask ONLY ONE follow-up question. Never two. Never three. ONE.
 3. NEVER use bullet points, numbered lists, or lettered options (A, B, C)
 4. Keep it SHORT - 2-3 sentences TOTAL, like texting a friend
 5. Sound human - use contractions, show emotion, be genuine
-6. If they seemed uncertain, gently explore that ONE thing deeper
+
+ANTI-PEDANTIC RULES - KNOW WHEN TO STOP:
+6. If you've asked 2-3 questions on the SAME sub-topic, MOVE ON to a new sub-topic or the next step.
+7. If user gives short/vague answers ('normal', 'fine', 'whatever'), ACCEPT IT and move on.
+8. If user shows frustration ('making me tired', 'can we move on'), IMMEDIATELY apologize and move on.
+9. If user CORRECTS you, ACKNOWLEDGE it and NEVER repeat the mistake.
+10. If user asks for recommendations/products, STOP asking and offer to help.
+
+FRUSTRATION DETECTION - If user says ANY of these, STOP drilling:
+- "you're making me tired" / "this is exhausting" / "too many questions"
+- "I don't know" / "whatever" / "just pick for me" / "you decide"
+- "can we move on" / "next" / "skip this"
+- "show me products" / "recommend something" / "what should I wear"
+
+When frustrated: "I hear you - let's move on. [offer next topic or action]"
 
 GOOD EXAMPLE:
 "Oh I love that - there's something so powerful about a well-fitted jacket. What is it about that feeling that you're drawn to?"
 
-BAD EXAMPLE (NEVER DO THIS):
-"Great! Now let me ask you about:
-1. Your budget range
-2. How often you shop
-3. Your preferred brands"
+BAD PEDANTIC EXAMPLE (NEVER DO THIS):
+User: "normal clothes"
+You: "What does normal look like?"
+User: "average joe"
+You: "What's average joe head to toe?" ← STOP! You already got the answer!
 
-You are their trusted confidant having coffee together, not conducting an interview.
+GOOD NON-PEDANTIC EXAMPLE:
+User: "normal clothes"
+You: "Got it - clean and unfussy. Ready to explore what occasions you dress for?"
 
 DECISION POINT:
-- If this topic feels complete, warmly offer to explore something new (but still just ONE question)
-- Never rush them or list multiple next steps
+- If exchange count >= 4 OR user seems done, warmly move to next topic
+- If user asks for recommendations, STOP onboarding and offer to show products
+- Never keep drilling on the same thing
 
 Give ONLY your next message to the user. Nothing else.
             """,
