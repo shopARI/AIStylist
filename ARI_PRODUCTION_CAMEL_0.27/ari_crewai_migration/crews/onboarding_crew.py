@@ -73,10 +73,16 @@ class OnboardingCrew:
 
         autonomy_data = self.extracted_data['style_autonomy']
 
-        # Extract key indicators
-        advice_receptiveness = autonomy_data.get('advice_receptiveness', 5)
-        creative_control = autonomy_data.get('creative_control', 5)
-        decision_style = autonomy_data.get('decision_making_style', 'curated_options')
+        # Extract key indicators (handle None values explicitly)
+        advice_receptiveness = autonomy_data.get('advice_receptiveness')
+        creative_control = autonomy_data.get('creative_control')
+        decision_style = autonomy_data.get('decision_making_style') or 'curated_options'
+
+        # Default to 5 if None
+        if advice_receptiveness is None:
+            advice_receptiveness = 5
+        if creative_control is None:
+            creative_control = 5
 
         # Calculate autonomy score (1-10, lower = wants more guidance)
         autonomy_score = (advice_receptiveness + creative_control) / 2
