@@ -51,8 +51,7 @@ def load_tools_for_agent(tool_names: List[str]) -> List:
 
     # Import all available tools
     try:
-        # Sync tools (legacy)
-        from tools.neo4j_tools import neo4j_query_tool, semantic_expansion_tool, neo4j_fulltext_search_tool
+        # Sync tools (some legacy tools still in use)
         from tools.qdrant_tools import qdrant_search_tool, embedding_generation_tool, qdrant_hybrid_search_tool
         from tools.fashionsig_tools import fashionsig_embedding_tool, visual_similarity_search_tool, multi_image_search_tool
         from tools.quality_tools import quality_scoring_tool, consensus_detection_tool, learning_analysis_tool
@@ -79,10 +78,7 @@ def load_tools_for_agent(tool_names: List[str]) -> List:
 
         # Map tool names to tool objects
         tool_map = {
-            # Sync tools (legacy)
-            'neo4j_query_tool': neo4j_query_tool,
-            'semantic_expansion_tool': semantic_expansion_tool,
-            'neo4j_fulltext_search_tool': neo4j_fulltext_search_tool,
+            # Sync tools (some legacy tools still in use)
             'qdrant_search_tool': qdrant_search_tool,
             'embedding_generation_tool': embedding_generation_tool,
             'qdrant_hybrid_search_tool': qdrant_hybrid_search_tool,
