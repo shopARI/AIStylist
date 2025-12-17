@@ -1,3 +1,5 @@
+"descriotion": "It’s the Neoj schema for the product graph, defining how products, brands, categories, prices, and embeddings are stored and connected for search and recommendation."
+
 {
   "database": "productionbackup2",
   "nodes": {
