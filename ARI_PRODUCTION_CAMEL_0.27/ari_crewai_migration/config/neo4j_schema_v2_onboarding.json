@@ -1,6 +1,4 @@
-""""
-Neo schema definition for the Users database that the system writes to and reads from during onboarding and personalization.
-""""
+"THIS PAGE DESCRIPTION": "Neo schema definition for the Users database that the system writes to and reads from during onboarding and personalization."
 
 {
   "database": "users",
