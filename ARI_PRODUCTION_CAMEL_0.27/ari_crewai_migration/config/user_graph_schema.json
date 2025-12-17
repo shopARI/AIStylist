@@ -1,3 +1,5 @@
+"description": "It’s the Neo4j schema for the user graph (productionbackup2_user) that powers onboarding, preference modeling, behavior tracking, and links users to products via references."
+
 {
   "database": "productionbackup2_user",
   "purpose": "User profiles, onboarding data, style preferences, and behavioral tracking",
