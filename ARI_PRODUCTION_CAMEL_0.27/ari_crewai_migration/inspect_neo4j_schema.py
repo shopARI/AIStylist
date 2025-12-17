@@ -4,6 +4,7 @@ This script connects to Neo4j and reports:
 1. What properties exist on Product nodes
 2. What indexes are available
 3. Sample Product data
+NOT used in runtime - used for seeing what's actually in the neo4j for migrations, sanity checks etc
 """
 import os
 import asyncio
