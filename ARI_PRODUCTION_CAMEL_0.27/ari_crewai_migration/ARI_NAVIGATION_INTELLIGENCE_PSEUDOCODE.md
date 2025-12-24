@@ -122,7 +122,7 @@ STRUCTURE StyleCoordinate:
     design_philosophy: STRING  # "scandinavian", "japanese", "italian"
 
     # Computed from embeddings
-    embedding_coordinates: VECTOR[10600]  # All embeddings concatenated
+    embedding_coordinates: VECTOR[7680]  # All embeddings concatenated (1536+1024+1024+2048+2048)
 
 
 STRUCTURE DeterministicFeatures:
@@ -587,6 +587,9 @@ CLASS FeatureExtractor:
         # Add deterministic as additional dimensions
         det_vector = vectorize_deterministic(det)  # ~900d
 
+        # Proportion: from aspect ratio analysis
+        proportion = map_aspect_to_proportion(det.aspect_ratio, det.compactness)
+
         RETURN StyleCoordinate(
             form=form,
             color_warmth=color_warmth,
@@ -594,6 +597,7 @@ CLASS FeatureExtractor:
             texture=texture,
             pattern=pattern,
             formality=formality,
+            proportion=proportion,
             embedding_coordinates=concatenate(all_embeddings, det_vector)
         )
 ```
@@ -729,7 +733,11 @@ CLASS NavigationIntelligence:
         # Calculate total distance
         total_distance = style_distance(current, destination)
 
-        # Determine step size based on user's velocity
+        # Determine step size based on user's velocity (units/week)
+        # Thresholds based on observed user behavior patterns:
+        # - <0.03: Conservative users who prefer gradual changes
+        # - 0.03-0.06: Average users comfortable with moderate exploration
+        # - >0.06: Adventurous users who embrace bigger style shifts
         IF trajectory.velocity < 0.03:  # Slow mover
             max_step = 0.2
         ELIF trajectory.velocity < 0.06:  # Moderate
@@ -787,8 +795,8 @@ CLASS CypherBot_Navigator:
         # Find users who successfully navigated similar paths
         similar_navigators = neo4j.query("""
             MATCH (u:User)
-            WHERE u.trajectory_direction ~ $direction
-              AND u.trajectory_start ~ $current_position
+            WHERE gds.similarity.cosine(u.trajectory_direction, $direction) > 0.8
+              AND gds.similarity.cosine(u.trajectory_start, $current_position) > 0.8
             MATCH (u)-[:PURCHASED]->(p:Product)
             WHERE (u)-[:REACHED_DESTINATION {success: true}]->()
             RETURN p, count(u) as navigator_count
@@ -1300,6 +1308,77 @@ ASYNC FUNCTION batch_process_products():
 | Basic embedding search | Multi-modal: Embeddings + Deterministic features |
 | Agent-based results | Path-quality-scored navigation |
 | "Here are similar products" | "Here's your next waypoint toward your style destination" |
+
+---
+
+## Cold Start Handling
+
+```
+FUNCTION handle_cold_start(user_id) → UserProfile:
+    """
+    For new users without interaction history, use onboarding data.
+    Leverages existing onboarding LLM flow to establish initial position.
+    """
+
+    # Check if user has onboarding data
+    onboarding = neo4j.query("""
+        MATCH (u:User {id: $user_id})
+        OPTIONAL MATCH (u)-[:HAS_TASTE_PROFILE]->(tp)
+        OPTIONAL MATCH (u)-[:HAS_BODY_DATA]->(bd)
+        OPTIONAL MATCH (u)-[:HAS_ROOT_VALUE]->(rv)
+        RETURN tp, bd, collect(rv) as values
+    """, user_id=user_id)
+
+    IF onboarding.tp IS NOT NULL:
+        # User completed onboarding — derive position from stated preferences
+        initial_position = derive_position_from_onboarding(
+            taste_profile=onboarding.tp,
+            root_values=onboarding.values
+        )
+        trajectory = {
+            direction: ZERO_VECTOR,  # No movement yet
+            velocity: 0.05,          # Assume moderate (will adapt)
+            consistency: 0.5         # Unknown
+        }
+    ELSE:
+        # Truly new user — use population median as starting point
+        initial_position = get_population_median_position()
+        trajectory = {
+            direction: ZERO_VECTOR,
+            velocity: 0.05,
+            consistency: 0.5
+        }
+
+    RETURN UserProfile(
+        current_position=initial_position,
+        trajectory=trajectory,
+        core_dimensions=[],  # Will learn from behavior
+        is_cold_start=TRUE
+    )
+
+FUNCTION derive_position_from_onboarding(taste_profile, root_values) → StyleCoordinate:
+    """
+    Map onboarding answers to style coordinates.
+    Uses LLM-extracted preferences from onboarding conversation.
+    """
+    # Extract from taste profile (already parsed by onboarding LLM)
+    form = map_style_preference(taste_profile.silhouette_preference)
+    formality = map_formality_preference(taste_profile.occasion_default)
+    color_warmth = map_color_preference(taste_profile.color_palette)
+
+    # Root values influence core dimensions
+    IF "comfortable" IN root_values:
+        texture = 0.3  # Lean toward smooth/soft
+    IF "minimalist" IN root_values:
+        pattern = 0.2  # Lean toward minimal
+
+    RETURN StyleCoordinate(
+        form=form,
+        color_warmth=color_warmth,
+        formality=formality,
+        # ... other dimensions with sensible defaults
+    )
+```
 
 ---
 

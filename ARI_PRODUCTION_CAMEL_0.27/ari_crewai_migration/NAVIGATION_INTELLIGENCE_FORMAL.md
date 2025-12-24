@@ -81,6 +81,7 @@ FUNCTION score_product(product, user, direction) → Float:
 
     // Factor 2: COHERENCE — Does this align with trajectory?
     coherence = dot_product(user.trajectory, product.position - user.position)
+    coherence = clamp(coherence, 0.0, 1.0)  // Normalize to [0,1]
 
     // Factor 3: ACHIEVABILITY — Budget + availability
     achievability = 1.0 if product.price ≤ user.budget.max else 0.0
