@@ -717,64 +717,506 @@ CLASS Pillar1_Personalization:
         )
 
 
+# ═══════════════════════════════════════════════════════════════════════════
+# PILLAR 2: STYLIST KNOWLEDGE - RAG Architecture
+# Making ARI an expert in textbook fashion and beyond
+# ═══════════════════════════════════════════════════════════════════════════
+
+ENUM KnowledgeCategory:
+    # Core Fashion Science
+    COLOR_THEORY           # Color wheel, harmony types, seasonal palettes
+    COLOR_PSYCHOLOGY       # Emotional/cultural associations with colors
+    BODY_TYPES            # Body shape analysis, flattering silhouettes
+    SILHOUETTE_SCIENCE    # A-line, bodycon, empire, etc. - when/why
+    PROPORTION_THEORY     # Visual balance, elongation, ratio principles
+
+    # Garment Knowledge
+    FABRIC_SCIENCE        # Materials, drape, texture, care, seasonality
+    CONSTRUCTION          # Tailoring, fit indicators, quality markers
+    NECKLINES             # Types, face shape compatibility, occasion
+    SLEEVE_STYLES         # Types, arm considerations, formality
+    HEMLINES              # Lengths, leg proportion, occasion rules
+
+    # Context & Occasion
+    DRESS_CODES           # Business formal, cocktail, black tie, etc.
+    OCCASION_RULES        # Wedding guest, interview, date night, etc.
+    CULTURAL_CONTEXT      # Regional/cultural dress expectations
+    SEASONAL_DRESSING     # Weather-appropriate styling
+
+    # Style & Aesthetics
+    STYLE_ARCHETYPES      # Classic, romantic, dramatic, natural, etc.
+    FASHION_HISTORY       # Era influences, revival cycles
+    TREND_ANALYSIS        # Current trends, longevity prediction
+    CAPSULE_WARDROBE      # Versatility, mix-and-match principles
+
+    # Advanced Topics
+    PERSONAL_BRANDING     # Style as identity expression
+    OPTICAL_ILLUSIONS     # Visual tricks for body enhancement
+    ACCESSORIZING         # Jewelry, bags, shoes coordination
+    PATTERN_MIXING        # Rules for combining prints
+
+
+STRUCTURE FashionKnowledgeChunk:
+    """
+    A single retrievable unit of fashion knowledge.
+    """
+    chunk_id: STRING
+
+    # Classification
+    category: KnowledgeCategory
+    subcategory: STRING              # e.g., "complementary_colors" under COLOR_THEORY
+    tags: LIST[STRING]               # Searchable tags
+
+    # Source attribution
+    source: {
+        title: STRING,               # "Color Me Beautiful", "The Curated Closet", etc.
+        author: STRING,
+        type: ENUM["textbook", "research_paper", "expert_article", "style_guide"],
+        credibility_score: FLOAT     # 0-1, peer-reviewed higher
+    }
+
+    # Content
+    content: STRING                  # The actual knowledge text
+    summary: STRING                  # One-line summary for quick reference
+
+    # Extracted structured rules (when applicable)
+    rules: LIST[{
+        condition: STRING,           # "IF body type is pear"
+        recommendation: STRING,      # "THEN favor A-line skirts"
+        confidence: FLOAT,           # How universally applicable
+        exceptions: LIST[STRING]     # When rule doesn't apply
+    }]
+
+    # Examples
+    examples: LIST[{
+        description: STRING,
+        image_url: STRING,           # Visual example if available
+        positive: BOOL               # Good example vs. what to avoid
+    }]
+
+    # Embeddings for retrieval
+    embedding: VECTOR[1536]          # OpenAI ada-002 for semantic search
+
+    # Metadata
+    created_at: DATETIME
+    last_verified: DATETIME          # When last checked for accuracy
+
+
+STRUCTURE KnowledgeRetrievalResult:
+    chunk: FashionKnowledgeChunk
+    relevance_score: FLOAT           # Semantic similarity
+    keyword_match_score: FLOAT       # BM25 or similar
+    combined_score: FLOAT            # Hybrid ranking
+
+
+CLASS FashionKnowledgeBase:
+    """
+    The RAG knowledge store for fashion expertise.
+    Hybrid retrieval: semantic embeddings + keyword search.
+    """
+
+    vector_store: Qdrant             # For semantic search
+    keyword_index: Elasticsearch     # For keyword/BM25 search
+
+    # ═══════════════════════════════════════════════════════════════════
+    # INGESTION PIPELINE
+    # ═══════════════════════════════════════════════════════════════════
+
+    FUNCTION ingest_textbook(pdf_path, metadata) → INT:
+        """
+        Ingest a fashion textbook into the knowledge base.
+        Returns number of chunks created.
+        """
+        # Extract text with structure preservation
+        pages = pdf_parser.extract_with_structure(pdf_path)
+
+        # Chunk by semantic boundaries (chapters, sections, topics)
+        chunks = semantic_chunker.chunk(
+            pages,
+            max_chunk_size=1000,      # tokens
+            overlap=100,               # token overlap for context
+            respect_boundaries=TRUE    # Don't split mid-paragraph
+        )
+
+        processed_chunks = []
+        FOR chunk IN chunks:
+            # Classify category
+            category = classify_category(chunk.text)
+
+            # Extract structured rules if present
+            rules = rule_extractor.extract(chunk.text)
+
+            # Generate summary
+            summary = llm.summarize(chunk.text, max_length=50)
+
+            # Generate embedding
+            embedding = openai.embed(chunk.text)
+
+            knowledge_chunk = FashionKnowledgeChunk(
+                chunk_id=generate_id(),
+                category=category,
+                subcategory=infer_subcategory(chunk.text, category),
+                tags=extract_tags(chunk.text),
+                source={
+                    title=metadata.title,
+                    author=metadata.author,
+                    type=metadata.type,
+                    credibility_score=metadata.credibility
+                },
+                content=chunk.text,
+                summary=summary,
+                rules=rules,
+                examples=extract_examples(chunk.text),
+                embedding=embedding,
+                created_at=now(),
+                last_verified=now()
+            )
+
+            processed_chunks.append(knowledge_chunk)
+
+        # Store in both indices
+        vector_store.upsert(processed_chunks)
+        keyword_index.index(processed_chunks)
+
+        RETURN len(processed_chunks)
+
+    FUNCTION ingest_expert_knowledge(content, expert_name, category) → STRING:
+        """
+        Ingest curated expert knowledge (e.g., from stylists, designers).
+        """
+        # Similar to textbook but single chunk, higher curation
+        embedding = openai.embed(content)
+
+        chunk = FashionKnowledgeChunk(
+            chunk_id=generate_id(),
+            category=category,
+            source={
+                title=f"Expert Knowledge: {expert_name}",
+                author=expert_name,
+                type="expert_article",
+                credibility_score=0.9
+            },
+            content=content,
+            summary=llm.summarize(content, max_length=50),
+            rules=rule_extractor.extract(content),
+            embedding=embedding,
+            created_at=now(),
+            last_verified=now()
+        )
+
+        vector_store.upsert([chunk])
+        keyword_index.index([chunk])
+
+        RETURN chunk.chunk_id
+
+    # ═══════════════════════════════════════════════════════════════════
+    # RETRIEVAL - Hybrid Search
+    # ═══════════════════════════════════════════════════════════════════
+
+    FUNCTION retrieve(
+        query: STRING,
+        categories: LIST[KnowledgeCategory] = None,
+        limit: INT = 10,
+        min_credibility: FLOAT = 0.5
+    ) → LIST[KnowledgeRetrievalResult]:
+        """
+        Hybrid retrieval: combines semantic search with keyword matching.
+        """
+
+        # Semantic search
+        query_embedding = openai.embed(query)
+        semantic_results = vector_store.search(
+            collection="fashion_knowledge",
+            query_vector=query_embedding,
+            filter={
+                "category": {"$in": categories} if categories else None,
+                "source.credibility_score": {"$gte": min_credibility}
+            },
+            limit=limit * 2  # Get more for re-ranking
+        )
+
+        # Keyword search (BM25)
+        keyword_results = keyword_index.search(
+            query=query,
+            filters={
+                "category": categories,
+                "min_credibility": min_credibility
+            },
+            limit=limit * 2
+        )
+
+        # Reciprocal Rank Fusion (RRF) for hybrid ranking
+        combined = reciprocal_rank_fusion(
+            semantic_results,
+            keyword_results,
+            k=60  # RRF constant
+        )
+
+        # Build result objects
+        results = []
+        FOR item IN combined[:limit]:
+            results.append(KnowledgeRetrievalResult(
+                chunk=item.chunk,
+                relevance_score=item.semantic_score,
+                keyword_match_score=item.keyword_score,
+                combined_score=item.rrf_score
+            ))
+
+        RETURN results
+
+    FUNCTION retrieve_rules(
+        context: {body_type, occasion, category},
+        limit: INT = 5
+    ) → LIST[FashionRule]:
+        """
+        Retrieve specific actionable rules for a context.
+        """
+        query = f"""
+            Rules for {context.body_type} body type
+            shopping for {context.category}
+            for {context.occasion} occasion
+        """
+
+        results = retrieve(
+            query=query,
+            categories=[BODY_TYPES, OCCASION_RULES, SILHOUETTE_SCIENCE],
+            limit=limit * 2
+        )
+
+        # Extract and deduplicate rules from chunks
+        all_rules = []
+        FOR result IN results:
+            FOR rule IN result.chunk.rules:
+                IF rule_applies_to_context(rule, context):
+                    all_rules.append(rule)
+
+        # Rank by confidence and deduplicate
+        RETURN deduplicate_and_rank(all_rules)[:limit]
+
+
 CLASS Pillar2_StylistKnowledge:
     """
     RAG-enabled fashion textbook knowledge.
-    Unchanged from V1 - this pillar provides domain expertise.
+    Makes ARI an expert in textbook fashion and beyond.
+
+    Knowledge Sources:
+    - Fashion textbooks (Color Me Beautiful, The Curated Closet, etc.)
+    - Academic research (color psychology, body image studies)
+    - Expert stylists' curated knowledge
+    - Style guides and dress code references
     """
 
-    knowledge_base: VectorStore
+    knowledge_base: FashionKnowledgeBase
 
     FUNCTION query_styling_rules(context) → LIST[StylingRule]:
-        query_text = f"""
-            User body type: {context.body_type}
-            Occasion: {context.occasion}
-            Current style: {context.style_description}
-            Destination style: {context.target_style}
+        """
+        Retrieve relevant styling rules for the user's context.
+        """
+        # Build rich query from context
+        query = f"""
+            Styling advice for:
+            - Body type: {context.body_type}
+            - Occasion: {context.occasion}
+            - Current style: {context.style_description}
+            - Target style: {context.target_style}
+            - Category: {context.category}
         """
 
-        relevant_rules = knowledge_base.search(
-            query=query_text,
-            filters={"category": ["body_type", "occasion", "color_theory", "silhouette"]},
+        # Retrieve from multiple relevant categories
+        results = knowledge_base.retrieve(
+            query=query,
+            categories=[
+                KnowledgeCategory.BODY_TYPES,
+                KnowledgeCategory.SILHOUETTE_SCIENCE,
+                KnowledgeCategory.OCCASION_RULES,
+                KnowledgeCategory.PROPORTION_THEORY
+            ],
             limit=20
         )
 
-        RETURN relevant_rules
+        # Extract and format rules
+        styling_rules = []
+        FOR result IN results:
+            FOR rule IN result.chunk.rules:
+                styling_rules.append(StylingRule(
+                    rule=rule.recommendation,
+                    condition=rule.condition,
+                    confidence=rule.confidence * result.combined_score,
+                    source=result.chunk.source.title,
+                    exceptions=rule.exceptions
+                ))
 
-    FUNCTION get_color_harmony_rules(colors) → HarmonyGuidance:
-        lch_colors = [rgb_to_lch(c) for c in colors]
-        harmony = lara_alvarez_analyze(lch_colors)
+        RETURN deduplicate_and_rank(styling_rules)
 
-        IF harmony.type == "none":
-            suggestions = generate_harmonious_palette(lch_colors[0])
-        ELSE:
-            suggestions = []
+    FUNCTION get_color_guidance(user_coloring, current_palette) → ColorGuidance:
+        """
+        Get color recommendations based on user's coloring and current choices.
+        """
+        # Retrieve color theory knowledge
+        color_knowledge = knowledge_base.retrieve(
+            query=f"Color recommendations for {user_coloring} coloring, harmonizing with {current_palette}",
+            categories=[
+                KnowledgeCategory.COLOR_THEORY,
+                KnowledgeCategory.COLOR_PSYCHOLOGY
+            ],
+            limit=10
+        )
 
-        RETURN HarmonyGuidance(
-            current_harmony=harmony,
-            suggestions=suggestions,
-            rules=lookup_harmony_rules(harmony.type)
+        # Combine with deterministic color harmony analysis
+        lch_colors = [rgb_to_lch(c) for c in current_palette]
+        harmony_analysis = lara_alvarez_analyze(lch_colors)
+
+        RETURN ColorGuidance(
+            seasonal_palette=extract_seasonal_palette(color_knowledge, user_coloring),
+            harmony_analysis=harmony_analysis,
+            recommended_colors=extract_color_recommendations(color_knowledge),
+            colors_to_avoid=extract_colors_to_avoid(color_knowledge, user_coloring),
+            knowledge_sources=[r.chunk.source.title for r in color_knowledge]
         )
 
     FUNCTION get_body_type_rules(body_type, category) → BodyGuidance:
-        rules = knowledge_base.query(
-            f"body_type:{body_type} AND category:{category}",
-            collection="body_silhouette_rules"
+        """
+        Get body-type specific guidance for a garment category.
+        """
+        results = knowledge_base.retrieve(
+            query=f"Best {category} styles for {body_type} body type, flattering silhouettes",
+            categories=[
+                KnowledgeCategory.BODY_TYPES,
+                KnowledgeCategory.SILHOUETTE_SCIENCE,
+                KnowledgeCategory.PROPORTION_THEORY,
+                KnowledgeCategory.OPTICAL_ILLUSIONS
+            ],
+            limit=15
         )
 
+        # Aggregate guidance from multiple sources
+        flattering = []
+        avoid = []
+        necklines = []
+        proportion_tips = []
+
+        FOR result IN results:
+            FOR rule IN result.chunk.rules:
+                IF "flattering" IN rule.recommendation.lower():
+                    flattering.append(rule.recommendation)
+                IF "avoid" IN rule.recommendation.lower():
+                    avoid.append(rule.recommendation)
+                IF "neckline" IN rule.recommendation.lower():
+                    necklines.append(rule.recommendation)
+                IF "proportion" IN rule.recommendation.lower():
+                    proportion_tips.append(rule.recommendation)
+
         RETURN BodyGuidance(
-            flattering_silhouettes=rules.flattering,
-            avoid_silhouettes=rules.avoid,
-            neckline_recommendations=rules.necklines,
-            proportion_tips=rules.proportions
+            flattering_silhouettes=deduplicate(flattering),
+            avoid_silhouettes=deduplicate(avoid),
+            neckline_recommendations=deduplicate(necklines),
+            proportion_tips=deduplicate(proportion_tips),
+            knowledge_sources=[r.chunk.source.title for r in results]
         )
 
     FUNCTION get_occasion_rules(occasion) → OccasionGuidance:
-        RETURN knowledge_base.lookup(
-            "occasions",
-            occasion,
-            fields=["formality_range", "dress_codes", "fabric_appropriateness"]
+        """
+        Get dress code and occasion-appropriate styling rules.
+        """
+        results = knowledge_base.retrieve(
+            query=f"Dress code and styling rules for {occasion}, appropriate attire",
+            categories=[
+                KnowledgeCategory.DRESS_CODES,
+                KnowledgeCategory.OCCASION_RULES,
+                KnowledgeCategory.CULTURAL_CONTEXT
+            ],
+            limit=10
         )
+
+        RETURN OccasionGuidance(
+            formality_range=extract_formality_range(results),
+            dress_codes=extract_dress_codes(results),
+            fabric_appropriateness=extract_fabric_rules(results),
+            colors_appropriate=extract_color_rules(results, occasion),
+            common_mistakes=extract_mistakes_to_avoid(results),
+            knowledge_sources=[r.chunk.source.title for r in results]
+        )
+
+    FUNCTION get_style_archetype_guidance(target_style) → StyleArchetypeGuidance:
+        """
+        Get guidance for achieving a particular style archetype.
+        """
+        results = knowledge_base.retrieve(
+            query=f"{target_style} style characteristics, key pieces, how to achieve",
+            categories=[
+                KnowledgeCategory.STYLE_ARCHETYPES,
+                KnowledgeCategory.FASHION_HISTORY,
+                KnowledgeCategory.CAPSULE_WARDROBE
+            ],
+            limit=10
+        )
+
+        RETURN StyleArchetypeGuidance(
+            defining_characteristics=extract_characteristics(results),
+            key_pieces=extract_key_pieces(results),
+            color_palette=extract_palette(results),
+            brands_to_explore=extract_brands(results),
+            styling_tips=extract_tips(results),
+            knowledge_sources=[r.chunk.source.title for r in results]
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════
+# KNOWLEDGE BASE INITIALIZATION
+# ═══════════════════════════════════════════════════════════════════════════
+
+FUNCTION initialize_fashion_knowledge_base() → FashionKnowledgeBase:
+    """
+    Initialize and populate the fashion knowledge base.
+    Called once during system setup.
+    """
+    kb = FashionKnowledgeBase()
+
+    # Core textbooks
+    kb.ingest_textbook("Color_Me_Beautiful.pdf", {
+        title: "Color Me Beautiful",
+        author: "Carole Jackson",
+        type: "textbook",
+        credibility: 0.9
+    })
+
+    kb.ingest_textbook("The_Curated_Closet.pdf", {
+        title: "The Curated Closet",
+        author: "Anuschka Rees",
+        type: "textbook",
+        credibility: 0.85
+    })
+
+    kb.ingest_textbook("The_Science_of_Style.pdf", {
+        title: "The Science of Style",
+        author: "Various",
+        type: "research_paper",
+        credibility: 0.95
+    })
+
+    # Body type science
+    kb.ingest_textbook("Body_Shape_Bible.pdf", {
+        title: "The Body Shape Bible",
+        author: "Trinny & Susannah",
+        type: "style_guide",
+        credibility: 0.8
+    })
+
+    # Dress codes and occasions
+    kb.ingest_textbook("Dress_Codes_Explained.pdf", {
+        title: "Dress Codes: How the Laws of Fashion Made History",
+        author: "Richard Thompson Ford",
+        type: "textbook",
+        credibility: 0.85
+    })
+
+    # TBD: Additional sources
+    # - Academic papers on color psychology
+    # - Cultural dress code guides
+    # - Trend forecasting reports
+    # - Expert stylist interviews
+
+    RETURN kb
 
 
 CLASS Pillar3_UserActivity:
