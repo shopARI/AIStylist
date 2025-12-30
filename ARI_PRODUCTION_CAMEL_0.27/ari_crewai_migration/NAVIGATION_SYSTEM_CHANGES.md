@@ -86,15 +86,14 @@ The system should not just return products. It should explain the path:
 
 This translation of navigation into narrative is where ARI becomes a stylist, not just an algorithm.
 
----
 
-## Summary
+NOTES:
 
-| Concern Raised | How We Address It |
-|----------------|-------------------|
-| Preferences are context-dependent | Compute from behavior at query time, filtered by context |
-| Fixed values become stale | Store raw data, let it evolve naturally |
-| System should feel human | Add journey narrative that explains the path |
-| Keep it simple for testing | Start with two primary agents, add complexity as needed |
 
-The navigation paradigm - position, trajectory, destination, path - remains the foundation. We're refining how we compute it, not replacing it.
+
+
+Preferences are context-dependent --> Compute from behavior at query time, filtered by context 
+
+Keep it simple for testing --> Start with two primary agents, add complexity as needed 
+
+The original navigation paradigm - position, trajectory, destination, path - remains the foundation but we are refining how we compute it
