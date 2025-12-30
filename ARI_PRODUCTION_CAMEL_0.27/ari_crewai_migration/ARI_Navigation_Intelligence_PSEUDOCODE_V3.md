@@ -25,7 +25,7 @@ The LLM receives historical data, personalization metrics, and behavioral patter
 - Destination grounded in real product space via exemplar retrieval
 - All other calculations are deterministic (fast, consistent, reproducible)
 - Feedback loop enables continuous learning
-
+- Re-interpret profile when behavior diverges from onboarding (people change)
 ---
 
 ## Section 0: System Architecture Overview
@@ -252,7 +252,26 @@ The LLM receives historical data, personalization metrics, and behavioral patter
 
 ---
 
+
+
+
 ## Section 1: Data Structures
+
+### 1.1.a Core Enums
+
+ENUM StyleContext:
+    """
+    Users don't have ONE style - they have a style repertoire.
+    Different contexts activate different style modes.
+    """
+    PROFESSIONAL      # Work, meetings, interviews
+    CASUAL            # Weekends, errands, relaxed
+    EVENING           # Date night, dinner, events
+    FORMAL            # Weddings, galas, ceremonies
+    ACTIVE            # Gym, sports, outdoor activities
+    CREATIVE          # Artistic events, self-expression
+    TRAVEL            # Vacation, comfort + style
+    DEFAULT           # When context is unclear
 
 ### 1.1 Onboarding Data Structures
 
@@ -2349,11 +2368,123 @@ FUNCTION compute_cold_start_position_from_profile(
 
 ## Section 8: Feedback Loop (New in V3)
 
-```
 CLASS FeedbackLoop:
     """
-     Learn from recommendation outcomes.
+    V3: Learn from recommendation outcomes.
     """
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # RE-INTERPRETATION TRIGGER
+    # When behavior diverges significantly from onboarding, update the profile
+    # ═══════════════════════════════════════════════════════════════════════════
+    
+    FUNCTION check_reinterpretation_trigger(user_id) → BOOL:
+        """
+        Detect when behavioral patterns diverge significantly from onboarding.
+        If triggered, re-run LLM #2 to update root values and profile.
+        """
+        raw_data = load_raw_user_data(user_id)
+        
+        IF NOT raw_data.onboarding_completed:
+            RETURN FALSE
+        
+        IF len(raw_data.interactions) < 30:
+            RETURN FALSE  # Not enough data to detect divergence
+        
+        profile = raw_data.onboarding_profile
+        behavioral = compute_behavioral_patterns(raw_data.interactions)
+        
+        divergence_signals = []
+        
+        # 1. Budget divergence: spending consistently outside stated range
+        stated_budget = profile.practicality.budget
+        actual_spending = compute_actual_spending(raw_data.interactions)
+        IF actual_spending.median > stated_budget.monthly * 1.5:
+            divergence_signals.append("spending_above_stated")
+        IF actual_spending.median < stated_budget.monthly * 0.3:
+            divergence_signals.append("spending_below_stated")
+        
+        # 2. Adventurousness divergence: behavior vs stated preference
+        stated_adventurousness = profile.process.adventurousness / 10.0
+        actual_exploration = compute_style_variance(raw_data.interactions)
+        IF abs(actual_exploration - stated_adventurousness) > 0.4:
+            divergence_signals.append("adventurousness_mismatch")
+        
+        # 3. Style avoidance violation: buying what they said they avoid
+        stated_avoids = parse_avoids(profile.taste.style_avoids)
+        purchased_styles = extract_styles(raw_data.interactions, type="purchased")
+        overlap = intersection(stated_avoids, purchased_styles)
+        IF len(overlap) >= 3:
+            divergence_signals.append("buying_stated_avoids")
+        
+        # 4. Context divergence: occasions used vs stated occasions
+        stated_contexts = [o.style_context for o in profile.personal.occasions]
+        actual_contexts = detect_user_contexts(raw_data.interactions)
+        new_contexts = [c for c in actual_contexts if c not in stated_contexts]
+        IF len(new_contexts) >= 2:
+            divergence_signals.append("new_life_contexts")
+        
+        # 5. Brand loyalty divergence
+        stated_loyalty = profile.process.brand_loyalty / 10.0
+        actual_loyalty = compute_brand_repeat_rate(raw_data.interactions)
+        IF abs(actual_loyalty - stated_loyalty) > 0.4:
+            divergence_signals.append("brand_loyalty_mismatch")
+        
+        # Trigger if 2+ divergence signals
+        RETURN len(divergence_signals) >= 2
+    
+    ASYNC FUNCTION run_reinterpretation(user_id):
+        """
+        Re-run LLM #2 with both onboarding AND behavioral data.
+        Updates profile and root values.
+        """
+        raw_data = load_raw_user_data(user_id)
+        behavioral_summary = summarize_behavioral_patterns(raw_data.interactions)
+        
+        # LLM #2 with additional behavioral context
+        updated_profile = interpretation_llm.reinterpret_with_behavior(
+            original_conversations=raw_data.raw_onboarding_conversations,
+            original_profile=raw_data.onboarding_profile,
+            behavioral_summary=behavioral_summary,
+            divergence_notes=get_divergence_notes(user_id)
+        )
+        
+        # Update navigation parameters
+        updated_nav_params = derive_navigation_parameters(updated_profile)
+        
+        # Persist updates
+        await neo4j.query("""
+            MATCH (u:User {id: $user_id})-[:HAS_ONBOARDING]->(ob)
+            SET ob = $updated_profile,
+                ob.reinterpreted_at = datetime(),
+                ob.reinterpretation_count = coalesce(ob.reinterpretation_count, 0) + 1
+            
+            WITH u
+            MATCH (u)-[:HAS_NAV_PARAMS]->(np)
+            SET np = $updated_nav_params
+        """, 
+            user_id=user_id,
+            updated_profile=updated_profile,
+            updated_nav_params=updated_nav_params
+        )
+        
+        log.info(f"Reinterpreted profile for user {user_id}")
+    
+    ASYNC FUNCTION on_interaction(user_id, interaction):
+        """
+        Called after each user interaction.
+        Checks for re-interpretation trigger every 20 interactions.
+        """
+        await record_interaction(user_id, interaction)
+        
+        interaction_count = get_interaction_count(user_id)
+        IF interaction_count % 20 == 0:
+            IF check_reinterpretation_trigger(user_id):
+                await run_reinterpretation(user_id)
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # SESSION TRACKING
+    # ═══════════════════════════════════════════════════════════════════════════
     
     ASYNC FUNCTION track_recommendation_session(
         user_id: STRING,
@@ -2423,7 +2554,7 @@ CLASS FeedbackLoop:
         product_id: STRING,
         outcome: ENUM["viewed", "clicked", "liked", "purchased", "rejected"],
         time_spent_seconds: INT = None,
-        explicit_feedback: INT = None  # 1-5 rating
+        explicit_feedback: INT = None
     ):
         """
         Record user interaction with a recommended product.
@@ -2455,6 +2586,10 @@ CLASS FeedbackLoop:
             time_spent=time_spent_seconds,
             feedback=explicit_feedback
         )
+    
+    # ═══════════════════════════════════════════════════════════════════════════
+    # ANALYTICS & LEARNING
+    # ═══════════════════════════════════════════════════════════════════════════
     
     FUNCTION analyze_session_outcomes(days: INT = 30) → FeedbackAnalysis:
         """
@@ -2488,9 +2623,6 @@ CLASS FeedbackLoop:
             # Which style descriptors correlate with success
             "effective_descriptors": analyze_descriptor_effectiveness(sessions),
             
-            # Which RAG rules correlated with conversions
-            # (would need to track which rules were applied)
-            
             # Navigation parameter effectiveness
             "exploration_vs_conversion": analyze_exploration_outcomes(sessions),
             "diversity_vs_satisfaction": analyze_diversity_outcomes(sessions)
@@ -2515,8 +2647,6 @@ CLASS FeedbackLoop:
         
         # Implementation depends on prompt management system
         pass
-```
-
 ---
 
 ## Section 9: Calibration Flow (TBD Placeholder)
@@ -2576,12 +2706,21 @@ CLASS FeedbackLoop:
 
 ## Appendix B: LLM Call Summary
 
+
 | LLM | When | Input | Output | Latency Concern |
 |-----|------|-------|--------|-----------------|
 | #1 Onboarding Agent | During onboarding | User responses | Conversational continuation | Real-time, but user-paced |
 | #2 Interpretation | After onboarding complete | Raw conversations | OnboardingProfile + RootValues | One-time, can be async |
+| #2 Re-interpretation | When behavior diverges from profile | Original profile + behavioral data | Updated profile + root values | Async, triggered periodically |
 | #3 Synthesis | Every query | Three pillars + query | Style descriptors + search terms | Critical path - needs optimization |
 | #4 Narrative | After products selected | Products + profile | Journey story | Can be async/streamed |
+
+**Re-interpretation Triggers (2+ signals required):**
+- Spending consistently outside stated budget range
+- Actual style variance diverges from stated adventurousness
+- Purchasing items they said they avoid
+- New life contexts not mentioned in onboarding
+- Brand repeat rate diverges from stated loyalty
 
 **Latency Mitigation for #3 Synthesis:**
 1. Cache by (user_id, query_hash, context) with 5-minute TTL
