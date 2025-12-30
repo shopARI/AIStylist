@@ -46,23 +46,38 @@ The navigation paradigm is intact:
 - Destination: Where you want to go (understood from your query)
 - Path: The route to get there, with comfortable step sizes
 
-The three pillars remain: Personalization, Stylist Knowledge, User Activity.
-
 The multi-modal intelligence remains: embeddings plus deterministic features (color science, shape, texture).
+
+---
+
+## The Three Pillars
+
+The ML Intelligence layer that feeds the LLM remains intact. Three pillars provide the knowledge:
+
+**Pillar 1: Personalization**
+User-specific data from the graph - body data, interaction history, computed position and trajectory. Raw data, not fixed inferences.
+
+**Pillar 2: Stylist Knowledge**
+RAG over fashion literature - color theory, body type rules, occasion appropriateness, silhouette science. Domain expertise the LLM can retrieve.
+
+**Pillar 3: User Activity**
+Behavioral patterns - what they view, like, purchase, reject. Preference drift detection. Recommendation feedback history.
+
+These three pillars feed into the LLM, which synthesizes them to navigate the user through style space.
 
 ---
 
 ## How It Works
 
 1. User asks for something
-2. Load their raw data (interactions, conversations, body data)
-3. Compute their current position and trajectory from that data
-4. Understand where they want to go (destination)
-5. Calculate the path
-6. Find products along that path
-7. Score and select the best ones
+2. **Pillar 1:** Load raw user data (interactions, conversations, body data)
+3. **Pillar 3:** Compute position and trajectory from behavioral patterns
+4. **Pillar 2:** Retrieve relevant stylist knowledge (body type rules, occasion rules, color guidance)
+5. **LLM:** Synthesize all pillars, understand destination, determine path
+6. **Agents:** Find products along that path
+7. **Judge:** Score and select the best ones
 
-The destination step uses AI to understand intent. Everything else is computed from data and rules in that way it is faster more consistent and reproducible.
+The LLM receives all three pillars and synthesizes them. The agents retrieve products. The scoring is deterministic - fast, consistent, reproducible.
 
 ---
 
