@@ -185,6 +185,36 @@ STRUCTURE EmbeddingFeatures:
     siglip_multimodal: VECTOR[2048]
 
 
+STRUCTURE UserEmbeddings:
+    """
+    Composite embedding representing user's style identity.
+    Lives in same vector space as products for direct similarity search.
+    Pre-computed and updated as new signals arrive.
+    """
+
+    # Core embeddings (same dimensionality as product embeddings)
+    semantic: VECTOR[1536]      # Same space as product OpenAI embeddings
+    visual: VECTOR[1024]        # Same space as product SigLIP vision
+    multimodal: VECTOR[2048]    # Same space as product multimodal fusion
+
+    # Source contribution weights (sum to 1.0)
+    source_weights: {
+        onboarding: FLOAT,       # Initial signal, decays as behavior grows
+        interactions: FLOAT,     # Primary signal from likes/purchases/views
+
+        # ═══════════════════════════════════════════════════════════════════
+        # TBD: Future embedding sources
+        # ═══════════════════════════════════════════════════════════════════
+        body_scan: FLOAT,        # 3D body geometry → style fit preferences
+        social_style: FLOAT,     # Instagram/photos → actual wardrobe analysis
+    }
+
+    # Metadata
+    last_updated: DATETIME
+    interaction_count: INT       # How many interactions contributed
+    confidence: FLOAT            # Higher with more data
+
+
 STRUCTURE ProductRepresentation:
     product_id: STRING
     title: STRING
@@ -245,6 +275,9 @@ STRUCTURE ComputedUserState:
     """
     # Current position in style space (computed from interactions)
     current_position: StyleCoordinate
+
+    # User embeddings (pre-computed, same space as products)
+    embeddings: UserEmbeddings
 
     # Trajectory (computed from interaction history)
     trajectory: {
@@ -419,8 +452,12 @@ CLASS Pillar1_Personalization:
         # Detect consistent behavioral patterns
         behavioral_patterns = detect_behavioral_patterns(raw_data.interactions)
 
+        # Compute user embeddings (same space as products)
+        user_embeddings = compute_user_embeddings(raw_data, raw_data.interactions)
+
         RETURN ComputedUserState(
             current_position=current_position,
+            embeddings=user_embeddings,
             trajectory=trajectory,
             spending_patterns=spending_patterns,
             behavioral_patterns=behavioral_patterns
@@ -577,6 +614,106 @@ CLASS Pillar1_Personalization:
             variable_dimensions=variable,
             preferred_categories=preferred,
             avoided_categories=avoided
+        )
+
+    FUNCTION compute_user_embeddings(raw_data: RawUserData, interactions) → UserEmbeddings:
+        """
+        Compute user embeddings from onboarding + interaction history.
+        User embeddings live in same vector space as products.
+        """
+
+        # ═══════════════════════════════════════════════════════════════════
+        # ONBOARDING CONTRIBUTION
+        # ═══════════════════════════════════════════════════════════════════
+
+        onboarding_embedding = None
+        IF raw_data.onboarding_responses:
+            # Extract text from onboarding for semantic embedding
+            onboarding_text = extract_style_text(raw_data.onboarding_responses)
+            onboarding_semantic = openai.embed(onboarding_text)
+
+            # If onboarding included reference images, compute visual embedding
+            IF raw_data.onboarding_responses.reference_images:
+                onboarding_visual = avg([
+                    siglip.encode_image(img)
+                    for img in raw_data.onboarding_responses.reference_images
+                ])
+            ELSE:
+                onboarding_visual = ZERO_VECTOR[1024]
+
+            onboarding_multimodal = concatenate(onboarding_semantic[:1024], onboarding_visual)
+
+        # ═══════════════════════════════════════════════════════════════════
+        # INTERACTION CONTRIBUTION
+        # ═══════════════════════════════════════════════════════════════════
+
+        weighted_semantic = []
+        weighted_visual = []
+        weighted_multimodal = []
+
+        FOR interaction IN interactions:
+            product = get_product(interaction.product_id)
+
+            # Recency weight (exponential decay)
+            days_ago = (now() - interaction.timestamp).days
+            recency_weight = exp(-0.02 * days_ago)
+
+            # Engagement weight
+            IF interaction.type == "purchased": engagement = 3.0
+            ELIF interaction.type == "liked": engagement = 2.0
+            ELIF interaction.type == "saved": engagement = 1.5
+            ELIF interaction.type == "viewed": engagement = 1.0
+            ELIF interaction.type == "rejected": engagement = -0.5
+
+            weight = recency_weight * engagement
+            IF weight > 0:
+                weighted_semantic.append((product.embeddings.openai_text, weight))
+                weighted_visual.append((product.embeddings.siglip_vision, weight))
+                weighted_multimodal.append((product.embeddings.siglip_multimodal, weight))
+
+        # Aggregate interaction embeddings
+        interaction_semantic = weighted_average(weighted_semantic)
+        interaction_visual = weighted_average(weighted_visual)
+        interaction_multimodal = weighted_average(weighted_multimodal)
+
+        # ═══════════════════════════════════════════════════════════════════
+        # BLEND SOURCES
+        # ═══════════════════════════════════════════════════════════════════
+
+        # Source weights decay onboarding as interactions grow
+        interaction_count = len([i for i in interactions if i.type in ["purchased", "liked"]])
+
+        IF interaction_count == 0:
+            onboarding_weight = 1.0
+            interaction_weight = 0.0
+        ELIF interaction_count < 10:
+            onboarding_weight = 0.5
+            interaction_weight = 0.5
+        ELIF interaction_count < 50:
+            onboarding_weight = 0.2
+            interaction_weight = 0.8
+        ELSE:
+            onboarding_weight = 0.1
+            interaction_weight = 0.9
+
+        # Blend embeddings
+        semantic = onboarding_semantic * onboarding_weight + interaction_semantic * interaction_weight
+        visual = onboarding_visual * onboarding_weight + interaction_visual * interaction_weight
+        multimodal = onboarding_multimodal * onboarding_weight + interaction_multimodal * interaction_weight
+
+        RETURN UserEmbeddings(
+            semantic=normalize(semantic),
+            visual=normalize(visual),
+            multimodal=normalize(multimodal),
+            source_weights={
+                onboarding: onboarding_weight,
+                interactions: interaction_weight,
+                body_scan: 0.0,      # TBD: Future
+                social_style: 0.0,   # TBD: Future
+            },
+            last_updated=now(),
+            interaction_count=interaction_count,
+            confidence=min(1.0, interaction_count / 50)  # Saturates at 50 interactions
         )
 
 
@@ -1117,19 +1254,18 @@ CLASS VibeBot_Navigator:
     """
     Semantic navigator using vector embeddings.
     PRIMARY agent in V2.
+    Uses direct user↔product embedding similarity.
     """
 
     FUNCTION search(nav_context: NavigationContext) → LIST[Product]:
-        # Build semantic query
-        semantic_query = build_navigation_aware_query(
-            base_query=nav_context.query,
-            current_style=describe_position(nav_context.current_position),
-            target_style=describe_position(nav_context.destination),
-            styling_rules=nav_context.styling_rules,
-            body_guidance=nav_context.body_guidance
-        )
+        # Get user's semantic embedding (pre-computed, same space as products)
+        user_embedding = nav_context.computed_state.embeddings.semantic
 
-        query_embedding = openai.embed(semantic_query)
+        # Build query-augmented embedding
+        query_embedding = openai.embed(nav_context.query)
+
+        # Blend user embedding with query (user provides context, query provides intent)
+        search_vector = normalize(user_embedding * 0.4 + query_embedding * 0.6)
 
         # V2: Use LLM-interpreted budget
         budget = nav_context.llm_interpretation.budget_for_this_query
@@ -1137,7 +1273,7 @@ CLASS VibeBot_Navigator:
 
         results = qdrant.search(
             collection="fashion_products",
-            query_vector=query_embedding,
+            query_vector=search_vector,
             filter={
                 "price": {"$gte": budget.min, "$lte": budget.max},
                 "formality": {"$gte": formality - 0.2, "$lte": formality + 0.2}
@@ -1145,17 +1281,19 @@ CLASS VibeBot_Navigator:
             limit=50
         )
 
-        # Re-rank by semantic alignment
+        # Re-rank by user embedding similarity (direct comparison in same space)
         FOR product IN results:
-            current_sim = cosine_similarity(
-                product.embeddings.siglip_text,
-                embed_position(nav_context.current_position)
+            # Direct user↔product similarity (they live in same embedding space)
+            user_sim = cosine_similarity(
+                product.embeddings.openai_text,
+                user_embedding
             )
-            dest_sim = cosine_similarity(
-                product.embeddings.siglip_text,
-                embed_position(nav_context.destination)
+            # Query relevance
+            query_sim = cosine_similarity(
+                product.embeddings.openai_text,
+                query_embedding
             )
-            product.semantic_bridge_score = (current_sim * 0.3 + dest_sim * 0.7)
+            product.semantic_bridge_score = (user_sim * 0.4 + query_sim * 0.6)
 
         RETURN sorted(results, key=lambda p: p.semantic_bridge_score)[:20]
 
@@ -1164,20 +1302,17 @@ CLASS VisionBot_Navigator:
     """
     Visual navigator using image embeddings + deterministic features.
     PRIMARY agent in V2.
+    Uses direct user↔product visual embedding similarity.
     """
 
     FUNCTION search(nav_context: NavigationContext) → LIST[Product]:
-        waypoint = nav_context.path.waypoints[0]
+        # Get user's visual embedding (pre-computed, same space as products)
+        user_visual_embedding = nav_context.computed_state.embeddings.visual
 
-        visual_query = generate_visual_target(
-            target_formality=waypoint.coordinates.formality,
-            target_color_warmth=waypoint.coordinates.color_warmth,
-            target_texture=waypoint.coordinates.texture
-        )
-
+        # Search using user's visual embedding directly
         visual_results = qdrant.search(
             collection="fashion_multimodal_embeddings",
-            query_vector=visual_query,
+            query_vector=user_visual_embedding,
             limit=50
         )
 
@@ -1197,13 +1332,14 @@ CLASS VisionBot_Navigator:
                     product.body_type_match = TRUE
                     filtered.append(product)
 
-        # Score by visual continuity
+        # Score by visual similarity to user (direct embedding comparison)
         FOR product IN filtered:
-            current_dist = visual_distance(
+            # Direct user↔product visual similarity (same embedding space)
+            user_visual_sim = cosine_similarity(
                 product.embeddings.siglip_vision,
-                embed_visual_position(nav_context.current_position)
+                user_visual_embedding
             )
-            product.visual_continuity = 1.0 if current_dist <= 0.3 else (1.0 - current_dist)
+            product.visual_continuity = user_visual_sim
 
         RETURN sorted(filtered,
                      key=lambda p: p.visual_continuity * 0.5 + p.visual_harmony_score * 0.5)[:20]
