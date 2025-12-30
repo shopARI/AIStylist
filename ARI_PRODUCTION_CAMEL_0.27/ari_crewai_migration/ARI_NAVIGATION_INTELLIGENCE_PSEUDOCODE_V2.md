@@ -341,28 +341,79 @@ STRUCTURE RawUserData:
     }
 
 
+ENUM StyleContext:
+    """
+    Users don't have ONE style - they have a style repertoire.
+    Different contexts activate different style modes.
+    """
+    PROFESSIONAL      # Work, meetings, interviews
+    CASUAL            # Weekends, errands, relaxed
+    EVENING           # Date night, dinner, events
+    FORMAL            # Weddings, galas, ceremonies
+    ACTIVE            # Gym, sports, outdoor activities
+    CREATIVE          # Artistic events, self-expression
+    TRAVEL            # Vacation, comfort + style
+    DEFAULT           # When context is unclear
+
+
+STRUCTURE ContextualPosition:
+    """
+    Position and trajectory for a specific style context.
+    A user may be minimalist at work but maximalist on weekends.
+    """
+    context: StyleContext
+    position: StyleCoordinate
+    trajectory: {
+        direction: VECTOR[N],
+        velocity: FLOAT,           # How fast they're evolving in this context
+        consistency: FLOAT         # How stable this context's style is
+    }
+    embeddings: UserEmbeddings     # Context-specific embeddings
+    interaction_count: INT         # How much data we have for this context
+    confidence: FLOAT              # Higher with more context-specific data
+
+
 STRUCTURE ComputedUserState:
     """
     V2: Computed at query time from RawUserData.
     These are not stored, they are calculated.
+
+    KEY INSIGHT: Users have multiple style modes, not one linear trajectory.
+    A person might be structured/neutral at work, colorful/relaxed on weekends,
+    and daring/form-fitting on date night. These are parallel stable modes,
+    not evolution - they're context-switching.
     """
-    # Current position in style space (computed from interactions)
-    current_position: StyleCoordinate
 
-    # User embeddings (pre-computed, same space as products)
-    embeddings: UserEmbeddings
+    # ═══════════════════════════════════════════════════════════════════════
+    # CONTEXT-AWARE POSITIONS
+    # Instead of ONE position, we track position PER CONTEXT
+    # ═══════════════════════════════════════════════════════════════════════
 
-    # Trajectory (computed from interaction history)
-    trajectory: {
-        direction: VECTOR[N],
-        velocity: FLOAT,
-        consistency: FLOAT
+    # All detected style contexts for this user
+    detected_contexts: LIST[StyleContext]
+
+    # Position and trajectory for each context
+    positions_by_context: MAP[StyleContext → ContextualPosition]
+
+    # The active context (selected based on current query/occasion)
+    active_context: StyleContext
+    active_position: ContextualPosition
+
+    # Cross-context patterns (what's consistent across ALL contexts)
+    universal_preferences: {
+        always_preferred: LIST[STRING],    # e.g., "always avoids yellow"
+        always_avoided: LIST[STRING],      # e.g., "never buys synthetic fabrics"
+        stable_dimensions: LIST[STRING]    # Dimensions consistent across contexts
     }
+
+    # User embeddings (blended across contexts, or context-specific)
+    embeddings: UserEmbeddings
 
     # Spending patterns by context (computed from purchases)
     spending_patterns: {
         by_category: MAP[category → {min, max, avg}],
         by_occasion: MAP[occasion → {min, max, avg}],
+        by_context: MAP[StyleContext → {min, max, avg}],
         overall: {min, max, avg}
     }
 
@@ -503,37 +554,167 @@ CLASS Pillar1_Personalization:
         """
         V2: Compute position, trajectory, and patterns from raw data.
         This is done at query time, not stored.
+
+        KEY: Users have multiple style modes (work vs weekend vs evening).
+        We compute position/trajectory PER CONTEXT, then select the active one.
         """
-        # Filter interactions by relevance to current context (optional)
-        relevant_interactions = raw_data.interactions
-        IF query_context.occasion:
-            # Weight interactions from similar occasions more heavily
-            relevant_interactions = weight_by_occasion_similarity(
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 1: Detect which style contexts this user has
+        # ═══════════════════════════════════════════════════════════════════
+
+        detected_contexts = detect_user_contexts(raw_data.interactions)
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 2: Compute position/trajectory for EACH context
+        # ═══════════════════════════════════════════════════════════════════
+
+        positions_by_context = {}
+        FOR context IN detected_contexts:
+            # Filter interactions to this context
+            context_interactions = filter_interactions_by_context(
                 raw_data.interactions,
-                query_context.occasion
+                context
             )
 
-        # Compute current position
-        current_position = compute_position_from_interactions(relevant_interactions)
+            IF len(context_interactions) >= 3:  # Minimum data threshold
+                position = compute_position_from_interactions(context_interactions)
+                trajectory = compute_trajectory_from_history(context_interactions)
+                embeddings = compute_user_embeddings(raw_data, context_interactions)
 
-        # Compute trajectory
-        trajectory = compute_trajectory_from_history(raw_data.interactions)
+                positions_by_context[context] = ContextualPosition(
+                    context=context,
+                    position=position,
+                    trajectory=trajectory,
+                    embeddings=embeddings,
+                    interaction_count=len(context_interactions),
+                    confidence=min(1.0, len(context_interactions) / 20)
+                )
 
-        # Compute spending patterns
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 3: Select active context based on current query
+        # ═══════════════════════════════════════════════════════════════════
+
+        active_context = select_active_context(query_context, detected_contexts)
+
+        IF active_context IN positions_by_context:
+            active_position = positions_by_context[active_context]
+        ELSE:
+            # Fall back to DEFAULT or compute from all interactions
+            active_position = ContextualPosition(
+                context=StyleContext.DEFAULT,
+                position=compute_position_from_interactions(raw_data.interactions),
+                trajectory=compute_trajectory_from_history(raw_data.interactions),
+                embeddings=compute_user_embeddings(raw_data, raw_data.interactions),
+                interaction_count=len(raw_data.interactions),
+                confidence=min(1.0, len(raw_data.interactions) / 20)
+            )
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 4: Detect universal preferences (consistent across ALL contexts)
+        # ═══════════════════════════════════════════════════════════════════
+
+        universal_preferences = detect_universal_preferences(positions_by_context)
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 5: Compute other patterns
+        # ═══════════════════════════════════════════════════════════════════
+
         spending_patterns = analyze_spending_patterns(raw_data.interactions)
-
-        # Detect consistent behavioral patterns
         behavioral_patterns = detect_behavioral_patterns(raw_data.interactions)
 
-        # Compute user embeddings (same space as products)
-        user_embeddings = compute_user_embeddings(raw_data, raw_data.interactions)
-
         RETURN ComputedUserState(
-            current_position=current_position,
-            embeddings=user_embeddings,
-            trajectory=trajectory,
+            detected_contexts=detected_contexts,
+            positions_by_context=positions_by_context,
+            active_context=active_context,
+            active_position=active_position,
+            universal_preferences=universal_preferences,
+            embeddings=active_position.embeddings,
             spending_patterns=spending_patterns,
             behavioral_patterns=behavioral_patterns
+        )
+
+    FUNCTION detect_user_contexts(interactions) → LIST[StyleContext]:
+        """
+        Analyze interactions to detect which style contexts the user has.
+        Based on occasion/context metadata in interactions.
+        """
+        context_counts = {}
+
+        FOR interaction IN interactions:
+            # Map occasion to StyleContext
+            occasion = interaction.context.occasion
+            style_context = map_occasion_to_context(occasion)
+            context_counts[style_context] = context_counts.get(style_context, 0) + 1
+
+        # Return contexts with sufficient data (at least 3 interactions)
+        RETURN [ctx for ctx, count in context_counts.items() if count >= 3]
+
+    FUNCTION map_occasion_to_context(occasion: STRING) → StyleContext:
+        """
+        Map free-text occasion to StyleContext enum.
+        """
+        occasion_lower = occasion.lower() if occasion else ""
+
+        IF any(word in occasion_lower for word in ["work", "office", "meeting", "interview", "business"]):
+            RETURN StyleContext.PROFESSIONAL
+        ELIF any(word in occasion_lower for word in ["date", "dinner", "night out", "party", "club"]):
+            RETURN StyleContext.EVENING
+        ELIF any(word in occasion_lower for word in ["wedding", "gala", "ceremony", "formal", "black tie"]):
+            RETURN StyleContext.FORMAL
+        ELIF any(word in occasion_lower for word in ["gym", "workout", "sports", "hiking", "yoga"]):
+            RETURN StyleContext.ACTIVE
+        ELIF any(word in occasion_lower for word in ["vacation", "travel", "trip", "flight"]):
+            RETURN StyleContext.TRAVEL
+        ELIF any(word in occasion_lower for word in ["art", "gallery", "creative", "festival"]):
+            RETURN StyleContext.CREATIVE
+        ELIF any(word in occasion_lower for word in ["casual", "weekend", "brunch", "errands", "everyday"]):
+            RETURN StyleContext.CASUAL
+        ELSE:
+            RETURN StyleContext.DEFAULT
+
+    FUNCTION select_active_context(query_context, detected_contexts) → StyleContext:
+        """
+        Select which context to use based on current query.
+        """
+        # If query has explicit occasion, map it
+        IF query_context.occasion:
+            mapped = map_occasion_to_context(query_context.occasion)
+            IF mapped IN detected_contexts:
+                RETURN mapped
+
+        # If no match, use DEFAULT or most frequent
+        IF StyleContext.DEFAULT IN detected_contexts:
+            RETURN StyleContext.DEFAULT
+        ELIF detected_contexts:
+            RETURN detected_contexts[0]  # Most frequent
+        ELSE:
+            RETURN StyleContext.DEFAULT
+
+    FUNCTION detect_universal_preferences(positions_by_context) → UniversalPreferences:
+        """
+        Find preferences that are consistent across ALL contexts.
+        These are the user's true invariants.
+        """
+        IF len(positions_by_context) < 2:
+            RETURN UniversalPreferences([], [], [])
+
+        # Find dimensions that are similar across all contexts
+        stable_dimensions = []
+        FOR dim IN STYLE_DIMENSIONS:
+            values = [pos.position[dim] for pos in positions_by_context.values()]
+            IF max(values) - min(values) < 0.15:  # Low variance across contexts
+                stable_dimensions.append(dim)
+
+        # Find categories always preferred/avoided (would need category tracking)
+        # This is a placeholder - real implementation would analyze category patterns
+        always_preferred = []
+        always_avoided = []
+
+        RETURN UniversalPreferences(
+            always_preferred=always_preferred,
+            always_avoided=always_avoided,
+            stable_dimensions=stable_dimensions
         )
 
     FUNCTION compute_position_from_interactions(interactions) → StyleCoordinate:
@@ -795,6 +976,79 @@ CLASS Pillar1_Personalization:
 # Making ARI an expert in textbook fashion and beyond
 # ═══════════════════════════════════════════════════════════════════════════
 
+# ┌─────────────────────────────────────────────────────────────────────────┐
+# │                    KNOWLEDGE CURATION PRINCIPLES                        │
+# │                                                                         │
+# │  The RAG system is only as good as the knowledge it contains.           │
+# │  These principles guide what we ingest and how we present it.           │
+# └─────────────────────────────────────────────────────────────────────────┘
+#
+# PRINCIPLE 1: DIVERSITY OF SOURCES
+# ---------------------------------
+# Not just Western fashion canon. Include:
+# - Global perspectives (Asian, African, Latin American, Middle Eastern fashion)
+# - Different body type expertise (plus-size specialists, petite specialists)
+# - Different age perspectives (not just youth-focused)
+# - Gender-diverse perspectives (non-binary, androgynous styling)
+# - Accessibility perspectives (adaptive fashion, mobility considerations)
+#
+# PRINCIPLE 2: CURRENCY
+# ---------------------
+# Fashion knowledge must be current. "Color Me Beautiful" (1980) has value
+# but must be balanced with modern sources. Requirements:
+# - Sources should span multiple decades (historical + contemporary)
+# - Trend-related content should be dated and refreshed annually
+# - Classic/timeless advice can be older; trend advice must be recent
+#
+# PRINCIPLE 3: MULTIPLE PERSPECTIVES, NOT ONE TRUTH
+# -------------------------------------------------
+# Fashion is not objective. The RAG should return MULTIPLE perspectives:
+# - Traditional view: "A-line skirts balance pear shapes"
+# - Body-neutral view: "All silhouettes work on all bodies"
+# - Cultural view: "In [context], this carries [meaning]"
+# Let the LLM synthesize; don't pre-filter to one "correct" answer.
+#
+# PRINCIPLE 4: BODY NEUTRALITY
+# ----------------------------
+# Move past "flattering = looks thinner" framing. Include:
+# - Body-positive sources that celebrate all shapes
+# - Sources focused on comfort, movement, self-expression
+# - Avoid language that implies certain bodies are "problems to solve"
+# - Balance traditional advice with modern body-positive perspectives
+#
+# PRINCIPLE 5: CULTURAL SENSITIVITY
+# ---------------------------------
+# Different cultures have different:
+# - Dress codes and expectations
+# - Color meanings (white = wedding in West, mourning in parts of Asia)
+# - Modesty standards
+# - Occasion-appropriate norms
+# Include these perspectives; don't assume Western norms are universal.
+#
+# PRINCIPLE 6: CREDIBILITY SCORING
+# --------------------------------
+# Weight sources appropriately:
+# - Peer-reviewed research: highest credibility
+# - Published textbooks: high credibility
+# - Expert stylists with credentials: moderate-high credibility
+# - Fashion journalism: moderate credibility
+# - Blog posts/influencers: lower credibility (but still valuable for trends)
+# Surface credibility to user when relevant.
+#
+
+ENUM KnowledgePerspective:
+    """
+    Different viewpoints on fashion advice.
+    We return MULTIPLE perspectives, not one "truth".
+    """
+    TRADITIONAL       # Classic fashion rules ("pear shapes should...")
+    BODY_NEUTRAL      # Body-positive view ("wear what feels good")
+    CULTURAL          # Culture-specific context
+    PRACTICAL         # Comfort, functionality, lifestyle
+    TREND_FORWARD     # Current fashion direction
+    TIMELESS          # Classic, enduring advice
+
+
 ENUM KnowledgeCategory:
     # Core Fashion Science
     COLOR_THEORY           # Color wheel, harmony types, seasonal palettes
@@ -840,12 +1094,18 @@ STRUCTURE FashionKnowledgeChunk:
     subcategory: STRING              # e.g., "complementary_colors" under COLOR_THEORY
     tags: LIST[STRING]               # Searchable tags
 
+    # Perspective (for returning multiple viewpoints)
+    perspective: KnowledgePerspective
+    cultural_context: STRING         # e.g., "Western", "East Asian", "Universal"
+
     # Source attribution
     source: {
         title: STRING,               # "Color Me Beautiful", "The Curated Closet", etc.
         author: STRING,
         type: ENUM["textbook", "research_paper", "expert_article", "style_guide"],
-        credibility_score: FLOAT     # 0-1, peer-reviewed higher
+        credibility_score: FLOAT,    # 0-1, peer-reviewed higher
+        publication_year: INT,       # For currency assessment
+        geographic_origin: STRING    # For cultural context
     }
 
     # Content
@@ -1065,6 +1325,102 @@ CLASS FashionKnowledgeBase:
 
         # Rank by confidence and deduplicate
         RETURN deduplicate_and_rank(all_rules)[:limit]
+
+    FUNCTION retrieve_multiple_perspectives(
+        query: STRING,
+        topic: STRING,
+        user_cultural_context: STRING = None
+    ) → MultiPerspectiveResult:
+        """
+        Retrieve MULTIPLE perspectives on a topic, not one "truth".
+        This is key to avoiding bias and serving diverse users.
+
+        Example output for "best silhouettes for pear body type":
+        - TRADITIONAL: "A-line skirts create visual balance by..."
+        - BODY_NEUTRAL: "All silhouettes work beautifully - choose what feels good"
+        - CULTURAL: "In [user's culture], this silhouette signifies..."
+        - PRACTICAL: "For comfort and movement, consider..."
+        """
+
+        # Retrieve across all perspectives
+        all_results = retrieve(
+            query=query,
+            categories=None,  # All categories
+            limit=30,
+            min_credibility=0.3  # Lower threshold to get diverse sources
+        )
+
+        # Group by perspective
+        by_perspective = {}
+        FOR result IN all_results:
+            perspective = result.chunk.perspective
+            IF perspective NOT IN by_perspective:
+                by_perspective[perspective] = []
+            by_perspective[perspective].append(result)
+
+        # Select best from each perspective
+        perspectives = {}
+
+        # Traditional perspective (classic fashion rules)
+        IF KnowledgePerspective.TRADITIONAL IN by_perspective:
+            perspectives["traditional"] = PerspectiveView(
+                perspective=KnowledgePerspective.TRADITIONAL,
+                summary=synthesize_perspective(by_perspective[TRADITIONAL][:3]),
+                sources=[r.chunk.source.title for r in by_perspective[TRADITIONAL][:3]],
+                confidence=avg([r.combined_score for r in by_perspective[TRADITIONAL][:3]])
+            )
+
+        # Body-neutral perspective
+        IF KnowledgePerspective.BODY_NEUTRAL IN by_perspective:
+            perspectives["body_neutral"] = PerspectiveView(
+                perspective=KnowledgePerspective.BODY_NEUTRAL,
+                summary=synthesize_perspective(by_perspective[BODY_NEUTRAL][:3]),
+                sources=[r.chunk.source.title for r in by_perspective[BODY_NEUTRAL][:3]],
+                confidence=avg([r.combined_score for r in by_perspective[BODY_NEUTRAL][:3]])
+            )
+
+        # Cultural perspective (if user context provided)
+        IF user_cultural_context:
+            cultural_results = [r for r in all_results
+                               if r.chunk.cultural_context == user_cultural_context
+                               or r.chunk.cultural_context == "Universal"]
+            IF cultural_results:
+                perspectives["cultural"] = PerspectiveView(
+                    perspective=KnowledgePerspective.CULTURAL,
+                    summary=synthesize_perspective(cultural_results[:3]),
+                    sources=[r.chunk.source.title for r in cultural_results[:3]],
+                    confidence=avg([r.combined_score for r in cultural_results[:3]])
+                )
+
+        # Practical perspective
+        IF KnowledgePerspective.PRACTICAL IN by_perspective:
+            perspectives["practical"] = PerspectiveView(
+                perspective=KnowledgePerspective.PRACTICAL,
+                summary=synthesize_perspective(by_perspective[PRACTICAL][:3]),
+                sources=[r.chunk.source.title for r in by_perspective[PRACTICAL][:3]],
+                confidence=avg([r.combined_score for r in by_perspective[PRACTICAL][:3]])
+            )
+
+        RETURN MultiPerspectiveResult(
+            query=query,
+            topic=topic,
+            perspectives=perspectives,
+            note="Multiple perspectives provided - synthesize based on user preferences"
+        )
+
+
+STRUCTURE PerspectiveView:
+    perspective: KnowledgePerspective
+    summary: STRING                    # Synthesized view from this perspective
+    sources: LIST[STRING]              # Source attributions
+    confidence: FLOAT                  # How confident we are in this perspective
+
+
+STRUCTURE MultiPerspectiveResult:
+    query: STRING
+    topic: STRING
+    perspectives: MAP[STRING → PerspectiveView]
+    note: STRING                       # Guidance for LLM on how to use
 
 
 CLASS Pillar2_StylistKnowledge:
