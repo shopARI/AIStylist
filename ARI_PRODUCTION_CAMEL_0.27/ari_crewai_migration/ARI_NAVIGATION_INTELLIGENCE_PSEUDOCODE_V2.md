@@ -32,66 +32,139 @@ The LLM receives historical data, personalization metrics, and behavioral patter
 ## Architecture Diagram
 
 ```
-┌──────────────────────────────────────────────────────────────────────────────┐
-│                     ARI NAVIGATION INTELLIGENCE V2                           │
-├──────────────────────────────────────────────────────────────────────────────┤
-│                                                                              │
-│  ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐              │
-│  │   PILLAR 1      │  │   PILLAR 2      │  │   PILLAR 3      │              │
-│  │ PERSONALIZATION │  │ STYLIST         │  │ USER ACTIVITY   │              │
-│  │                 │  │ KNOWLEDGE       │  │ PATTERNS        │              │
-│  ├─────────────────┤  ├─────────────────┤  ├─────────────────┤              │
-│  │ Raw User Data   │  │ Textbook        │  │ Behavioral      │              │
-│  │ • BodyData      │  │ Literature      │  │ Tracking        │              │
-│  │ • Interactions  │  │ • Color theory  │  │ • Interactions  │              │
-│  │ • Conversations │  │ • Body types    │  │ • Purchases     │              │
-│  │ • Onboarding    │  │ • Occasion      │  │ • Views/Likes   │              │
-│  │   (raw)         │  │   rules         │  │ • Drift         │              │
-│  │                 │  │ • Silhouettes   │  │   detection     │              │
-│  └────────┬────────┘  │ • Harmony       │  └────────┬────────┘              │
-│           │           └────────┬────────┘           │                        │
-│           │                    │                    │                        │
-│           └────────────────────┼────────────────────┘                        │
-│                                ▼                                             │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │                    DETERMINISTIC COMPUTATION                         │   │
-│  │                                                                      │   │
-│  │   • Position: weighted_avg(recent_interactions)                      │   │
-│  │   • Trajectory: compute_from_history(direction, velocity)            │   │
-│  │   • Spending patterns: analyze_by_context(purchases)                 │   │
-│  │   • Style consistency: detect_stable_patterns(behavior)              │   │
-│  │                                                                      │   │
-│  └───────────────────────────────┬──────────────────────────────────────┘   │
-│                                  ▼                                           │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │                    LLM SYNTHESIS (Single Call)                       │   │
-│  │                                                                      │   │
-│  │   Input: All 3 pillars + query + occasion                           │   │
-│  │   Output: Destination coordinates + path parameters                  │   │
-│  │                                                                      │   │
-│  │   The LLM traverses stylistic + tangential spaces simultaneously    │   │
-│  │                                                                      │   │
-│  └───────────────────────────────┬──────────────────────────────────────┘   │
-│                                  ▼                                           │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │              PATH CALCULATION (Deterministic)                        │   │
-│  │                                                                      │   │
-│  │   • Step size from velocity                                          │   │
-│  │   • Waypoint interpolation                                           │   │
-│  │   • Outlier injection (10-20%)                                       │   │
-│  │                                                                      │   │
-│  └───────────────────────────────┬──────────────────────────────────────┘   │
-│                                  ▼                                           │
-│  ┌──────────────────────────────────────────────────────────────────────┐   │
-│  │              AGENT COORDINATION                                      │   │
-│  │                                                                      │   │
-│  │   VibeBot        VisionBot      [GraphBot]     JudgeAri             │   │
-│  │   (Semantic)     (Visual)       (off by        (Path Quality)       │   │
-│  │   PRIMARY        PRIMARY        default)       EVALUATION           │   │
-│  │                                                                      │   │
-│  └──────────────────────────────────────────────────────────────────────┘   │
-│                                                                              │
-└──────────────────────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                        ARI NAVIGATION INTELLIGENCE V2                                │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                     │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                           THREE PILLARS OF KNOWLEDGE                        │   │
+│  ├──────────────────────┬──────────────────────┬───────────────────────────────┤   │
+│  │      PILLAR 1        │      PILLAR 2        │         PILLAR 3              │   │
+│  │   PERSONALIZATION    │  STYLIST KNOWLEDGE   │      USER ACTIVITY            │   │
+│  ├──────────────────────┼──────────────────────┼───────────────────────────────┤   │
+│  │                      │                      │                               │   │
+│  │  Raw User Data       │  Fashion RAG         │  Behavioral Patterns          │   │
+│  │  ┌────────────────┐  │  ┌────────────────┐  │  ┌─────────────────────────┐  │   │
+│  │  │ • BodyData     │  │  │ Knowledge Base │  │  │ • Interaction history   │  │   │
+│  │  │ • Onboarding   │  │  │ ┌────────────┐ │  │  │ • Purchase patterns     │  │   │
+│  │  │   (raw)        │  │  │ │ Textbooks  │ │  │  │ • View/Like/Reject      │  │   │
+│  │  │ • Interactions │  │  │ │ Research   │ │  │  │ • Preference drift      │  │   │
+│  │  │ • Conversations│  │  │ │ Experts    │ │  │  │ • Category interests    │  │   │
+│  │  └────────────────┘  │  │ └────────────┘ │  │  └─────────────────────────┘  │   │
+│  │                      │  │       ↓        │  │               ↓               │   │
+│  │  User Embeddings     │  │ Hybrid Search  │  │  Computed Patterns            │   │
+│  │  ┌────────────────┐  │  │ ┌────────────┐ │  │  ┌─────────────────────────┐  │   │
+│  │  │ • Semantic     │  │  │ │ Semantic + │ │  │  │ • Consistent dimensions │  │   │
+│  │  │   [1536d]      │  │  │ │ BM25 + RRF │ │  │  │ • Variable dimensions   │  │   │
+│  │  │ • Visual       │  │  │ └────────────┘ │  │  │ • Spending by context   │  │   │
+│  │  │   [1024d]      │  │  │       ↓        │  │  └─────────────────────────┘  │   │
+│  │  │ • Multimodal   │  │  │ 20+ Categories │  │                               │   │
+│  │  │   [2048d]      │  │  │ • Color theory │  │                               │   │
+│  │  │               │  │  │ • Body types   │  │                               │   │
+│  │  │ Sources:       │  │  │ • Occasions    │  │                               │   │
+│  │  │ • Onboarding   │  │  │ • Silhouettes  │  │                               │   │
+│  │  │ • Interactions │  │  │ • Fabrics      │  │                               │   │
+│  │  │ • [TBD] Body   │  │  │ • Psychology   │  │                               │   │
+│  │  │   scan         │  │  │ • Trends       │  │                               │   │
+│  │  │ • [TBD] Social │  │  │ • ...          │  │                               │   │
+│  │  │   style        │  │  └────────────────┘  │                               │   │
+│  │  └────────────────┘  │                      │                               │   │
+│  └──────────────────────┴──────────────────────┴───────────────────────────────┘   │
+│                                       │                                             │
+│                                       ▼                                             │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                    DETERMINISTIC COMPUTATION                                │   │
+│  │                                                                             │   │
+│  │   • Position: weighted_avg(product embeddings from interactions)            │   │
+│  │   • Trajectory: direction + velocity from historical patterns               │   │
+│  │   • User Embeddings: blend(onboarding, interactions) → same space as products│   │
+│  │   • Spending: analyze_by_context(category, occasion)                        │   │
+│  │   • Behavioral patterns: detect_stable_vs_variable_dimensions               │   │
+│  │                                                                             │   │
+│  └──────────────────────────────────────┬──────────────────────────────────────┘   │
+│                                         ▼                                           │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                      LLM SYNTHESIS (Single Call)                            │   │
+│  │                                                                             │   │
+│  │   Input: All 3 pillars + query + occasion                                   │   │
+│  │   Output:                                                                   │   │
+│  │     • Destination coordinates (where user wants to go)                      │   │
+│  │     • Budget interpretation (for THIS query)                                │   │
+│  │     • Formality level (for THIS occasion)                                   │   │
+│  │     • Exploration appetite (affects outlier %)                              │   │
+│  │                                                                             │   │
+│  │   The LLM traverses stylistic + tangential spaces simultaneously            │   │
+│  │                                                                             │   │
+│  └──────────────────────────────────────┬──────────────────────────────────────┘   │
+│                                         ▼                                           │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                PATH CALCULATION (Deterministic)                             │   │
+│  │                                                                             │   │
+│  │   • Step size derived from trajectory velocity                              │   │
+│  │   • Waypoint interpolation (current → destination)                          │   │
+│  │   • Outlier injection: exploration_appetite × 20% of results                │   │
+│  │                                                                             │   │
+│  └──────────────────────────────────────┬──────────────────────────────────────┘   │
+│                                         ▼                                           │
+│  ┌─────────────────────────────────────────────────────────────────────────────┐   │
+│  │                         AGENT COORDINATION                                  │   │
+│  │                                                                             │   │
+│  │   ┌─────────────────┐  ┌─────────────────┐  ┌─────────────────┐             │   │
+│  │   │    VibeBot      │  │   VisionBot     │  │   [GraphBot]    │             │   │
+│  │   │   (Semantic)    │  │    (Visual)     │  │  (Attributes)   │             │   │
+│  │   │    PRIMARY      │  │    PRIMARY      │  │  off by default │             │   │
+│  │   ├─────────────────┤  ├─────────────────┤  ├─────────────────┤             │   │
+│  │   │ User↔Product    │  │ User↔Product    │  │ Brand/Price/    │             │   │
+│  │   │ semantic sim    │  │ visual sim      │  │ Size queries    │             │   │
+│  │   │                 │  │                 │  │                 │             │   │
+│  │   │ Adaptive weight:│  │ Direct embed    │  │ Cypher queries  │             │   │
+│  │   │ user vs query   │  │ comparison      │  │ on Neo4j        │             │   │
+│  │   │ (context-based) │  │                 │  │                 │             │   │
+│  │   └────────┬────────┘  └────────┬────────┘  └────────┬────────┘             │   │
+│  │            │                    │                    │                       │   │
+│  │            └────────────────────┼────────────────────┘                       │   │
+│  │                                 ▼                                            │   │
+│  │                     ┌───────────────────────┐                                │   │
+│  │                     │      JudgeAri         │                                │   │
+│  │                     │   (Path Evaluator)    │                                │   │
+│  │                     ├───────────────────────┤                                │   │
+│  │                     │ Scoring (deterministic)│                               │   │
+│  │                     │ • Smoothness          │                                │   │
+│  │                     │ • Coherence           │                                │   │
+│  │                     │ • Budget fit          │                                │   │
+│  │                     │ • Behavioral match    │                                │   │
+│  │                     │ • Rule compliance     │                                │   │
+│  │                     │ + Outlier injection   │                                │   │
+│  │                     └───────────────────────┘                                │   │
+│  └─────────────────────────────────────────────────────────────────────────────┘   │
+│                                         │                                           │
+│                                         ▼                                           │
+│                              ┌─────────────────────┐                                │
+│                              │   FINAL RESULTS     │                                │
+│                              │   + Journey         │                                │
+│                              │     Narrative       │                                │
+│                              └─────────────────────┘                                │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+EMBEDDING SPACES (User ↔ Product in same space):
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                     │
+│   User Embeddings                              Product Embeddings                   │
+│   ┌──────────────┐                             ┌──────────────┐                    │
+│   │ Semantic     │◄────── same space ────────►│ OpenAI text  │                    │
+│   │ [1536d]      │                             │ [1536d]      │                    │
+│   ├──────────────┤                             ├──────────────┤                    │
+│   │ Visual       │◄────── same space ────────►│ SigLIP vision│                    │
+│   │ [1024d]      │                             │ [1024d]      │                    │
+│   ├──────────────┤                             ├──────────────┤                    │
+│   │ Multimodal   │◄────── same space ────────►│ SigLIP fused │                    │
+│   │ [2048d]      │                             │ [2048d]      │                    │
+│   └──────────────┘                             └──────────────┘                    │
+│                                                                                     │
+│   ══► Direct cosine similarity for retrieval and ranking                           │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -1706,8 +1779,19 @@ CLASS VibeBot_Navigator:
         # Build query-augmented embedding
         query_embedding = openai.embed(nav_context.query)
 
-        # Blend user embedding with query (user provides context, query provides intent)
-        search_vector = normalize(user_embedding * 0.4 + query_embedding * 0.6)
+        # ═══════════════════════════════════════════════════════════════════
+        # ADAPTIVE WEIGHTING: No hardcoded assumptions about user↔query balance
+        # The balance depends on context, not a universal truth
+        # ═══════════════════════════════════════════════════════════════════
+
+        user_weight, query_weight = compute_user_query_balance(
+            user_confidence=nav_context.computed_state.embeddings.confidence,
+            query_specificity=analyze_query_specificity(nav_context.query),
+            exploration_appetite=nav_context.llm_interpretation.exploration_appetite
+        )
+
+        # Blend user embedding with query using adaptive weights
+        search_vector = normalize(user_embedding * user_weight + query_embedding * query_weight)
 
         # V2: Use LLM-interpreted budget
         budget = nav_context.llm_interpretation.budget_for_this_query
@@ -1735,9 +1819,76 @@ CLASS VibeBot_Navigator:
                 product.embeddings.openai_text,
                 query_embedding
             )
-            product.semantic_bridge_score = (user_sim * 0.4 + query_sim * 0.6)
+            # Use same adaptive weights for scoring
+            product.semantic_bridge_score = (user_sim * user_weight + query_sim * query_weight)
 
         RETURN sorted(results, key=lambda p: p.semantic_bridge_score)[:20]
+
+    FUNCTION compute_user_query_balance(user_confidence, query_specificity, exploration_appetite) → (FLOAT, FLOAT):
+        """
+        Compute adaptive weights for blending user history vs query intent.
+        No hardcoded assumptions - balance depends on context.
+
+        Factors:
+        - user_confidence: 0-1, how much interaction history we have
+        - query_specificity: 0-1, how specific/detailed the query is
+        - exploration_appetite: 0-1, how much user wants to explore new territory
+        """
+
+        # Base: start balanced
+        user_weight = 0.5
+        query_weight = 0.5
+
+        # Low user confidence (new user) → lean on query
+        IF user_confidence < 0.3:
+            query_weight += 0.2
+            user_weight -= 0.2
+
+        # High query specificity ("red silk dress for wedding") → lean on query
+        IF query_specificity > 0.7:
+            query_weight += 0.15
+            user_weight -= 0.15
+
+        # Vague query ("show me something nice") → lean on user history
+        IF query_specificity < 0.3:
+            user_weight += 0.15
+            query_weight -= 0.15
+
+        # High exploration appetite → lean on query (they want something new)
+        IF exploration_appetite > 0.6:
+            query_weight += 0.1
+            user_weight -= 0.1
+
+        # Ensure weights are valid and sum to 1
+        user_weight = clamp(user_weight, 0.1, 0.9)
+        query_weight = 1.0 - user_weight
+
+        RETURN (user_weight, query_weight)
+
+    FUNCTION analyze_query_specificity(query) → FLOAT:
+        """
+        Analyze how specific/detailed a query is.
+        Returns 0-1 (vague to highly specific).
+        """
+        specificity = 0.5  # Base
+
+        # Length indicator
+        word_count = len(query.split())
+        IF word_count > 10: specificity += 0.1
+        IF word_count < 4: specificity -= 0.1
+
+        # Specific attributes increase specificity
+        IF contains_color(query): specificity += 0.1
+        IF contains_material(query): specificity += 0.1
+        IF contains_occasion(query): specificity += 0.1
+        IF contains_brand(query): specificity += 0.1
+        IF contains_price(query): specificity += 0.1
+
+        # Vague terms decrease specificity
+        IF contains_vague_terms(query, ["something", "anything", "nice", "good", "cute"]):
+            specificity -= 0.2
+
+        RETURN clamp(specificity, 0.0, 1.0)
 
 
 CLASS VisionBot_Navigator:
