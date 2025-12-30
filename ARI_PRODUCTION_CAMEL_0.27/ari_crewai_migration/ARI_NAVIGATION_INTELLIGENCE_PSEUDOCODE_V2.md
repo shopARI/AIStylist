@@ -1653,4 +1653,4 @@ ASYNC FUNCTION batch_process_products():
 ### Phase 4: Testing
 1. A/B test V1 vs V2 on recommendation quality
 2. Measure latency (single LLM call should be faster)
-3. Validate that computed
+3. Validate that computed preferences match user expectations
