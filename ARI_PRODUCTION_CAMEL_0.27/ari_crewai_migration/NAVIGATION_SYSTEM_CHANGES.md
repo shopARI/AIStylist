@@ -62,7 +62,7 @@ The multi-modal intelligence remains: embeddings plus deterministic features (co
 6. Find products along that path
 7. Score and select the best ones
 
-The destination step uses AI to understand intent. Everything else is computed from data and rules - fast, consistent, reproducible.
+The destination step uses AI to understand intent. Everything else is computed from data and rules in that way it is faster more consistent and reproducible.
 
 ---
 
