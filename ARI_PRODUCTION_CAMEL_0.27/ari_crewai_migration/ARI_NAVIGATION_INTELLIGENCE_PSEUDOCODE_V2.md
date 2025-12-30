@@ -46,28 +46,38 @@ The LLM receives historical data, personalization metrics, and behavioral patter
 │  │  Raw User Data       │  Fashion RAG         │  Behavioral Patterns          │   │
 │  │  ┌────────────────┐  │  ┌────────────────┐  │  ┌─────────────────────────┐  │   │
 │  │  │ • BodyData     │  │  │ Knowledge Base │  │  │ • Interaction history   │  │   │
-│  │  │ • Onboarding   │  │  │ ┌────────────┐ │  │  │ • Purchase patterns     │  │   │
-│  │  │   (raw)        │  │  │ │ Textbooks  │ │  │  │ • View/Like/Reject      │  │   │
-│  │  │ • Interactions │  │  │ │ Research   │ │  │  │ • Preference drift      │  │   │
-│  │  │ • Conversations│  │  │ │ Experts    │ │  │  │ • Category interests    │  │   │
-│  │  └────────────────┘  │  │ └────────────┘ │  │  └─────────────────────────┘  │   │
-│  │                      │  │       ↓        │  │               ↓               │   │
-│  │  User Embeddings     │  │ Hybrid Search  │  │  Computed Patterns            │   │
-│  │  ┌────────────────┐  │  │ ┌────────────┐ │  │  ┌─────────────────────────┐  │   │
-│  │  │ • Semantic     │  │  │ │ Semantic + │ │  │  │ • Consistent dimensions │  │   │
-│  │  │   [1536d]      │  │  │ │ BM25 + RRF │ │  │  │ • Variable dimensions   │  │   │
-│  │  │ • Visual       │  │  │ └────────────┘ │  │  │ • Spending by context   │  │   │
-│  │  │   [1024d]      │  │  │       ↓        │  │  └─────────────────────────┘  │   │
+│  │  │ • Onboarding   │  │  │ (6 Curation    │  │  │ • Purchase patterns     │  │   │
+│  │  │   (raw)        │  │  │  Principles)   │  │  │ • View/Like/Reject      │  │   │
+│  │  │ • Interactions │  │  │ ┌────────────┐ │  │  │ • Preference drift      │  │   │
+│  │  │ • Conversations│  │  │ │ Textbooks  │ │  │  │ • Category interests    │  │   │
+│  │  └────────────────┘  │  │ │ Research   │ │  │  └─────────────────────────┘  │   │
+│  │                      │  │ │ Experts    │ │  │               ↓               │   │
+│  │  CONTEXT-AWARE       │  │ │ Global     │ │  │  Context Detection            │   │
+│  │  POSITIONS           │  │ └────────────┘ │  │  ┌─────────────────────────┐  │   │
+│  │  ┌────────────────┐  │  │       ↓        │  │  │ StyleContext:           │  │   │
+│  │  │ User has STYLE │  │  │ Hybrid Search  │  │  │ • PROFESSIONAL          │  │   │
+│  │  │ REPERTOIRE not │  │  │ ┌────────────┐ │  │  │ • CASUAL                │  │   │
+│  │  │ one trajectory │  │  │ │ Semantic + │ │  │  │ • EVENING               │  │   │
+│  │  │                │  │  │ │ BM25 + RRF │ │  │  │ • FORMAL                │  │   │
+│  │  │ positions_by_  │  │  │ └────────────┘ │  │  │ • ACTIVE                │  │   │
+│  │  │ context: MAP   │  │  │       ↓        │  │  │ • TRAVEL                │  │   │
+│  │  │ [Context →     │  │  │ MULTIPLE       │  │  │ • CREATIVE              │  │   │
+│  │  │  Position]     │  │  │ PERSPECTIVES   │  │  └─────────────────────────┘  │   │
+│  │  └────────────────┘  │  │ ┌────────────┐ │  │                               │   │
+│  │                      │  │ │ Traditional│ │  │  Universal Preferences        │   │
+│  │  User Embeddings     │  │ │ Body-Neutr │ │  │  (consistent across ALL       │   │
+│  │  (per context)       │  │ │ Cultural   │ │  │   contexts = true invariants) │   │
+│  │  ┌────────────────┐  │  │ │ Practical  │ │  │                               │   │
+│  │  │ • Semantic     │  │  │ └────────────┘ │  │                               │   │
+│  │  │ • Visual       │  │  │       ↓        │  │                               │   │
 │  │  │ • Multimodal   │  │  │ 20+ Categories │  │                               │   │
-│  │  │   [2048d]      │  │  │ • Color theory │  │                               │   │
-│  │  │               │  │  │ • Body types   │  │                               │   │
-│  │  │ Sources:       │  │  │ • Occasions    │  │                               │   │
-│  │  │ • Onboarding   │  │  │ • Silhouettes  │  │                               │   │
-│  │  │ • Interactions │  │  │ • Fabrics      │  │                               │   │
-│  │  │ • [TBD] Body   │  │  │ • Psychology   │  │                               │   │
-│  │  │   scan         │  │  │ • Trends       │  │                               │   │
-│  │  │ • [TBD] Social │  │  │ • ...          │  │                               │   │
-│  │  │   style        │  │  └────────────────┘  │                               │   │
+│  │  │                │  │  │ Diversity,     │  │                               │   │
+│  │  │ Sources:       │  │  │ Currency,      │  │                               │   │
+│  │  │ • Onboarding   │  │  │ Body-neutral   │  │                               │   │
+│  │  │ • Interactions │  │  └────────────────┘  │                               │   │
+│  │  │ • [TBD] Body   │  │                      │                               │   │
+│  │  │   scan         │  │                      │                               │   │
+│  │  │ • [TBD] Social │  │                      │                               │   │
 │  │  └────────────────┘  │                      │                               │   │
 │  └──────────────────────┴──────────────────────┴───────────────────────────────┘   │
 │                                       │                                             │
@@ -75,24 +85,26 @@ The LLM receives historical data, personalization metrics, and behavioral patter
 │  ┌─────────────────────────────────────────────────────────────────────────────┐   │
 │  │                    DETERMINISTIC COMPUTATION                                │   │
 │  │                                                                             │   │
-│  │   • Position: weighted_avg(product embeddings from interactions)            │   │
-│  │   • Trajectory: direction + velocity from historical patterns               │   │
+│  │   • Context Detection: map occasion → StyleContext                          │   │
+│  │   • Position (per context): weighted_avg(context-filtered interactions)     │   │
+│  │   • Trajectory (per context): direction + velocity for this context         │   │
+│  │   • Universal Prefs: what's stable across ALL contexts (true invariants)    │   │
 │  │   • User Embeddings: blend(onboarding, interactions) → same space as products│   │
-│  │   • Spending: analyze_by_context(category, occasion)                        │   │
-│  │   • Behavioral patterns: detect_stable_vs_variable_dimensions               │   │
+│  │   • Spending: analyze_by_context(category, occasion, StyleContext)          │   │
 │  │                                                                             │   │
 │  └──────────────────────────────────────┬──────────────────────────────────────┘   │
 │                                         ▼                                           │
 │  ┌─────────────────────────────────────────────────────────────────────────────┐   │
 │  │                      LLM SYNTHESIS (Single Call)                            │   │
 │  │                                                                             │   │
-│  │   Input: All 3 pillars + query + occasion                                   │   │
+│  │   Input: All 3 pillars + query + occasion + active_context                  │   │
 │  │   Output:                                                                   │   │
 │  │     • Destination coordinates (where user wants to go)                      │   │
 │  │     • Budget interpretation (for THIS query)                                │   │
 │  │     • Formality level (for THIS occasion)                                   │   │
 │  │     • Exploration appetite (affects outlier %)                              │   │
 │  │                                                                             │   │
+│  │   Receives MULTIPLE PERSPECTIVES from RAG (not one "truth")                 │   │
 │  │   The LLM traverses stylistic + tangential spaces simultaneously            │   │
 │  │                                                                             │   │
 │  └──────────────────────────────────────┬──────────────────────────────────────┘   │
@@ -100,8 +112,8 @@ The LLM receives historical data, personalization metrics, and behavioral patter
 │  ┌─────────────────────────────────────────────────────────────────────────────┐   │
 │  │                PATH CALCULATION (Deterministic)                             │   │
 │  │                                                                             │   │
-│  │   • Step size derived from trajectory velocity                              │   │
-│  │   • Waypoint interpolation (current → destination)                          │   │
+│  │   • Step size derived from context-specific trajectory velocity             │   │
+│  │   • Waypoint interpolation (current context position → destination)         │   │
 │  │   • Outlier injection: exploration_appetite × 20% of results                │   │
 │  │                                                                             │   │
 │  └──────────────────────────────────────┬──────────────────────────────────────┘   │
@@ -119,7 +131,8 @@ The LLM receives historical data, personalization metrics, and behavioral patter
 │  │   │                 │  │                 │  │                 │             │   │
 │  │   │ Adaptive weight:│  │ Direct embed    │  │ Cypher queries  │             │   │
 │  │   │ user vs query   │  │ comparison      │  │ on Neo4j        │             │   │
-│  │   │ (context-based) │  │                 │  │                 │             │   │
+│  │   │ (context-based, │  │ (uses context-  │  │                 │             │   │
+│  │   │  no hardcoded)  │  │  specific embed)│  │                 │             │   │
 │  │   └────────┬────────┘  └────────┬────────┘  └────────┬────────┘             │   │
 │  │            │                    │                    │                       │   │
 │  │            └────────────────────┼────────────────────┘                       │   │
@@ -147,10 +160,57 @@ The LLM receives historical data, personalization metrics, and behavioral patter
 │                                                                                     │
 └─────────────────────────────────────────────────────────────────────────────────────┘
 
+CONTEXT-AWARE STYLE REPERTOIRE:
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                     │
+│   Users don't have ONE style - they have a STYLE REPERTOIRE                        │
+│                                                                                     │
+│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│   │ PROFESSIONAL│  │   CASUAL    │  │   EVENING   │  │   FORMAL    │              │
+│   │ Position A  │  │ Position B  │  │ Position C  │  │ Position D  │              │
+│   │ Trajectory A│  │ Trajectory B│  │ Trajectory C│  │ Trajectory D│              │
+│   │ Embeddings A│  │ Embeddings B│  │ Embeddings C│  │ Embeddings D│              │
+│   └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘              │
+│         │                │                │                │                       │
+│         └────────────────┴────────────────┴────────────────┘                       │
+│                                   │                                                 │
+│                                   ▼                                                 │
+│                    ┌──────────────────────────────┐                                │
+│                    │   UNIVERSAL PREFERENCES      │                                │
+│                    │   (consistent across ALL)    │                                │
+│                    │   = True style invariants    │                                │
+│                    └──────────────────────────────┘                                │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
+RAG KNOWLEDGE CURATION PRINCIPLES:
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                                                                                     │
+│   1. DIVERSITY        Global perspectives, all body types, ages, accessibility     │
+│   2. CURRENCY         Balance historical with contemporary sources                 │
+│   3. PERSPECTIVES     Return MULTIPLE viewpoints, not one "truth"                  │
+│   4. BODY NEUTRALITY  Not just "flattering = thin"                                 │
+│   5. CULTURAL         Don't assume Western norms are universal                     │
+│   6. CREDIBILITY      Weight: peer-reviewed > textbooks > expert > blogs           │
+│                                                                                     │
+│   ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │
+│   │ TRADITIONAL │  │ BODY-NEUTRAL│  │  CULTURAL   │  │  PRACTICAL  │              │
+│   │ "A-line     │  │ "All shapes │  │ "In [ctx],  │  │ "For comfort│              │
+│   │  balances"  │  │  work well" │  │  this means"│  │  consider"  │              │
+│   └─────────────┘  └─────────────┘  └─────────────┘  └─────────────┘              │
+│         │                │                │                │                       │
+│         └────────────────┴────────────────┴────────────────┘                       │
+│                                   │                                                 │
+│                                   ▼                                                 │
+│                        LLM synthesizes based on                                    │
+│                        user preferences & context                                  │
+│                                                                                     │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+
 EMBEDDING SPACES (User ↔ Product in same space):
 ┌─────────────────────────────────────────────────────────────────────────────────────┐
 │                                                                                     │
-│   User Embeddings                              Product Embeddings                   │
+│   User Embeddings (per context)              Product Embeddings                    │
 │   ┌──────────────┐                             ┌──────────────┐                    │
 │   │ Semantic     │◄────── same space ────────►│ OpenAI text  │                    │
 │   │ [1536d]      │                             │ [1536d]      │                    │
