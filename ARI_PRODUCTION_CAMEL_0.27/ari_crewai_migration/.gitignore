@@ -74,3 +74,4 @@ dump.rdb
 onnx_sam2_repo/checkpoints/
 *.png
 onnx_sam2_repo/
+CLAUDE_HANDOFF_PROMPT.md
