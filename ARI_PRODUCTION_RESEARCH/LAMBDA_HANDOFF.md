@@ -264,7 +264,16 @@ python navigation_crew.py
 - `/home/ubuntu/fashionsig.env` - FashionSigLIP configuration
 - `/home/ubuntu/ari-prod.pem` - AWS credentials
 
-### 8.2 Git Repository
+### 8.2 SAM3 Folders (3D Object Generation)
+| Folder | Size | Description |
+|--------|------|-------------|
+| `~/sam-3d-objects/` | 13GB | SAM 3D model checkpoints and code |
+| `~/sam3/` | 130MB | SAM3 configuration and utilities |
+| `~/sam3_product_outputs/` | 1.2GB | Generated 3D product outputs |
+
+These folders contain the 3D object generation pipeline for product visualization.
+
+### 8.3 Git Repository
 The repo on Lambda may be behind. To update:
 ```bash
 cd ~/AIStylist
