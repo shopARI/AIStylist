@@ -107,17 +107,17 @@ print('All imports OK')
 ```
 
 ### 4.3 Environment Variables (.env)
-The `.env` file contains:
+The `.env` file should be updated for local services:
 ```bash
-# Neo4j Connection
-NEO4J_URL=bolt://34.135.40.119:7687
+# Neo4j Connection (LOCAL)
+NEO4J_URL=bolt://localhost:7687
 NEO4J_USERNAME=neo4j
 NEO4J_PASSWORD=shopari1234
 
 # OpenAI
 OPENAI_API_KEY=sk-proj-...
 
-# Qdrant (LOCAL - updated for Lambda)
+# Qdrant (LOCAL)
 QDRANT_URL=http://localhost:6333
 QDRANT_COLLECTION_NAME=fashion_products
 
@@ -126,7 +126,7 @@ NUM_WORKER_THREADS=4
 API_PORT=5000
 ```
 
-**IMPORTANT:** Update `QDRANT_URL` from the cloud URL to `http://localhost:6333` for local Qdrant.
+**IMPORTANT:** Update both `NEO4J_URL` and `QDRANT_URL` to use `localhost` for fully local operation.
 
 ---
 
@@ -214,12 +214,48 @@ driver.close()
 "
 ```
 
-### 6.2 Service URLs
+### 6.2 Service URLs (Local Mode)
 | Service | URL | Notes |
 |---------|-----|-------|
 | Qdrant | http://localhost:6333 | Local Docker |
-| Neo4j | bolt://34.135.40.119:7687 | Remote GCloud |
+| Neo4j | bolt://localhost:7687 | Local Docker |
 | OpenAI | api.openai.com | Cloud API |
+
+### 6.3 Neo4j Local Setup
+Neo4j runs locally on Lambda via Docker with the same credentials as production.
+
+```bash
+# Start Neo4j
+sudo docker start neo4j
+
+# Or run fresh:
+sudo docker run -d --name neo4j \
+    -p 7474:7474 -p 7687:7687 \
+    -v ~/neo4j/data:/data \
+    -v ~/neo4j/logs:/logs \
+    -v ~/neo4j/import:/var/lib/neo4j/import \
+    -e NEO4J_AUTH=neo4j/shopari1234 \
+    --restart unless-stopped \
+    neo4j:5.15.0
+
+# Web UI: http://localhost:7474
+# Bolt: bolt://localhost:7687
+# Credentials: neo4j / shopari1234
+```
+
+### 6.4 Neo4j Data Import
+To import the production database export:
+```bash
+cd ~/AIStylist/ARI_PRODUCTION_RESEARCH
+source venv/bin/activate
+pip install neo4j  # if not installed
+python ~/import_neo4j.py --clear
+```
+
+The import includes:
+- ~6.4M Product nodes
+- Brand, Color, Style, Material nodes
+- HAS_BRAND, HAS_COLOR, HAS_STYLE relationships
 
 ---
 
