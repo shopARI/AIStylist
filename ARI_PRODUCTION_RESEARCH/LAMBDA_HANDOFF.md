@@ -1,6 +1,6 @@
 # Lambda Migration Handoff Document
 
-**Date:** January 5, 2026 (Updated)
+**Date:** January 5, 2026 (V3 Schema Updated)
 **From:** GCloud VM (leo@gcloud)
 **To:** Lambda Labs (ubuntu@192.18.143.49)
 **Status:** ✅ MIGRATION COMPLETE
@@ -73,20 +73,27 @@ See `ARI_V3_Implementation_Roadmap.md` for the full 10-step implementation plan.
 - **Embedding Pipeline:** Complete (SigLIP 1024d + OpenAI 1536d)
 - **Three Pillars:** Framework exists, needs V3 refinement
 - **Navigation Engine:** Core exists, needs InterpretableDimensions integration
+- **Neo4j Storage Schema:** V3 spec now includes persistence layer (Section 1.4)
 
 ### Key V3 Components to Build
 1. `NavigationParameters` data structure
 2. `InterpretableDimensions` (8 fashion dimensions)
 3. 4-LLM orchestration (Navigator, Identifier, Describer, Presenter)
 4. Enhanced feedback loop with preference learning
+5. **NEW:** Implement V3 Neo4j nodes (NavigationState, ContextPosition, StyleTrajectory)
+6. **NEW:** Implement negative signal relationships (PASSED, REJECTED, RETURNED)
 
 ### Critical Files for V3
 ```
 ARI_PRODUCTION_RESEARCH/
 ├── ari_crewai_migration/          # CrewAI agent implementation
+│   ├── ARI_Navigation_Intelligence_PSEUDOCODE_V3.md  # ⭐ V3 Spec (updated Jan 2026)
 │   ├── fashion_agents.py          # Agent definitions
 │   ├── fashion_tasks.py           # Task definitions
-│   └── navigation_crew.py         # Crew orchestration
+│   ├── navigation_crew.py         # Crew orchestration
+│   └── config/
+│       ├── user_graph_schema.json       # V1 User schema
+│       └── neo4j_schema_v2_onboarding.json  # V2 Onboarding schema
 ├── onboarding/                    # User onboarding system
 │   ├── onboarding_conversation.py # 6-node conversation flow
 │   └── profile_aggregator.py      # Profile compilation
@@ -95,6 +102,13 @@ ARI_PRODUCTION_RESEARCH/
 │   └── balanced_enhanced_embeddings.py
 └── run_fashionsig_multimodal_multi_image.py  # SigLIP visual embeddings
 ```
+
+### V3 Neo4j Schema (Section 1.4 of Pseudocode)
+New nodes and relationships for navigation persistence:
+- **NavigationState**: Current position + active context per user
+- **ContextPosition**: Per-context positions (work, casual, etc.)
+- **StyleTrajectory**: Direction and velocity of style evolution
+- **PASSED/REJECTED/RETURNED**: Negative signal relationships for exclusion
 
 ---
 

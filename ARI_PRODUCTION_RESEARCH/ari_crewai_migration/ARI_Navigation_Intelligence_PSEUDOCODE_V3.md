@@ -984,6 +984,220 @@ STRUCTURE RawUserData:
 
 ---
 
+### 1.4 Neo4j Storage Schema (V3 Addition)
+
+The following schema defines how V3 navigation structures are persisted in Neo4j. This enables session continuity, trajectory tracking, and preference learning.
+
+```
+# ═══════════════════════════════════════════════════════════════════════════════
+# V3 NODE DEFINITIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+NODE NavigationState:
+    """
+    Persists the current navigation state for a user.
+    One per user, updated each session.
+    """
+    id: STRING (UUID)
+    user_id: STRING
+
+    # Current position (embedding serialized as JSON array)
+    current_embedding: LIST[FLOAT]           # OpenAI 1536d
+    current_visual_embedding: LIST[FLOAT]    # SigLIP 1024d (optional)
+
+    # Active context
+    active_context: STRING                   # StyleContext name
+
+    # Session metadata
+    session_id: STRING
+    last_updated: DATETIME
+    created_at: DATETIME
+
+
+NODE ContextPosition:
+    """
+    Per-context position in style space.
+    Users have multiple positions (one per context they've interacted in).
+    """
+    id: STRING (UUID)
+    context: STRING                          # "work_professional", "casual_weekend", etc.
+
+    # Position embedding
+    embedding: LIST[FLOAT]                   # OpenAI 1536d
+    visual_embedding: LIST[FLOAT]            # SigLIP 1024d (optional)
+
+    # Quality metrics
+    interaction_count: INT
+    confidence: FLOAT                        # 0-1, based on data quality
+
+    # Temporal
+    first_interaction: DATETIME
+    last_interaction: DATETIME
+
+
+NODE StyleTrajectory:
+    """
+    Tracks style evolution over time within a context.
+    Enables "you're moving toward X" insights.
+    """
+    id: STRING (UUID)
+    context: STRING                          # Context this trajectory belongs to
+
+    # Direction in embedding space
+    direction_embedding: LIST[FLOAT]         # Normalized direction vector
+
+    # Trajectory metrics
+    velocity: FLOAT                          # Rate of change (0-1)
+    consistency: FLOAT                       # How stable is this direction (0-1)
+
+    # Temporal
+    computed_from_window: STRING             # e.g., "30_days", "90_days"
+    last_computed: DATETIME
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# V3 RELATIONSHIP DEFINITIONS
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Navigation State Relationships
+RELATIONSHIP (User)-[:HAS_NAV_STATE]->(NavigationState)
+RELATIONSHIP (User)-[:HAS_CONTEXT_POSITION]->(ContextPosition)
+RELATIONSHIP (ContextPosition)-[:HAS_TRAJECTORY]->(StyleTrajectory)
+
+# Positive Interaction Signals (existing)
+RELATIONSHIP (User)-[:VIEWED]->(Product)
+    properties: {
+        timestamp: DATETIME,
+        session_id: STRING,
+        context: STRING,
+        time_spent_ms: INT,
+        source: STRING                       # "search", "recommendation", "browse"
+    }
+
+RELATIONSHIP (User)-[:SAVED]->(Product)
+    properties: {
+        timestamp: DATETIME,
+        session_id: STRING,
+        context: STRING,
+        collection_id: STRING                # Optional: which collection
+    }
+
+RELATIONSHIP (User)-[:PURCHASED]->(Product)
+    properties: {
+        timestamp: DATETIME,
+        session_id: STRING,
+        context: STRING,
+        order_id: STRING,
+        price_paid: FLOAT
+    }
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# V3 NEGATIVE SIGNAL RELATIONSHIPS (NEW)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+RELATIONSHIP (User)-[:PASSED]->(Product)
+    """
+    User saw product but explicitly chose not to engage.
+    Weak negative signal - may indicate "not for this context" vs "dislike".
+    """
+    properties: {
+        timestamp: DATETIME,
+        session_id: STRING,
+        context: STRING,
+        exposure_time_ms: INT,               # How long was it visible
+        position_in_results: INT             # Where in the list
+    }
+
+RELATIONSHIP (User)-[:REJECTED]->(Product)
+    """
+    User explicitly rejected (thumbs down, "not for me", removed from consideration).
+    Strong negative signal - use for exclusion in future recommendations.
+    """
+    properties: {
+        timestamp: DATETIME,
+        session_id: STRING,
+        context: STRING,
+        rejection_reason: STRING,            # Optional: if user provided
+        source: STRING                       # "carousel", "comparison", "detail_page"
+    }
+
+RELATIONSHIP (User)-[:RETURNED]->(Product)
+    """
+    User purchased but returned.
+    Strongest negative signal - indicates mismatch between expectation and reality.
+    """
+    properties: {
+        timestamp: DATETIME,
+        order_id: STRING,
+        return_reason: STRING,               # "fit", "quality", "color", "style", "other"
+        days_kept: INT,                      # How long before return
+        original_purchase_context: STRING
+    }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# CYPHER EXAMPLES FOR V3 PERSISTENCE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Save navigation state after session
+QUERY save_navigation_state(user_id, state):
+    """
+    MERGE (u:User {id: $user_id})
+    MERGE (u)-[:HAS_NAV_STATE]->(ns:NavigationState {user_id: $user_id})
+    SET ns.current_embedding = $embedding,
+        ns.active_context = $context,
+        ns.session_id = $session_id,
+        ns.last_updated = datetime()
+    """
+
+# Save context position after interactions
+QUERY save_context_position(user_id, context, position):
+    """
+    MERGE (u:User {id: $user_id})
+    MERGE (u)-[:HAS_CONTEXT_POSITION]->(cp:ContextPosition {
+        user_id: $user_id,
+        context: $context
+    })
+    SET cp.embedding = $embedding,
+        cp.interaction_count = cp.interaction_count + 1,
+        cp.confidence = $confidence,
+        cp.last_interaction = datetime()
+    """
+
+# Record negative signal (rejection)
+QUERY record_rejection(user_id, product_id, context, reason):
+    """
+    MATCH (u:User {id: $user_id})
+    MATCH (p:Product {id: $product_id})
+    CREATE (u)-[:REJECTED {
+        timestamp: datetime(),
+        context: $context,
+        rejection_reason: $reason,
+        session_id: $session_id
+    }]->(p)
+    """
+
+# Compute trajectory from recent interactions
+QUERY compute_trajectory(user_id, context, days):
+    """
+    MATCH (u:User {id: $user_id})-[r:PURCHASED|SAVED|VIEWED]->(p:Product)
+    WHERE r.context = $context
+      AND r.timestamp > datetime() - duration({days: $days})
+    WITH p ORDER BY r.timestamp
+    RETURN p.embedding AS embeddings
+    // Process in application layer to compute direction vector
+    """
+
+# Get products to exclude (negative signals)
+QUERY get_exclusions(user_id):
+    """
+    MATCH (u:User {id: $user_id})-[:REJECTED|RETURNED]->(p:Product)
+    RETURN COLLECT(DISTINCT p.id) AS excluded_ids
+    """
+```
+
+---
+
 ## Section 2: Three Pillars - Knowledge Sources
 
 ### 2.1 Pillar 1: Personalization (Updated)
