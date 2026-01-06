@@ -40,7 +40,7 @@ class Mem0MemoryProvider:
                     "url": os.getenv("NEO4J_URI", "neo4j://localhost:7687"),
                     "username": os.getenv("NEO4J_USER", "neo4j"),
                     "password": os.getenv("NEO4J_PASSWORD", "password"),
-                    "database": "users"  # Use users database for graph memory
+                    "database": os.getenv("NEO4J_USER_DATABASE", "users")
                 }
             },
             "vector_store": {

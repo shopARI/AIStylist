@@ -26,7 +26,7 @@ async def _execute_neo4j_query(cypher: str, parameters: Dict[str, Any] = None) -
         neo4j_uri = os.getenv("NEO4J_URI") or os.getenv("NEO4J_URL", "bolt://localhost:7687")
         neo4j_user = os.getenv("NEO4J_USER") or os.getenv("NEO4J_USERNAME", "neo4j")
         neo4j_password = os.getenv("NEO4J_PASSWORD", "")
-        neo4j_database = os.getenv("NEO4J_DATABASE", "neo4j")  # Default to "neo4j" if not specified
+        neo4j_database = os.getenv("NEO4J_DATABASE", "productionbackup2")
 
         driver = AsyncGraphDatabase.driver(
             neo4j_uri,

@@ -380,9 +380,9 @@ class InstagramEmbeddings:
     """Embeddings from Instagram analysis."""
     saved_posts_embedding: np.ndarray
     liked_posts_embedding: Optional[np.ndarray] = None
-    following_style_embedding: np.ndarray = None
-    overall_embedding: np.ndarray = None
-    last_synced: datetime = None
+    following_style_embedding: Optional[np.ndarray] = None
+    overall_embedding: Optional[np.ndarray] = None
+    last_synced: Optional[datetime] = None
 
 
 @dataclass
@@ -390,8 +390,8 @@ class TikTokEmbeddings:
     """Embeddings from TikTok analysis."""
     liked_videos_embedding: np.ndarray
     saved_videos_embedding: Optional[np.ndarray] = None
-    overall_embedding: np.ndarray = None
-    last_synced: datetime = None
+    overall_embedding: Optional[np.ndarray] = None
+    last_synced: Optional[datetime] = None
 
 
 @dataclass
