@@ -80,6 +80,7 @@ test_*.py
 *_test.py
 debug_*.py
 *_debug.py
+ari_v3/tests/
 
 # Development tools and chat interfaces (local only)
 chat_terminal.py
