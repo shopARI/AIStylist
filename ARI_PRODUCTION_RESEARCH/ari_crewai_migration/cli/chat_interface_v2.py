@@ -20,6 +20,8 @@ warnings.filterwarnings("ignore", category=DeprecationWarning)
 
 # Add parent directory to path - ensure it's at the front to avoid conflicts
 import os
+from dotenv import load_dotenv
+load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 _current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ari_crewai_migration
 _parent_dir = os.path.dirname(_current_dir)  # ARI_PRODUCTION_CAMEL_0.27
 
