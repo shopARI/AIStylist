@@ -25,7 +25,7 @@ from ari_v3.core import (
     serialize_onboarding_profile,
     serialize_navigation_params,
 )
-from ari_v3.services import UserGraphManager
+from ari_v3.services.user_graph_manager import UserGraphManager
 
 logger = logging.getLogger("ari_v3.services.onboarding")
 

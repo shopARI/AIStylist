@@ -115,12 +115,40 @@ def convert_extracted_to_v3_profile(
     )
 
 
+def _safe_int(value: Any, default: int, min_val: int = None, max_val: int = None) -> int:
+    """Safely convert value to int with optional bounds."""
+    try:
+        result = int(value) if value is not None else default
+        if min_val is not None:
+            result = max(min_val, result)
+        if max_val is not None:
+            result = min(max_val, result)
+        return result
+    except (ValueError, TypeError):
+        return default
+
+
+def _safe_float(value: Any, default: float, min_val: float = None, max_val: float = None) -> float:
+    """Safely convert value to float with optional bounds."""
+    try:
+        result = float(value) if value is not None else default
+        if min_val is not None:
+            result = max(min_val, result)
+        if max_val is not None:
+            result = min(max_val, result)
+        return result
+    except (ValueError, TypeError):
+        return default
+
+
 def _build_personal_node(data: Dict[str, Any]) -> PersonalNode:
     """Build PersonalNode from extracted personal data."""
     # Location
-    location_data = data.get("location", {})
+    location_data = data.get("location") or {}
     if isinstance(location_data, str):
         location_data = {"city": location_data, "region": "", "urban_suburban_rural": "urban"}
+    elif not isinstance(location_data, dict):
+        location_data = {}
 
     location = Location(
         city=location_data.get("city", "Unknown"),
@@ -146,7 +174,7 @@ def _build_personal_node(data: Dict[str, Any]) -> PersonalNode:
             DressCode,
             DressCode.CASUAL
         ),
-        work_style_alignment=float(occupation_data.get("work_style_alignment", 0.5)),
+        work_style_alignment=_safe_float(occupation_data.get("work_style_alignment"), 0.5, 0.0, 1.0),
     )
 
     # Occasions
@@ -162,7 +190,7 @@ def _build_personal_node(data: Dict[str, Any]) -> PersonalNode:
                 OccasionFrequency,
                 OccasionFrequency.WEEKLY
             ),
-            importance=float(occ.get("importance", 0.5)),
+            importance=_safe_float(occ.get("importance"), 0.5, 0.0, 1.0),
             style_context=_map_occasion_to_context(occ.get("name", "")),
         ))
 
@@ -177,7 +205,7 @@ def _build_personal_node(data: Dict[str, Any]) -> PersonalNode:
         )
 
     return PersonalNode(
-        age=int(data.get("age", 30)),
+        age=_safe_int(data.get("age"), 30, 13, 120),
         life_stage=data.get("life_stage", "established"),
         location=location,
         occupation=occupation,
@@ -204,7 +232,7 @@ def _build_taste_node(data: Dict[str, Any]) -> TasteNode:
 
     gender_expression = GenderExpression(
         spectrum_position=str(gender_expr_data.get("spectrum_position", "balanced")),
-        fluidity=float(gender_expr_data.get("fluidity", 0.3)),
+        fluidity=_safe_float(gender_expr_data.get("fluidity"), 0.3, 0.0, 1.0),
         fit_preferences=gender_expr_data.get("fit_preferences", []),
     )
 
@@ -232,7 +260,7 @@ def _build_taste_node(data: Dict[str, Any]) -> TasteNode:
             style_data = {"description": style_data, "consistency_with_other_contexts": 0.7}
         occasion_styles[occ_name] = OccasionStyle(
             description=style_data.get("description", ""),
-            consistency_with_other_contexts=float(style_data.get("consistency_with_other_contexts", 0.7)),
+            consistency_with_other_contexts=_safe_float(style_data.get("consistency_with_other_contexts"), 0.7, 0.0, 1.0),
         )
 
     return TasteNode(
@@ -258,7 +286,7 @@ def _build_process_node(data: Dict[str, Any]) -> ProcessNode:
             mot = {"motivation": mot, "importance": 0.5, "root_value": ""}
         style_motivations.append(StyleMotivation(
             motivation=mot.get("motivation", ""),
-            importance=float(mot.get("importance", 0.5)),
+            importance=_safe_float(mot.get("importance"), 0.5, 0.0, 1.0),
             root_value=mot.get("root_value", ""),
         ))
 
@@ -274,7 +302,7 @@ def _build_process_node(data: Dict[str, Any]) -> ProcessNode:
                 ValidationSource,
                 ValidationSource.SELF
             ),
-            importance=float(vs.get("importance", 0.5)),
+            importance=_safe_float(vs.get("importance"), 0.5, 0.0, 1.0),
         ))
 
     # Default validation source if none provided
@@ -286,7 +314,7 @@ def _build_process_node(data: Dict[str, Any]) -> ProcessNode:
     social_influences = SocialInfluences(
         primary_sources=social_data.get("primary_sources", []),
         trend_relationship=social_data.get("trend_relationship", "follower"),
-        originality_importance=float(social_data.get("originality_importance", 0.5)),
+        originality_importance=_safe_float(social_data.get("originality_importance"), 0.5, 0.0, 1.0),
     )
 
     # Exploration preference
@@ -300,10 +328,10 @@ def _build_process_node(data: Dict[str, Any]) -> ProcessNode:
 
     return ProcessNode(
         style_motivations=style_motivations,
-        creative_control=int(data.get("creative_control", 5)),
+        creative_control=_safe_int(data.get("creative_control"), 5, 1, 10),
         style_goals=data.get("style_goals", ""),
-        brand_loyalty=int(data.get("brand_loyalty", 5)),
-        adventurousness=int(data.get("adventurousness", 5)),
+        brand_loyalty=_safe_int(data.get("brand_loyalty"), 5, 1, 10),
+        adventurousness=_safe_int(data.get("adventurousness"), 5, 1, 10),
         validation_sources=validation_sources,
         exploration_preference=exploration_pref,
         social_influences=social_influences,
@@ -315,11 +343,15 @@ def _build_practicality_node(data: Dict[str, Any]) -> PracticalityNode:
     # Budget
     budget_data = data.get("budget", {})
     if isinstance(budget_data, (int, float)):
-        budget_data = {"monthly": budget_data, "yearly": budget_data * 12}
+        monthly_val = float(budget_data)
+        budget_data = {"monthly": monthly_val, "yearly": monthly_val * 12}
+    elif not isinstance(budget_data, dict):
+        budget_data = {}
 
+    monthly = _safe_float(budget_data.get("monthly"), 500, 0)
     budget = Budget(
-        monthly=float(budget_data.get("monthly", 500)),
-        yearly=float(budget_data.get("yearly", budget_data.get("monthly", 500) * 12)),
+        monthly=monthly,
+        yearly=_safe_float(budget_data.get("yearly"), monthly * 12, 0),
         flexibility=_parse_enum(
             budget_data.get("flexibility", "guideline"),
             BudgetFlexibility,
@@ -421,11 +453,11 @@ def _build_root_values(
     process_data = nodes.get("process", {})
 
     # Authenticity: high creative_control suggests authenticity importance
-    creative_control = int(process_data.get("creative_control", 5))
+    creative_control = _safe_int(process_data.get("creative_control"), 5, 1, 10)
     authenticity = creative_control / 10.0
 
     # Belonging vs standing out
-    adventurousness = int(process_data.get("adventurousness", 5))
+    adventurousness = _safe_int(process_data.get("adventurousness"), 5, 1, 10)
     standing_out = adventurousness / 10.0
     belonging = 1.0 - standing_out
 
