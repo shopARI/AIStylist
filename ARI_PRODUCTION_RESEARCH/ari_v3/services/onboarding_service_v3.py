@@ -16,7 +16,6 @@ from datetime import datetime
 
 from ari_v3.interpretation import (
     interpret_onboarding,
-    convert_extracted_to_v3_profile,
     OnboardingInterpreter,
 )
 from ari_v3.core import (
@@ -182,18 +181,17 @@ class OnboardingServiceV3:
         Returns:
             Updated (OnboardingProfile, NavigationParameters)
         """
+        from ari_v3.core import deserialize_to_onboarding_profile
+
         # Get existing profile
         existing_data = self.get_user_v3_profile(user_id)
         if not existing_data:
             raise ValueError(f"No V3 profile found for user {user_id}")
 
-        # Convert to OnboardingProfile (simplified - would need full deserialization)
-        existing_profile = convert_extracted_to_v3_profile({
-            "nodes": existing_data,
-            "root_values": {},
-            "photos": {},
-            "social_media": {},
-        })
+        # Deserialize stored data back to OnboardingProfile
+        existing_profile = deserialize_to_onboarding_profile(existing_data)
+        if not existing_profile:
+            raise ValueError(f"Failed to deserialize V3 profile for user {user_id}")
 
         # Re-interpret with behavioral context
         updated_profile, updated_params = await self.interpreter.reinterpret(

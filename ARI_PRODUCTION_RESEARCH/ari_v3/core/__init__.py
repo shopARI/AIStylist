@@ -111,6 +111,7 @@ from .serialization import (
     serialize_onboarding_profile,
     serialize_navigation_params,
     deserialize_to_navigation_params,
+    deserialize_to_onboarding_profile,
 )
 
 __all__ = [
@@ -190,4 +191,5 @@ __all__ = [
     "serialize_onboarding_profile",
     "serialize_navigation_params",
     "deserialize_to_navigation_params",
+    "deserialize_to_onboarding_profile",
 ]
