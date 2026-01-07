@@ -707,6 +707,64 @@ Give ONLY your next message to the user. Nothing else.
                 return False
         return True
 
+    def finalize_v3_onboarding(self, user_id: str) -> Dict[str, Any]:
+        """
+        Finalize onboarding by processing data through V3 interpretation.
+
+        This method should be called after onboarding is complete to:
+        1. Convert extracted data to V3 OnboardingProfile
+        2. Derive NavigationParameters
+        3. Store both in Neo4j
+
+        Args:
+            user_id: User ID to associate with the profile
+
+        Returns:
+            Dict with profile and nav_params on success, error info on failure
+        """
+        if not self.is_complete():
+            return {
+                "success": False,
+                "error": "Onboarding not complete. Call is_complete() to check status."
+            }
+
+        try:
+            # Lazy import to avoid circular dependencies
+            from ari_v3.services import OnboardingServiceV3
+
+            # Get all extracted data
+            extracted_data = self.get_all_extracted_data()
+
+            # Process through V3
+            service = OnboardingServiceV3()
+            try:
+                profile, nav_params = service.process_completed_onboarding(
+                    user_id=user_id,
+                    extracted_data=extracted_data
+                )
+
+                return {
+                    "success": True,
+                    "user_id": user_id,
+                    "exploration_appetite": nav_params.exploration_appetite,
+                    "brand_affinity_weight": nav_params.brand_affinity_weight,
+                    "step_size_multiplier": nav_params.step_size_multiplier,
+                    "message": "V3 profile and navigation parameters stored successfully"
+                }
+            finally:
+                service.close()
+
+        except ImportError as e:
+            return {
+                "success": False,
+                "error": f"V3 module not available: {e}"
+            }
+        except Exception as e:
+            return {
+                "success": False,
+                "error": f"V3 processing failed: {e}"
+            }
+
     def reset(self):
         """Reset the onboarding crew to start fresh."""
         self.current_node_id = None
