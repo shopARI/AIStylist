@@ -105,6 +105,14 @@ from .navigation_params import (
     summarize_navigation_parameters,
 )
 
+# Serialization utilities
+from .serialization import (
+    serialize_dataclass,
+    serialize_onboarding_profile,
+    serialize_navigation_params,
+    deserialize_to_navigation_params,
+)
+
 __all__ = [
     # Enums
     "StyleContext",
@@ -177,4 +185,9 @@ __all__ = [
     "get_budget_for_category",
     "calculate_budget_range",
     "summarize_navigation_parameters",
+    # Serialization utilities
+    "serialize_dataclass",
+    "serialize_onboarding_profile",
+    "serialize_navigation_params",
+    "deserialize_to_navigation_params",
 ]

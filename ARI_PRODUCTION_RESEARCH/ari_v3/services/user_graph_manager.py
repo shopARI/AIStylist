@@ -7,6 +7,7 @@ and calculating observed preferences.
 """
 
 import os
+import json
 import uuid
 import logging
 from typing import List, Dict, Optional, Any
@@ -1091,3 +1092,163 @@ class UserGraphManager:
                 metrics['accepted_within_budget'] = sum(1 for p in accepted_prices if budget_min <= p <= budget_max)
 
             return metrics
+
+    # ======================
+    # V3 ONBOARDING PROFILE & NAVIGATION PARAMETERS
+    # ======================
+
+    def store_v3_onboarding_profile(self, user_id: str, profile_data: Dict[str, Any]) -> bool:
+        """
+        Store V3 OnboardingProfile in Neo4j.
+
+        Creates OnboardingProfileV3 node with all 6 sub-nodes.
+
+        Args:
+            user_id: User ID
+            profile_data: Serialized OnboardingProfile data
+
+        Returns:
+            Success boolean
+        """
+        self._validate_user_id(user_id)
+
+        with self.driver.session(database=self.database) as session:
+            # Create main profile node
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                MERGE (u)-[:HAS_V3_PROFILE]->(p:OnboardingProfileV3 {user_id: $user_id})
+                SET p.created_at = COALESCE(p.created_at, datetime()),
+                    p.updated_at = datetime(),
+                    p.reinterpretation_count = $reinterpretation_count,
+                    p.root_values_primary = $root_values_primary,
+                    p.root_values_secondary = $root_values_secondary
+                RETURN p
+            """,
+                user_id=user_id,
+                reinterpretation_count=profile_data.get("reinterpretation_count", 0),
+                root_values_primary=profile_data.get("root_values", {}).get("primary", ""),
+                root_values_secondary=profile_data.get("root_values", {}).get("secondary", []),
+            )
+
+            # Store each node as JSON properties (simplified storage)
+            for node_name in ["personal", "taste", "process", "practicality", "body", "external"]:
+                node_data = profile_data.get(node_name, {})
+                if node_data:
+                    session.run(f"""
+                        MATCH (u:User {{id: $user_id}})-[:HAS_V3_PROFILE]->(p:OnboardingProfileV3)
+                        SET p.{node_name}_data = $node_data
+                    """,
+                        user_id=user_id,
+                        node_data=json.dumps(node_data) if isinstance(node_data, dict) else str(node_data),
+                    )
+
+            return True
+
+    def store_navigation_parameters(self, user_id: str, nav_params_data: Dict[str, Any]) -> bool:
+        """
+        Store V3 NavigationParameters in Neo4j.
+
+        Creates NavigationParameters node linked to user.
+
+        Args:
+            user_id: User ID
+            nav_params_data: Serialized NavigationParameters data
+
+        Returns:
+            Success boolean
+        """
+        self._validate_user_id(user_id)
+
+        with self.driver.session(database=self.database) as session:
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                MERGE (u)-[:HAS_NAV_PARAMS]->(np:NavigationParameters {user_id: $user_id})
+                SET np.exploration_appetite = $exploration_appetite,
+                    np.step_size_multiplier = $step_size_multiplier,
+                    np.brand_affinity_weight = $brand_affinity_weight,
+                    np.result_set_size = $result_set_size,
+                    np.diversity_requirement = $diversity_requirement,
+                    np.user_embedding_weight = $user_embedding_weight,
+                    np.default_budget_min = $default_budget_min,
+                    np.default_budget_max = $default_budget_max,
+                    np.default_budget_flexibility = $default_budget_flexibility,
+                    np.category_budget_overrides = $category_budget_overrides,
+                    np.created_at = COALESCE(np.created_at, datetime()),
+                    np.updated_at = datetime()
+                RETURN np
+            """,
+                user_id=user_id,
+                exploration_appetite=nav_params_data.get("exploration_appetite", 0.5),
+                step_size_multiplier=nav_params_data.get("step_size_multiplier", 1.0),
+                brand_affinity_weight=nav_params_data.get("brand_affinity_weight", 0.5),
+                result_set_size=nav_params_data.get("result_set_size", 10),
+                diversity_requirement=nav_params_data.get("diversity_requirement", 0.5),
+                user_embedding_weight=nav_params_data.get("user_embedding_weight", 0.5),
+                default_budget_min=nav_params_data.get("default_budget", {}).get("min", 50),
+                default_budget_max=nav_params_data.get("default_budget", {}).get("max", 250),
+                default_budget_flexibility=nav_params_data.get("default_budget", {}).get("flexibility", 0.4),
+                category_budget_overrides=json.dumps(nav_params_data.get("category_budget_overrides", {})),
+            )
+
+            return True
+
+    def get_navigation_parameters(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get V3 NavigationParameters for a user.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            NavigationParameters data or None
+        """
+        with self.driver.session(database=self.database) as session:
+            result = session.run("""
+                MATCH (u:User {id: $user_id})-[:HAS_NAV_PARAMS]->(np:NavigationParameters)
+                RETURN np
+            """, user_id=user_id)
+
+            record = result.single()
+            if record:
+                np_data = dict(record['np'])
+                # Parse category_budget_overrides from JSON
+                if 'category_budget_overrides' in np_data and np_data['category_budget_overrides']:
+                    try:
+                        np_data['category_budget_overrides'] = json.loads(np_data['category_budget_overrides'])
+                    except (json.JSONDecodeError, TypeError):
+                        np_data['category_budget_overrides'] = {}
+                return convert_neo4j_datetimes(np_data)
+            return None
+
+    def get_v3_onboarding_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get V3 OnboardingProfile for a user.
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            OnboardingProfile data or None
+        """
+        with self.driver.session(database=self.database) as session:
+            result = session.run("""
+                MATCH (u:User {id: $user_id})-[:HAS_V3_PROFILE]->(p:OnboardingProfileV3)
+                RETURN p
+            """, user_id=user_id)
+
+            record = result.single()
+            if record:
+                profile_data = dict(record['p'])
+
+                # Parse JSON node data
+                for node_name in ["personal", "taste", "process", "practicality", "body", "external"]:
+                    key = f"{node_name}_data"
+                    if key in profile_data and profile_data[key]:
+                        try:
+                            profile_data[node_name] = json.loads(profile_data[key])
+                            del profile_data[key]
+                        except (json.JSONDecodeError, TypeError):
+                            profile_data[node_name] = {}
+
+                return convert_neo4j_datetimes(profile_data)
+            return None
