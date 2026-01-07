@@ -1,8 +1,8 @@
 # ARI V3 Implementation Roadmap
 
-Version: 1.0
-Date: 2025-12-31
-Status: Ready for Implementation
+Version: 1.1
+Date: 2026-01-07
+Status: Steps 1-2 COMPLETE, Ready for Step 3
 
 ---
 
@@ -12,77 +12,83 @@ This document outlines the implementation plan for ARI Navigation Intelligence V
 
 ---
 
-## Step 1: V3 Data Structures
+## Step 1: V3 Data Structures [COMPLETE]
 
 Foundation that everything else depends on.
 
-1.1 Create core/data_structures.py
-    - StyleContext enum
-    - OnboardingProfile (V3 aligned)
-    - NavigationParameters
-    - StyleCoordinate
-    - ContextualPosition
-    - ComputedUserState
-    - UserEmbeddings (V3 format)
-    - SocialTasteEmbeddings
-    - InterpretableDimensions - DEFER to post-MVP. Embeddings are canonical; interpretable projections are nice-to-have for explanations.
+1.1 Create ari_v3/core/data_structures.py [DONE]
+    - StyleContext enum (8 contexts: professional, casual, evening, formal, active, creative, travel, default)
+    - OnboardingProfile (V3 aligned with 6 nodes + root_values + metadata)
+    - NavigationParameters (exploration_appetite, step_size_multiplier, etc.)
+    - StyleCoordinate, ContextualPosition, ComputedUserState
+    - UserEmbeddings, SocialTasteEmbeddings
+    - InterpretableDimensions - DEFER to post-MVP
 
-1.2 Create core/navigation_params.py
+1.2 Create ari_v3/core/navigation_params.py [DONE]
     - derive_navigation_parameters(profile) returns NavigationParameters
-    - Pure function, no LLM, deterministic formulas from V3 spec
-    - Formulas:
+    - Pure function, no LLM, deterministic formulas:
         exploration_appetite = (adventurousness/10) * 0.7 + (1 - creative_control/10) * 0.3
         step_size_multiplier = 0.5 + (adventurousness/10) * 1.0
         user_embedding_weight = 0.3 + (creative_control/10) * 0.4
         brand_affinity_weight = brand_loyalty / 10
+    - Helper functions: calculate_max_step_size, calculate_velocity_adjustment, etc.
 
-1.3 Update models/onboarding_models.py
-    - Align existing models with V3 OnboardingProfile structure
-    - Add missing fields (root_values, occasion_styles, validation_sources, etc.)
+1.3 V3 module structure created [DONE]
+    - ari_v3/core/ - data structures and navigation params
+    - ari_v3/services/ - user_graph_manager with V3 storage
+    - ari_v3/tools/ - neo4j_tools, qdrant_tools (async)
+    - All configured for productionbackup2 database (6.4M products)
 
-1.4 Verification
-    - Unit tests for all structures
-    - Unit tests for derivation function
+1.4 Verification [DONE]
+    - 32 unit tests for core structures
+    - 11 integration tests for Neo4j/Qdrant
+    - All tests passing
 
 Dependencies: None
 Unlocks: Steps 2, 3, 4
 
 ---
 
-## Step 2: LLM #2 Interpretation Upgrade
+## Step 2: LLM #2 Interpretation Upgrade [COMPLETE]
 
 Formalize existing extraction to output V3 structures.
 
-2.1 Update crews/onboarding_crew_v2.py
-    - Modify _run_extraction_agent() to output OnboardingProfile (V3)
-    - Add root_values extraction to prompt
-    - Ensure all 6 nodes map to V3 structure (Personal, Taste, Process, Practicality, Body, External)
+**Design Decision:** LLM #2 is implemented as deterministic conversion from OnboardingCrewV2's
+extracted data to V3 structures. The crew already performs LLM extraction with root_value_connection
+prompts, so we convert rather than re-extract. This is efficient and aligns with "formalize existing."
 
-2.2 Create interpretation/interpretation_llm.py
-    - interpret_onboarding(raw_conversations) returns OnboardingProfile
-    - Structured output with response_format
-    - Extraction of implicit signals + explicit values
-    - Separate extract_root_values() function for deeper psychological inference
+2.1 Update crews/onboarding_crew_v2.py [DONE]
+    - Added finalize_v3_onboarding(user_id) method - calls V3 service after onboarding completes
+    - root_values extraction already in prompts (root_value_connection fields)
+    - All 6 nodes mapped: Personal, Taste, Process, Practicality, Body, External
 
-2.3 Update services/onboarding_service.py
-    - After interpretation, call derive_navigation_parameters()
-    - Store both OnboardingProfile and NavigationParameters in Neo4j
+2.2 Create ari_v3/interpretation/interpretation_llm.py [DONE]
+    - interpret_onboarding(extracted_data) returns (OnboardingProfile, NavigationParameters)
+    - convert_extracted_to_v3_profile() - deterministic conversion from crew output
+    - extract_root_values() - async LLM call for deeper psychological inference (optional)
+    - Safe type conversion with bounds validation (_safe_int, _safe_float)
 
-2.4 Update Neo4j schema
-    - Add [:HAS_NAV_PARAMS] relationship
-    - Add NavigationParameters node type
-    - Add to OnboardingProfile node:
+2.3 Create ari_v3/services/onboarding_service_v3.py [DONE]
+    - OnboardingServiceV3 class with full Neo4j integration
+    - process_completed_onboarding() calls derive_navigation_parameters()
+    - Stores both OnboardingProfile and NavigationParameters in Neo4j
+    - reinterpret_profile() for behavioral drift re-interpretation
+
+2.4 Update Neo4j schema (in ari_v3/services/user_graph_manager.py) [DONE]
+    - Added [:HAS_NAV_PARAMS] relationship
+    - Added NavigationParameters node type
+    - Added to OnboardingProfile node:
         - reinterpreted_at: DATETIME
         - reinterpretation_count: INT
-    - Add RecommendationSession node type (for Step 9)
-    - Add [:HAD_SESSION] relationship
-    - Add [:OUTCOME] relationship
+    - RecommendationSession, [:HAD_SESSION], [:OUTCOME] deferred to Step 9
 
-2.5 Verification
-    - End-to-end onboarding to profile to nav_params flow
-    - Verify all fields populated correctly
+2.5 Verification [DONE]
+    - 112 tests in ari_v3/tests/ (unit + integration)
+    - test_step2_comprehensive.py: 54 tests covering edge cases
+    - Neo4j store/retrieve roundtrip tests
+    - All tests passing
 
-Dependencies: Step 1
+Dependencies: Step 1 [COMPLETE]
 Unlocks: Steps 3, 4, 5
 
 ---
