@@ -16,11 +16,26 @@ from .personalization import (
     CONFIDENCE_SCALE,
 )
 
+from .stylist_knowledge import (
+    Pillar2_StylistKnowledge,
+    RetrievedKnowledge,
+    StylingContext,
+    MultiPerspectiveResult,
+    KNOWLEDGE_COLLECTION,
+)
+
 __all__ = [
+    # Pillar 1
     "Pillar1_Personalization",
     "QueryContext",
     "MIN_INTERACTIONS_FOR_POSITION",
     "MIN_INTERACTIONS_FOR_TRAJECTORY",
     "RECENT_DAYS",
     "CONFIDENCE_SCALE",
+    # Pillar 2
+    "Pillar2_StylistKnowledge",
+    "RetrievedKnowledge",
+    "StylingContext",
+    "MultiPerspectiveResult",
+    "KNOWLEDGE_COLLECTION",
 ]
