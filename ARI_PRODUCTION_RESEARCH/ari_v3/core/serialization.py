@@ -157,7 +157,8 @@ def deserialize_to_onboarding_profile(data: Dict[str, Any]) -> Optional[Onboardi
         Location, Occupation, Occasion, BrandPreference, GenderExpression,
         ValidationPreference, ValidationSource, StyleMotivation, Budget, CategoryBudget,
         Coloring, StyleContext, OccasionStyle, ExplorationPreference, SocialInfluences,
-        SocialMediaConnection,
+        SocialMediaConnection, UrbanType, DressCode, OccasionFrequency, BrandFrequency,
+        BudgetFlexibility, BudgetLevel, Undertone,
     )
 
     def _safe_get(d: Any, key: str, default: Any = None) -> Any:
@@ -188,14 +189,22 @@ def deserialize_to_onboarding_profile(data: Dict[str, Any]) -> Optional[Onboardi
         location = Location(
             city=_safe_get(location_data, "city", ""),
             region=_safe_get(location_data, "region", ""),
-            urban_suburban_rural=_safe_get(location_data, "urban_suburban_rural", "urban"),
+            urban_suburban_rural=_parse_enum(
+                _safe_get(location_data, "urban_suburban_rural", "urban"),
+                UrbanType,
+                UrbanType.URBAN
+            ),
             climate=_safe_get(location_data, "climate", ""),
         )
 
         occupation = Occupation(
             title=_safe_get(occupation_data, "title", ""),
             industry=_safe_get(occupation_data, "industry", ""),
-            dress_code=_safe_get(occupation_data, "dress_code", "casual"),
+            dress_code=_parse_enum(
+                _safe_get(occupation_data, "dress_code", "casual"),
+                DressCode,
+                DressCode.CASUAL
+            ),
             work_style_alignment=float(_safe_get(occupation_data, "work_style_alignment", 0.5) or 0.5),
         )
 
@@ -204,7 +213,11 @@ def deserialize_to_onboarding_profile(data: Dict[str, Any]) -> Optional[Onboardi
             if isinstance(occ, dict):
                 occasions.append(Occasion(
                     name=_safe_get(occ, "name", ""),
-                    frequency=_safe_get(occ, "frequency", ""),
+                    frequency=_parse_enum(
+                        _safe_get(occ, "frequency"),
+                        OccasionFrequency,
+                        OccasionFrequency.OCCASIONAL
+                    ),
                     importance=float(_safe_get(occ, "importance", 0.5) or 0.5),
                     style_context=_parse_enum(
                         _safe_get(occ, "style_context"),
@@ -233,7 +246,11 @@ def deserialize_to_onboarding_profile(data: Dict[str, Any]) -> Optional[Onboardi
                 brand_preferences.append(BrandPreference(
                     brand=_safe_get(bp, "brand", ""),
                     why_love_it=_safe_get(bp, "why_love_it", ""),
-                    frequency=_safe_get(bp, "frequency", ""),
+                    frequency=_parse_enum(
+                        _safe_get(bp, "frequency"),
+                        BrandFrequency,
+                        BrandFrequency.SOMETIMES
+                    ),
                 ))
 
         gender_expression = GenderExpression(
@@ -322,7 +339,11 @@ def deserialize_to_onboarding_profile(data: Dict[str, Any]) -> Optional[Onboardi
         budget = Budget(
             monthly=int(_safe_get(budget_data, "monthly", 200) or 200),
             yearly=int(_safe_get(budget_data, "yearly", 2400) or 2400),
-            flexibility=_safe_get(budget_data, "flexibility", "guideline"),
+            flexibility=_parse_enum(
+                _safe_get(budget_data, "flexibility", "guideline"),
+                BudgetFlexibility,
+                BudgetFlexibility.GUIDELINE
+            ),
             investment_mindset=_safe_get(budget_data, "investment_mindset", "balanced"),
         )
 
@@ -330,7 +351,11 @@ def deserialize_to_onboarding_profile(data: Dict[str, Any]) -> Optional[Onboardi
         for cat, cb in category_budgets_data.items():
             if isinstance(cb, dict):
                 category_budgets[cat] = CategoryBudget(
-                    budget_level=_safe_get(cb, "budget_level", "moderate"),
+                    budget_level=_parse_enum(
+                        _safe_get(cb, "budget_level", "moderate"),
+                        BudgetLevel,
+                        BudgetLevel.MODERATE
+                    ),
                     reasoning=_safe_get(cb, "reasoning", ""),
                 )
 
@@ -345,7 +370,11 @@ def deserialize_to_onboarding_profile(data: Dict[str, Any]) -> Optional[Onboardi
 
         coloring = Coloring(
             skin_tone=_safe_get(coloring_data, "skin_tone", ""),
-            undertone=_safe_get(coloring_data, "undertone", ""),
+            undertone=_parse_enum(
+                _safe_get(coloring_data, "undertone"),
+                Undertone,
+                Undertone.NEUTRAL
+            ),
             hair_color=_safe_get(coloring_data, "hair_color", ""),
             eye_color=_safe_get(coloring_data, "eye_color", ""),
         )
