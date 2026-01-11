@@ -9,18 +9,19 @@ Usage:
 """
 
 import asyncio
+import os
 import sys
+import textwrap
+import traceback
 import uuid
 import warnings
 from datetime import datetime
 from typing import Optional, Dict, Any
 
+from dotenv import load_dotenv
+
 # Suppress deprecation warnings for cleaner output
 warnings.filterwarnings("ignore", category=DeprecationWarning)
-
-# Add parent directory to path - ensure it's at the front to avoid conflicts
-import os
-from dotenv import load_dotenv
 load_dotenv(os.path.join(os.path.dirname(__file__), "..", "..", ".env"))
 _current_dir = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))  # ari_crewai_migration
 _parent_dir = os.path.dirname(_current_dir)  # ARI_PRODUCTION_CAMEL_0.27
@@ -67,7 +68,7 @@ class EnhancedChatInterface:
     # ONBOARDING FLOW
     # ======================
 
-    async def run_conversational_onboarding(self, username: str, email: str = None) -> Optional[User]:
+    async def run_conversational_onboarding(self, username: str, email: Optional[str] = None) -> Optional[User]:
         """
         Run conversational onboarding flow using AI agents.
 
@@ -114,11 +115,11 @@ class EnhancedChatInterface:
         except Exception as mem_error:
             print(f"[DEBUG] Warning: Memory storage failed: {mem_error}")
 
-        # Create onboarding crew with GPT-5
+        # Create onboarding crew with GPT-4o
         from crewai.llm import LLM
         llm = LLM(
-            model="gpt-5",
-            temperature=1  # GPT-5 only supports temperature=1
+            model="gpt-4o",
+            temperature=0.9
         )
         crew = create_onboarding_crew(llm=llm)
 
@@ -162,7 +163,7 @@ class EnhancedChatInterface:
                 except Exception as mem_error:
                     print(f"[DEBUG] Warning: Memory storage failed: {mem_error}")
 
-                #  Handle skip
+                # Handle skip
                 if user_input.lower() in ['skip', 'next']:
                     crew.complete_step()
                     try:
@@ -199,7 +200,6 @@ class EnhancedChatInterface:
                 except Exception as e:
                     print(f"\n(Could you rephrase that?)\n")
                     print(f"[DEBUG] Error processing response: {e}")
-                    import traceback
                     print(f"[DEBUG] Traceback:\n{traceback.format_exc()}")
 
         # Save data to Neo4j
@@ -413,14 +413,13 @@ class EnhancedChatInterface:
                         user = self.user_service.update_user_profile(user.id, profile_data)
 
                         if user:
-                            print(f"✓ Test user '{username}' created and ready!")
+                            print(f"[OK] Test user '{username}' created and ready!")
                         else:
-                            print(f"✗ Failed to configure test user")
+                            print(f"[FAILED] Failed to configure test user")
                             continue
 
                     except Exception as e:
                         print(f"Error creating test user: {e}")
-                        import traceback
                         traceback.print_exc()
                         continue
                 else:
@@ -429,7 +428,7 @@ class EnhancedChatInterface:
                         self.user_service.mark_onboarding_complete(user.id)
                         user = self.user_service.get_user_by_id(user.id)
 
-                    print(f"✓ Welcome back, test user '{username}'!")
+                    print(f"[OK] Welcome back, test user '{username}'!")
 
                 self.current_user = user
 
@@ -457,7 +456,6 @@ class EnhancedChatInterface:
                 except Exception as e:
                     print(f"\nError during onboarding: {e}")
                     print("Please try again.")
-                    import traceback
                     traceback.print_exc()
                     continue
 
@@ -477,7 +475,6 @@ class EnhancedChatInterface:
                     except Exception as e:
                         print(f"\nError during onboarding: {e}")
                         print("Please try again.")
-                        import traceback
                         traceback.print_exc()
                         continue
 
@@ -666,10 +663,13 @@ class EnhancedChatInterface:
                     continue
 
                 # Track user query in Mem0
-                await self.mem0.add_episodic(
-                    f"User searched: {query}",
-                    metadata={"interaction_type": "search", "query": query}
-                )
+                try:
+                    await self.mem0.add_episodic(
+                        f"User searched: {query}",
+                        metadata={"interaction_type": "search", "query": query}
+                    )
+                except Exception as mem_error:
+                    print(f"[DEBUG] Warning: Memory storage failed: {mem_error}")
 
                 # Execute search
                 print(f"\n  Searching...")
@@ -691,35 +691,39 @@ class EnhancedChatInterface:
                 # Track search results in Mem0
                 products = result.get("products", [])
                 if products:
-                    product_summary = f"Showed {len(products)} products: " + ", ".join(
-                        [p.get('title', '')[:30] for p in products[:3]]
-                    )
-                    await self.mem0.add_episodic(
-                        product_summary,
-                        metadata={
-                            "interaction_type": "search_results",
-                            "product_count": len(products),
-                            "query": query
-                        }
-                    )
+                    try:
+                        product_summary = f"Showed {len(products)} products: " + ", ".join(
+                            [p.get('title', '')[:30] for p in products[:3]]
+                        )
+                        await self.mem0.add_episodic(
+                            product_summary,
+                            metadata={
+                                "interaction_type": "search_results",
+                                "product_count": len(products),
+                                "query": query
+                            }
+                        )
 
-                    # Track semantic relationships with products
-                    for product in products[:3]:  # Top 3 products
-                        if 'brand' in product and product['brand']:
-                            await self.mem0.add_semantic(
-                                f"User saw {product['brand']} {product.get('category', 'product')} when searching for {query}",
-                                metadata={
-                                    "brand": product['brand'],
-                                    "category": product.get('category', ''),
-                                    "product_id": product.get('id', '')
-                                }
-                            )
+                        # Track semantic relationships with products
+                        for product in products[:3]:  # Top 3 products
+                            if 'brand' in product and product['brand']:
+                                await self.mem0.add_semantic(
+                                    f"User saw {product['brand']} {product.get('category', 'product')} when searching for {query}",
+                                    metadata={
+                                        "brand": product['brand'],
+                                        "category": product.get('category', ''),
+                                        "product_id": product.get('id', '')
+                                    }
+                                )
+                    except Exception as mem_error:
+                        print(f"[DEBUG] Warning: Memory storage failed: {mem_error}")
 
                 # Display results
                 self.display_results(result)
 
                 # Update observed preferences periodically
-                if self.current_user.total_searches % 5 == 0:
+                total_searches = getattr(self.current_user, 'total_searches', 0) or 0
+                if total_searches > 0 and total_searches % 5 == 0:
                     self.user_service.update_observed_preferences(self.current_user.id)
 
             except KeyboardInterrupt:
@@ -851,7 +855,6 @@ class EnhancedChatInterface:
             # Show full reasoning, but format nicely for long text
             if len(reasoning) > 500:
                 # For very long reasoning, wrap text nicely
-                import textwrap
                 wrapped = textwrap.fill(reasoning, width=68, initial_indent='  ', subsequent_indent='  ')
                 print(f"\n{wrapped}")
             else:
