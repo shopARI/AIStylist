@@ -54,16 +54,22 @@ def get_client() -> OpenAI:
     return client
 
 
+VALID_NODES = ["personal", "taste", "process", "practicality", "body", "external"]
+
+
 def build_system_prompt(current_node_id: str = "personal") -> str:
     """
     Build system prompt using actual V2 prompts.
 
     Args:
-        current_node_id: The current conversation node
+        current_node_id: The current conversation node (must be valid)
 
     Returns:
         Full system prompt with V2 content
     """
+    if current_node_id not in VALID_NODES:
+        current_node_id = "personal"
+
     node = get_node_by_id(current_node_id)
 
     # Build ARI personality section
@@ -137,8 +143,19 @@ def get_ai_response(
         return None
 
 
-def is_conversation_complete(message: str) -> bool:
-    """Check if the conversation has reached natural completion."""
+def is_conversation_complete(message: Optional[str]) -> bool:
+    """
+    Check if the conversation has reached natural completion.
+
+    Args:
+        message: The assistant's message to check
+
+    Returns:
+        True if completion phrases detected, False otherwise
+    """
+    if not message:
+        return False
+
     completion_phrases = [
         "i really get your vibe",
         "excited to help you find",
@@ -152,10 +169,27 @@ def is_conversation_complete(message: str) -> bool:
     return any(phrase in message.lower() for phrase in completion_phrases)
 
 
-def detect_node_transition(message: str, current_node: str) -> Optional[str]:
-    """Detect if the AI is transitioning to a new node."""
+def detect_node_transition(message: Optional[str], current_node: str) -> Optional[str]:
+    """
+    Detect if the AI is transitioning to a new node.
+
+    Args:
+        message: The assistant's message to analyze
+        current_node: The current conversation node ID
+
+    Returns:
+        The next node ID if transitioning, None otherwise
+    """
+    if not message:
+        return None
+
     node_order = ["personal", "taste", "process", "practicality"]
-    current_index = node_order.index(current_node) if current_node in node_order else 0
+
+    # Safely get current index
+    try:
+        current_index = node_order.index(current_node)
+    except ValueError:
+        current_index = 0
 
     # Check for transition phrases
     transition_phrases = {
@@ -210,8 +244,6 @@ def chat():
 
     # Conversation loop
     while True:
-        turn_count += 1
-
         # Check max turns
         if turn_count >= MAX_CONVERSATION_TURNS:
             print("\nARI: We've covered a lot of ground! I have a great sense of your style now.\n")
@@ -245,6 +277,7 @@ def chat():
 
         messages.append({"role": "assistant", "content": assistant_msg})
         print(f"\nARI: {assistant_msg}\n")
+        turn_count += 1
 
         # Check for node transition
         new_node = detect_node_transition(assistant_msg, current_node)
