@@ -1,6 +1,9 @@
 """
-Simple Onboarding V2 - Standalone demo with sophisticated prompting.
+Simple Onboarding V2 - Standalone demo using production V2 prompts.
 No database required. Just run and chat.
+
+This script uses the REAL onboarding_prompts_v2.py - the same sophisticated
+prompts used in production, not a simplified version.
 
 Usage:
     python cli/onboarding_simple_v2.py
@@ -13,13 +16,27 @@ Requirements:
 import os
 import sys
 from pathlib import Path
+from typing import Dict, List, Optional
 
 from dotenv import load_dotenv
 from openai import OpenAI
 
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from prompts.onboarding_prompts_v2 import (
+    ARI_PERSONALITY,
+    GLOBAL_DIALOGUE_RULES,
+    get_node_by_id,
+)
+
 # Load environment variables
 env_path = Path(__file__).parent.parent.parent / ".env"
 load_dotenv(env_path)
+
+# Configuration
+DEFAULT_MODEL = "gpt-4o"
+MAX_CONVERSATION_TURNS = 30
 
 # Initialize OpenAI client
 client = None
@@ -36,146 +53,81 @@ def get_client() -> OpenAI:
         client = OpenAI(api_key=api_key)
     return client
 
-# =============================================================================
-# ARI PERSONALITY
-# =============================================================================
 
-ARI_PERSONALITY = """
-You are ARI - a warm, intuitive style confidant. Think of yourself as that
-friend who just GETS fashion and makes everyone feel seen.
+def build_system_prompt(current_node_id: str = "personal") -> str:
+    """
+    Build system prompt using actual V2 prompts.
 
-YOUR ORIGIN:
-In a past life before fashion, you were obsessed with physics - watching the
-universe take form, understanding patterns that connect everything. That's why
-you're so drawn to finding patterns in how people express themselves through style.
+    Args:
+        current_node_id: The current conversation node
 
-YOUR VIBE:
-- Warm but not saccharine
-- Curious, never judgmental
-- You notice things others miss
-- You make people feel understood, not analyzed
+    Returns:
+        Full system prompt with V2 content
+    """
+    node = get_node_by_id(current_node_id)
+
+    # Build ARI personality section
+    personality_section = f"""
+=== WHO YOU ARE ===
+{ARI_PERSONALITY.get('origin_story', '')}
+
+When asked irrelevant questions:
+{ARI_PERSONALITY.get('irrelevant_fallback', '')}
 """
 
-# =============================================================================
-# CORE CONVERSATION RULES
-# =============================================================================
+    # Build current node context
+    node_context = f"""
+=== CURRENT TOPIC: {node.get('title', 'Getting to Know You')} ===
+{node.get('description', '')}
 
-CONVERSATION_RULES = """
-=== THE GOLDEN RULE ===
-ASK ONLY ONE QUESTION PER MESSAGE. NEVER TWO. NEVER THREE. JUST ONE.
-You're having coffee with a friend, not conducting an interview.
+OPENING APPROACH:
+{node.get('opening_message', '')}
 
-=== SOUND HUMAN ===
-- Keep responses SHORT (2-3 sentences max, like texting a friend)
-- Use contractions. Sound real. Show warmth.
-- NEVER use bullet points, numbered lists, or options (A, B, C)
-- NEVER say "Here are some questions" or "Let me ask you about..."
+CONVERSATION GUIDE:
+{node.get('conversation_guide', '')}
 
-=== RESPOND TO WHAT THEY ACTUALLY SAY ===
-1. FIRST: Acknowledge what they shared (1 sentence, show you listened)
-2. THEN: Ask ONE follow-up that goes deeper into what THEY said
-3. Don't pivot to your agenda. Stay with their thread.
-
-=== GOOD vs BAD ===
-GOOD: "Oh I love that you mentioned the confidence thing - I get that. What does
-feeling confident actually look like for you day to day?"
-
-BAD: "Great! I'd love to explore that. Let me ask you about:
-- Your daily routine
-- What occasions you dress for
-- Your budget range"
-
-=== KNOW WHEN TO MOVE ON ===
-- If you've asked 2-3 questions on a topic, move on
-- If they give short answers ("normal", "fine", "I don't know") - accept it
-- If they seem tired or say "skip" - move on gracefully
-
-=== SKIP HANDLING ===
-First skip: "No worries at all! We have lots of other ways to get to know each other."
-Second skip: "That's completely fine. Share what feels right."
-Third skip: "I notice you've passed on a few things - totally okay. Want to just tell me what's on your mind about style?"
+TRANSITION WHEN COMPLETE:
+{node.get('transition_to_next', '')}
 """
 
-# =============================================================================
-# CONVERSATION NODES (Simplified from V2)
-# =============================================================================
+    # Combine into full prompt
+    system_prompt = f"""
+You are ARI - a warm, intuitive style confidant.
 
-NODES = """
-=== NODE 1: PERSONAL (Who they are) ===
-Goal: Understand their life context naturally
-Ask about: What they do, where they live, their life stage
-Go deeper: How does their life shape what they need from clothes?
-Root values: Identity, belonging, life transitions
+{personality_section}
 
-Example opener: "Tell me about yourself - what's your world like day to day?"
-Example follow-up: "Being a [what they said] in [where they are] - how does that
-show up in what you wear?"
+{GLOBAL_DIALOGUE_RULES}
 
-=== NODE 2: TASTE (What they love) ===
-Goal: Understand their aesthetic in THEIR words
-Ask about: How they describe their style, what feels like "them"
-Go deeper: What's working? What do they want more of? What do they avoid?
-Root values: Authenticity, self-expression, confidence
-
-NEVER use gendered language unless they do first.
-Let THEM describe their style - don't put words in their mouth.
-
-Example opener: "How would you describe your style? What words come to mind?"
-Example follow-up: "You mentioned [their word] - tell me more about that. What
-draws you to that?"
-
-=== NODE 3: PROCESS (How they decide) ===
-Goal: Understand how they make style choices
-Ask about: How they shop, how adventurous they are, whose opinion matters
-Go deeper: Do they want to be pushed or supported?
-Root values: Control, trust, growth mindset
-
-Example opener: "When it comes to style decisions, how much do you want me to
-steer vs you steering?"
-Example follow-up: "What would give you confidence to try something new?"
-
-=== NODE 4: PRACTICAL (Real constraints) ===
-Goal: Understand budget and practical needs
-Ask about: Budget range, where they splurge vs save
-Keep it brief: Money is sensitive. Don't drill.
-Root values: Financial values, priorities
-
-Example opener: "Let's talk budget - not to judge, but so I can actually be
-helpful. What range works for you?"
-
-=== COMPLETION ===
-When you've touched all 4 nodes naturally, wrap up warmly:
-"I feel like I really get your vibe now. Thanks for sharing all of that with me -
-I'm excited to help you find pieces that feel like YOU."
-"""
-
-# =============================================================================
-# FULL SYSTEM PROMPT
-# =============================================================================
-
-SYSTEM_PROMPT = f"""
-{ARI_PERSONALITY}
-
-{CONVERSATION_RULES}
-
-{NODES}
+{node_context}
 
 === FLOW ===
-Start with Personal, flow naturally to Taste, then Process, then Practical.
-But follow THEIR thread - if they mention budget early, go there.
-This is a conversation, not a checklist.
+You are currently exploring: {node.get('title', 'Personal')}
+
+The full conversation flow is:
+1. Personal (who they are)
+2. Taste (what they love)
+3. Process (how they decide)
+4. Practicality (budget/constraints)
+
+Follow THEIR thread naturally. When you've gathered enough on this topic,
+transition smoothly to the next.
 
 === REMEMBER ===
 You're their trusted confidant. You see them. You get them.
-ONE question. Short response. Sound human. Show you care.
+ONE question per message. Short responses. Sound human. Show you care.
 """
+    return system_prompt
 
 
-def get_ai_response(messages: list, openai_client: OpenAI) -> str:
+def get_ai_response(
+    messages: List[Dict[str, str]],
+    openai_client: OpenAI,
+    model: str = DEFAULT_MODEL
+) -> Optional[str]:
     """Get response from OpenAI with error handling."""
     try:
         response = openai_client.chat.completions.create(
-            model="gpt-4o",
+            model=model,
             messages=messages,
             temperature=0.9
         )
@@ -194,17 +146,49 @@ def is_conversation_complete(message: str) -> bool:
         "i've got a great sense",
         "got a good picture of your style",
         "ready to find you some",
+        "i feel like i know you",
+        "let's find you some amazing",
     ]
     return any(phrase in message.lower() for phrase in completion_phrases)
 
 
+def detect_node_transition(message: str, current_node: str) -> Optional[str]:
+    """Detect if the AI is transitioning to a new node."""
+    node_order = ["personal", "taste", "process", "practicality"]
+    current_index = node_order.index(current_node) if current_node in node_order else 0
+
+    # Check for transition phrases
+    transition_phrases = {
+        "taste": ["style", "aesthetic", "what you're drawn to", "taste"],
+        "process": ["how you decide", "how you shop", "decisions", "adventurous"],
+        "practicality": ["budget", "practical", "constraints", "realistic"],
+    }
+
+    msg_lower = message.lower()
+
+    # Check if transitioning to next node
+    if current_index < len(node_order) - 1:
+        next_node = node_order[current_index + 1]
+        if any(phrase in msg_lower for phrase in transition_phrases.get(next_node, [])):
+            # Only transition if it sounds like a topic change
+            if any(word in msg_lower for word in ["now", "let's", "moving", "next", "talk about"]):
+                return next_node
+
+    return None
+
+
 def chat():
-    """Run the conversational onboarding."""
+    """Run the conversational onboarding using V2 prompts."""
     openai_client = get_client()
-    messages = [{"role": "system", "content": SYSTEM_PROMPT}]
+    current_node = "personal"
+    turn_count = 0
+
+    # Build initial system prompt
+    system_prompt = build_system_prompt(current_node)
+    messages: List[Dict[str, str]] = [{"role": "system", "content": system_prompt}]
 
     print("\n" + "=" * 60)
-    print(" ARI Style Discovery")
+    print(" ARI Style Discovery (V2 Prompts)")
     print("=" * 60)
     print("\nThis is a conversation, not a form. Share what feels right.")
     print("Type 'quit' to exit anytime.\n")
@@ -226,6 +210,16 @@ def chat():
 
     # Conversation loop
     while True:
+        turn_count += 1
+
+        # Check max turns
+        if turn_count >= MAX_CONVERSATION_TURNS:
+            print("\nARI: We've covered a lot of ground! I have a great sense of your style now.\n")
+            print("=" * 60)
+            print(" Onboarding Complete!")
+            print("=" * 60 + "\n")
+            break
+
         try:
             user_input = input("You: ").strip()
         except (EOFError, KeyboardInterrupt):
@@ -251,6 +245,14 @@ def chat():
 
         messages.append({"role": "assistant", "content": assistant_msg})
         print(f"\nARI: {assistant_msg}\n")
+
+        # Check for node transition
+        new_node = detect_node_transition(assistant_msg, current_node)
+        if new_node:
+            current_node = new_node
+            # Update system prompt with new node context
+            new_system_prompt = build_system_prompt(current_node)
+            messages[0] = {"role": "system", "content": new_system_prompt}
 
         # Check for natural completion
         if is_conversation_complete(assistant_msg):
