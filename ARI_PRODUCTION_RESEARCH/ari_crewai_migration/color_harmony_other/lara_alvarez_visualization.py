@@ -278,7 +278,7 @@ class LaraAlvarezVisualization(LaraAlvarezImplementation):
         
         # Tone analysis
         tone_info = result['tone_analysis']
-        text.append(f"Tone Harmony: {'✓ HARMONIC' if tone_info['harmonic'] else '✗ NOT HARMONIC'}\n")
+        text.append(f"Tone Harmony: {'[OK] HARMONIC' if tone_info['harmonic'] else '[NO] NOT HARMONIC'}\n")
         
         if tone_info['harmonic'] and 'line_params' in tone_info:
             params = tone_info['line_params']

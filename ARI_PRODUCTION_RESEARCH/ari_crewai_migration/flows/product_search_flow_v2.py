@@ -287,7 +287,7 @@ Generate main_query (your best query) and fallback_query (simpler/broader query 
                 products_found=len(products)
             )
 
-            logger.info(f"✓ CypherBot: {len(products)} products in {execution_time:.2f}s")
+            logger.info(f"[OK] CypherBot: {len(products)} products in {execution_time:.2f}s")
 
         except asyncio.TimeoutError:
             error_msg = "CypherBot timed out after 30s"
@@ -357,7 +357,7 @@ Generate main_query (your best query) and fallback_query (simpler/broader query 
                 products_found=len(products)
             )
 
-            logger.info(f"✓ VibeBot: {len(products)} products in {execution_time:.2f}s")
+            logger.info(f"[OK] VibeBot: {len(products)} products in {execution_time:.2f}s")
 
         except asyncio.TimeoutError:
             error_msg = "VibeBot timed out after 30s"
@@ -446,7 +446,7 @@ Generate main_query (your best query) and fallback_query (simpler/broader query 
                 products_found=len(products)
             )
 
-            logger.info(f"✓ VisionBot: {len(products)} products in {execution_time:.2f}s")
+            logger.info(f"[OK] VisionBot: {len(products)} products in {execution_time:.2f}s")
 
         except asyncio.TimeoutError:
             error_msg = "VisionBot timed out after 30s"
@@ -598,7 +598,7 @@ Return your evaluation with:
                 execution_time=execution_time
             )
 
-            logger.info(f"✓ Judge: Selected {len(final_products)} products in {execution_time:.2f}s")
+            logger.info(f"[OK] Judge: Selected {len(final_products)} products in {execution_time:.2f}s")
             logger.info(f"  Consensus: {len(judge_response.consensus_product_ids)} products")
             logger.info(f"  Confidence: {judge_response.judgment_confidence:.2f}")
 

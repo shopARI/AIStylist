@@ -73,7 +73,7 @@ with driver.session(database=NEO4J_DATABASE) as session:
         """)
         record = result.single()
         if record and record['count'] > 0:
-            print(f"  ✓ {prop}: {record['count']} products")
+            print(f"  [OK] {prop}: {record['count']} products")
 
 # Query 5: Check total Product count
 print("\n5. Total Product count:")
@@ -83,4 +83,4 @@ with driver.session(database=NEO4J_DATABASE) as session:
     print(f"Total products: {record['count']}")
 
 driver.close()
-print("\n✓ Schema check complete")
+print("\n[OK] Schema check complete")

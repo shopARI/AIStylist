@@ -291,7 +291,7 @@ class ConversationalOnboardingV2:
                 )
                 print(f"Saved {node_id} data")
             except Exception as e:
-                print(f"✗ Error saving {node_id}: {e}")
+                print(f"[ERROR] Error saving {node_id}: {e}")
 
         # Save root values
         if all_data["root_values"]:
@@ -304,7 +304,7 @@ class ConversationalOnboardingV2:
                 )
                 print(f"Saved root values")
             except Exception as e:
-                print(f"✗ Error saving root values: {e}")
+                print(f"[ERROR] Error saving root values: {e}")
 
         # Save metadata
         try:
@@ -315,7 +315,7 @@ class ConversationalOnboardingV2:
             )
             print(f"Saved metadata")
         except Exception as e:
-            print(f"✗ Error saving metadata: {e}")
+            print(f"[ERROR] Error saving metadata: {e}")
 
         # Mark onboarding complete
         self.user_service.update_user_profile(self.user_id, {

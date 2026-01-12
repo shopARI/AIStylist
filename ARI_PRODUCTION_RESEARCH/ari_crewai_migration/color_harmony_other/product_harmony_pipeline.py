@@ -265,7 +265,7 @@ class ProductHarmonyPipeline:
         print(f"  Hue Pattern: {result.get('hue_pattern', 'N/A')}")
         print(f"  Tone Harmonic: {result.get('tone_harmonic', 'N/A')}")
         print(f"  Overall Score: {result.get('overall_score', 0):.2f}/1.0")
-        print(f"  Is Harmonic: {'✓ Yes' if result.get('is_harmonic', False) else '✗ No'}")
+        print(f"  Is Harmonic: {'[OK] Yes' if result.get('is_harmonic', False) else '[NO]'}")
 
         print("="*60 + "\n")
 

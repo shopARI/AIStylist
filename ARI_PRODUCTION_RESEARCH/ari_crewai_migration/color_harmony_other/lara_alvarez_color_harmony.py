@@ -438,7 +438,7 @@ class LaraAlvarezImplementation:
             print(f"  Max deviation: {result['tone_analysis']['max_deviation']:.2f}")
         
         print(f"\nOverall Harmony Score: {result['overall_score']:.2f}/1.0")
-        print(f"Is Harmonic: {'✓' if result['is_harmonic'] else '✗'}")
+        print(f"Is Harmonic: {'YES' if result['is_harmonic'] else 'NO'}")
         print("="*60)
 
 

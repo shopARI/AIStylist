@@ -594,7 +594,7 @@ if __name__ == "__main__":
             print(f"  Tone: {result['scores']['tone']:.2f}")
             print(f"  Overall: {result['overall_score']:.2f}")
             
-            print(f"\nIs Harmonic: {'✓' if result['is_harmonic'] else '✗'}")
+            print(f"\nIs Harmonic: {'YES' if result['is_harmonic'] else 'NO'}")
             
             if result['recommendations']:
                 print("\nRecommendations:")

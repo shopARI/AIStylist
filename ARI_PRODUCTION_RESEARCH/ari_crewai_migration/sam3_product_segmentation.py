@@ -526,7 +526,7 @@ async def main():
         # Step 2: Query products with images
         print(f"[2/5] Querying {NUM_PRODUCTS} products with images...")
         products = neo4j_conn.query_products_with_images(limit=NUM_PRODUCTS, category_filter=CATEGORY_FILTER)
-        print(f"✓ Found {len(products)} products with images")
+        print(f"[OK] Found {len(products)} products with images")
 
         if not products:
             print("[ERROR] No products with images found!")
@@ -557,14 +557,14 @@ async def main():
             image = downloader.download_image(image_url)
 
             if image is None:
-                print("  ✗ Failed to download image")
+                print("  [FAILED] Failed to download image")
                 failed_count += 1
                 continue
 
             # Save original image
             image_file = IMAGES_DIR / f"{product_id}.png"
             downloader.save_image(image, image_file)
-            print(f"  ✓ Saved to {image_file}")
+            print(f"  [OK] Saved to {image_file}")
 
             # Extract keywords from product title/description
             keywords = ProductKeywordExtractor.extract_keywords(
@@ -579,8 +579,8 @@ async def main():
                 image,
                 text_prompts=keywords
             )
-            print(f"  ✓ Generated {sam3_results['num_masks']} masks")
-            print(f"  ✓ IoU scores: {sam3_results['iou_scores']}")
+            print(f"  [OK] Generated {sam3_results['num_masks']} masks")
+            print(f"  [OK] IoU scores: {sam3_results['iou_scores']}")
 
             # Save masks
             print("  • Saving masks...")
@@ -589,7 +589,7 @@ async def main():
                 product_id,
                 MASKS_DIR
             )
-            print(f"  ✓ Saved {len(mask_files)} mask files")
+            print(f"  [OK] Saved {len(mask_files)} mask files")
 
             # Save overlay visualization
             print("  • Creating overlay visualization...")
@@ -600,7 +600,7 @@ async def main():
                 product_id,
                 RESULTS_DIR
             )
-            print(f"  ✓ Saved overlay to {overlay_file}")
+            print(f"  [OK] Saved overlay to {overlay_file}")
 
             # Save all SAM3 features
             print("  • Saving SAM3 features...")
@@ -610,7 +610,7 @@ async def main():
                 RESULTS_DIR
             )
             if feature_files:
-                print(f"  ✓ Saved {len(feature_files)} feature files")
+                print(f"  [OK] Saved {len(feature_files)} feature files")
 
             # Save metadata
             print("  • Saving metadata...")
@@ -622,7 +622,7 @@ async def main():
                 feature_files,
                 METADATA_DIR
             )
-            print(f"  ✓ Saved metadata to {metadata_file}")
+            print(f"  [OK] Saved metadata to {metadata_file}")
 
             processed_count += 1
 
@@ -630,8 +630,8 @@ async def main():
         print("\n" + "="*80)
         print("[5/5] PIPELINE COMPLETE")
         print("="*80)
-        print(f"✓ Successfully processed: {processed_count}/{len(products)}")
-        print(f"✗ Failed: {failed_count}/{len(products)}")
+        print(f"[OK] Successfully processed: {processed_count}/{len(products)}")
+        print(f"[FAILED] Failed: {failed_count}/{len(products)}")
         print(f"\nOutput directories:")
         print(f"  • Images:   {IMAGES_DIR}")
         print(f"  • Masks:    {MASKS_DIR}")
@@ -641,7 +641,7 @@ async def main():
 
     finally:
         neo4j_conn.close()
-        print("\n✓ Neo4j connection closed")
+        print("\n[OK] Neo4j connection closed")
 
 
 if __name__ == "__main__":
