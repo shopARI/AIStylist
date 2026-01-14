@@ -1,0 +1,103 @@
+{
+  "product_info": {
+    "product_id": "8109784010351816722",
+    "title": "Ecoalf Amatista Short Sleeve Dress Beige M Woman",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14101/original/141011872.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14101/original/141011872.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing > Dresses; Women's clothing > Dresses",
+    "brand": "Ecoalf",
+    "price": 6199,
+    "description": "The Amatista linen dress has a button closure and is made from 100% linen.This fibre is known for its high yield due to its short growth cycle as well as being a recyclable and biodegradable material.It's extremely lightweight and durable, so it can be worn for years.What's more, as a low-impact material, it doesn't need much water in the cultivation process and absorbs CO2 during its growth cycle."
+  },
+  "segmentation_results": {
+    "num_masks": 1,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "dress",
+      "hat",
+      "ring"
+    ],
+    "iou_scores": [
+      0.9782561659812927
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109784010351816722_mask_0.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109784010351816722_overlay.png"
+  },
+  "sam3_features": {
+    "feature_files": {
+      "vision_features": "/home/leo/sam3_product_outputs/results/8109784010351816722_vision_features.npy",
+      "vision_pos_enc": "/home/leo/sam3_product_outputs/results/8109784010351816722_vision_pos_enc.pkl",
+      "backbone_fpn": "/home/leo/sam3_product_outputs/results/8109784010351816722_backbone_fpn.pkl",
+      "masks_logits": "/home/leo/sam3_product_outputs/results/8109784010351816722_masks_logits.npy"
+    },
+    "feature_shapes": {
+      "vision_features": [
+        1,
+        256,
+        72,
+        72
+      ],
+      "vision_pos_enc": [
+        [
+          1,
+          256,
+          288,
+          288
+        ],
+        [
+          1,
+          256,
+          144,
+          144
+        ],
+        [
+          1,
+          256,
+          72,
+          72
+        ]
+      ],
+      "backbone_fpn": [
+        [
+          1,
+          256,
+          288,
+          288
+        ],
+        [
+          1,
+          256,
+          144,
+          144
+        ],
+        [
+          1,
+          256,
+          72,
+          72
+        ]
+      ],
+      "masks_logits": [
+        1,
+        1,
+        1000,
+        1000
+      ]
+    },
+    "description": {
+      "vision_features": "High-level 256-dim vision features at 1/16 resolution",
+      "vision_pos_enc": "Positional encodings for vision features",
+      "backbone_fpn": "Feature Pyramid Network features at multiple scales",
+      "masks_logits": "Raw mask logits before sigmoid activation"
+    }
+  },
+  "timestamp": "2025-11-26T09:35:40.569288",
+  "model": "facebook/sam3"
+}

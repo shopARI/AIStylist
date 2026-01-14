@@ -1,0 +1,47 @@
+{
+  "product_info": {
+    "product_id": "8109787606394194398",
+    "title": "Police Splf70-50880b Sunglasses White Grey Man",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997978.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997978.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing Accessories > Sunglasses; Accessories > Sunglasses",
+    "brand": "Police",
+    "price": 11099,
+    "description": "Family:Sunglasses.Material Of Bracelet:Plastic.Dial Color:White.Glass Type:White.Glass Type:Grey.Diameter Dial:50/24/145.Special Functions:Blue Mirror."
+  },
+  "segmentation_results": {
+    "num_masks": 2,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "sunglasses",
+      "glasses",
+      "bracelet"
+    ],
+    "iou_scores": [
+      0.9582453370094299,
+      0.9812479019165039
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109787606394194398_mask_0.png",
+      "/home/leo/sam3_product_outputs/masks/8109787606394194398_mask_1.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109787606394194398_overlay.png"
+  },
+  "embeddings": {
+    "has_vision_embeddings": false,
+    "has_image_embeddings": false,
+    "vision_embedding_shape": [
+      0
+    ],
+    "image_embedding_shape": [
+      0
+    ]
+  },
+  "timestamp": "2025-11-26T09:21:36.589426",
+  "model": "facebook/sam3"
+}

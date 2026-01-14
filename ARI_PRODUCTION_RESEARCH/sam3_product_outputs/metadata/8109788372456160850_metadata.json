@@ -1,0 +1,102 @@
+{
+  "product_info": {
+    "product_id": "8109788372456160850",
+    "title": "Ecoalf Bornite Sleeveless Midi Dress Orange XL Woman",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14101/original/141011918.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14101/original/141011918.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing > Dresses; Women's clothing > Dresses",
+    "brand": "Ecoalf",
+    "price": 8299,
+    "description": "The Alcudia trainers are made from 46% PI\u00d1ATEX\u00ae, an innovative material derived from pineapple leaf fibre waste.PI\u00d1ATEX\u00ae is our vegan alterative to leather.What's more, the sole is made from recycled rubber.Through innovative processes, we've succeeded in incorporating recycled rubber into our soles, in line with our mission to create a new generation of recycled products.Innovation and sustainability to step towards the future."
+  },
+  "segmentation_results": {
+    "num_masks": 1,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "dress",
+      "hat"
+    ],
+    "iou_scores": [
+      0.9827526807785034
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109788372456160850_mask_0.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109788372456160850_overlay.png"
+  },
+  "sam3_features": {
+    "feature_files": {
+      "vision_features": "/home/leo/sam3_product_outputs/results/8109788372456160850_vision_features.npy",
+      "vision_pos_enc": "/home/leo/sam3_product_outputs/results/8109788372456160850_vision_pos_enc.pkl",
+      "backbone_fpn": "/home/leo/sam3_product_outputs/results/8109788372456160850_backbone_fpn.pkl",
+      "masks_logits": "/home/leo/sam3_product_outputs/results/8109788372456160850_masks_logits.npy"
+    },
+    "feature_shapes": {
+      "vision_features": [
+        1,
+        256,
+        72,
+        72
+      ],
+      "vision_pos_enc": [
+        [
+          1,
+          256,
+          288,
+          288
+        ],
+        [
+          1,
+          256,
+          144,
+          144
+        ],
+        [
+          1,
+          256,
+          72,
+          72
+        ]
+      ],
+      "backbone_fpn": [
+        [
+          1,
+          256,
+          288,
+          288
+        ],
+        [
+          1,
+          256,
+          144,
+          144
+        ],
+        [
+          1,
+          256,
+          72,
+          72
+        ]
+      ],
+      "masks_logits": [
+        1,
+        1,
+        1000,
+        1000
+      ]
+    },
+    "description": {
+      "vision_features": "High-level 256-dim vision features at 1/16 resolution",
+      "vision_pos_enc": "Positional encodings for vision features",
+      "backbone_fpn": "Feature Pyramid Network features at multiple scales",
+      "masks_logits": "Raw mask logits before sigmoid activation"
+    }
+  },
+  "timestamp": "2025-11-26T09:35:48.550548",
+  "model": "facebook/sam3"
+}

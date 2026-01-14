@@ -1,0 +1,47 @@
+{
+  "product_info": {
+    "product_id": "8109782503164282748",
+    "title": "Police Splf31-470b34 Woman Sunglasses Blue Lilac Man",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997970.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997970.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing Accessories > Sunglasses; Accessories > Sunglasses",
+    "brand": "Police",
+    "price": 4999,
+    "description": "Family:Sunglasses.Material Of Bracelet:Plastic.Dial Color:Blue.Glass Type:Blue.Glass Type:Lilac.Diameter Dial:47/23/135.Special Functions:Pink Gradient."
+  },
+  "segmentation_results": {
+    "num_masks": 2,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "sunglasses",
+      "glasses",
+      "bracelet"
+    ],
+    "iou_scores": [
+      0.9769744277000427,
+      0.9839238524436951
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109782503164282748_mask_0.png",
+      "/home/leo/sam3_product_outputs/masks/8109782503164282748_mask_1.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109782503164282748_overlay.png"
+  },
+  "embeddings": {
+    "has_vision_embeddings": false,
+    "has_image_embeddings": false,
+    "vision_embedding_shape": [
+      0
+    ],
+    "image_embedding_shape": [
+      0
+    ]
+  },
+  "timestamp": "2025-11-26T09:21:31.225202",
+  "model": "facebook/sam3"
+}

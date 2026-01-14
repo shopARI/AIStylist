@@ -1,0 +1,47 @@
+{
+  "product_info": {
+    "product_id": "8109783672548206734",
+    "title": "Police Spll16-58u28z Sunglasses Black Pink Man",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140998001.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140998001.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing Accessories > Sunglasses; Accessories > Sunglasses",
+    "brand": "Police",
+    "price": 5199,
+    "description": "Family:Sunglasses.Material Of Bracelet:Plastic/Metal.Dial Color:Black.Glass Type:Black.Glass Type:Pink.Diameter Dial:58/16/145.Special Functions:Green Multilayer."
+  },
+  "segmentation_results": {
+    "num_masks": 2,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "sunglasses",
+      "glasses",
+      "bracelet"
+    ],
+    "iou_scores": [
+      0.9747543931007385,
+      0.9824711084365845
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109783672548206734_mask_0.png",
+      "/home/leo/sam3_product_outputs/masks/8109783672548206734_mask_1.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109783672548206734_overlay.png"
+  },
+  "embeddings": {
+    "has_vision_embeddings": false,
+    "has_image_embeddings": false,
+    "vision_embedding_shape": [
+      0
+    ],
+    "image_embedding_shape": [
+      0
+    ]
+  },
+  "timestamp": "2025-11-26T09:21:56.333072",
+  "model": "facebook/sam3"
+}

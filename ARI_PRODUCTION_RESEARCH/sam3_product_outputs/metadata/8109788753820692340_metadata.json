@@ -1,0 +1,47 @@
+{
+  "product_info": {
+    "product_id": "8109788753820692340",
+    "title": "Police Spll16-58v78x Sunglasses Grey Brown Man",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140998002.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140998002.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing Accessories > Sunglasses; Accessories > Sunglasses",
+    "brand": "Police",
+    "price": 5199,
+    "description": "Family:Sunglasses.Material Of Bracelet:Plastic/Metal.Dial Color:Grey.Glass Type:Grey.Glass Type:Brown.Diameter Dial:58/16/145.Special Functions:Bronze Mirror."
+  },
+  "segmentation_results": {
+    "num_masks": 2,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "sunglasses",
+      "glasses",
+      "bracelet"
+    ],
+    "iou_scores": [
+      0.9820637106895447,
+      0.9881846308708191
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109788753820692340_mask_0.png",
+      "/home/leo/sam3_product_outputs/masks/8109788753820692340_mask_1.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109788753820692340_overlay.png"
+  },
+  "embeddings": {
+    "has_vision_embeddings": false,
+    "has_image_embeddings": false,
+    "vision_embedding_shape": [
+      0
+    ],
+    "image_embedding_shape": [
+      0
+    ]
+  },
+  "timestamp": "2025-11-26T09:21:58.965668",
+  "model": "facebook/sam3"
+}

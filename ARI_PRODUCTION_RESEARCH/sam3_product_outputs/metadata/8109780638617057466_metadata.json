@@ -1,0 +1,44 @@
+{
+  "product_info": {
+    "product_id": "8109780638617057466",
+    "title": "Gant 1949 Arch Hoodie Beige M Woman",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14100/original/141000820.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14100/original/141000820.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing > Activewear; Women's clothing > Sweatshirts",
+    "brand": "Gant",
+    "price": 6299,
+    "description": "This hoodie is designed for a loose fit, but if you prefer a closer fit, we suggest sizing down. Hoodie with drawstrings. Ribbed hem and sleeve cuffs. GANT graphic embroidered at chest. Wash with similar colors.Do not iron on motif.Compostion:100% Cotton."
+  },
+  "segmentation_results": {
+    "num_masks": 1,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "hoodie",
+      "ring"
+    ],
+    "iou_scores": [
+      0.9598037004470825
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109780638617057466_mask_0.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109780638617057466_overlay.png"
+  },
+  "embeddings": {
+    "has_vision_embeddings": false,
+    "has_image_embeddings": false,
+    "vision_embedding_shape": [
+      0
+    ],
+    "image_embedding_shape": [
+      0
+    ]
+  },
+  "timestamp": "2025-11-26T09:25:12.602177",
+  "model": "facebook/sam3"
+}

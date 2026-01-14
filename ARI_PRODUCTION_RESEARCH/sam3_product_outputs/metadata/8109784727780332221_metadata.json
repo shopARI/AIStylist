@@ -1,0 +1,43 @@
+{
+  "product_info": {
+    "product_id": "8109784727780332221",
+    "title": "Gant Archive Shield Hoodie Beige S Woman",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14100/original/141000822.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14100/original/141000822.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing > Activewear; Women's clothing > Sweatshirts",
+    "brand": "Gant",
+    "price": 5849,
+    "description": "This hoodie is designed for a relaxed fit, but if you prefer a closer fit, we suggest sizing down. Front patch pocket. GANT graphic embroidered at chest. Wash with similar colors.Do not iron directly on embroidery.Compostion:78% Cotton, 22% Polyester."
+  },
+  "segmentation_results": {
+    "num_masks": 1,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "hoodie"
+    ],
+    "iou_scores": [
+      0.9635201096534729
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109784727780332221_mask_0.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109784727780332221_overlay.png"
+  },
+  "embeddings": {
+    "has_vision_embeddings": false,
+    "has_image_embeddings": false,
+    "vision_embedding_shape": [
+      0
+    ],
+    "image_embedding_shape": [
+      0
+    ]
+  },
+  "timestamp": "2025-11-26T09:25:32.761219",
+  "model": "facebook/sam3"
+}

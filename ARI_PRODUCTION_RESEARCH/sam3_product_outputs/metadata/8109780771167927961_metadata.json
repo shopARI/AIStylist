@@ -1,0 +1,47 @@
+{
+  "product_info": {
+    "product_id": "8109780771167927961",
+    "title": "Police Splf70-500781 Sunglasses Brown Brown Man",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997977.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997977.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing Accessories > Sunglasses; Accessories > Sunglasses",
+    "brand": "Police",
+    "price": 5199,
+    "description": "Family:Sunglasses.Material Of Bracelet:Plastic.Dial Color:Brown.Glass Type:Brown.Glass Type:Brown.Diameter Dial:50/24/145."
+  },
+  "segmentation_results": {
+    "num_masks": 2,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "sunglasses",
+      "glasses",
+      "bracelet"
+    ],
+    "iou_scores": [
+      0.975642204284668,
+      0.9771076440811157
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109780771167927961_mask_0.png",
+      "/home/leo/sam3_product_outputs/masks/8109780771167927961_mask_1.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109780771167927961_overlay.png"
+  },
+  "embeddings": {
+    "has_vision_embeddings": false,
+    "has_image_embeddings": false,
+    "vision_embedding_shape": [
+      0
+    ],
+    "image_embedding_shape": [
+      0
+    ]
+  },
+  "timestamp": "2025-11-26T09:21:33.887670",
+  "model": "facebook/sam3"
+}

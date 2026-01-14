@@ -1,0 +1,47 @@
+{
+  "product_info": {
+    "product_id": "8109787067803519413",
+    "title": "Police Splb39e60u28p Polarized Sunglasses Black Grey Man",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997942.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997942.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing Accessories > Sunglasses; Accessories > Sunglasses",
+    "brand": "Police",
+    "price": 3999,
+    "description": "Family:Sunglasses.Material Of Bracelet:Injected.Dial Color:Black.Glass Type:Black.Glass Type:Grey.Diameter Dial:60/17/140.Special Functions:Polarized."
+  },
+  "segmentation_results": {
+    "num_masks": 2,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "sunglasses",
+      "glasses",
+      "bracelet"
+    ],
+    "iou_scores": [
+      0.7661458253860474,
+      0.9825138449668884
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109787067803519413_mask_0.png",
+      "/home/leo/sam3_product_outputs/masks/8109787067803519413_mask_1.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109787067803519413_overlay.png"
+  },
+  "embeddings": {
+    "has_vision_embeddings": false,
+    "has_image_embeddings": false,
+    "vision_embedding_shape": [
+      0
+    ],
+    "image_embedding_shape": [
+      0
+    ]
+  },
+  "timestamp": "2025-11-26T09:21:21.344537",
+  "model": "facebook/sam3"
+}

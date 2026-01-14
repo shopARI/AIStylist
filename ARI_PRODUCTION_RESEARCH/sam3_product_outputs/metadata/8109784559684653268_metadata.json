@@ -1,0 +1,47 @@
+{
+  "product_info": {
+    "product_id": "8109784559684653268",
+    "title": "Police Splg21-530700 Woman Sunglasses Black Grey Man",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997985.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997985.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing Accessories > Sunglasses; Accessories > Sunglasses",
+    "brand": "Police",
+    "price": 4999,
+    "description": "Family:Sunglasses.Material Of Bracelet:Plastic.Dial Color:Black.Glass Type:Black.Glass Type:Grey.Diameter Dial:53/22/140."
+  },
+  "segmentation_results": {
+    "num_masks": 2,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "sunglasses",
+      "glasses",
+      "bracelet"
+    ],
+    "iou_scores": [
+      0.941582202911377,
+      0.9872861504554749
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109784559684653268_mask_0.png",
+      "/home/leo/sam3_product_outputs/masks/8109784559684653268_mask_1.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109784559684653268_overlay.png"
+  },
+  "embeddings": {
+    "has_vision_embeddings": false,
+    "has_image_embeddings": false,
+    "vision_embedding_shape": [
+      0
+    ],
+    "image_embedding_shape": [
+      0
+    ]
+  },
+  "timestamp": "2025-11-26T09:21:38.730856",
+  "model": "facebook/sam3"
+}

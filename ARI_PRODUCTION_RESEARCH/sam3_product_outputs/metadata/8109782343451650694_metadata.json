@@ -1,0 +1,47 @@
+{
+  "product_info": {
+    "product_id": "8109782343451650694",
+    "title": "Police Spla19-998ffg Woman Sunglasses Clear Brown Man",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997933.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997933.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing Accessories > Sunglasses; Accessories > Sunglasses",
+    "brand": "Police",
+    "price": 4949,
+    "description": "Family:Sunglasses.Material Of Bracelet:Metal.Dial Color:Golden.Glass Type:Golden.Glass Type:Brown.Diameter Dial:99/14/135.Special Functions:Degraded-Golden Mirror."
+  },
+  "segmentation_results": {
+    "num_masks": 2,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "sunglasses",
+      "glasses",
+      "bracelet"
+    ],
+    "iou_scores": [
+      0.9235464334487915,
+      0.9871765375137329
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109782343451650694_mask_0.png",
+      "/home/leo/sam3_product_outputs/masks/8109782343451650694_mask_1.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109782343451650694_overlay.png"
+  },
+  "embeddings": {
+    "has_vision_embeddings": false,
+    "has_image_embeddings": false,
+    "vision_embedding_shape": [
+      0
+    ],
+    "image_embedding_shape": [
+      0
+    ]
+  },
+  "timestamp": "2025-11-26T09:21:18.841499",
+  "model": "facebook/sam3"
+}

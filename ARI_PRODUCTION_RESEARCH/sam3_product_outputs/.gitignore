@@ -1,0 +1,9 @@
+# Large feature files (can be regenerated with SAM3)
+*_backbone_fpn.pkl
+*_vision_pos_enc.pkl
+
+# Keep these (smaller, useful for examples):
+# *_vision_features.npy  (~5MB each)
+# *_masks_logits.npy     (~4MB each)
+# *_3d.ply               (~10-22MB each)
+# *_3d.glb               (~200KB each)

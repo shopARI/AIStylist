@@ -1,0 +1,47 @@
+{
+  "product_info": {
+    "product_id": "8109786579427498365",
+    "title": "Police Spll10-520w45 Sunglasses Brown Grey Man",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997990.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997990.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing Accessories > Sunglasses; Accessories > Sunglasses",
+    "brand": "Police",
+    "price": 4699,
+    "description": "Family:Sunglasses.Material Of Bracelet:Plastic.Dial Color:Brown.Glass Type:Brown.Glass Type:Grey.Diameter Dial:52/20/145."
+  },
+  "segmentation_results": {
+    "num_masks": 2,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "sunglasses",
+      "glasses",
+      "bracelet"
+    ],
+    "iou_scores": [
+      0.9785444736480713,
+      0.9859792590141296
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109786579427498365_mask_0.png",
+      "/home/leo/sam3_product_outputs/masks/8109786579427498365_mask_1.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109786579427498365_overlay.png"
+  },
+  "embeddings": {
+    "has_vision_embeddings": false,
+    "has_image_embeddings": false,
+    "vision_embedding_shape": [
+      0
+    ],
+    "image_embedding_shape": [
+      0
+    ]
+  },
+  "timestamp": "2025-11-26T09:21:46.207778",
+  "model": "facebook/sam3"
+}

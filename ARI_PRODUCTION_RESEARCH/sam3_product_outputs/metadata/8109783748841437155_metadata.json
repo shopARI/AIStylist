@@ -1,0 +1,47 @@
+{
+  "product_info": {
+    "product_id": "8109783748841437155",
+    "title": "Police Spla15-5207ln Woman Sunglasses Red Red Man",
+    "image_url": "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997932.jpg",
+    "images_all": [
+      "https://storage.googleapis.com/tradeinn-images/web/products_image/14099/original/140997932.jpg"
+    ],
+    "category": "Apparel & Accessories > Clothing Accessories > Sunglasses; Accessories > Sunglasses",
+    "brand": "Police",
+    "price": 3899,
+    "description": "Family:Sunglasses.Material Of Bracelet:Injected.Dial Color:Red.Glass Type:Red.Glass Type:Red.Diameter Dial:52/18/140.Special Functions:Degraded."
+  },
+  "segmentation_results": {
+    "num_masks": 2,
+    "image_size": [
+      1000,
+      1000
+    ],
+    "text_prompts": [
+      "sunglasses",
+      "glasses",
+      "bracelet"
+    ],
+    "iou_scores": [
+      0.8425519466400146,
+      0.9900619983673096
+    ],
+    "mask_files": [
+      "/home/leo/sam3_product_outputs/masks/8109783748841437155_mask_0.png",
+      "/home/leo/sam3_product_outputs/masks/8109783748841437155_mask_1.png"
+    ],
+    "overlay_file": "/home/leo/sam3_product_outputs/results/8109783748841437155_overlay.png"
+  },
+  "embeddings": {
+    "has_vision_embeddings": false,
+    "has_image_embeddings": false,
+    "vision_embedding_shape": [
+      0
+    ],
+    "image_embedding_shape": [
+      0
+    ]
+  },
+  "timestamp": "2025-11-26T09:21:16.753083",
+  "model": "facebook/sam3"
+}
