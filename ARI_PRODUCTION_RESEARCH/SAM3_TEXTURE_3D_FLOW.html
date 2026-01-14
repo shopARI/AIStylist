@@ -27,11 +27,20 @@
         .file-tree .comment { color: #666; }
         ul { margin: 10px 0; }
         li { margin: 5px 0; }
+        a { color: #0066cc; }
+        .github-link { background: #f0f8ff; padding: 10px; border-radius: 4px; margin: 10px 0; }
     </style>
 </head>
 <body>
     <h1>SAM3 + Texture + 3D Pipeline Report</h1>
     <p><strong>Date:</strong> January 2026</p>
+
+    <div class="github-link">
+        <strong>GitHub Repository:</strong>
+        <a href="https://github.com/shopARI/AIStylist/tree/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs">
+            github.com/shopARI/AIStylist/.../sam3_product_outputs
+        </a>
+    </div>
 
     <h2>1. Pipeline Overview</h2>
     <table>
@@ -57,32 +66,28 @@
         </tr>
     </table>
 
-    <h2>2. File Structure</h2>
+    <h2>2. GitHub File Structure</h2>
     <div class="file-tree">
 <pre>
-<span class="folder">/home/ubuntu/</span>
-<span class="folder">├── sam3/</span>                              <span class="comment"># SAM3 Library</span>
-│   ├── sam3/                          # Core segmentation library
-│   ├── examples/                      # Jupyter notebooks
-│   └── scripts/                       # Eval scripts
-
-<span class="folder">├── sam3_product_outputs/</span>              <span class="comment"># Processing Results</span>
-│   ├── images/                        # Original product images (.png)
-│   ├── masks/                         # Binary segmentation masks
-│   ├── results/                       # Features + 3D outputs
-│   │   ├── *_vision_features.npy      [5 MB each]
-│   │   ├── *_backbone_fpn.pkl         [107 MB each]
-│   │   ├── *_masks_logits.npy         [4 MB each]
-│   │   ├── *_3d.ply                   [7-22 MB] Gaussian Splat
-│   │   └── *_3d.glb                   [124-388 KB] 3D Mesh
-│   ├── metadata/                      # JSON metadata
-│   └── SAM3_FEATURES_GUIDE.md
-
-<span class="folder">└── sam-3d-objects/</span>                    <span class="comment"># 3D Reconstruction Library</span>
-    ├── reconstruct_product.py         # Basic 3D (.ply)
-    ├── reconstruct_product_mesh.py    # Full 3D with mesh (.glb)
-    ├── sam3d_objects/                 # Core library
-    └── checkpoints/                   # Model weights
+<span class="folder"><a href="https://github.com/shopARI/AIStylist/tree/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs">sam3_product_outputs/</a></span>
+├── <a href="https://github.com/shopARI/AIStylist/tree/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/images">images/</a>                        <span class="comment"># 45 original product images (.png)</span>
+├── <a href="https://github.com/shopARI/AIStylist/tree/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/masks">masks/</a>                         <span class="comment"># 64 binary segmentation masks</span>
+├── <a href="https://github.com/shopARI/AIStylist/tree/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/metadata">metadata/</a>                      <span class="comment"># 45 JSON metadata files</span>
+├── <a href="https://github.com/shopARI/AIStylist/tree/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/results">results/</a>                       <span class="comment"># 3D outputs + overlays</span>
+│   ├── *_3d.ply                   <span class="comment">[7-22 MB] Gaussian Splat</span>
+│   ├── *_3d.glb                   <span class="comment">[124-388 KB] 3D Mesh</span>
+│   ├── *_overlay.png              <span class="comment">Visualization overlays</span>
+│   ├── *_vision_features.npy      <span class="comment">[5 MB] Example feature</span>
+│   └── *_masks_logits.npy         <span class="comment">[4 MB] Example logits</span>
+├── <a href="https://github.com/shopARI/AIStylist/tree/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/scripts">scripts/</a>                       <span class="comment"># Processing scripts</span>
+│   ├── sam3_product_segmentation.py
+│   ├── sam3_quick_test.py
+│   ├── sam3_example.py
+│   ├── test_sam3_features.py
+│   └── test_sam3_sunglasses.py
+├── <a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/SAM3_FEATURES_GUIDE.md">SAM3_FEATURES_GUIDE.md</a>
+├── <a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/SAM3_INTEGRATION_GUIDE.md">SAM3_INTEGRATION_GUIDE.md</a>
+└── segmentation_summary.txt
 </pre>
     </div>
 
@@ -107,7 +112,7 @@
             <td rowspan="3"><code>*_backbone_fpn.pkl</code></td>
             <td>(1, 256, 288, 288)</td>
             <td rowspan="3">~107 MB</td>
-            <td rowspan="3">Multi-scale features</td>
+            <td rowspan="3">Multi-scale features (not in repo - regenerate)</td>
         </tr>
         <tr>
             <td>FPN Features (Scale 1)</td>
@@ -191,8 +196,8 @@ lbp_hist, _ = np.histogram(lbp[mask], bins=10, density=True)
 from sam3d_objects.pipeline.inference_pipeline_pointmap import InferencePipelinePointMap
 
 # Load image + SAM3 mask
-image = load_image(f"/sam3_product_outputs/images/{product_id}.png")
-mask = load_mask(f"/sam3_product_outputs/masks/{product_id}_mask_0.png")
+image = load_image(f"images/{product_id}.png")
+mask = load_mask(f"masks/{product_id}_mask_0.png")
 
 # Merge to RGBA (image + mask as alpha)
 rgba_image = np.concatenate([image[:,:,:3], mask[:,:,None]*255], axis=-1)
@@ -214,26 +219,26 @@ output["glb"].export(f"{product_id}_3d.glb")
         <tr>
             <th>Product ID</th>
             <th>Description</th>
-            <th>.ply Size</th>
-            <th>.glb Size</th>
+            <th>.ply</th>
+            <th>.glb</th>
         </tr>
         <tr>
             <td><code>8109780025406700292</code></td>
             <td>Blue Gant Hoodie</td>
-            <td>22 MB</td>
-            <td>388 KB</td>
+            <td><a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/results/8109780025406700292_3d.ply">22 MB</a></td>
+            <td><a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/results/8109780025406700292_3d.glb">388 KB</a></td>
         </tr>
         <tr>
             <td><code>8109780771167927961</code></td>
             <td>Fashion Product</td>
-            <td>7.4 MB</td>
-            <td>124 KB</td>
+            <td><a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/results/8109780771167927961_3d.ply">7.4 MB</a></td>
+            <td><a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/results/8109780771167927961_3d.glb">124 KB</a></td>
         </tr>
         <tr>
             <td><code>8109784498766011128</code></td>
             <td>Ecoalf Bornite Dress</td>
-            <td>9.7 MB</td>
-            <td>192 KB</td>
+            <td><a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/results/8109784498766011128_3d.ply">9.7 MB</a></td>
+            <td><a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/results/8109784498766011128_3d.glb">192 KB</a></td>
         </tr>
     </table>
 
@@ -241,46 +246,50 @@ output["glb"].export(f"{product_id}_3d.glb")
     <table>
         <tr>
             <th>Script</th>
-            <th>Location</th>
+            <th>GitHub Link</th>
             <th>Purpose</th>
         </tr>
         <tr>
             <td><code>sam3_product_segmentation.py</code></td>
-            <td>ARI_PRODUCTION_RESEARCH/ari_crewai_migration/</td>
+            <td><a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/scripts/sam3_product_segmentation.py">View on GitHub</a></td>
             <td>Neo4j to SAM3 to masks + features</td>
         </tr>
         <tr>
             <td><code>sam3_quick_test.py</code></td>
-            <td>ARI_PRODUCTION_RESEARCH/ari_crewai_migration/</td>
+            <td><a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/scripts/sam3_quick_test.py">View on GitHub</a></td>
             <td>Quick SAM3 segmentation test</td>
         </tr>
         <tr>
+            <td><code>sam3_example.py</code></td>
+            <td><a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/scripts/sam3_example.py">View on GitHub</a></td>
+            <td>Example SAM3 usage</td>
+        </tr>
+        <tr>
             <td><code>test_sam3_features.py</code></td>
-            <td>ARI_PRODUCTION_RESEARCH/ari_crewai_migration/</td>
+            <td><a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/scripts/test_sam3_features.py">View on GitHub</a></td>
             <td>Explore SAM3 feature outputs</td>
         </tr>
         <tr>
-            <td><code>reconstruct_product.py</code></td>
-            <td>/home/ubuntu/sam-3d-objects/</td>
-            <td>Basic 3D (.ply only)</td>
-        </tr>
-        <tr>
-            <td><code>reconstruct_product_mesh.py</code></td>
-            <td>/home/ubuntu/sam-3d-objects/</td>
-            <td>Full 3D with mesh (.ply + .glb)</td>
+            <td><code>test_sam3_sunglasses.py</code></td>
+            <td><a href="https://github.com/shopARI/AIStylist/blob/master/ARI_PRODUCTION_RESEARCH/sam3_product_outputs/scripts/test_sam3_sunglasses.py">View on GitHub</a></td>
+            <td>Sunglasses segmentation test</td>
         </tr>
     </table>
 
     <h2>8. Summary</h2>
     <ul>
         <li>SAM3 segmentation with text prompts</li>
-        <li>Binary masks for 50+ products</li>
-        <li>Vision features (256-dim embeddings)</li>
-        <li>Multi-scale FPN features (3 scales)</li>
-        <li>3D Gaussian splats (.ply) for 3 products</li>
-        <li>3D Meshes (.glb) for 3 products</li>
-        <li>Texture extraction pipeline (Gabor/LBP/GLCM)</li>
-        <li>Color extraction on masked regions</li>
+        <li>45 product images</li>
+        <li>64 binary segmentation masks</li>
+        <li>45 JSON metadata files</li>
+        <li>54 overlay visualizations</li>
+        <li>3 Gaussian splats (.ply)</li>
+        <li>3 web-ready 3D meshes (.glb)</li>
+        <li>1 example feature set (vision_features, masks_logits)</li>
+        <li>5 processing scripts</li>
     </ul>
+
+    <p><strong>Total repository size:</strong> 79 MB</p>
+    <p><strong>Note:</strong> Large feature files (*_backbone_fpn.pkl, *_vision_pos_enc.pkl ~107MB each) excluded - can be regenerated using scripts.</p>
 </body>
 </html>
