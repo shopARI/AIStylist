@@ -1,0 +1,286 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>SAM3 + Texture + 3D Pipeline Report</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #fff;
+            color: #333;
+            max-width: 1000px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            line-height: 1.6;
+        }
+        h1 { font-size: 1.8rem; border-bottom: 2px solid #333; padding-bottom: 10px; }
+        h2 { font-size: 1.3rem; margin-top: 30px; border-bottom: 1px solid #ccc; padding-bottom: 5px; }
+        h3 { font-size: 1.1rem; margin-top: 20px; }
+        table { width: 100%; border-collapse: collapse; margin: 15px 0; }
+        th, td { border: 1px solid #ddd; padding: 8px 12px; text-align: left; }
+        th { background: #f5f5f5; }
+        code { background: #f0f0f0; padding: 2px 6px; font-family: monospace; }
+        pre { background: #f5f5f5; padding: 15px; overflow-x: auto; font-size: 0.85rem; }
+        .file-tree { font-family: monospace; background: #f9f9f9; padding: 15px; }
+        .file-tree .folder { font-weight: bold; }
+        .file-tree .comment { color: #666; }
+        ul { margin: 10px 0; }
+        li { margin: 5px 0; }
+    </style>
+</head>
+<body>
+    <h1>SAM3 + Texture + 3D Pipeline Report</h1>
+    <p><strong>Date:</strong> January 2026</p>
+
+    <h2>1. Pipeline Overview</h2>
+    <table>
+        <tr>
+            <th>Stage</th>
+            <th>Input</th>
+            <th>Output</th>
+        </tr>
+        <tr>
+            <td>1. Image Download</td>
+            <td>Product URL from Neo4j</td>
+            <td>PNG image</td>
+        </tr>
+        <tr>
+            <td>2. SAM3 Segmentation</td>
+            <td>Image + text prompt</td>
+            <td>Binary masks, FPN features, vision features</td>
+        </tr>
+        <tr>
+            <td>3. 3D Reconstruction</td>
+            <td>Image + mask (RGBA)</td>
+            <td>.ply (Gaussian splat), .glb (mesh)</td>
+        </tr>
+    </table>
+
+    <h2>2. File Structure</h2>
+    <div class="file-tree">
+<pre>
+<span class="folder">/home/ubuntu/</span>
+<span class="folder">├── sam3/</span>                              <span class="comment"># SAM3 Library</span>
+│   ├── sam3/                          # Core segmentation library
+│   ├── examples/                      # Jupyter notebooks
+│   └── scripts/                       # Eval scripts
+
+<span class="folder">├── sam3_product_outputs/</span>              <span class="comment"># Processing Results</span>
+│   ├── images/                        # Original product images (.png)
+│   ├── masks/                         # Binary segmentation masks
+│   ├── results/                       # Features + 3D outputs
+│   │   ├── *_vision_features.npy      [5 MB each]
+│   │   ├── *_backbone_fpn.pkl         [107 MB each]
+│   │   ├── *_masks_logits.npy         [4 MB each]
+│   │   ├── *_3d.ply                   [7-22 MB] Gaussian Splat
+│   │   └── *_3d.glb                   [124-388 KB] 3D Mesh
+│   ├── metadata/                      # JSON metadata
+│   └── SAM3_FEATURES_GUIDE.md
+
+<span class="folder">└── sam-3d-objects/</span>                    <span class="comment"># 3D Reconstruction Library</span>
+    ├── reconstruct_product.py         # Basic 3D (.ply)
+    ├── reconstruct_product_mesh.py    # Full 3D with mesh (.glb)
+    ├── sam3d_objects/                 # Core library
+    └── checkpoints/                   # Model weights
+</pre>
+    </div>
+
+    <h2>3. SAM3 Feature Outputs</h2>
+    <table>
+        <tr>
+            <th>Output</th>
+            <th>File Pattern</th>
+            <th>Shape</th>
+            <th>Size</th>
+            <th>Purpose</th>
+        </tr>
+        <tr>
+            <td>Vision Features</td>
+            <td><code>*_vision_features.npy</code></td>
+            <td>(1, 256, 72, 72)</td>
+            <td>~5 MB</td>
+            <td>Global appearance, embeddings</td>
+        </tr>
+        <tr>
+            <td>FPN Features (Scale 0)</td>
+            <td rowspan="3"><code>*_backbone_fpn.pkl</code></td>
+            <td>(1, 256, 288, 288)</td>
+            <td rowspan="3">~107 MB</td>
+            <td rowspan="3">Multi-scale features</td>
+        </tr>
+        <tr>
+            <td>FPN Features (Scale 1)</td>
+            <td>(1, 256, 144, 144)</td>
+        </tr>
+        <tr>
+            <td>FPN Features (Scale 2)</td>
+            <td>(1, 256, 72, 72)</td>
+        </tr>
+        <tr>
+            <td>Binary Masks</td>
+            <td><code>*_mask_0.png</code></td>
+            <td>(1000, 1000)</td>
+            <td>~5 KB</td>
+            <td>Object isolation</td>
+        </tr>
+        <tr>
+            <td>Mask Logits</td>
+            <td><code>*_masks_logits.npy</code></td>
+            <td>(N, 1, 1000, 1000)</td>
+            <td>~4 MB</td>
+            <td>Soft masks, confidence</td>
+        </tr>
+    </table>
+
+    <h2>4. Texture Extraction Pipeline</h2>
+    <h3>Steps:</h3>
+    <ol>
+        <li><strong>Segment:</strong> SAM3 text prompt ("dress", "shirt") produces binary mask</li>
+        <li><strong>Extract:</strong> Apply Gabor filters, LBP, GLCM to masked region</li>
+        <li><strong>Combine:</strong> Texture vector (~256-512 dim) + FPN features + color features</li>
+    </ol>
+
+    <h3>Code Reference:</h3>
+    <pre>
+# Texture extraction on SAM3-masked regions
+from skimage.feature import graycomatrix, graycoprops, local_binary_pattern
+from skimage.filters import gabor
+
+# Load mask from SAM3
+mask = np.array(Image.open(f"masks/{product_id}_mask_0.png")) > 127
+
+# Apply mask to isolate garment
+garment_pixels = image[mask]
+
+# Gabor texture features (orientation/frequency)
+for theta in [0, np.pi/4, np.pi/2, 3*np.pi/4]:
+    filt_real, _ = gabor(gray, frequency=0.2, theta=theta)
+    texture_features.append(filt_real[mask].mean())
+
+# LBP for micro-patterns
+lbp = local_binary_pattern(gray, P=8, R=1)
+lbp_hist, _ = np.histogram(lbp[mask], bins=10, density=True)
+    </pre>
+
+    <h2>5. 3D Reconstruction Outputs</h2>
+    <table>
+        <tr>
+            <th>Format</th>
+            <th>Extension</th>
+            <th>Size Range</th>
+            <th>Description</th>
+        </tr>
+        <tr>
+            <td>Gaussian Splat</td>
+            <td>.ply</td>
+            <td>7-22 MB</td>
+            <td>3D Gaussian splatting, high quality, real-time rendering</td>
+        </tr>
+        <tr>
+            <td>3D Mesh</td>
+            <td>.glb</td>
+            <td>124-388 KB</td>
+            <td>GLTF binary, web-compatible, AR/VR ready</td>
+        </tr>
+    </table>
+
+    <h3>Code Reference:</h3>
+    <pre>
+# 3D Reconstruction with SAM 3D Objects
+from sam3d_objects.pipeline.inference_pipeline_pointmap import InferencePipelinePointMap
+
+# Load image + SAM3 mask
+image = load_image(f"/sam3_product_outputs/images/{product_id}.png")
+mask = load_mask(f"/sam3_product_outputs/masks/{product_id}_mask_0.png")
+
+# Merge to RGBA (image + mask as alpha)
+rgba_image = np.concatenate([image[:,:,:3], mask[:,:,None]*255], axis=-1)
+
+# Run 3D reconstruction
+output = pipeline.run(
+    rgba_image,
+    with_mesh_postprocess=True,
+    use_vertex_color=True,
+)
+
+# Save outputs
+output["gs"].save_ply(f"{product_id}_3d.ply")
+output["glb"].export(f"{product_id}_3d.glb")
+    </pre>
+
+    <h2>6. Generated 3D Files</h2>
+    <table>
+        <tr>
+            <th>Product ID</th>
+            <th>Description</th>
+            <th>.ply Size</th>
+            <th>.glb Size</th>
+        </tr>
+        <tr>
+            <td><code>8109780025406700292</code></td>
+            <td>Blue Gant Hoodie</td>
+            <td>22 MB</td>
+            <td>388 KB</td>
+        </tr>
+        <tr>
+            <td><code>8109780771167927961</code></td>
+            <td>Fashion Product</td>
+            <td>7.4 MB</td>
+            <td>124 KB</td>
+        </tr>
+        <tr>
+            <td><code>8109784498766011128</code></td>
+            <td>Ecoalf Bornite Dress</td>
+            <td>9.7 MB</td>
+            <td>192 KB</td>
+        </tr>
+    </table>
+
+    <h2>7. Scripts Reference</h2>
+    <table>
+        <tr>
+            <th>Script</th>
+            <th>Location</th>
+            <th>Purpose</th>
+        </tr>
+        <tr>
+            <td><code>sam3_product_segmentation.py</code></td>
+            <td>ARI_PRODUCTION_RESEARCH/ari_crewai_migration/</td>
+            <td>Neo4j to SAM3 to masks + features</td>
+        </tr>
+        <tr>
+            <td><code>sam3_quick_test.py</code></td>
+            <td>ARI_PRODUCTION_RESEARCH/ari_crewai_migration/</td>
+            <td>Quick SAM3 segmentation test</td>
+        </tr>
+        <tr>
+            <td><code>test_sam3_features.py</code></td>
+            <td>ARI_PRODUCTION_RESEARCH/ari_crewai_migration/</td>
+            <td>Explore SAM3 feature outputs</td>
+        </tr>
+        <tr>
+            <td><code>reconstruct_product.py</code></td>
+            <td>/home/ubuntu/sam-3d-objects/</td>
+            <td>Basic 3D (.ply only)</td>
+        </tr>
+        <tr>
+            <td><code>reconstruct_product_mesh.py</code></td>
+            <td>/home/ubuntu/sam-3d-objects/</td>
+            <td>Full 3D with mesh (.ply + .glb)</td>
+        </tr>
+    </table>
+
+    <h2>8. Summary</h2>
+    <ul>
+        <li>SAM3 segmentation with text prompts</li>
+        <li>Binary masks for 50+ products</li>
+        <li>Vision features (256-dim embeddings)</li>
+        <li>Multi-scale FPN features (3 scales)</li>
+        <li>3D Gaussian splats (.ply) for 3 products</li>
+        <li>3D Meshes (.glb) for 3 products</li>
+        <li>Texture extraction pipeline (Gabor/LBP/GLCM)</li>
+        <li>Color extraction on masked regions</li>
+    </ul>
+</body>
+</html>
