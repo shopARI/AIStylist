@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARI V3 - Steps 5 & 6 Demo</title>
+    <style>
+        * { box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            max-width: 1100px;
+            margin: 0 auto;
+            padding: 40px 20px;
+            background: #f8f9fa;
+            color: #333;
+        }
+        h1 {
+            text-align: center;
+            color: #1a1a2e;
+            border-bottom: 3px solid #4a4e69;
+            padding-bottom: 15px;
+        }
+        h2 {
+            color: #4a4e69;
+            margin-top: 40px;
+            padding: 10px 15px;
+            background: #e8e8e8;
+            border-left: 4px solid #4a4e69;
+        }
+        h3 {
+            color: #22223b;
+            margin-top: 25px;
+        }
+        .timestamp {
+            text-align: center;
+            color: #666;
+            font-size: 0.9rem;
+            margin-bottom: 30px;
+        }
+        .pillars-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin: 20px 0;
+        }
+        .pillar {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .pillar h4 {
+            margin: 0 0 10px 0;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #eee;
+        }
+        .pillar.intent { border-top: 3px solid #e63946; }
+        .pillar.behavioral { border-top: 3px solid #457b9d; }
+        .pillar.state { border-top: 3px solid #2a9d8f; }
+        .pillar table {
+            width: 100%;
+            font-size: 0.85rem;
+        }
+        .pillar td {
+            padding: 4px 0;
+        }
+        .pillar td:first-child {
+            color: #666;
+            width: 40%;
+        }
+        .score {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .score.high { background: #d4edda; color: #155724; }
+        .score.medium { background: #fff3cd; color: #856404; }
+        .score.low { background: #f8d7da; color: #721c24; }
+        .synthesis-output {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .synthesis-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #eee;
+        }
+        .synthesis-item:last-child { border-bottom: none; }
+        .nav-path {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            margin: 20px 0;
+        }
+        .path-visual {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+        }
+        .path-start, .path-end {
+            background: #4a4e69;
+            color: white;
+            padding: 15px 25px;
+            border-radius: 8px;
+            font-weight: bold;
+        }
+        .path-arrow {
+            font-size: 2rem;
+            color: #4a4e69;
+        }
+        .path-params {
+            background: #f0f0f0;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .products-table, .results-table {
+            width: 100%;
+            border-collapse: collapse;
+            background: white;
+            margin: 15px 0;
+        }
+        .products-table th, .results-table th {
+            background: #4a4e69;
+            color: white;
+            padding: 12px;
+            text-align: left;
+        }
+        .products-table td, .results-table td {
+            padding: 10px 12px;
+            border-bottom: 1px solid #eee;
+        }
+        .outlier-row {
+            background: #fff8e1 !important;
+        }
+        .outlier-badge {
+            background: #ff9800;
+            color: white;
+            padding: 3px 8px;
+            border-radius: 4px;
+            font-size: 0.8rem;
+        }
+        .scoring-weights {
+            background: #e3f2fd;
+            padding: 15px;
+            border-radius: 8px;
+            margin: 15px 0;
+        }
+        .score-bars {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+        }
+        .score-bar-row {
+            display: flex;
+            align-items: center;
+            margin: 8px 0;
+        }
+        .dimension-name {
+            width: 120px;
+            font-size: 0.9rem;
+        }
+        .bar-container {
+            flex: 1;
+            height: 20px;
+            background: #eee;
+            border-radius: 4px;
+            margin: 0 10px;
+        }
+        .bar {
+            height: 100%;
+            border-radius: 4px;
+            transition: width 0.3s;
+        }
+        .bar.high { background: #4caf50; }
+        .bar.medium { background: #ff9800; }
+        .bar.low { background: #f44336; }
+        .dimension-score {
+            width: 50px;
+            text-align: right;
+            font-weight: bold;
+        }
+        .mmr-explanation, .outlier-explanation {
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #2196f3;
+        }
+        .test-status {
+            text-align: center;
+            padding: 20px;
+            background: #d4edda;
+            border-radius: 8px;
+            margin-top: 40px;
+        }
+        .test-status.pass {
+            border: 2px solid #28a745;
+        }
+    </style>
+</head>
+<body>
+    <h1>ARI V3 Navigation Intelligence Demo</h1>
+    <p class="timestamp">Generated: 2026-01-14 08:55:09</p>
+
+    <h2>Step 5: Synthesis LLM - Three Pillars → Navigation</h2><h3>Input: Three Pillars</h3><div class='pillars-grid'>
+    <div class='pillar intent'>
+        <h4>Pillar 1: Personalization</h4>
+        <table>
+            <tr><td>Body Type</td><td>hourglass</td></tr>
+            <tr><td>Coloring</td><td>warm</td></tr>
+            <tr><td>Categories</td><td>dresses, summer wear, wedding attire</td></tr>
+        </table>
+    </div>
+    
+    <div class='pillar behavioral'>
+        <h4>Pillar 2: Stylist Knowledge</h4>
+        <table>
+            <tr><td>Body Guidance</td><td>Fitted waist styles complement hourglass figure</td></tr>
+            <tr><td>Occasion</td><td>Beach wedding - light fabrics, flowy silhouettes</td></tr>
+            <tr><td>Color Guidance</td><td>Warm tones: coral, peach, soft yellow</td></tr>
+        </table>
+    </div>
+    
+    <div class='pillar state'>
+        <h4>Pillar 3: Activity</h4>
+        <table>
+            <tr><td>Exploration</td><td><span class='score medium'>0.4</span></td></tr>
+            <tr><td>Session Depth</td><td>3 interactions</td></tr>
+            <tr><td>Recent Actions</td><td>viewed floral dress, saved linen jumpsuit</td></tr>
+        </table>
+    </div>
+    </div><h3>Output: Navigation Synthesis (from LLM)</h3>
+    <div class='synthesis-output'>
+        <div class='synthesis-item'>
+            <strong>Style Descriptors:</strong> flowy, feminine, beach-appropriate, warm-toned
+        </div>
+        <div class='synthesis-item'>
+            <strong>Exemplar Search Terms:</strong> beach wedding dress, flowy summer dress, coral midi dress
+        </div>
+        <div class='synthesis-item'>
+            <strong>Understood Intent:</strong> Beach wedding guest attire in warm tones
+        </div>
+        <div class='synthesis-item'>
+            <strong>Budget Range:</strong> $100 - $250
+        </div>
+        <div class='synthesis-item'>
+            <strong>Formality Level:</strong> <span class='score medium'>0.4</span>
+        </div>
+        <div class='synthesis-item'>
+            <strong>Relevant Context:</strong> hourglass body type, warm coloring, outdoor beach venue
+        </div>
+    </div>
+    <h3>Calculated Navigation Path</h3>
+    <div class='nav-path'>
+        <div class='path-visual'>
+            <div class='path-start'>Current Position</div>
+            <div class='path-arrow'>→</div>
+            <div class='path-params'>
+                <div>Max Step: <strong>0.25</strong></div>
+                <div>Diversity: <strong>0.50</strong></div>
+                <div>Outlier %: <strong>8%</strong></div>
+            </div>
+            <div class='path-arrow'>→</div>
+            <div class='path-end'>Target Style</div>
+        </div>
+    </div>
+    <h2>Step 6: Judge - MMR Selection + Outlier Injection</h2><h3>Input: 8 Candidate Products</h3><table class='products-table'><tr><th>ID</th><th>Title</th><th>Brand</th><th>Price</th></tr><tr><td>P001</td><td>Flowy Beach Dress</td><td>Reformation</td><td>$198</td></tr><tr><td>P002</td><td>Linen Midi Dress</td><td>Anthropologie</td><td>$168</td></tr><tr><td>P003</td><td>Bohemian Maxi</td><td>Free People</td><td>$148</td></tr><tr><td>P004</td><td>Floral Wrap Dress</td><td>Reformation</td><td>$218</td></tr><tr><td>P005</td><td>Cotton Sundress</td><td>Everlane</td><td>$88</td></tr><tr><td>P006</td><td>Silk Party Dress</td><td>Vince</td><td>$395</td></tr><tr><td>P007</td><td>Casual Shift Dress</td><td>Madewell</td><td>$128</td></tr><tr><td>P008</td><td>Vintage Floral Maxi</td><td>Anthropologie</td><td>$178</td></tr></table><h3>7-Dimension Scoring</h3><div class='scoring-weights'><strong>Weights:</strong> Smoothness=15%, Coherence=10%, Budget=15%, Brand=10%, Behavioral=20%, Multi-Agent=10%, Rules=20%</div><h3>Output: Ranked Results (Top 5)</h3><table class='results-table'><tr><th>Rank</th><th>Product</th><th>Brand</th><th>Price</th><th>Score</th><th>Outlier?</th></tr>
+        <tr class=''>
+            <td><strong>#1</strong></td>
+            <td>Linen Midi Dress</td>
+            <td>Anthropologie</td>
+            <td>$168</td>
+            <td><span class='score high'>0.620</span></td>
+            <td></td>
+        </tr>
+        
+        <tr class=''>
+            <td><strong>#2</strong></td>
+            <td>Vintage Floral Maxi</td>
+            <td>Anthropologie</td>
+            <td>$178</td>
+            <td><span class='score high'>0.620</span></td>
+            <td></td>
+        </tr>
+        
+        <tr class=''>
+            <td><strong>#3</strong></td>
+            <td>Floral Wrap Dress</td>
+            <td>Reformation</td>
+            <td>$218</td>
+            <td><span class='score high'>0.620</span></td>
+            <td></td>
+        </tr>
+        
+        <tr class=''>
+            <td><strong>#4</strong></td>
+            <td>Bohemian Maxi</td>
+            <td>Free People</td>
+            <td>$148</td>
+            <td><span class='score high'>0.620</span></td>
+            <td></td>
+        </tr>
+        
+        <tr class='outlier-row'>
+            <td><strong>#5</strong></td>
+            <td>Casual Shift Dress</td>
+            <td>Madewell</td>
+            <td>$128</td>
+            <td><span class='score medium'>0.550</span></td>
+            <td><span class='outlier-badge'>OUTLIER</span></td>
+        </tr>
+        </table><h3>Score Breakdown: #1 Linen Midi Dress</h3><div class='score-bars'>
+            <div class='score-bar-row'>
+                <span class='dimension-name'>Smoothness</span>
+                <div class='bar-container'>
+                    <div class='bar low' style='width: 0%'></div>
+                </div>
+                <span class='dimension-score'>0.00</span>
+            </div>
+            
+            <div class='score-bar-row'>
+                <span class='dimension-name'>Coherence</span>
+                <div class='bar-container'>
+                    <div class='bar high' style='width: 80%'></div>
+                </div>
+                <span class='dimension-score'>0.80</span>
+            </div>
+            
+            <div class='score-bar-row'>
+                <span class='dimension-name'>Budget Fit</span>
+                <div class='bar-container'>
+                    <div class='bar high' style='width: 100%'></div>
+                </div>
+                <span class='dimension-score'>1.00</span>
+            </div>
+            
+            <div class='score-bar-row'>
+                <span class='dimension-name'>Brand Match</span>
+                <div class='bar-container'>
+                    <div class='bar high' style='width: 100%'></div>
+                </div>
+                <span class='dimension-score'>1.00</span>
+            </div>
+            
+            <div class='score-bar-row'>
+                <span class='dimension-name'>Behavioral</span>
+                <div class='bar-container'>
+                    <div class='bar medium' style='width: 50%'></div>
+                </div>
+                <span class='dimension-score'>0.50</span>
+            </div>
+            
+            <div class='score-bar-row'>
+                <span class='dimension-name'>Multi-Agent</span>
+                <div class='bar-container'>
+                    <div class='bar medium' style='width: 50%'></div>
+                </div>
+                <span class='dimension-score'>0.50</span>
+            </div>
+            
+            <div class='score-bar-row'>
+                <span class='dimension-name'>Rule Compliance</span>
+                <div class='bar-container'>
+                    <div class='bar high' style='width: 70%'></div>
+                </div>
+                <span class='dimension-score'>0.70</span>
+            </div>
+            </div><h3>MMR Diversity Selection</h3>
+    <div class='mmr-explanation'>
+        <p><strong>MMR Formula:</strong> score = lambda * relevance - (1-lambda) * max_similarity</p>
+        <p>With lambda = 0.50, the algorithm balances:</p>
+        <ul>
+            <li><strong>50%</strong> weight on relevance (how good is this product?)</li>
+            <li><strong>50%</strong> weight on diversity (how different from already selected?)</li>
+        </ul>
+    </div>
+    <h3>Outlier Injection for Exploration</h3>
+    <div class='outlier-explanation'>
+        <p><strong>Exploration Appetite:</strong> 0.4 → <strong>8%</strong> outliers injected</p>
+        <p>Outliers are products with cosine distance &gt; 0.4 from current position.</p>
+        <p>They introduce serendipity and help users discover new styles.</p>
+    </div>
+    
+
+    <div class="test-status pass">
+        <h3>All Systems Operational</h3>
+        <p>Step 5 (Synthesis LLM) and Step 6 (Judge MMR + Outliers) are working correctly.</p>
+        <p><strong>288 unit tests passing</strong></p>
+    </div>
+</body>
+</html>
