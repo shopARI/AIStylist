@@ -26,7 +26,6 @@ import numpy as np
 from openai import OpenAI
 
 from ari_v3.core.data_structures import (
-    StyleContext,
     RawUserData,
     ComputedUserState,
     StyleCoordinate,
