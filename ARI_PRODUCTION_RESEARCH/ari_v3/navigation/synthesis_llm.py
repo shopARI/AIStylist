@@ -495,10 +495,8 @@ Output a JSON object with:
             text: Text to embed
 
         Returns:
-            List of floats representing the embedding
-
-        Raises:
-            Exception: If embedding API call fails
+            List of floats representing the embedding.
+            Returns zero vector if API call fails (graceful degradation).
         """
         try:
             response = self.client.embeddings.create(
@@ -508,4 +506,7 @@ Output a JSON object with:
             return response.data[0].embedding
         except Exception as e:
             logger.error(f"Embedding API call failed for text '{text[:50]}...': {e}")
-            raise
+            # Return zero vector as fallback - allows pipeline to continue
+            # The zero vector will result in neutral similarity scores
+            logger.warning(f"Returning zero vector fallback for failed embedding")
+            return zero_vector(TEXT_EMBEDDING_DIM).tolist()

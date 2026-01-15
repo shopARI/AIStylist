@@ -29,6 +29,7 @@ def inject_outliers(
     outlier_percentage: float,
     current_position_embedding: Optional[np.ndarray] = None,
     distance_threshold: float = OUTLIER_DISTANCE_THRESHOLD,
+    seed: Optional[int] = None,
 ) -> Tuple[List[ScoredProduct], List[ScoredProduct]]:
     """
     Inject outlier products for exploration.
@@ -42,6 +43,7 @@ def inject_outliers(
         outlier_percentage: Percentage of final results to be outliers (0.0-0.2)
         current_position_embedding: User's current style position embedding
         distance_threshold: Minimum distance to qualify as outlier (default 0.4)
+        seed: Optional random seed for deterministic outlier selection (for testing)
 
     Returns:
         Tuple of (final_products, injected_outliers)
@@ -80,9 +82,13 @@ def inject_outliers(
         logger.info("No qualified outliers found - skipping injection")
         return selected, []
 
-    # Sample outliers
+    # Sample outliers (with optional seed for reproducibility)
     num_to_sample = min(num_outliers, len(qualified_outliers))
-    sampled_outliers = random.sample(qualified_outliers, num_to_sample)
+    if seed is not None:
+        rng = random.Random(seed)
+        sampled_outliers = rng.sample(qualified_outliers, num_to_sample)
+    else:
+        sampled_outliers = random.sample(qualified_outliers, num_to_sample)
 
     logger.info(f"Injecting {len(sampled_outliers)} outliers from {len(qualified_outliers)} qualified candidates")
 
