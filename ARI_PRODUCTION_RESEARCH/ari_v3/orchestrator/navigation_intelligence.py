@@ -594,6 +594,12 @@ class NavigationOrchestrator:
         Returns:
             SearchResult with products, narrative, and metadata
         """
+        # Input validation (also validated in generate_navigation_context, but check here for logging)
+        if not user_id:
+            raise ValueError("user_id cannot be empty")
+        if not query:
+            raise ValueError("query cannot be empty")
+
         # Log with truncated user_id for privacy
         user_id_short = user_id[:8] + "..." if len(user_id) > 8 else user_id
         logger.info(f"Executing search for user {user_id_short}: '{query}'")
@@ -692,8 +698,10 @@ class NavigationOrchestrator:
         # Ensure at least 1 main product
         main_count = max(1, main_count)
 
-        # MMR selection
-        lambda_param = nav_context.path.diversity_requirement if nav_context.path else COLD_START_DIVERSITY_REQUIREMENT
+        # MMR selection - ensure lambda_param is never None
+        lambda_param = COLD_START_DIVERSITY_REQUIREMENT
+        if nav_context.path and nav_context.path.diversity_requirement is not None:
+            lambda_param = nav_context.path.diversity_requirement
         selected = mmr_select(
             candidates=scored_products,
             limit=main_count,
@@ -744,6 +752,14 @@ class NavigationOrchestrator:
         if nav_context.raw_user_data:
             user_profile = nav_context.raw_user_data.onboarding_profile
 
+        # Use async version for future-proofing (currently wraps sync)
+        if hasattr(self.narrative_llm, 'generate_narrative_async'):
+            return await self.narrative_llm.generate_narrative_async(
+                nav_context=nav_context,
+                products=products,
+                user_profile=user_profile,
+            )
+        # Fallback to sync version
         return self.narrative_llm.generate_narrative(
             nav_context=nav_context,
             products=products,

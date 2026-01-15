@@ -355,12 +355,14 @@ class TestNarrativeIntegration:
             raw_user_data=MagicMock(onboarding_profile=None),
         ))
 
-        # Mock narrative LLM
+        # Mock narrative LLM with async version
         mock_narrative_llm = MagicMock()
-        mock_narrative_llm.generate_narrative = MagicMock(return_value=MagicMock(
+        mock_narrative_response = MagicMock(
             intro="Here are your picks!",
             product_explanations=[],
-        ))
+        )
+        mock_narrative_llm.generate_narrative_async = AsyncMock(return_value=mock_narrative_response)
+        mock_narrative_llm.generate_narrative = MagicMock(return_value=mock_narrative_response)
 
         orchestrator = NavigationOrchestrator(
             navigation_intelligence=nav_intel,
@@ -373,7 +375,8 @@ class TestNarrativeIntegration:
             products=mock_sample_products,
         )
 
-        mock_narrative_llm.generate_narrative.assert_called_once()
+        # Should use async version when available
+        mock_narrative_llm.generate_narrative_async.assert_called_once()
         assert result.narrative is not None
 
     @pytest.mark.asyncio
@@ -387,8 +390,9 @@ class TestNarrativeIntegration:
             raw_user_data=MagicMock(onboarding_profile=None),
         ))
 
-        # Mock narrative LLM to raise error
+        # Mock narrative LLM to raise error (async version since that's preferred)
         mock_narrative_llm = MagicMock()
+        mock_narrative_llm.generate_narrative_async = AsyncMock(side_effect=Exception("Narrative Error"))
         mock_narrative_llm.generate_narrative = MagicMock(side_effect=Exception("Narrative Error"))
 
         orchestrator = NavigationOrchestrator(
