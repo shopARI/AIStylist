@@ -258,10 +258,11 @@ class SynthesisLLM:
 - Brand affinity: {pillars.nav_params.brand_affinity_weight:.2f}"""
 
         # Format behavioral patterns
+        # Use getattr for defensive access - BehavioralPatterns may have different field names
         behavioral_desc = ""
         if pillars.behavioral_patterns:
-            consistent = pillars.behavioral_patterns.consistent_dimensions or ["general style"]
-            variable = pillars.behavioral_patterns.variable_dimensions or []
+            consistent = getattr(pillars.behavioral_patterns, 'consistent_dimensions', None) or ["general style"]
+            variable = getattr(pillars.behavioral_patterns, 'variable_dimensions', None) or []
             behavioral_desc = f"""
 - Consistent on: {', '.join(consistent[:3])}
 - Varies on: {', '.join(variable[:3]) if variable else 'nothing notable'}"""
