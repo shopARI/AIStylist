@@ -255,11 +255,15 @@ class ARIOrchestrator:
                 occasion = params.occasions[0]
 
             # Step 1: Run navigation intelligence pipeline
-            nav_context = await self.navigation.generate_navigation_context(
-                user_id=user_id,
-                query=query,
-                occasion=occasion,
-            )
+            nav_context = None
+            try:
+                nav_context = await self.navigation.generate_navigation_context(
+                    user_id=user_id,
+                    query=query,
+                    occasion=occasion,
+                )
+            except Exception as nav_err:
+                logger.warning(f"Navigation pipeline failed: {nav_err}, will use direct embedding")
 
             # Step 2: Search products using destination embedding
             products = []
@@ -270,7 +274,7 @@ class ARIOrchestrator:
                 query_vector = None
 
                 # Try navigation context embedding first
-                if nav_context.destination and nav_context.destination.embedding is not None:
+                if nav_context and nav_context.destination and nav_context.destination.embedding is not None:
                     embedding = nav_context.destination.embedding
                     query_vector = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
 
