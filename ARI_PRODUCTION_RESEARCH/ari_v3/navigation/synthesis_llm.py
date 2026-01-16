@@ -389,16 +389,21 @@ Output a JSON object with:
 
                 if qdrant_client:
                     # Search for products matching the descriptor
-                    results = qdrant_client.search(
-                        collection_name=collection_name,
-                        query_vector=query_embedding,
-                        limit=EXEMPLAR_SEARCH_LIMIT,
-                    )
-
-                    # Collect embeddings of top results
-                    for result in results:
-                        if hasattr(result, 'vector') and result.vector:
-                            exemplar_embeddings.append(np.array(result.vector))
+                    # Use query_points with with_vectors=True to get embeddings back
+                    try:
+                        results = qdrant_client.query_points(
+                            collection_name=collection_name,
+                            query=query_embedding,
+                            limit=EXEMPLAR_SEARCH_LIMIT,
+                            with_vectors=True,
+                        )
+                        # Collect embeddings of top results
+                        for point in results.points:
+                            if point.vector is not None:
+                                exemplar_embeddings.append(np.array(point.vector))
+                    except Exception as search_err:
+                        logger.warning(f"Qdrant search failed: {search_err}, using query embedding directly")
+                        exemplar_embeddings.append(np.array(query_embedding))
                 else:
                     # No Qdrant client - use search term embedding directly
                     exemplar_embeddings.append(np.array(query_embedding))
@@ -438,16 +443,21 @@ Output a JSON object with:
 
                 if qdrant_client:
                     # Search for products matching the descriptor (async Qdrant)
-                    results = await qdrant_client.search(
-                        collection_name=collection_name,
-                        query_vector=query_embedding,
-                        limit=EXEMPLAR_SEARCH_LIMIT,
-                    )
-
-                    # Collect embeddings of top results
-                    for result in results:
-                        if hasattr(result, 'vector') and result.vector:
-                            exemplar_embeddings.append(np.array(result.vector))
+                    # Use query_points with with_vectors=True to get embeddings back
+                    try:
+                        results = await qdrant_client.query_points(
+                            collection_name=collection_name,
+                            query=query_embedding,
+                            limit=EXEMPLAR_SEARCH_LIMIT,
+                            with_vectors=True,
+                        )
+                        # Collect embeddings of top results
+                        for point in results.points:
+                            if point.vector is not None:
+                                exemplar_embeddings.append(np.array(point.vector))
+                    except Exception as search_err:
+                        logger.warning(f"Qdrant search failed: {search_err}, using query embedding directly")
+                        exemplar_embeddings.append(np.array(query_embedding))
                 else:
                     # No Qdrant client - use search term embedding directly
                     exemplar_embeddings.append(np.array(query_embedding))

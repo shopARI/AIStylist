@@ -255,10 +255,10 @@ class IntentDetector:
                     matches.append(pattern)
 
             if matches:
-                # Improved scoring: base confidence + bonus for multiple matches
-                # This doesn't penalize intents with more patterns
-                base_confidence = 0.5  # Base confidence for any match
-                match_bonus = min(len(matches) * 0.15, 0.4)  # Up to 0.4 bonus for multiple matches
+                # Higher base confidence to avoid unnecessary LLM fallback
+                # A single pattern match should exceed the 0.7 threshold
+                base_confidence = 0.75  # High enough to pass 0.7 threshold
+                match_bonus = min(len(matches) * 0.05, 0.15)  # Small bonus for multiple matches
                 score = base_confidence + match_bonus
                 intent_scores[intent] = score
                 matched_patterns[intent] = matches
