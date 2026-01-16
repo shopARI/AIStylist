@@ -245,8 +245,8 @@ class ARIDemoCLI:
 
             # Qdrant
             qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
-            self.qdrant_client = QdrantClient(url=qdrant_url)
-            self.qdrant_client_async = AsyncQdrantClient(url=qdrant_url)
+            self.qdrant_client = QdrantClient(url=qdrant_url, timeout=60)
+            self.qdrant_client_async = AsyncQdrantClient(url=qdrant_url, timeout=60)
 
             info = self.qdrant_client.get_collection("fashion_products")
             print(f"  [OK] Qdrant connected ({info.points_count:,} products)")
