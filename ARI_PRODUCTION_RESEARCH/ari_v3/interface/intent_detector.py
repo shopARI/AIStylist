@@ -62,9 +62,12 @@ class IntentDetector:
         self.intent_patterns: Dict[SearchIntent, List[str]] = {
             # Conversation/Memory Intents - CHECK THESE FIRST
             SearchIntent.GREETING: [
-                r"^hi\b", r"^hello\b", r"^hey\b", r"^good morning\b",
-                r"^good afternoon\b", r"^good evening\b", r"^greetings\b",
-                r"^how are you", r"^what's up\b", r"^howdy\b",
+                # Only match short greetings, not "hey what should I wear"
+                r"^hi[!?,.\s]*$", r"^hello[!?,.\s]*$", r"^hey[!?,.\s]*$",
+                r"^hi there[!?,.\s]*$", r"^hello there[!?,.\s]*$", r"^hey there[!?,.\s]*$",
+                r"^good morning[!?,.\s]*$", r"^good afternoon[!?,.\s]*$", r"^good evening[!?,.\s]*$",
+                r"^greetings[!?,.\s]*$", r"^howdy[!?,.\s]*$",
+                r"^how are you", r"^what's up[!?,.\s]*$",
             ],
             SearchIntent.GOODBYE: [
                 r"\bbye\b", r"\bgoodbye\b", r"\bsee you\b", r"\bthanks?\b$",
@@ -165,8 +168,9 @@ class IntentDetector:
         # Query type patterns
         self.query_type_patterns: Dict[QueryType, List[str]] = {
             QueryType.GREETING: [
-                r"^(hi|hello|hey|good morning|good afternoon|good evening)",
-                r"^how are you", r"^what's up",
+                # Only match short greetings without product queries following
+                r"^(hi|hello|hey|good morning|good afternoon|good evening)[!?,.\s]*$",
+                r"^how are you[!?,.\s]*$", r"^what's up[!?,.\s]*$",
             ],
             QueryType.QUESTION: [
                 r"^(what|when|where|who|why|how) ",
