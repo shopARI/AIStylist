@@ -55,11 +55,19 @@ class Message:
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> Message:
-        """Create from dictionary."""
+        """Create from dictionary with error handling for malformed data."""
+        # Parse timestamp with error handling
+        timestamp = datetime.now()
+        if data.get("timestamp"):
+            try:
+                timestamp = datetime.fromisoformat(data["timestamp"])
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid timestamp format: {data.get('timestamp')}, using current time")
+
         return cls(
             role=MessageRole(data["role"]),
             content=data["content"],
-            timestamp=datetime.fromisoformat(data["timestamp"]) if data.get("timestamp") else datetime.now(),
+            timestamp=timestamp,
             metadata=data.get("metadata"),
             message_id=data.get("id", str(uuid.uuid4())),
         )

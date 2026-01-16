@@ -25,6 +25,7 @@ from .intent_detector import (
     HybridIntentDetector,
     DetectionStrategy,
     get_intent_detector,
+    reset_intent_detector,
 )
 from .parameter_extractor import (
     ParameterExtractor,
@@ -53,6 +54,7 @@ __all__ = [
     "HybridIntentDetector",
     "DetectionStrategy",
     "get_intent_detector",
+    "reset_intent_detector",
     # Parameter Extraction
     "ParameterExtractor",
     "get_parameter_extractor",

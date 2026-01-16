@@ -120,9 +120,10 @@ class ARIOrchestrator:
         self.openai_client = openai_client
         self.qdrant_collection = qdrant_collection
 
-        # Cached instances (created lazily, reused)
+        # Cached instances (created lazily, reused) - protected by _instance_lock
         self._evaluator = None
         self._narrative_llm = None
+        self._instance_lock = threading.Lock()
 
         # User context cache with TTL (user_id -> (context, last_access))
         self._user_context_cache: Dict[str, Tuple[Dict[str, Any], datetime]] = {}
@@ -132,7 +133,7 @@ class ARIOrchestrator:
         self._sessions: Dict[str, Dict[str, Any]] = {}
         self._session_lock = threading.Lock()
 
-        # Last search session ID (for feedback tracking)
+        # Last search session ID (for feedback tracking) - protected by _session_lock
         self._last_search_session_id: Optional[str] = None
 
         logger.info(
@@ -292,9 +293,10 @@ class ARIOrchestrator:
             # Step 4: Generate narrative (using cached narrative LLM)
             narrative = self._generate_narrative(nav_context, selected[:5])
 
-            # Generate a search session ID for feedback tracking
+            # Generate a search session ID for feedback tracking (thread-safe)
             search_session_id = str(uuid.uuid4())
-            self._last_search_session_id = search_session_id
+            with self._session_lock:
+                self._last_search_session_id = search_session_id
 
             return ARIResponse(
                 response_type=ResponseType.PRODUCTS,
@@ -326,16 +328,18 @@ class ARIOrchestrator:
         nav_context: Any,
         limit: int = 10,
     ) -> List[Any]:
-        """Evaluate and select best products using cached evaluator."""
+        """Evaluate and select best products using cached evaluator (thread-safe)."""
         EvaluatorClass = _get_evaluator_class()
         if not EvaluatorClass:
             logger.warning("ARIEvaluator not available, using raw results")
             return products[:limit]
 
         try:
-            # Create evaluator once and cache it
+            # Thread-safe lazy initialization
             if self._evaluator is None:
-                self._evaluator = EvaluatorClass()
+                with self._instance_lock:
+                    if self._evaluator is None:
+                        self._evaluator = EvaluatorClass()
 
             selected = self._evaluator.evaluate_and_select(
                 products=products,
@@ -353,7 +357,7 @@ class ARIOrchestrator:
         nav_context: Any,
         products: List[Any],
     ) -> Optional[Any]:
-        """Generate narrative using cached narrative LLM."""
+        """Generate narrative using cached narrative LLM (thread-safe)."""
         if not self.openai_client or not products:
             return None
 
@@ -363,9 +367,11 @@ class ARIOrchestrator:
             return None
 
         try:
-            # Create narrative LLM once and cache it
+            # Thread-safe lazy initialization
             if self._narrative_llm is None:
-                self._narrative_llm = NarrativeClass(openai_client=self.openai_client)
+                with self._instance_lock:
+                    if self._narrative_llm is None:
+                        self._narrative_llm = NarrativeClass(openai_client=self.openai_client)
 
             narrative = self._narrative_llm.generate_narrative(
                 nav_context=nav_context,
@@ -379,7 +385,13 @@ class ARIOrchestrator:
 
     def get_last_search_session_id(self) -> Optional[str]:
         """Get the session ID from the last product search (for feedback tracking)."""
-        return self._last_search_session_id
+        with self._session_lock:
+            return self._last_search_session_id
+
+    def clear_last_search_session(self) -> None:
+        """Clear the last search session ID after feedback is collected."""
+        with self._session_lock:
+            self._last_search_session_id = None
 
     async def _handle_conversation_intent(
         self,
