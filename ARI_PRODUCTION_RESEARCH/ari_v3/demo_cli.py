@@ -289,43 +289,81 @@ class ARIDemoCLI:
             traceback.print_exc()
             return False
 
-    def show_main_menu(self):
-        """Show main menu."""
-        print("\n" + "-"*60)
-        print("  MAIN MENU")
-        print("-"*60)
-        print("  1. Use demo user (preset onboarding)")
-        print("  2. Complete real onboarding")
-        print("  3. Quick start (cold start, no onboarding)")
-        print("  4. Exit")
-        print("-"*60)
+    def detect_demo_user_request(self, text: str) -> Optional[Dict]:
+        """
+        Detect if user is requesting a demo profile from natural language.
 
-    def select_demo_user(self) -> Optional[Dict]:
-        """Let user select a demo user."""
-        print("\n" + "-"*60)
-        print("  SELECT DEMO USER")
-        print("-"*60)
+        Examples that should match:
+        - "I'm Emma" / "I am Emma" / "call me Emma"
+        - "Use Emma's profile" / "load Emma"
+        - "Be Marcus" / "switch to Sophia"
+        """
+        text_lower = text.lower()
 
-        for i, (key, user) in enumerate(DEMO_USERS.items(), 1):
-            print(f"  {i}. {user['name']}: {user['description']}")
-        print("  0. Back to main menu")
-        print("-"*60)
+        for key, user_data in DEMO_USERS.items():
+            name_lower = user_data["name"].lower()
 
-        choice = input("\nSelect user (1-3): ").strip()
+            # Check various patterns
+            patterns = [
+                f"i'm {name_lower}",
+                f"i am {name_lower}",
+                f"call me {name_lower}",
+                f"use {name_lower}",
+                f"load {name_lower}",
+                f"be {name_lower}",
+                f"switch to {name_lower}",
+                f"as {name_lower}",
+                f"{name_lower}'s profile",
+                f"{name_lower} profile",
+            ]
 
-        if choice == "0":
-            return None
+            for pattern in patterns:
+                if pattern in text_lower:
+                    return user_data
 
-        try:
-            idx = int(choice) - 1
-            keys = list(DEMO_USERS.keys())
-            if 0 <= idx < len(keys):
-                return DEMO_USERS[keys[idx]]
-        except ValueError:
-            pass
-
-        print("Invalid selection.")
         return None
+
+    def detect_onboarding_request(self, text: str) -> bool:
+        """Detect if user wants to go through onboarding."""
+        text_lower = text.lower()
+
+        onboarding_phrases = [
+            "set up my profile",
+            "setup my profile",
+            "create my profile",
+            "onboarding",
+            "get started",
+            "learn about me",
+            "know my style",
+            "my preferences",
+            "personalize",
+            "customize",
+        ]
+
+        for phrase in onboarding_phrases:
+            if phrase in text_lower:
+                return True
+
+        return False
+
+    def detect_help_request(self, text: str) -> bool:
+        """Detect if user is asking for help with the system."""
+        text_lower = text.lower()
+
+        help_phrases = [
+            "what can you do",
+            "how do i use",
+            "how does this work",
+            "help me understand",
+            "what are my options",
+            "who are the demo",
+        ]
+
+        for phrase in help_phrases:
+            if phrase in text_lower:
+                return True
+
+        return False
 
     async def setup_demo_user(self, user_data: Dict) -> str:
         """Create or update demo user in Neo4j."""
@@ -447,96 +485,70 @@ class ARIDemoCLI:
         print("\n" + "-"*60)
 
     async def collect_feedback(self, products: List[Dict]):
-        """Collect user feedback on products."""
-        # Get session ID from orchestrator
-        feedback_session_id = None
-        if self.orchestrator:
-            feedback_session_id = self.orchestrator.get_last_search_session_id()
+        """
+        Collect user feedback naturally through conversation.
 
-        if not feedback_session_id:
-            # Still allow feedback prompt but note it won't be recorded
-            print("\nFeedback (helps ARI learn your preferences):")
-            print("  Enter product numbers to like (e.g., '1 3 5'), or press Enter to skip")
-            liked = input("  Liked products: ").strip()
-            if liked:
-                print("    [Note] Feedback recorded locally (session tracking not available)")
-            return
-
-        try:
-            from ari_v3.feedback import OutcomeRecorder, OutcomeType
-        except ImportError:
-            print("\n  [Note] Feedback system not available")
-            return
-
-        recorder = OutcomeRecorder(neo4j_driver=self.neo4j_driver_async)
-
-        print("\nFeedback (helps ARI learn your preferences):")
-        print("  Enter product numbers to like (e.g., '1 3 5'), or press Enter to skip")
-
-        liked = input("  Liked products: ").strip()
-
-        if liked:
-            for num in liked.split():
-                try:
-                    idx = int(num) - 1
-                    if 0 <= idx < len(products):
-                        product_id = products[idx].get("_id") or products[idx].get("uuid") or f"product_{idx}"
-                        await recorder.record_outcome(
-                            session_id=feedback_session_id,
-                            product_id=product_id,
-                            outcome=OutcomeType.LIKED,
-                        )
-                        print(f"    [OK] Recorded like for product {num}")
-                except (ValueError, IndexError):
-                    pass
-
-        print("\nThank you! Your feedback helps ARI improve recommendations.")
+        Instead of asking for numbers, we just continue the conversation.
+        Users can say things like "I like the first one" or "show me more like #3"
+        and the orchestrator will handle it via intent detection.
+        """
+        # No explicit feedback prompt - keep it conversational
+        # The user can naturally say "I love that first one" or "not quite right"
+        # and the conversation handler will pick it up
+        pass
 
     async def run_simple_onboarding(self) -> Optional[str]:
-        """Run a simplified onboarding flow."""
-        print("\n" + "="*60)
-        print("  QUICK ONBOARDING")
-        print("="*60)
+        """Run a conversational onboarding flow."""
+        print()
 
-        print("\nLet's learn a bit about your style preferences.\n")
-
-        # Basic questions
-        name = input("What should we call you? ").strip() or "User"
+        # Name
+        name = input("ARI: First off, what's your name?\nYou: ").strip() or "Friend"
         user_id = f"user_{name.lower()}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
 
-        print("\nWhat's your primary style goal?")
-        print("  1. Stand out and express myself")
-        print("  2. Look polished and professional")
-        print("  3. Be comfortable and practical")
-        print("  4. Stay on trend")
-        goal_choice = input("Select (1-4): ").strip()
-        goals = {
-            "1": ("self-expression", "bold"),
-            "2": ("competence", "polished"),
-            "3": ("comfort", "practical"),
-            "4": ("belonging", "trendy"),
-        }
-        root_value, style_word = goals.get(goal_choice, ("self-expression", "versatile"))
+        # Style goal - conversational
+        print(f"\nARI: Great to meet you, {name}! When you get dressed, what's")
+        print("     most important to you - standing out, looking polished,")
+        print("     being comfortable, or staying on trend?")
+        goal_input = input("You: ").strip().lower()
 
-        print("\nWhat colors do you love wearing?")
-        colors = input("(e.g., black, navy, red): ").strip() or "black, navy, white"
+        # Parse natural language response
+        if any(w in goal_input for w in ["stand out", "express", "unique", "bold", "creative"]):
+            root_value, style_word = "self-expression", "bold"
+        elif any(w in goal_input for w in ["polish", "professional", "sharp", "clean", "refined"]):
+            root_value, style_word = "competence", "polished"
+        elif any(w in goal_input for w in ["comfort", "practical", "easy", "casual", "relaxed"]):
+            root_value, style_word = "comfort", "practical"
+        elif any(w in goal_input for w in ["trend", "fashion", "current", "modern", "fresh"]):
+            root_value, style_word = "belonging", "trendy"
+        else:
+            root_value, style_word = "self-expression", "versatile"
 
-        print("\nWhat's your monthly clothing budget?")
-        print("  1. Under $200")
-        print("  2. $200-500")
-        print("  3. $500-1000")
-        print("  4. Over $1000")
-        budget_choice = input("Select (1-4): ").strip()
-        budgets = {"1": 150, "2": 350, "3": 750, "4": 1500}
-        budget = budgets.get(budget_choice, 500)
+        # Colors - conversational
+        print(f"\nARI: Got it - {style_word} vibes. What colors do you find")
+        print("     yourself reaching for most?")
+        colors = input("You: ").strip() or "black, navy, white"
+
+        # Budget - conversational
+        print("\nARI: And roughly, how much do you usually spend on clothes")
+        print("     in a month?")
+        budget_input = input("You: ").strip().lower()
+
+        # Parse natural language budget
+        budget = 500  # default
+        if any(w in budget_input for w in ["not much", "little", "under 200", "100", "150", "cheap"]):
+            budget = 150
+        elif any(w in budget_input for w in ["moderate", "200", "300", "400", "medium"]):
+            budget = 350
+        elif any(w in budget_input for w in ["500", "600", "700", "800", "decent"]):
+            budget = 750
+        elif any(w in budget_input for w in ["lot", "1000", "thousand", "splurge", "invest"]):
+            budget = 1500
 
         # Create user
-        print(f"\nCreating your profile...")
-
         import json
         profile = {
             "personal": {"root_value": root_value, "style_goal": style_word},
-            "taste": {"style_words": [style_word], "color_preferences": colors.split(",")},
+            "taste": {"style_words": [style_word], "color_preferences": [c.strip() for c in colors.split(",")]},
             "practicality": {"budget_monthly": budget},
         }
 
@@ -566,22 +578,20 @@ class ARIDemoCLI:
                 practicality=json.dumps(profile["practicality"]),
             )
 
-        print(f"  [OK] Welcome, {name}! Your profile is ready.\n")
+        self.current_profile = self._build_onboarding_profile(profile)
         return user_id
 
-    async def interactive_session(self, user_id: str):
+    async def interactive_session(self, user_id: str, show_welcome: bool = True):
         """Run interactive recommendation session with conversational interface."""
         self.current_user = user_id
 
         # Create session ID
         session_id = str(uuid.uuid4())
 
-        print("\n" + "="*60)
-        print("  Chat with ARI - Your Personal Fashion Stylist")
-        print("="*60)
-        print("  Type anything - I can chat, answer questions, or find products!")
-        print("  Type 'quit' to exit")
-        print("="*60)
+        if show_welcome:
+            print("\n")
+            print("ARI: Hey there! I'm ARI. What brings you in today - looking for")
+            print("     something specific, or just browsing for inspiration?")
 
         while True:
             print()
@@ -590,9 +600,37 @@ class ARIDemoCLI:
             if query.lower() in ["quit", "exit", "q"]:
                 # Say goodbye
                 print("\nARI: Goodbye! It was lovely helping you today. Come back anytime!")
-                break
+                return "quit"
 
             if not query:
+                continue
+
+            # Check for demo user switch request
+            demo_user = self.detect_demo_user_request(query)
+            if demo_user:
+                user_id = await self.setup_demo_user(demo_user)
+                self.current_user = user_id
+                desc = demo_user['description'].lower()
+                print(f"\nARI: Nice to meet you, {demo_user['name']}! I see you're a")
+                print(f"     {desc} - that's a great aesthetic.")
+                print(f"     What are you in the mood for today?")
+                continue
+
+            # Check for onboarding request
+            if self.detect_onboarding_request(query):
+                print("\nARI: I'd love to get to know your style better. Let me ask")
+                print("     you a few quick questions...")
+                new_user_id = await self.run_simple_onboarding()
+                if new_user_id:
+                    user_id = new_user_id
+                    self.current_user = user_id
+                    print("\nARI: Great, I've got a good sense of your style now.")
+                    print("     So what brings you in today?")
+                continue
+
+            # Check for help request
+            if self.detect_help_request(query):
+                self._show_natural_help()
                 continue
 
             # Use the orchestrator to process input
@@ -635,36 +673,30 @@ class ARIDemoCLI:
             else:
                 print(f"\nARI: {response.text or 'How can I help you today?'}")
 
+        return "continue"
+
+    def _show_natural_help(self):
+        """Show help in a natural, conversational way."""
+        print("\nARI: I'm here to help you find the perfect pieces! Just tell me")
+        print("     what you're looking for - an occasion, a vibe, a specific item,")
+        print("     whatever's on your mind. The more you share about your style")
+        print("     and what you're after, the better I can help. What's the occasion?")
+
     async def run(self):
-        """Main run loop."""
+        """Main run loop - fully naturalistic conversational interface."""
         if not await self.initialize():
             return
 
-        while True:
-            self.show_main_menu()
-            choice = input("\nSelect option (1-4): ").strip()
+        # Start as guest - user can switch profiles naturally
+        user_id = f"guest_{datetime.now().strftime('%H%M%S')}"
 
-            if choice == "1":
-                user_data = self.select_demo_user()
-                if user_data:
-                    user_id = await self.setup_demo_user(user_data)
-                    await self.interactive_session(user_id)
+        # Natural greeting - like a real stylist
+        print("\n")
+        print("ARI: Hey there! I'm ARI. What brings you in today - looking for")
+        print("     something specific, or just browsing for inspiration?")
 
-            elif choice == "2":
-                user_id = await self.run_simple_onboarding()
-                if user_id:
-                    await self.interactive_session(user_id)
-
-            elif choice == "3":
-                user_id = f"guest_{datetime.now().strftime('%H%M%S')}"
-                print(f"\nStarting as guest (cold start mode)...")
-                await self.interactive_session(user_id)
-
-            elif choice == "4":
-                print("\nGoodbye! Thanks for using ARI.\n")
-                break
-            else:
-                print("Invalid option. Please try again.")
+        # Run the interactive session
+        await self.interactive_session(user_id, show_welcome=False)
 
         # Cleanup
         if self.neo4j_driver_sync:

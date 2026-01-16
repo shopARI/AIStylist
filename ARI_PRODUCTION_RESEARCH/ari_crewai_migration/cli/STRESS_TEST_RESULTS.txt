@@ -1,0 +1,160 @@
+======================================================================
+STRESS TEST: onboarding_simple_v2.py
+Date: 2026-01-11
+======================================================================
+
+SIMULATED USER PERSONA:
+- Software engineer, 32, Seattle
+- Works from home
+- Minimalist with edge style
+- Prefers quality over quantity
+- Budget: $200-400/month
+
+======================================================================
+FULL CONVERSATION TRANSCRIPT
+======================================================================
+
+USER: Hi, I am ready to discover my style
+ARI: Great! I'm excited to help you with that. Tell me a bit about yourself.
+
+USER: I am a software engineer, 32, working from home in Seattle.
+ARI: Seattle's a lovely place, and working from home can be both cozy and
+challenging! How does your home office setup influence what you choose to
+wear during the day?
+
+USER: My days are casual - video calls, coffee meetings, morning workouts.
+ARI: It sounds like your days are pretty varied with a mix of work and
+movement. How do you like to balance comfort and style for those different
+activities?
+
+USER: Minimalist with edge. Clean lines, leather jackets, quality basics.
+ARI: That sounds like a great blend of simplicity and personality! What
+draws you to that edgy touch in your style?
+
+USER: Black, navy, olive green. I avoid bright colors.
+ARI: Those are such versatile colors that fit well with a minimalistic vibe.
+Is there something about bright colors that doesn't resonate with you, or is
+it more about feeling grounded in those deeper tones?
+
+USER: I prefer fewer high-quality pieces that last years.
+ARI: Investing in quality is such a smart move, especially when you know
+what you like. How do you decide which pieces are worth the investment?
+
+USER: Maybe a 6 out of 10 on adventurousness. Open but not flashy.
+ARI: That's a solid balance, keeping it interesting without straying too far
+from your core style. How do you usually incorporate that touch of
+adventurousness into your wardrobe?
+
+USER: I decide quickly when shopping. I know what I like. Online mostly.
+ARI: Knowing your style and making quick decisions must make online shopping
+a breeze! What do you enjoy most about shopping online for clothes?
+
+>>> NODE TRANSITION: personal -> taste <<<
+
+USER: Budget is 200-400 per month. I splurge on shoes and outerwear.
+ARI: Shoes and outerwear are such impactful pieces, so splurging there makes
+sense! What do you look for when picking out a new pair of shoes or a jacket?
+
+USER: Yes lets talk about my taste more.
+ARI: Absolutely! I'm curious, are there any specific designers or brands
+that you find yourself drawn to?
+
+USER: I am drawn to Scandinavian design. Clean, functional, timeless.
+ARI: Scandinavian design is such a perfect match for your minimalist style.
+What is it about their approach that you find most appealing?
+
+USER: I admire how designers like Jil Sander and Lemaire approach simplicity.
+ARI: Jil Sander and Lemaire have such a refined way of elevating simplicity.
+Is there a particular piece from them that has captured your attention
+recently?
+
+USER: Textures matter to me - good cotton, soft leather, quality wool.
+ARI: Textures can add so much depth to a minimalist wardrobe. How do you
+usually incorporate these materials into your daily outfits?
+
+USER: I want clothes that work hard but look effortless.
+ARI: I love that approach—pieces that do the heavy lifting while keeping it
+sleek. Do you have any go-to items that really embody that effortless vibe
+for you?
+
+USER: Lets move on to how I make decisions.
+ARI: Got it! When you're deciding on a new piece to add to your wardrobe,
+what's your decision-making process like?
+
+USER: I research a lot before buying. I read reviews and check materials.
+ARI: Sounds like you're quite thorough in ensuring every piece meets your
+standards. Once you've done your research, what usually seals the deal for
+you to make the purchase?
+
+USER: I usually know within seconds if something is for me.
+ARI: That's a great instinct to have! It must make shopping feel pretty
+intuitive. Does anything specific help confirm that initial "yes" when
+you're deciding?
+
+USER: I trust my gut but I appreciate expert opinions too.
+ARI: It's great to have that balance between intuition and informed advice.
+Do you have any favorite resources or style experts you turn to for those
+expert opinions?
+
+USER: Now lets talk budget and practical stuff.
+ARI: For sure! We touched on your monthly budget a bit earlier. How do you
+typically prioritize or plan your spending within that range?
+
+USER: Like I said, 200-400 monthly. More for investment pieces.
+ARI: That makes sense, especially for investment pieces like shoes and
+outerwear. Do you usually set aside part of your budget specifically for
+those bigger splurges, or is it more flexible based on what's catching your
+eye?
+
+USER: I care about sustainability and ethical production.
+ARI: That's such an important consideration, and it's great to hear. How
+does your focus on sustainability influence your shopping choices?
+
+USER: I think we have covered everything. Thanks so much!
+ARI: You're very welcome! It was a pleasure getting to know your style. If
+you ever want to chat more, just let me know. Enjoy expressing your unique
+style!
+
+======================================================================
+TEST METRICS
+======================================================================
+
+Total Turns: 22
+Node Transitions: 1 (personal -> taste)
+Final Node: taste
+Total Messages: 45 (including system)
+Completion Detected: No (natural conversation end)
+
+======================================================================
+OBSERVATIONS
+======================================================================
+
+POSITIVES:
+1. Conversation flows naturally - feels like a real stylist
+2. ARI acknowledges and builds on what user says
+3. ONE question per message - rule followed consistently
+4. Responses are short (2-3 sentences) - rule followed
+5. No bullet points or lists - rule followed
+6. Warm, human tone throughout
+
+ISSUES FOUND:
+1. Node transition detection too strict - only transitioned once
+   - "process" and "practicality" nodes never reached
+   - User explicitly said "lets move on" but transition didn't trigger
+
+2. Completion detection didn't trigger
+   - User said "I think we have covered everything"
+   - But none of the completion phrases matched
+
+3. Emoji used in final message (should be disabled per user request)
+
+RECOMMENDATIONS:
+1. Loosen transition detection - add more trigger phrases
+2. Add more completion phrases like "covered everything"
+3. Ensure emoji suppression in prompts
+4. Consider adding explicit node completion by AI (e.g., "Ready to
+   move to budget?")
+
+======================================================================
+END OF STRESS TEST
+======================================================================

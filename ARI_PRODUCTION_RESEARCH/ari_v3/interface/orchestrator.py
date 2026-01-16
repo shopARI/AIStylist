@@ -265,19 +265,42 @@ class ARIOrchestrator:
             products = []
             if not self.qdrant_client:
                 logger.warning("Qdrant client not configured, cannot search products")
-            elif nav_context.destination and nav_context.destination.embedding is not None:
-                embedding = nav_context.destination.embedding
-                query_vector = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
-
-                results = await self.qdrant_client.query_points(
-                    collection_name=self.qdrant_collection,
-                    query=query_vector,
-                    limit=50,
-                )
-                products = [hit.payload for hit in results.points]
-                logger.info(f"Found {len(products)} candidate products from {self.qdrant_collection}")
             else:
-                logger.warning("No destination embedding available for search")
+                # Get embedding to use for search
+                query_vector = None
+
+                # Try navigation context embedding first
+                if nav_context.destination and nav_context.destination.embedding is not None:
+                    embedding = nav_context.destination.embedding
+                    query_vector = embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
+
+                    # Check if embedding is valid (not all zeros)
+                    import numpy as np
+                    emb_arr = np.array(query_vector)
+                    if np.allclose(emb_arr, 0):
+                        logger.warning("Navigation embedding is all zeros, falling back to direct query embedding")
+                        query_vector = None
+
+                # Fall back to direct query embedding if navigation failed
+                if query_vector is None and self.openai_client:
+                    logger.info("Using direct query embedding for search")
+                    from ari_v3.navigation.constants import EMBEDDING_MODEL
+                    response = self.openai_client.embeddings.create(
+                        model=EMBEDDING_MODEL,
+                        input=query,
+                    )
+                    query_vector = response.data[0].embedding
+
+                if query_vector:
+                    results = await self.qdrant_client.query_points(
+                        collection_name=self.qdrant_collection,
+                        query=query_vector,
+                        limit=50,
+                    )
+                    products = [hit.payload for hit in results.points]
+                    logger.info(f"Found {len(products)} candidate products from {self.qdrant_collection}")
+                else:
+                    logger.warning("No embedding available for search")
 
             if not products:
                 return ARIResponse(
