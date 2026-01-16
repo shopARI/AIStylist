@@ -471,10 +471,14 @@ Output a JSON object with:
 
         Returns:
             StyleCoordinate representing the destination
+
+        Raises:
+            Exception: If both exemplar and fallback embedding fail
         """
         if not exemplar_embeddings:
             # Fallback: embed the descriptors directly
             descriptor_text = " ".join(synthesis.style_descriptors)
+            # This will raise if embedding fails - let orchestrator handle fallback
             destination_embedding = self.get_embedding_sync(descriptor_text)
             logger.info("Using fallback descriptor embedding for destination")
         else:
@@ -497,7 +501,9 @@ Output a JSON object with:
 
         Returns:
             List of floats representing the embedding.
-            Returns zero vector if API call fails (graceful degradation).
+
+        Raises:
+            Exception: Re-raises if embedding API call fails
         """
         try:
             response = self.client.embeddings.create(
@@ -507,7 +513,5 @@ Output a JSON object with:
             return response.data[0].embedding
         except Exception as e:
             logger.error(f"Embedding API call failed for text '{text[:50]}...': {e}")
-            # Return zero vector as fallback - allows pipeline to continue
-            # The zero vector will result in neutral similarity scores
-            logger.warning(f"Returning zero vector fallback for failed embedding")
-            return zero_vector(TEXT_EMBEDDING_DIM).tolist()
+            # Re-raise so orchestrator can use fallback
+            raise
