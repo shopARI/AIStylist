@@ -648,24 +648,15 @@ class ARIDemoCLI:
                     # Display results from orchestrator
                     await self.display_results(response.products, response.narrative)
 
-                    # Offer feedback collection
+                    # Offer feedback collection (now just continues conversation)
                     await self.collect_feedback(response.products)
                 else:
+                    # No products found - natural response
                     print(f"\nARI: {response.text}")
-                    if response.suggestions:
-                        print("\n  Suggestions:")
-                        for i, suggestion in enumerate(response.suggestions[:3], 1):
-                            print(f"    {i}. {suggestion}")
 
             elif response.response_type in [ResponseType.CONVERSATION, ResponseType.GREETING, ResponseType.GOODBYE]:
-                # Conversational response
+                # Conversational response - no suggestions, keep it natural
                 print(f"\nARI: {response.text}")
-
-                # Show suggestions if available
-                if response.suggestions:
-                    print("\n  Suggestions:")
-                    for i, suggestion in enumerate(response.suggestions[:3], 1):
-                        print(f"    {i}. {suggestion}")
 
             elif response.response_type == ResponseType.ERROR:
                 print(f"\nARI: {response.text}")
