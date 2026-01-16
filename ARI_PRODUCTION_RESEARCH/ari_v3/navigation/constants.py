@@ -74,7 +74,8 @@ SYNTHESIS_LLM_TEMPERATURE = 0.7
 SYNTHESIS_MODEL = "gpt-4o"
 
 # Default model for embeddings
-EMBEDDING_MODEL = "text-embedding-3-small"
+# IMPORTANT: Must match the model used to embed products in Qdrant!
+EMBEDDING_MODEL = "text-embedding-ada-002"
 
 
 # =============================================================================
