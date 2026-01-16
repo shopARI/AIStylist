@@ -238,13 +238,13 @@ class SessionTracker:
         product_scores = session_data.pop("product_scores", [])
 
         # Create session node and link to user
-        query = """
+        cypher = """
             // Create session node
             CREATE (s:RecommendationSession {
                 id: $session_id,
                 user_id: $user_id,
                 timestamp: datetime($timestamp),
-                query: $query,
+                query: $search_query,
                 occasion: $occasion,
                 active_context: $active_context,
                 style_descriptors: $style_descriptors,
@@ -268,11 +268,11 @@ class SessionTracker:
 
         async with self.neo4j_driver.session(database=self._database) as neo_session:
             await neo_session.run(
-                query,
+                cypher,
                 session_id=session.session_id,
                 user_id=session.user_id,
                 timestamp=session.timestamp.isoformat() if session.timestamp else None,
-                query=session.query,
+                search_query=session.query,
                 occasion=session.occasion,
                 active_context=session.active_context,
                 style_descriptors=session.style_descriptors,

@@ -1,8 +1,8 @@
 # ARI V3 Implementation Roadmap
 
-Version: 1.1
-Date: 2026-01-07
-Status: Steps 1-2 COMPLETE, Ready for Step 3
+Version: 1.3
+Date: 2026-01-14
+Status: Steps 1-6 COMPLETE, Ready for Step 7
 
 ---
 
@@ -93,76 +93,76 @@ Unlocks: Steps 3, 4, 5
 
 ---
 
-## Step 3: Pillar 1 - Personalization Engine
+## Step 3: Pillar 1 - Personalization Engine [COMPLETE]
 
 Compute user state with per-context trajectories.
 
-3.1 Create pillars/personalization.py
+3.1 Create pillars/personalization.py [DONE]
     - load_raw_user_data(user_id) returns RawUserData
     - Pull from existing Neo4j V2 ontology
     - Include OnboardingProfile, NavigationParameters, interactions
 
-3.2 Implement compute_user_state()
+3.2 Implement compute_user_state() [DONE]
     - detect_user_contexts() from interactions
     - compute_position_from_interactions() per context
     - compute_context_trajectory() per context (V3 per-context trajectories)
     - select_active_context() based on query/occasion
 
-3.3 Implement compute_cold_start_position()
+3.3 Implement compute_cold_start_position() [DONE]
     - Use onboarding occasion_styles
     - Fall back to general style preferences
     - Population prior for unknown contexts
     - Confidence = 0.4 for onboarding-based, 0.1 for population prior
 
-3.4 Implement compute_unified_embeddings()
+3.4 Implement compute_unified_embeddings() [DONE]
     - Blend interaction embeddings with social (when available)
     - Weight by data richness:
         social_weight = (1 - interaction_confidence) * 0.5
         interaction_weight = 1.0 - social_weight
 
-3.5 Verification
+3.5 Verification [DONE]
     - User state computation for existing test users
     - Verify per-context trajectories computed correctly
 
-Dependencies: Steps 1, 2
-Unlocks: Step 5
+Dependencies: Steps 1, 2 [COMPLETE]
+Unlocks: Step 5 [COMPLETE]
 
 ---
 
-## Step 4: Pillar 2 - Stylist Knowledge RAG
+## Step 4: Pillar 2 - Stylist Knowledge RAG [COMPLETE]
 
 Vectorize existing fashion knowledge.
 
-4.1 Expand nlp/fashion_knowledge.py
+4.1 Expand nlp/fashion_knowledge.py [DONE]
     - Add multi-perspective content (traditional, body-neutral, cultural, practical)
     - Structure by topic (color theory, body types, occasions, silhouettes)
     - Include the 6 curation principles
 
-4.2 Create pillars/stylist_knowledge.py
+4.2 Create pillars/stylist_knowledge.py [DONE]
     - FashionKnowledgeBase class
     - Ingest knowledge into Qdrant collection (fashion_knowledge)
     - Chunk and embed all content
 
-4.3 Implement RAG retrieval
+4.3 Implement RAG retrieval [DONE]
     - retrieve_styling_rules(query, body_type, occasion)
     - retrieve_multiple_perspectives(topic) for diversity
     - Hybrid search (semantic + keyword + metadata filtering)
 
-4.4 Verification
+4.4 Verification [DONE]
     - RAG retrieval returns relevant multi-perspective results
     - Test with various body types, occasions, style queries
 
-Dependencies: Step 1.1 (StyleContext enum only)
-Unlocks: Step 5
+Dependencies: Step 1.1 (StyleContext enum only) [COMPLETE]
+Unlocks: Step 5 [COMPLETE]
 Note: Can run parallel to Steps 2-3
 
 ---
 
-## Step 5: LLM #3 Synthesis
+## Step 5: LLM #3 Synthesis [COMPLETE]
 
 Three pillars to style descriptors to destination.
 
-5.1 Create navigation/synthesis_llm.py
+5.1 Create navigation/synthesis_llm.py [DONE]
     - synthesize(pillar1, pillar2, pillar3, query) returns SynthesisOutput
     - Outputs: style_descriptors, exemplar_terms, budget_interpretation, formality_level, relevant_context
     - No coordinate output - descriptors only (prevents hallucination)
@@ -174,24 +174,25 @@ Three pillars to style descriptors to destination.
     - user_service.py:track_search(), track_product_view() - tracking
     No new implementation needed - wire existing methods into Synthesis input.
 
-5.2 Implement exemplar retrieval
+5.2 Implement exemplar retrieval [DONE]
     - Style descriptors to Qdrant search to top products
     - Search each exemplar_search_term, collect top 5 per term
     - Destination = centroid of exemplar embeddings (normalized mean)
     - Grounding in real product space (no coordinate hallucination)
 
-5.3 Implement path calculation (deterministic)
+5.3 Implement path calculation (deterministic) [DONE]
     - max_step_size = 0.3 * nav_params.step_size_multiplier
     - Velocity adjustment: slow movers get 0.7x, fast movers get 1.2x
     - outlier_percentage = nav_params.exploration_appetite * 0.20
+    - All constants extracted to navigation/constants.py
 
-5.4 Create navigation/navigation_context.py
+5.4 Create navigation/navigation_context.py [DONE]
     - NavigationContext dataclass
     - Combines: computed_state, synthesis, destination, path, styling_rules
 
-5.5 Agent Input Formatting
+5.5 Agent Input Formatting [DONE]
     - The orchestrator (Step 8) formats NavigationContext into existing agent input structure:
-    
+
     agent_context = {
         "query": nav_context.query,
         "user_context": nav_context.computed_state.to_dict(),
@@ -199,23 +200,24 @@ Three pillars to style descriptors to destination.
         "max_step_size": nav_context.path.max_step_size,
         "styling_rules": nav_context.styling_rules
     }
-    
+
     Agents unchanged - orchestrator adapts the interface.
 
-5.6 Verification
+5.6 Verification [DONE]
+    - 14 unit tests passing (test_step5_synthesis.py)
     - Full synthesis flow produces valid NavigationContext
     - Destination embeddings are grounded in real product space
 
-Dependencies: Steps 3, 4
+Dependencies: Steps 3, 4 [COMPLETE]
 Unlocks: Steps 6, 7
 
 ---
 
-## Step 6: Judge Upgrade - MMR + Outliers
+## Step 6: Judge Upgrade - MMR + Outliers [COMPLETE]
 
 Diversity selection and exploration injection.
 
-6.1 Create judge/mmr_selector.py
+6.1 Create judge/mmr_selector.py [DONE]
     - mmr_select(candidates, limit, lambda_param) returns selected list
     - Balances relevance with diversity
     - Uses nav_params.diversity_requirement as lambda_param
@@ -224,13 +226,13 @@ Diversity selection and exploration injection.
         2. Iteratively add product with best MMR score
         3. MMR = lambda * relevance - (1 - lambda) * max_similarity_to_selected
 
-6.2 Create judge/outlier_injector.py
+6.2 Create judge/outlier_injector.py [DONE]
     - inject_outliers(selected, remaining, outlier_percentage)
     - Products with distance > 0.4 from current position qualify as outliers
     - Random sample from qualified outliers
     - Uses nav_params.exploration_appetite to determine percentage
 
-6.3 Update judge evaluation (agents/judge_ari.yaml or create judge/ari_evaluator.py)
+6.3 Create judge/ari_evaluator.py [DONE]
     - Score products on 7 dimensions:
         1. Smoothness (step distance) - 0.15 weight
         2. Coherence (trajectory alignment) - 0.10 weight
@@ -243,12 +245,14 @@ Diversity selection and exploration injection.
     - Call outlier injection
     - Return final ranked list
 
-6.4 Verification
-    - Judge produces diverse results
-    - Exploration products included at correct percentage
-    - MMR prevents clustering of similar items
+6.4 Verification [DONE]
+    - 28 unit tests passing (test_step6_judge.py)
+    - MMR selection produces diverse results
+    - Outlier injection works with exploration_appetite
+    - 7-dimension scoring with configurable weights
+    - Full pipeline end-to-end tested
 
-Dependencies: Step 5
+Dependencies: Step 5 [COMPLETE]
 Unlocks: Step 7
 
 ---
