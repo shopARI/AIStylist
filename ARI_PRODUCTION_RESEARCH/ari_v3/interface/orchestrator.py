@@ -283,13 +283,17 @@ class ARIOrchestrator:
 
                 # Fall back to direct query embedding if navigation failed
                 if query_vector is None and self.openai_client:
-                    logger.info("Using direct query embedding for search")
-                    from ari_v3.navigation.constants import EMBEDDING_MODEL
-                    response = self.openai_client.embeddings.create(
-                        model=EMBEDDING_MODEL,
-                        input=query,
-                    )
-                    query_vector = response.data[0].embedding
+                    try:
+                        logger.info("Using direct query embedding for search")
+                        from ari_v3.navigation.constants import EMBEDDING_MODEL
+                        response = self.openai_client.embeddings.create(
+                            model=EMBEDDING_MODEL,
+                            input=query,
+                        )
+                        query_vector = response.data[0].embedding
+                        logger.info(f"Got direct embedding, dim={len(query_vector)}")
+                    except Exception as emb_err:
+                        logger.error(f"Failed to get direct embedding: {emb_err}")
 
                 if query_vector:
                     results = await self.qdrant_client.query_points(
