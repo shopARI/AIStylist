@@ -36,6 +36,28 @@ The LLM receives historical data, personalization metrics, and behavioral patter
 ├─────────────────────────────────────────────────────────────────────────────────────┤
 │                                                                                      │
 │  ════════════════════════════════════════════════════════════════════════════════   │
+│                      PHASE 0: CONVERSATIONAL INTERFACE (V3.1)                        │
+│  ════════════════════════════════════════════════════════════════════════════════   │
+│                                                                                      │
+│  ┌──────────────────────────────────────────────────────────────────────────────┐   │
+│  │                         USER INPUT                                            │   │
+│  │   "Find me a dress" | "Talk a little?" | "What did I see yesterday?"         │   │
+│  └───────────────────────────────────┬──────────────────────────────────────────┘   │
+│                                      ▼                                               │
+│  ┌──────────────────────────────────────────────────────────────────────────────┐   │
+│  │                    INTENT DETECTOR (LLM #0)                                   │   │
+│  │   Classifies: PRODUCT_SEARCH | CONVERSATION | MEMORY_QUERY | CLARIFICATION   │   │
+│  └───────────────────────────────────┬──────────────────────────────────────────┘   │
+│                    ┌─────────────────┴─────────────────┐                            │
+│                    ▼                                   ▼                            │
+│  ┌────────────────────────────┐      ┌────────────────────────────────────────┐    │
+│  │   PRODUCT INTENT           │      │   CONVERSATION INTENT                  │    │
+│  │   → Phase 3 (Navigation)   │      │   → Conversation Handler (LLM #5)      │    │
+│  │   → Returns: Products +    │      │   → Returns: Natural response +        │    │
+│  │     Narrative              │      │     Follow-up suggestions              │    │
+│  └────────────────────────────┘      └────────────────────────────────────────┘    │
+│                                                                                      │
+│  ════════════════════════════════════════════════════════════════════════════════   │
 │                              PHASE 1: USER ONBOARDING                                │
 │  ════════════════════════════════════════════════════════════════════════════════   │
 │                                                                                      │
@@ -252,7 +274,450 @@ The LLM receives historical data, personalization metrics, and behavioral patter
 
 ---
 
+## Section 0.5: Conversational Interface Layer (New in V3.1)
 
+```
+┌─────────────────────────────────────────────────────────────────────────────────────┐
+│                         CONVERSATIONAL INTERFACE LAYER                               │
+├─────────────────────────────────────────────────────────────────────────────────────┤
+│                                                                                      │
+│  ┌──────────────────────────────────────────────────────────────────────────────┐   │
+│  │                         USER INPUT                                            │   │
+│  │                                                                               │   │
+│  │   "Find me a dress for my sister's wedding"  ← Product Search Intent         │   │
+│  │   "Talk a little?"                           ← Conversation Intent           │   │
+│  │   "What did I look at yesterday?"            ← Memory Query Intent           │   │
+│  │   "Why did you recommend that jacket?"       ← Clarification Intent          │   │
+│  │                                                                               │   │
+│  └───────────────────────────────────┬──────────────────────────────────────────┘   │
+│                                      │                                               │
+│                                      ▼                                               │
+│  ┌──────────────────────────────────────────────────────────────────────────────┐   │
+│  │                    INTENT DETECTOR (LLM #0)                                   │   │
+│  │                                                                               │   │
+│  │   Classifies user input into:                                                │   │
+│  │   • PRODUCT_SEARCH      - User wants product recommendations                 │   │
+│  │   • GENERAL_CONVERSATION - User wants to chat/discuss                        │   │
+│  │   • MEMORY_QUERY        - User asking about past interactions                │   │
+│  │   • CLARIFICATION       - User asking why/how about recommendations          │   │
+│  │   • SYSTEM_STATUS       - User asking about system capabilities              │   │
+│  │   • ONBOARDING          - User in onboarding flow                            │   │
+│  │                                                                               │   │
+│  │   Also extracts:                                                             │   │
+│  │   • Categories, colors, occasions (for product search)                       │   │
+│  │   • Time references (for memory queries)                                     │   │
+│  │   • Entity references (for clarifications)                                   │   │
+│  │                                                                               │   │
+│  └───────────────────────────────────┬──────────────────────────────────────────┘   │
+│                                      │                                               │
+│                    ┌─────────────────┴─────────────────┐                            │
+│                    │                                   │                            │
+│                    ▼                                   ▼                            │
+│  ┌────────────────────────────────┐  ┌────────────────────────────────────────┐    │
+│  │     PRODUCT SEARCH INTENT      │  │     CONVERSATION INTENT                │    │
+│  │                                │  │                                        │    │
+│  │   Route to:                    │  │   Route to:                            │    │
+│  │   Navigation Intelligence      │  │   Conversation Handler (LLM #5)       │    │
+│  │   (Section 4-6)                │  │                                        │    │
+│  │                                │  │   Uses:                                │    │
+│  │   Returns:                     │  │   • Conversation history               │    │
+│  │   • Products                   │  │   • User profile context               │    │
+│  │   • Narrative                  │  │   • Memory (Mem0)                      │    │
+│  │   • Journey explanation        │  │                                        │    │
+│  │                                │  │   Returns:                             │    │
+│  └────────────────────────────────┘  │   • Natural language response          │    │
+│                                      │   • Follow-up suggestions              │    │
+│                                      └────────────────────────────────────────┘    │
+│                                                                                      │
+│  ════════════════════════════════════════════════════════════════════════════════   │
+│                              CONVERSATION MEMORY                                     │
+│  ════════════════════════════════════════════════════════════════════════════════   │
+│                                                                                      │
+│  ┌──────────────────────────────────────────────────────────────────────────────┐   │
+│  │                         MEM0 MEMORY SYSTEM                                    │   │
+│  │                                                                               │   │
+│  │   ┌──────────────┐  ┌──────────────┐  ┌──────────────┐                       │   │
+│  │   │   EPISODIC   │  │   SEMANTIC   │  │   FACTUAL    │                       │   │
+│  │   │              │  │              │  │              │                       │   │
+│  │   │ • Session    │  │ • Style      │  │ • Budget:    │                       │   │
+│  │   │   history    │  │   preferences│  │   $500/mo    │                       │   │
+│  │   │ • "Searched  │  │ • Brand      │  │ • Size: M    │                       │   │
+│  │   │   for red    │  │   affinities │  │ • Dislikes:  │                       │   │
+│  │   │   dresses"   │  │ • "User      │  │   polyester  │                       │   │
+│  │   │ • "Liked     │  │   prefers    │  │              │                       │   │
+│  │   │   item #3"   │  │   minimalist"│  │              │                       │   │
+│  │   └──────────────┘  └──────────────┘  └──────────────┘                       │   │
+│  │                                                                               │   │
+│  └──────────────────────────────────────────────────────────────────────────────┘   │
+│                                                                                      │
+└─────────────────────────────────────────────────────────────────────────────────────┘
+```
+
+### 0.5.1 Intent Detection
+
+```
+ENUM SearchIntent:
+    """
+    User intent classifications for routing.
+    """
+    # Product-related intents → Route to Navigation Intelligence
+    PRODUCT_SEARCH           # "Find me a blue dress"
+    PRODUCT_COMPARISON       # "Compare these two jackets"
+    STYLE_ADVICE             # "What would go with this?"
+    OUTFIT_BUILDING          # "Help me build an outfit for..."
+
+    # Conversation intents → Route to Conversation Handler
+    GENERAL_CONVERSATION     # "Talk a little?", "How are you?"
+    MEMORY_QUERY             # "What did I look at yesterday?"
+    CONVERSATION_HISTORY     # "What were we discussing?"
+    CLARIFICATION            # "Why did you recommend that?"
+    SYSTEM_STATUS            # "What can you do?"
+
+    # Special intents
+    ONBOARDING               # User in onboarding flow
+    FEEDBACK                 # "I liked that one" / "Not my style"
+
+
+STRUCTURE IntentResult:
+    """
+    Output from intent detection.
+    """
+    primary_intent: SearchIntent
+    confidence: FLOAT                    # 0-1
+    detection_method: STRING             # "llm", "rule", "hybrid"
+
+    # Extracted parameters (for product intents)
+    extracted_parameters: {
+        categories: LIST[STRING],        # ["dress", "top"]
+        colors: LIST[STRING],            # ["blue", "navy"]
+        occasions: LIST[STRING],         # ["wedding", "casual"]
+        price_range: {min: FLOAT, max: FLOAT},
+        brand_preferences: LIST[STRING],
+        style_modifiers: LIST[STRING]    # ["minimalist", "bold"]
+    }
+
+    # For memory/clarification intents
+    time_reference: STRING               # "yesterday", "last week"
+    entity_reference: STRING             # "that jacket", "item #3"
+
+
+CLASS IntentDetector:
+    """
+    Hybrid intent detection using rules + LLM.
+    LLM-first strategy for natural language understanding.
+    """
+
+    FUNCTION detect_intent(
+        query: STRING,
+        conversation_history: LIST[Message] = []
+    ) → IntentResult:
+        """
+        Detect user intent from query.
+        Uses conversation history for context continuity.
+        """
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 1: Quick rule-based check for obvious patterns
+        # ═══════════════════════════════════════════════════════════════════
+
+        rule_result = self._check_rules(query)
+        IF rule_result.confidence > 0.9:
+            RETURN rule_result
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 2: LLM-based intent detection
+        # ═══════════════════════════════════════════════════════════════════
+
+        prompt = f"""
+        Classify this user message and extract relevant parameters.
+
+        CONVERSATION HISTORY:
+        {format_history(conversation_history[-5:])}
+
+        CURRENT MESSAGE: "{query}"
+
+        INTENTS:
+        - PRODUCT_SEARCH: User wants to find/browse products
+        - STYLE_ADVICE: User wants styling help
+        - GENERAL_CONVERSATION: User wants to chat, not shop
+        - MEMORY_QUERY: User asking about past interactions
+        - CLARIFICATION: User asking why/how about recommendations
+        - FEEDBACK: User giving feedback on shown items
+
+        Output JSON:
+        {{
+            "intent": "<INTENT_NAME>",
+            "confidence": <0.0-1.0>,
+            "categories": [...],
+            "colors": [...],
+            "occasions": [...],
+            "reasoning": "<why this intent>"
+        }}
+        """
+
+        response = llm.complete(prompt, model="gpt-4o-mini")
+        parsed = json.parse(response)
+
+        RETURN IntentResult(
+            primary_intent=SearchIntent[parsed.intent],
+            confidence=parsed.confidence,
+            detection_method="llm",
+            extracted_parameters={
+                categories=parsed.categories,
+                colors=parsed.colors,
+                occasions=parsed.occasions
+            }
+        )
+
+    FUNCTION _check_rules(query: STRING) → IntentResult:
+        """
+        Fast rule-based detection for common patterns.
+        """
+        query_lower = query.lower().strip()
+
+        # Greeting patterns → GENERAL_CONVERSATION
+        IF query_lower IN ["hi", "hello", "hey", "talk a little", "chat"]:
+            RETURN IntentResult(
+                primary_intent=SearchIntent.GENERAL_CONVERSATION,
+                confidence=0.95,
+                detection_method="rule"
+            )
+
+        # Memory patterns → MEMORY_QUERY
+        IF "yesterday" IN query_lower OR "last time" IN query_lower:
+            IF "look" IN query_lower OR "show" IN query_lower OR "saw" IN query_lower:
+                RETURN IntentResult(
+                    primary_intent=SearchIntent.MEMORY_QUERY,
+                    confidence=0.9,
+                    detection_method="rule"
+                )
+
+        # Why/how patterns → CLARIFICATION
+        IF query_lower.startswith("why") OR query_lower.startswith("how come"):
+            RETURN IntentResult(
+                primary_intent=SearchIntent.CLARIFICATION,
+                confidence=0.85,
+                detection_method="rule"
+            )
+
+        # Default: low confidence, let LLM decide
+        RETURN IntentResult(
+            primary_intent=SearchIntent.PRODUCT_SEARCH,
+            confidence=0.3,
+            detection_method="rule"
+        )
+```
+
+### 0.5.2 Conversation Handler
+
+```
+CLASS ConversationHandler:
+    """
+    Handles non-product conversational intents.
+    Provides natural, GPT-like responses.
+    """
+
+    ASYNC FUNCTION handle_conversation(
+        session_id: STRING,
+        query: STRING,
+        intent: IntentResult,
+        user_context: UserContext
+    ) → ConversationResponse:
+        """
+        Generate natural conversational response.
+        """
+
+        # Get conversation history from Mem0
+        history = await mem0.get_episodic(session_id, limit=10)
+
+        # Get user facts for personalization
+        user_facts = await mem0.get_factual(user_context.user_id)
+
+        # Build context-aware prompt
+        prompt = f"""
+        You are ARI, a friendly and knowledgeable personal stylist.
+        You're having a conversation with {user_context.name or 'a user'}.
+
+        USER PROFILE:
+        {format_user_facts(user_facts)}
+
+        CONVERSATION HISTORY:
+        {format_history(history)}
+
+        USER SAYS: "{query}"
+        DETECTED INTENT: {intent.primary_intent.name}
+
+        Respond naturally and helpfully. If the user seems to want to
+        browse products, gently guide them. If they want to chat, engage
+        warmly while staying relevant to fashion/style.
+
+        Keep response concise (2-3 sentences max for casual chat).
+        """
+
+        response = await llm.complete(prompt, model="gpt-4o")
+
+        # Store in episodic memory
+        await mem0.add_episodic(
+            session_id,
+            f"User: {query}\nARI: {response}",
+            metadata={"intent": intent.primary_intent.name}
+        )
+
+        RETURN ConversationResponse(
+            text=response,
+            intent=intent.primary_intent,
+            suggestions=self._generate_suggestions(intent, user_context)
+        )
+
+    FUNCTION _generate_suggestions(
+        intent: IntentResult,
+        user_context: UserContext
+    ) → LIST[STRING]:
+        """
+        Generate follow-up suggestions based on context.
+        """
+        IF intent.primary_intent == SearchIntent.GENERAL_CONVERSATION:
+            RETURN [
+                "Show me what's new",
+                "Help me find something for work",
+                "What's trending right now?"
+            ]
+
+        IF intent.primary_intent == SearchIntent.MEMORY_QUERY:
+            RETURN [
+                "Show me similar items",
+                "Search for something new",
+                "Tell me more about my style"
+            ]
+
+        RETURN []
+```
+
+### 0.5.3 Main Interface Orchestrator
+
+```
+CLASS ARIOrchestrator:
+    """
+    Main entry point for all user interactions.
+    Routes to appropriate handler based on intent.
+    """
+
+    ASYNC FUNCTION process_input(
+        session_id: STRING,
+        user_id: STRING,
+        query: STRING
+    ) → ARIResponse:
+        """
+        Process any user input - conversation or product search.
+        """
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 1: Load user context
+        # ═══════════════════════════════════════════════════════════════════
+
+        user_context = await load_user_context(user_id)
+        conversation_history = await mem0.get_episodic(session_id, limit=5)
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 2: Detect intent
+        # ═══════════════════════════════════════════════════════════════════
+
+        intent = await intent_detector.detect_intent(
+            query=query,
+            conversation_history=conversation_history
+        )
+
+        log.info(f"Intent: {intent.primary_intent.name} (confidence: {intent.confidence})")
+
+        # ═══════════════════════════════════════════════════════════════════
+        # STEP 3: Route to appropriate handler
+        # ═══════════════════════════════════════════════════════════════════
+
+        IF self._is_product_intent(intent.primary_intent):
+            # Route to Navigation Intelligence (Section 4-6)
+            result = await navigation_orchestrator.execute_search(
+                user_id=user_id,
+                query=query,
+                occasion=intent.extracted_parameters.occasions[0] if intent.extracted_parameters.occasions else None,
+                filters=intent.extracted_parameters
+            )
+
+            RETURN ARIResponse(
+                type="products",
+                products=result.products,
+                narrative=result.narrative,
+                metadata={
+                    "intent": intent,
+                    "session_id": session_id
+                }
+            )
+
+        ELSE:
+            # Route to Conversation Handler
+            result = await conversation_handler.handle_conversation(
+                session_id=session_id,
+                query=query,
+                intent=intent,
+                user_context=user_context
+            )
+
+            RETURN ARIResponse(
+                type="conversation",
+                text=result.text,
+                suggestions=result.suggestions,
+                metadata={
+                    "intent": intent,
+                    "session_id": session_id
+                }
+            )
+
+    FUNCTION _is_product_intent(intent: SearchIntent) → BOOL:
+        """
+        Determine if intent should route to product search.
+        """
+        product_intents = {
+            SearchIntent.PRODUCT_SEARCH,
+            SearchIntent.PRODUCT_COMPARISON,
+            SearchIntent.STYLE_ADVICE,
+            SearchIntent.OUTFIT_BUILDING
+        }
+        RETURN intent IN product_intents
+
+
+STRUCTURE ARIResponse:
+    """
+    Unified response from ARI.
+    """
+    type: ENUM["products", "conversation", "error"]
+
+    # For product responses
+    products: LIST[Product] = []
+    narrative: JourneyNarrative = None
+
+    # For conversation responses
+    text: STRING = None
+    suggestions: LIST[STRING] = []
+
+    # Always present
+    metadata: {
+        intent: IntentResult,
+        session_id: STRING,
+        execution_time: FLOAT
+    }
+```
+
+### 0.5.4 LLM Usage Summary (Updated)
+
+| LLM # | Name | When Used | Input | Output |
+|-------|------|-----------|-------|--------|
+| #0 | Intent Detector | Every user input | Query + history | Intent classification |
+| #1 | Onboarding Agent | During onboarding | User responses | Conversational continuation |
+| #2 | Interpretation | After onboarding | Raw conversations | OnboardingProfile |
+| #3 | Synthesis | Product search | 3 Pillars + Query | Style descriptors |
+| #4 | Narrative | After product selection | Products + Context | Journey story |
+| #5 | Conversation | Non-product intents | Query + Context | Natural response |
+
+---
 
 
 ## Section 1: Data Structures
@@ -2287,7 +2752,16 @@ CLASS Ari_PathEvaluator:
 ```
 CLASS NavigationOrchestrator:
     """
-    V3: Updated flow with narrative generation.
+    V3.1: Product search orchestration with narrative generation.
+
+    NOTE: This is called by ARIOrchestrator (Section 0.5) ONLY when
+    intent is detected as PRODUCT_SEARCH, STYLE_ADVICE, etc.
+    For conversation intents, ARIOrchestrator routes to ConversationHandler instead.
+
+    Flow:
+    User Input → IntentDetector → ARIOrchestrator
+                                      ├─→ [PRODUCT] → NavigationOrchestrator (this class)
+                                      └─→ [CONVERSATION] → ConversationHandler
     """
     
     ASYNC FUNCTION execute_search(
