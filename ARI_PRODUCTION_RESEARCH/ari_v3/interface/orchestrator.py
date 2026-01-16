@@ -296,13 +296,19 @@ class ARIOrchestrator:
                         logger.error(f"Failed to get direct embedding: {emb_err}")
 
                 if query_vector:
-                    results = await self.qdrant_client.query_points(
-                        collection_name=self.qdrant_collection,
-                        query=query_vector,
-                        limit=50,
-                    )
-                    products = [hit.payload for hit in results.points]
-                    logger.info(f"Found {len(products)} candidate products from {self.qdrant_collection}")
+                    try:
+                        results = await self.qdrant_client.query_points(
+                            collection_name=self.qdrant_collection,
+                            query=query_vector,
+                            limit=50,
+                            timeout=30,  # 30 second timeout
+                        )
+                        products = [hit.payload for hit in results.points]
+                        logger.info(f"Found {len(products)} candidate products from {self.qdrant_collection}")
+                    except Exception as qdrant_err:
+                        logger.error(f"Qdrant query failed: {qdrant_err}")
+                        # Return empty results instead of error
+                        products = []
                 else:
                     logger.warning("No embedding available for search")
 
