@@ -223,26 +223,17 @@ class NavigationIntelligence:
             )
 
         # Step 6: Compute destination from exemplars
-        try:
-            if self.qdrant_client:
-                destination = await self.synthesis_llm.compute_destination_from_synthesis_async(
-                    synthesis=synthesis,
-                    qdrant_client=self.qdrant_client,
-                )
-            else:
-                destination = self.synthesis_llm.compute_destination_from_synthesis(
-                    synthesis=synthesis,
-                )
-            logger.info("Destination computed from exemplars")
-        except (KeyboardInterrupt, SystemExit):
-            raise
-        except Exception as e:
-            logger.error(f"Destination computation failed: {e}")
-            # Fallback to zero vector
-            destination = StyleCoordinate(
-                embedding=zero_vector(TEXT_EMBEDDING_DIM),
-                visual_embedding=zero_vector(VISUAL_EMBEDDING_DIM),
+        # Let exceptions propagate so orchestrator can use direct embedding fallback
+        if self.qdrant_client:
+            destination = await self.synthesis_llm.compute_destination_from_synthesis_async(
+                synthesis=synthesis,
+                qdrant_client=self.qdrant_client,
             )
+        else:
+            destination = self.synthesis_llm.compute_destination_from_synthesis(
+                synthesis=synthesis,
+            )
+        logger.info("Destination computed from exemplars")
 
         # Step 7: Calculate navigation path
         # Safely access position and trajectory from active_position
