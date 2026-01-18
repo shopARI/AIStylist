@@ -6,14 +6,17 @@ Provides methods for creating user profiles, managing relationships, tracking be
 and calculating observed preferences.
 """
 
+import asyncio
 import os
 import uuid
 import logging
-from typing import List, Dict, Optional, Any
+from typing import List, Dict, Optional, Any, Callable, TypeVar
 from datetime import datetime
 from neo4j import GraphDatabase, AsyncGraphDatabase
 from neo4j.time import DateTime as Neo4jDateTime
 from dotenv import load_dotenv
+
+T = TypeVar('T')
 
 load_dotenv()
 
@@ -55,15 +58,50 @@ class UserGraphManager:
         self.password = os.getenv("NEO4J_USER_PASSWORD", os.getenv("NEO4J_PASSWORD"))
         self.database = os.getenv("NEO4J_USER_DATABASE", "users")
 
+        # Sync driver for backward compatibility
         self.driver = GraphDatabase.driver(
             self.uri,
             auth=(self.username, self.password)
         )
+        # Async driver for async methods
+        self._async_driver = None
+
+    @property
+    def async_driver(self):
+        """Lazy initialization of async driver."""
+        if self._async_driver is None:
+            self._async_driver = AsyncGraphDatabase.driver(
+                self.uri,
+                auth=(self.username, self.password)
+            )
+        return self._async_driver
 
     def close(self):
         """Close the database connection."""
         if self.driver:
             self.driver.close()
+
+    async def close_async(self):
+        """Close both sync and async database connections."""
+        if self.driver:
+            self.driver.close()
+        if self._async_driver:
+            await self._async_driver.close()
+
+    async def run_sync_in_thread(self, func: Callable[..., T], *args, **kwargs) -> T:
+        """
+        Run a sync method in a thread pool to avoid blocking the event loop.
+
+        Use this to safely call sync methods from async context.
+
+        Args:
+            func: The sync function to call
+            *args, **kwargs: Arguments to pass to the function
+
+        Returns:
+            The result of the function call
+        """
+        return await asyncio.to_thread(func, *args, **kwargs)
 
     # ======================
     # INPUT VALIDATION
@@ -92,6 +130,51 @@ class UserGraphManager:
             raise TypeError(f"user_id must be a string, got {type(user_id).__name__}")
         if not user_id.strip():
             raise ValueError("user_id cannot be empty")
+
+    # Whitelist of allowed profile property names to prevent Cypher injection
+    ALLOWED_PROFILE_FIELDS = frozenset({
+        # Basic user info
+        "name", "username", "email", "phone", "avatar_url",
+        # Demographics
+        "age", "gender", "gender_identity", "location", "city", "region", "country",
+        "ethnicity", "cultural_background",
+        # Life context
+        "occupation", "industry", "work_style", "relationship_status",
+        "parental_status", "life_stage",
+        # Style preferences
+        "style_goals", "style_motivation", "root_value", "validation_source",
+        # Budget
+        "budget_monthly", "budget_flexibility", "budget_min", "budget_max",
+        # Process preferences
+        "adventurousness", "creative_control", "brand_loyalty", "trend_following",
+        "decision_speed", "research_depth", "exploration_preference",
+        # Body data
+        "height", "body_type", "skin_tone", "hair_color", "eye_color",
+        # Social
+        "instagram_handle", "pinterest_handle", "tiktok_handle",
+        # System fields
+        "onboarding_completed", "onboarding_step", "last_active",
+        "total_searches", "total_products_viewed", "total_products_saved", "total_purchases",
+    })
+
+    @classmethod
+    def _validate_profile_fields(cls, profile_data: Dict[str, Any]) -> None:
+        """
+        Validate that all profile field names are in the allowed whitelist.
+        Prevents Cypher injection attacks through malicious property names.
+
+        Args:
+            profile_data: Dictionary of properties to validate
+
+        Raises:
+            ValueError: If any field name is not in the allowed whitelist
+        """
+        invalid_fields = set(profile_data.keys()) - cls.ALLOWED_PROFILE_FIELDS
+        if invalid_fields:
+            raise ValueError(
+                f"Invalid profile field(s): {', '.join(sorted(invalid_fields))}. "
+                f"Allowed fields: {', '.join(sorted(cls.ALLOWED_PROFILE_FIELDS))}"
+            )
 
     # ======================
     # USER CREATION
@@ -140,8 +223,14 @@ class UserGraphManager:
 
         Returns:
             Success boolean
+
+        Raises:
+            ValueError: If any field name is not in the allowed whitelist
         """
-        # Build SET clause dynamically
+        self._validate_user_id(user_id)
+        self._validate_profile_fields(profile_data)
+
+        # Build SET clause dynamically (safe now due to whitelist validation)
         set_clauses = []
         params = {'user_id': user_id, 'updated_at': datetime.now()}
 
@@ -169,7 +258,7 @@ class UserGraphManager:
     # ======================
 
     def add_style_adjectives(self, user_id: str, adjectives: List[str], priorities: Optional[List[int]] = None):
-        """Add style adjectives with priorities."""
+        """Add style adjectives with priorities (batch operation using UNWIND)."""
         self._validate_user_id(user_id)
         self._validate_string_list(adjectives, "adjectives")
 
@@ -180,43 +269,47 @@ class UserGraphManager:
             if len(priorities) != len(adjectives):
                 raise ValueError(f"priorities length ({len(priorities)}) must match adjectives length ({len(adjectives)})")
 
+        # Batch operation using UNWIND
+        items = [{"name": adj, "priority": pri} for adj, pri in zip(adjectives, priorities)]
         with self.driver.session(database=self.database) as session:
-            for adj, priority in zip(adjectives, priorities):
-                session.run("""
-                    MATCH (u:User {id: $user_id})
-                    MERGE (s:StyleAdjective {name: $adjective})
-                    MERGE (u)-[r:IDENTIFIES_WITH]->(s)
-                    SET r.priority = $priority
-                """, user_id=user_id, adjective=adj, priority=priority)
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                UNWIND $items AS item
+                MERGE (s:StyleAdjective {name: item.name})
+                MERGE (u)-[r:IDENTIFIES_WITH]->(s)
+                SET r.priority = item.priority
+            """, user_id=user_id, items=items)
 
     def add_fit_preferences(self, user_id: str, fits: List[str]):
-        """Add fit preferences."""
+        """Add fit preferences (batch operation using UNWIND)."""
         self._validate_user_id(user_id)
         self._validate_string_list(fits, "fits")
 
+        # Batch operation using UNWIND
         with self.driver.session(database=self.database) as session:
-            for fit in fits:
-                session.run("""
-                    MATCH (u:User {id: $user_id})
-                    MERGE (f:FitPreference {name: $fit})
-                    MERGE (u)-[:PREFERS_FIT]->(f)
-                """, user_id=user_id, fit=fit)
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                UNWIND $fits AS fit_name
+                MERGE (f:FitPreference {name: fit_name})
+                MERGE (u)-[:PREFERS_FIT]->(f)
+            """, user_id=user_id, fits=fits)
 
     def add_life_stages(self, user_id: str, life_stages: List[str]):
-        """Add life stages."""
+        """Add life stages (batch operation using UNWIND)."""
         self._validate_user_id(user_id)
         self._validate_string_list(life_stages, "life_stages")
 
+        # Batch operation using UNWIND
         with self.driver.session(database=self.database) as session:
-            for stage in life_stages:
-                session.run("""
-                    MATCH (u:User {id: $user_id})
-                    MERGE (l:LifeStage {name: $stage})
-                    MERGE (u)-[:IN_LIFE_STAGE]->(l)
-                """, user_id=user_id, stage=stage)
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                UNWIND $life_stages AS stage_name
+                MERGE (l:LifeStage {name: stage_name})
+                MERGE (u)-[:IN_LIFE_STAGE]->(l)
+            """, user_id=user_id, life_stages=life_stages)
 
     def add_occasions(self, user_id: str, occasions: List[str], frequencies: Optional[List[str]] = None):
-        """Add occasions with optional frequencies."""
+        """Add occasions with optional frequencies (batch operation using UNWIND)."""
         self._validate_user_id(user_id)
         self._validate_string_list(occasions, "occasions")
 
@@ -227,17 +320,19 @@ class UserGraphManager:
             if len(frequencies) != len(occasions):
                 raise ValueError(f"frequencies length ({len(frequencies)}) must match occasions length ({len(occasions)})")
 
+        # Batch operation using UNWIND
+        items = [{"name": occ, "frequency": freq} for occ, freq in zip(occasions, frequencies)]
         with self.driver.session(database=self.database) as session:
-            for occasion, frequency in zip(occasions, frequencies):
-                session.run("""
-                    MATCH (u:User {id: $user_id})
-                    MERGE (o:Occasion {name: $occasion})
-                    MERGE (u)-[r:DRESSES_FOR]->(o)
-                    SET r.frequency = $frequency
-                """, user_id=user_id, occasion=occasion, frequency=frequency)
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                UNWIND $items AS item
+                MERGE (o:Occasion {name: item.name})
+                MERGE (u)-[r:DRESSES_FOR]->(o)
+                SET r.frequency = item.frequency
+            """, user_id=user_id, items=items)
 
     def add_values(self, user_id: str, values: List[str], importance: Optional[List[int]] = None):
-        """Add value priorities with importance rankings."""
+        """Add value priorities with importance rankings (batch operation using UNWIND)."""
         self._validate_user_id(user_id)
         self._validate_string_list(values, "values")
 
@@ -248,27 +343,30 @@ class UserGraphManager:
             if len(importance) != len(values):
                 raise ValueError(f"importance length ({len(importance)}) must match values length ({len(values)})")
 
+        # Batch operation using UNWIND
+        items = [{"name": val, "importance": imp} for val, imp in zip(values, importance)]
         with self.driver.session(database=self.database) as session:
-            for value, imp in zip(values, importance):
-                session.run("""
-                    MATCH (u:User {id: $user_id})
-                    MERGE (v:ValuePriority {name: $value})
-                    MERGE (u)-[r:VALUES]->(v)
-                    SET r.importance = $importance
-                """, user_id=user_id, value=value, importance=imp)
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                UNWIND $items AS item
+                MERGE (v:ValuePriority {name: item.name})
+                MERGE (u)-[r:VALUES]->(v)
+                SET r.importance = item.importance
+            """, user_id=user_id, items=items)
 
     def add_motivations(self, user_id: str, motivations: List[str]):
-        """Add style motivations."""
+        """Add style motivations (batch operation using UNWIND)."""
         self._validate_user_id(user_id)
         self._validate_string_list(motivations, "motivations")
 
+        # Batch operation using UNWIND
         with self.driver.session(database=self.database) as session:
-            for motivation in motivations:
-                session.run("""
-                    MATCH (u:User {id: $user_id})
-                    MERGE (m:StyleMotivation {name: $motivation})
-                    MERGE (u)-[:MOTIVATED_BY]->(m)
-                """, user_id=user_id, motivation=motivation)
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                UNWIND $motivations AS motivation_name
+                MERGE (m:StyleMotivation {name: motivation_name})
+                MERGE (u)-[:MOTIVATED_BY]->(m)
+            """, user_id=user_id, motivations=motivations)
 
     def add_budget_categories(self, user_id: str, budgets: List[Dict[str, Any]]):
         """
@@ -296,21 +394,19 @@ class UserGraphManager:
             if not isinstance(budget['max_price'], (int, float)):
                 raise TypeError(f"budgets[{i}]['max_price'] must be a number")
 
+        # Batch operation using UNWIND
         with self.driver.session(database=self.database) as session:
-            for budget in budgets:
-                session.run("""
-                    MATCH (u:User {id: $user_id})
-                    MERGE (b:BudgetCategory {
-                        user_id: $user_id,
-                        category: $category
-                    })
-                    SET b.min_price = $min_price,
-                        b.max_price = $max_price
-                    MERGE (u)-[:HAS_BUDGET]->(b)
-                """, user_id=user_id,
-                    category=budget['category'],
-                    min_price=budget['min_price'],
-                    max_price=budget['max_price'])
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                UNWIND $budgets AS budget
+                MERGE (b:BudgetCategory {
+                    user_id: $user_id,
+                    category: budget.category
+                })
+                SET b.min_price = budget.min_price,
+                    b.max_price = budget.max_price
+                MERGE (u)-[:HAS_BUDGET]->(b)
+            """, user_id=user_id, budgets=budgets)
 
     # ======================
     # V2 ONTOLOGY NODES
@@ -407,19 +503,20 @@ class UserGraphManager:
             return True
 
     def add_root_values(self, user_id: str, values: List[str]) -> bool:
-        """Add root values discovered during onboarding."""
+        """Add root values discovered during onboarding (batch operation using UNWIND)."""
         self._validate_user_id(user_id)
         self._validate_string_list(values, "values")
 
+        # Batch operation using UNWIND
         with self.driver.session(database=self.database) as session:
-            for value in values:
-                session.run("""
-                    MATCH (u:User {id: $user_id})
-                    MERGE (rv:RootValue {name: $value})
-                    MERGE (u)-[r:HAS_ROOT_VALUE]->(rv)
-                    SET r.discovered_at = COALESCE(r.discovered_at, datetime()),
-                        r.updated_at = datetime()
-                """, user_id=user_id, value=value)
+            session.run("""
+                MATCH (u:User {id: $user_id})
+                UNWIND $values AS value_name
+                MERGE (rv:RootValue {name: value_name})
+                MERGE (u)-[r:HAS_ROOT_VALUE]->(rv)
+                SET r.discovered_at = COALESCE(r.discovered_at, datetime()),
+                    r.updated_at = datetime()
+            """, user_id=user_id, values=values)
             return True
 
     # ======================
@@ -1091,3 +1188,181 @@ class UserGraphManager:
                 metrics['accepted_within_budget'] = sum(1 for p in accepted_prices if budget_min <= p <= budget_max)
 
             return metrics
+
+    # ======================
+    # ASYNC METHODS
+    # These use the async Neo4j driver to avoid blocking the event loop.
+    # ======================
+
+    async def get_user_by_id_async(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """Async version: Get user by ID."""
+        async with self.async_driver.session(database=self.database) as session:
+            result = await session.run("""
+                MATCH (u:User {id: $user_id})
+                RETURN u
+            """, user_id=user_id)
+
+            record = await result.single()
+            if record:
+                user_data = dict(record['u'])
+                return convert_neo4j_datetimes(user_data)
+            return None
+
+    async def get_user_style_profile_async(self, user_id: str) -> Dict[str, Any]:
+        """Async version: Get complete user style profile."""
+        async with self.async_driver.session(database=self.database) as session:
+            # Get user node
+            user_result = await session.run("""
+                MATCH (u:User {id: $user_id})
+                RETURN u
+            """, user_id=user_id)
+
+            user_record = await user_result.single()
+            if not user_record:
+                return {}
+
+            user_node = dict(user_record['u'])
+
+            # Get style adjectives
+            adjectives_result = await session.run("""
+                MATCH (u:User {id: $user_id})-[r:IDENTIFIES_WITH]->(s:StyleAdjective)
+                RETURN s.name as name, r.priority as priority
+                ORDER BY r.priority
+            """, user_id=user_id)
+            adjectives = [dict(r) async for r in adjectives_result]
+
+            # Get fit preferences
+            fits_result = await session.run("""
+                MATCH (u:User {id: $user_id})-[:PREFERS_FIT]->(f:FitPreference)
+                RETURN f.name as name
+            """, user_id=user_id)
+            fits = [r['name'] async for r in fits_result]
+
+            # Get occasions
+            occasions_result = await session.run("""
+                MATCH (u:User {id: $user_id})-[r:DRESSES_FOR]->(o:Occasion)
+                RETURN o.name as name, r.frequency as frequency
+            """, user_id=user_id)
+            occasions = [dict(r) async for r in occasions_result]
+
+            # Get values
+            values_result = await session.run("""
+                MATCH (u:User {id: $user_id})-[r:VALUES]->(v:ValuePriority)
+                RETURN v.name as name, r.importance as importance
+                ORDER BY r.importance
+            """, user_id=user_id)
+            values = [dict(r) async for r in values_result]
+
+            # Get budgets
+            budgets_result = await session.run("""
+                MATCH (u:User {id: $user_id})-[:HAS_BUDGET]->(b:BudgetCategory)
+                RETURN b.category as category, b.min_price as min_price, b.max_price as max_price
+            """, user_id=user_id)
+            budgets = [dict(r) async for r in budgets_result]
+
+            return {
+                'user': convert_neo4j_datetimes(user_node),
+                'style_adjectives': adjectives,
+                'fit_preferences': fits,
+                'occasions': occasions,
+                'values': values,
+                'budgets': budgets
+            }
+
+    async def update_user_profile_async(self, user_id: str, profile_data: Dict[str, Any]) -> bool:
+        """Async version: Update user profile properties."""
+        self._validate_user_id(user_id)
+        self._validate_profile_fields(profile_data)
+
+        # Build SET clause dynamically (safe now due to whitelist validation)
+        set_clauses = []
+        params = {'user_id': user_id, 'updated_at': datetime.now()}
+
+        for key, value in profile_data.items():
+            if value is not None:
+                params[key] = value
+                set_clauses.append(f"u.{key} = ${key}")
+
+        if not set_clauses:
+            return True
+
+        set_clauses.append("u.updated_at = $updated_at")
+        query = f"""
+            MATCH (u:User {{id: $user_id}})
+            SET {', '.join(set_clauses)}
+            RETURN u
+        """
+
+        async with self.async_driver.session(database=self.database) as session:
+            result = await session.run(query, **params)
+            record = await result.single()
+            return record is not None
+
+    async def record_product_view_async(
+        self,
+        user_id: str,
+        product_id: str,
+        session_id: str,
+        product_title: str = "",
+        product_category: str = ""
+    ):
+        """Async version: Record a product view."""
+        async with self.async_driver.session(database=self.database) as session:
+            await session.run("""
+                MATCH (u:User {id: $user_id})
+                MERGE (p:ProductRef {product_id: $product_id})
+                ON CREATE SET p.product_title = $product_title,
+                              p.product_category = $product_category
+                MERGE (u)-[r:VIEWED]->(p)
+                ON CREATE SET r.timestamp = datetime(),
+                              r.session_id = $session_id,
+                              r.count = 1
+                ON MATCH SET r.count = r.count + 1,
+                             r.last_viewed = datetime()
+
+                WITH u
+                SET u.total_products_viewed = u.total_products_viewed + 1
+            """, user_id=user_id, product_id=product_id, session_id=session_id,
+                product_title=product_title, product_category=product_category)
+
+    async def record_recommendation_async(
+        self,
+        user_id: str,
+        product_id: str,
+        source: str,
+        context: str = "",
+        confidence_score: float = None,
+        product_title: str = "",
+        product_category: str = "",
+        product_price: float = None
+    ) -> str:
+        """Async version: Record a recommendation shown to the user."""
+        rec_id = str(uuid.uuid4())
+
+        async with self.async_driver.session(database=self.database) as session:
+            await session.run("""
+                MATCH (u:User {id: $user_id})
+                MERGE (p:ProductRef {product_id: $product_id})
+                ON CREATE SET p.product_title = $product_title,
+                              p.product_category = $product_category,
+                              p.product_price = $product_price
+
+                CREATE (r:Recommendation {
+                    id: $rec_id,
+                    user_id: $user_id,
+                    product_id: $product_id,
+                    source: $source,
+                    context: $context,
+                    confidence_score: $confidence_score,
+                    timestamp: datetime(),
+                    accepted: false,
+                    user_rating: null
+                })
+                CREATE (u)-[:RECEIVED_RECOMMENDATION]->(r)
+                CREATE (r)-[:RECOMMENDS]->(p)
+            """, user_id=user_id, product_id=product_id, rec_id=rec_id,
+                source=source, context=context, confidence_score=confidence_score,
+                product_title=product_title, product_category=product_category,
+                product_price=product_price)
+
+        return rec_id

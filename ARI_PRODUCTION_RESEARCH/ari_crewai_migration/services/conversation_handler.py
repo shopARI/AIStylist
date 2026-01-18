@@ -486,9 +486,17 @@ class ConversationHandler:
         }
         
         # CRITICAL: Initialize missing attributes that are used throughout the class
+        # Session management with limits to prevent unbounded memory growth
+        self.MAX_SESSIONS = 1000  # Maximum concurrent sessions
+        self.SESSION_TTL_HOURS = 2  # Sessions expire after this many hours
         self.sessions = {}  # In-memory session cache
-        self.conversations = {}  # In-memory conversation cache  
+        self.conversations = {}  # In-memory conversation cache
         self.interactions = defaultdict(list)  # In-memory interactions cache
+        self._session_lock = asyncio.Lock()  # Thread safety for session operations
+
+        # Track background tasks to prevent fire-and-forget issues
+        # Tasks are automatically cleaned up when they complete
+        self._background_tasks: set = set()
         
         # Initialize OpenAI client for conversational responses
         self.openai_client = AsyncOpenAI(api_key=os.getenv('OPENAI_API_KEY'))
@@ -516,6 +524,42 @@ class ConversationHandler:
             # Persist all active sessions before stopping
             await self._persist_all_sessions()
             await self.persistence_worker.stop()
+
+        # Wait for background tasks to complete (with timeout)
+        if self._background_tasks:
+            logger.info(f"Waiting for {len(self._background_tasks)} background tasks to complete")
+            done, pending = await asyncio.wait(
+                self._background_tasks,
+                timeout=5.0  # 5 second timeout
+            )
+            if pending:
+                logger.warning(f"Cancelling {len(pending)} pending background tasks")
+                for task in pending:
+                    task.cancel()
+
+    def _create_background_task(self, coro) -> asyncio.Task:
+        """
+        Create a tracked background task.
+
+        This ensures tasks don't get garbage collected and logs any errors.
+        Tasks are automatically removed from tracking when they complete.
+
+        Args:
+            coro: Coroutine to run in background
+
+        Returns:
+            The created Task
+        """
+        task = asyncio.create_task(coro)
+        self._background_tasks.add(task)
+
+        def _on_done(t):
+            self._background_tasks.discard(t)
+            if t.exception() is not None:
+                logger.error(f"Background task failed: {t.exception()}")
+
+        task.add_done_callback(_on_done)
+        return task
     
     async def _persist_all_sessions(self):
         """Persist all active sessions."""
@@ -639,7 +683,7 @@ class ConversationHandler:
         
         # Check if persistence needed
         if context.needs_persistence() and self.persistence_worker:
-            asyncio.create_task(self._persist_session(session_id, context))
+            self._create_background_task(self._persist_session(session_id, context))
         
         # Check for meta-questions (only fashion-related)
         meta_type = self._detect_meta_question(message)
@@ -690,7 +734,7 @@ class ConversationHandler:
         
         # Async save to Redis in background if available
         if self.redis_client:
-            asyncio.create_task(self._save_conversations_to_redis(session_id, self.conversations[session_id]))
+            self._create_background_task(self._save_conversations_to_redis(session_id, self.conversations[session_id]))
     
     async def _optimize_session_memory(self, session_id: str):
         """Optimize session memory."""
@@ -743,9 +787,9 @@ class ConversationHandler:
         
         # Async save to Redis in background if available
         if self.redis_client:
-            asyncio.create_task(self._save_session_to_redis(session_id, context))
-            asyncio.create_task(self._save_conversations_to_redis(session_id, []))
-        
+            self._create_background_task(self._save_session_to_redis(session_id, context))
+            self._create_background_task(self._save_conversations_to_redis(session_id, []))
+
         self.stats["total_sessions"] += 1
         logger.info(f"Created session: {session_id}")
         return context
@@ -808,7 +852,7 @@ class ConversationHandler:
             
             # Record as recommendations
             for product_id in products:
-                asyncio.create_task(
+                self._create_background_task(
                     self.record_product_interaction(
                         session_id, product_id, "recommended"
                     )

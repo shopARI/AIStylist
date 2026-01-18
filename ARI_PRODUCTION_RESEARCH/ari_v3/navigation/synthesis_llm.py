@@ -10,13 +10,15 @@ Based on: ARI_Navigation_Intelligence_PSEUDOCODE_V3.md Section 3.3
 
 from __future__ import annotations
 
+import asyncio
 import json
 import logging
 from dataclasses import dataclass, field
+from functools import lru_cache
 from typing import Any, Dict, List, Optional
 
 import numpy as np
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 
 from ari_v3.core.data_structures import (
     StyleCoordinate,
@@ -28,6 +30,7 @@ from ari_v3.core.data_structures import (
     zero_vector,
     normalize_vector,
 )
+from ari_v3.core.prompt_sanitizer import sanitize_user_input, wrap_user_content
 from ari_v3.navigation.constants import (
     EMBEDDING_MODEL,
     TEXT_EMBEDDING_DIM,
@@ -109,6 +112,7 @@ class SynthesisLLM:
     def __init__(
         self,
         openai_client: Optional[OpenAI] = None,
+        async_openai_client: Optional[AsyncOpenAI] = None,
         model: str = SYNTHESIS_MODEL,
         embedding_model: str = EMBEDDING_MODEL,
     ):
@@ -116,13 +120,17 @@ class SynthesisLLM:
         Initialize the Synthesis LLM.
 
         Args:
-            openai_client: OpenAI client instance
+            openai_client: OpenAI sync client instance
+            async_openai_client: OpenAI async client instance (for async methods)
             model: Model to use for synthesis
             embedding_model: Model for embeddings
         """
         self.client = openai_client or OpenAI()
+        self.async_client = async_openai_client or AsyncOpenAI()
         self.model = model
         self.embedding_model = embedding_model
+        # Simple cache for embeddings to reduce API calls
+        self._embedding_cache: Dict[str, List[float]] = {}
 
     def synthesize_navigation(
         self,
@@ -194,6 +202,77 @@ class SynthesisLLM:
         except Exception as e:
             logger.error(f"Synthesis LLM failed: {e}")
             # Return fallback output
+            return self._fallback_synthesis(query, occasion)
+
+    async def synthesize_navigation_async(
+        self,
+        pillars: ThreePillarsInput,
+        query: str,
+        occasion: Optional[str] = None,
+    ) -> SynthesisOutput:
+        """
+        Async version of synthesize_navigation.
+
+        Uses AsyncOpenAI client to avoid blocking the event loop.
+
+        Args:
+            pillars: Combined input from all three pillars
+            query: User's search query
+            occasion: Optional occasion context
+
+        Returns:
+            SynthesisOutput with style descriptors and search terms
+        """
+        prompt = self._build_synthesis_prompt(pillars, query, occasion)
+
+        try:
+            response = await self.async_client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": "You are ARI, a style navigator. Output valid JSON only."},
+                    {"role": "user", "content": prompt}
+                ],
+                response_format={"type": "json_object"},
+                temperature=SYNTHESIS_LLM_TEMPERATURE,
+            )
+
+            result = json.loads(response.choices[0].message.content)
+
+            # Validate and coerce LLM response types
+            style_descriptors = self._validate_string_list(result.get("style_descriptors"), [query])
+            exemplar_search_terms = self._validate_string_list(result.get("exemplar_search_terms"), [query])
+            understood_intent = self._validate_string(result.get("understood_intent"), f"Looking for {query}")
+            formality_level = self._validate_float(result.get("formality_level"), COLD_START_FORMALITY, 0.0, 1.0)
+            relevant_context = self._validate_string_list(result.get("relevant_context"), [])
+
+            # Parse budget interpretation
+            budget_data = result.get("budget_interpretation", {})
+            if not isinstance(budget_data, dict):
+                budget_data = {}
+            budget_min = self._validate_float(budget_data.get("min"), LLM_PARSE_BUDGET_MIN, 0.0, 100000.0)
+            budget_max = self._validate_float(budget_data.get("max"), LLM_PARSE_BUDGET_MAX, 0.0, 100000.0)
+            budget_reasoning = self._validate_string(budget_data.get("reasoning"), "")
+
+            # Swap if min > max (LLM may return inverted values)
+            if budget_min > budget_max:
+                budget_min, budget_max = budget_max, budget_min
+
+            return SynthesisOutput(
+                style_descriptors=style_descriptors,
+                exemplar_search_terms=exemplar_search_terms,
+                understood_intent=understood_intent,
+                budget_interpretation=BudgetInterpretation(
+                    min=budget_min,
+                    max=budget_max,
+                    reasoning=budget_reasoning,
+                ),
+                formality_level=formality_level,
+                relevant_context=relevant_context,
+                raw_response=result,
+            )
+
+        except Exception as e:
+            logger.error(f"Async Synthesis LLM failed: {e}")
             return self._fallback_synthesis(query, occasion)
 
     def _validate_string_list(self, value: Any, default: List[str]) -> List[str]:
@@ -282,6 +361,10 @@ class SynthesisLLM:
         # Infer category from query
         category = self._infer_category(query)
 
+        # Sanitize user-provided input to prevent prompt injection
+        safe_query = sanitize_user_input(query, max_length=500)
+        safe_occasion = sanitize_user_input(occasion, max_length=100) if occasion else "not specified"
+
         prompt = f"""You are ARI, a style navigator. You help users traverse style space.
 
 You have THREE PILLARS of knowledge:
@@ -305,8 +388,10 @@ PILLAR 3 - ACTIVITY (what they've done):
 - Category interests: {', '.join(pillars.category_interests[:5]) if pillars.category_interests else 'broad interests'}
 {spending_desc}
 
-QUERY: "{query}"
-OCCASION: {occasion or "not specified"}
+<USER_QUERY>
+{safe_query}
+</USER_QUERY>
+OCCASION: {safe_occasion}
 CATEGORY DETECTED: {category}
 
 YOUR TASK:
@@ -424,6 +509,7 @@ Output a JSON object with:
         Async version: Convert LLM descriptors to coordinates via exemplar retrieval.
 
         V3: Grounds the destination in actual product space.
+        Uses async embedding and parallel Qdrant searches for performance.
 
         Args:
             synthesis: Output from synthesize_navigation
@@ -433,38 +519,53 @@ Output a JSON object with:
         Returns:
             StyleCoordinate representing the destination
         """
+        # Get embeddings for all search terms in parallel
+        async def get_embedding_safe(term: str) -> Optional[List[float]]:
+            try:
+                return await self.get_embedding_async(term)
+            except Exception as e:
+                logger.warning(f"Failed to get embedding for '{term}': {e}")
+                return None
+
+        embedding_tasks = [get_embedding_safe(term) for term in synthesis.exemplar_search_terms]
+        query_embeddings = await asyncio.gather(*embedding_tasks)
+
+        # Filter out failed embeddings and pair with terms
+        valid_pairs = [
+            (term, emb) for term, emb in zip(synthesis.exemplar_search_terms, query_embeddings)
+            if emb is not None
+        ]
+
+        if not valid_pairs:
+            logger.warning("No valid embeddings obtained, using fallback")
+            return self._compute_destination_from_embeddings([], synthesis)
+
         exemplar_embeddings = []
 
-        # Search for exemplars using each search term
-        for search_term in synthesis.exemplar_search_terms:
-            try:
-                # Get embedding for search term (sync - OpenAI client is sync)
-                query_embedding = self.get_embedding_sync(search_term)
+        if qdrant_client:
+            # Search Qdrant in parallel for all search terms
+            async def search_qdrant(query_embedding: List[float]) -> List[np.ndarray]:
+                try:
+                    results = await qdrant_client.query_points(
+                        collection_name=collection_name,
+                        query=query_embedding,
+                        limit=EXEMPLAR_SEARCH_LIMIT,
+                        with_vectors=True,
+                    )
+                    return [np.array(point.vector) for point in results.points if point.vector is not None]
+                except Exception as e:
+                    logger.warning(f"Qdrant search failed: {e}")
+                    return [np.array(query_embedding)]
 
-                if qdrant_client:
-                    # Search for products matching the descriptor (async Qdrant)
-                    # Use query_points with with_vectors=True to get embeddings back
-                    try:
-                        results = await qdrant_client.query_points(
-                            collection_name=collection_name,
-                            query=query_embedding,
-                            limit=EXEMPLAR_SEARCH_LIMIT,
-                            with_vectors=True,
-                        )
-                        # Collect embeddings of top results
-                        for point in results.points:
-                            if point.vector is not None:
-                                exemplar_embeddings.append(np.array(point.vector))
-                    except Exception as search_err:
-                        logger.warning(f"Qdrant search failed: {search_err}, using query embedding directly")
-                        exemplar_embeddings.append(np.array(query_embedding))
-                else:
-                    # No Qdrant client - use search term embedding directly
-                    exemplar_embeddings.append(np.array(query_embedding))
+            search_tasks = [search_qdrant(emb) for _, emb in valid_pairs]
+            search_results = await asyncio.gather(*search_tasks)
 
-            except Exception as e:
-                logger.warning(f"Exemplar search failed for '{search_term}': {e}")
-                continue
+            for result_list in search_results:
+                exemplar_embeddings.extend(result_list)
+        else:
+            # No Qdrant client - use search term embeddings directly
+            for _, emb in valid_pairs:
+                exemplar_embeddings.append(np.array(emb))
 
         return self._compute_destination_from_embeddings(exemplar_embeddings, synthesis)
 
@@ -515,13 +616,53 @@ Output a JSON object with:
         Raises:
             Exception: Re-raises if embedding API call fails
         """
+        # Check cache first
+        if text in self._embedding_cache:
+            return self._embedding_cache[text]
+
         try:
             response = self.client.embeddings.create(
                 model=self.embedding_model,
                 input=text,
             )
-            return response.data[0].embedding
+            embedding = response.data[0].embedding
+            # Cache the result (limit cache size to prevent memory issues)
+            if len(self._embedding_cache) < 1000:
+                self._embedding_cache[text] = embedding
+            return embedding
         except Exception as e:
             logger.error(f"Embedding API call failed for text '{text[:50]}...': {e}")
             # Re-raise so orchestrator can use fallback
+            raise
+
+    async def get_embedding_async(self, text: str) -> List[float]:
+        """Get embedding for text (asynchronous).
+
+        Uses AsyncOpenAI client to avoid blocking the event loop.
+
+        Args:
+            text: Text to embed
+
+        Returns:
+            List of floats representing the embedding.
+
+        Raises:
+            Exception: Re-raises if embedding API call fails
+        """
+        # Check cache first
+        if text in self._embedding_cache:
+            return self._embedding_cache[text]
+
+        try:
+            response = await self.async_client.embeddings.create(
+                model=self.embedding_model,
+                input=text,
+            )
+            embedding = response.data[0].embedding
+            # Cache the result (limit cache size to prevent memory issues)
+            if len(self._embedding_cache) < 1000:
+                self._embedding_cache[text] = embedding
+            return embedding
+        except Exception as e:
+            logger.error(f"Async embedding API call failed for text '{text[:50]}...': {e}")
             raise

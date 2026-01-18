@@ -40,6 +40,9 @@ def derive_navigation_parameters(profile: OnboardingProfile) -> NavigationParame
     Returns:
         NavigationParameters controlling navigation behavior
 
+    Raises:
+        ValueError: If any input values are outside expected ranges
+
     Example:
         >>> profile = OnboardingProfile(...)
         >>> nav_params = derive_navigation_parameters(profile)
@@ -47,6 +50,17 @@ def derive_navigation_parameters(profile: OnboardingProfile) -> NavigationParame
     """
     process = profile.process
     practicality = profile.practicality
+
+    # =========================================================================
+    # INPUT VALIDATION
+    # Ensure all values are within expected ranges to prevent calculation errors
+    # =========================================================================
+    if not (1 <= process.adventurousness <= 10):
+        raise ValueError(f"adventurousness must be 1-10, got {process.adventurousness}")
+    if not (1 <= process.creative_control <= 10):
+        raise ValueError(f"creative_control must be 1-10, got {process.creative_control}")
+    if not (1 <= process.brand_loyalty <= 10):
+        raise ValueError(f"brand_loyalty must be 1-10, got {process.brand_loyalty}")
 
     # =========================================================================
     # EXPLORATION APPETITE
@@ -181,7 +195,15 @@ def _derive_category_overrides(
 
 
 def _clamp(value: float, min_val: float, max_val: float) -> float:
-    """Clamp a value to a range."""
+    """
+    Clamp a value to a range.
+
+    Handles NaN and Inf values safely by returning the midpoint of the range.
+    """
+    import math
+    if not math.isfinite(value):
+        # Return midpoint for invalid values
+        return (min_val + max_val) / 2.0
     return max(min_val, min(max_val, value))
 
 

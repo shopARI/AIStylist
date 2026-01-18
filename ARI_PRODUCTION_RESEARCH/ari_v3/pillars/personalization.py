@@ -935,11 +935,121 @@ class Pillar1_Personalization:
         purchased = sum(1 for i in interactions if i.type == InteractionType.PURCHASED)
         return_rate = returned / purchased if purchased > 0 else 0.0
 
-        # Placeholder values for other patterns
+        # Calculate decision speed from time between view and purchase
+        decision_speed = self._calculate_decision_speed(interactions)
+
+        # Calculate time of day preference from timestamps
+        time_of_day_preference = self._calculate_time_of_day_preference(interactions)
+
+        # Calculate seasonal preference from timestamps
+        seasonal_preference = self._calculate_seasonal_preference(interactions)
+
         return BehavioralPatterns(
             exploration_rate=exploration_rate,
             return_rate=return_rate,
-            decision_speed=0.5,  # TODO: Compute from time between view and purchase
-            time_of_day_preference="afternoon",  # TODO: Compute from timestamps
-            seasonal_preference={}
+            decision_speed=decision_speed,
+            time_of_day_preference=time_of_day_preference,
+            seasonal_preference=seasonal_preference
         )
+
+    def _calculate_decision_speed(self, interactions: List[Interaction]) -> float:
+        """
+        Calculate decision speed based on time between view and purchase.
+
+        Returns:
+            Float 0-1 where:
+            - 0.0 = very slow (weeks between view and purchase)
+            - 0.5 = moderate (days between view and purchase)
+            - 1.0 = very fast (same session purchase)
+        """
+        # Group interactions by product to find view->purchase pairs
+        from collections import defaultdict
+        product_interactions: Dict[str, List[Interaction]] = defaultdict(list)
+
+        for interaction in interactions:
+            product_interactions[interaction.product_id].append(interaction)
+
+        decision_times = []
+        for product_id, product_ints in product_interactions.items():
+            views = [i for i in product_ints if i.type == InteractionType.VIEWED]
+            purchases = [i for i in product_ints if i.type == InteractionType.PURCHASED]
+
+            if views and purchases:
+                # Get first view and first purchase
+                first_view = min(views, key=lambda x: x.timestamp)
+                first_purchase = min(purchases, key=lambda x: x.timestamp)
+
+                if first_purchase.timestamp >= first_view.timestamp:
+                    # Calculate time difference in hours
+                    time_diff = (first_purchase.timestamp - first_view.timestamp).total_seconds() / 3600.0
+                    decision_times.append(time_diff)
+
+        if not decision_times:
+            return 0.5  # Default to moderate if no data
+
+        # Calculate average decision time
+        avg_time = sum(decision_times) / len(decision_times)
+
+        # Convert to 0-1 scale (assuming max reasonable time is 168 hours = 1 week)
+        # Fast (< 1 hour) -> 1.0
+        # Moderate (1-24 hours) -> 0.5-0.9
+        # Slow (> 24 hours) -> 0.0-0.5
+        if avg_time <= 1:
+            return 1.0
+        elif avg_time <= 24:
+            return 0.5 + 0.5 * (1 - avg_time / 24)
+        else:
+            return max(0.0, 0.5 * (1 - min(avg_time, 168) / 168))
+
+    def _calculate_time_of_day_preference(self, interactions: List[Interaction]) -> str:
+        """
+        Calculate preferred shopping time of day from interaction timestamps.
+
+        Returns:
+            One of: "morning" (6-12), "afternoon" (12-18), "evening" (18-24), "night" (0-6)
+        """
+        time_buckets = {"morning": 0, "afternoon": 0, "evening": 0, "night": 0}
+
+        for interaction in interactions:
+            hour = interaction.timestamp.hour
+            if 6 <= hour < 12:
+                time_buckets["morning"] += 1
+            elif 12 <= hour < 18:
+                time_buckets["afternoon"] += 1
+            elif 18 <= hour < 24:
+                time_buckets["evening"] += 1
+            else:
+                time_buckets["night"] += 1
+
+        # Return the most common time of day
+        if sum(time_buckets.values()) == 0:
+            return "afternoon"  # Default
+
+        return max(time_buckets, key=time_buckets.get)
+
+    def _calculate_seasonal_preference(self, interactions: List[Interaction]) -> Dict[str, float]:
+        """
+        Calculate seasonal shopping preferences from interaction timestamps.
+
+        Returns:
+            Dict mapping season to normalized preference weight (0-1)
+        """
+        season_counts = {"spring": 0, "summer": 0, "fall": 0, "winter": 0}
+
+        for interaction in interactions:
+            month = interaction.timestamp.month
+            if month in [3, 4, 5]:
+                season_counts["spring"] += 1
+            elif month in [6, 7, 8]:
+                season_counts["summer"] += 1
+            elif month in [9, 10, 11]:
+                season_counts["fall"] += 1
+            else:
+                season_counts["winter"] += 1
+
+        total = sum(season_counts.values())
+        if total == 0:
+            return {"spring": 0.25, "summer": 0.25, "fall": 0.25, "winter": 0.25}
+
+        # Normalize to 0-1 scale
+        return {season: count / total for season, count in season_counts.items()}

@@ -59,11 +59,19 @@ class SessionMetrics:
 
     @property
     def engagement_rate(self) -> float:
-        """Percentage of shown products with any positive engagement."""
+        """
+        Percentage of shown products with any positive engagement.
+
+        Note: We use max() to avoid double-counting products that were
+        clicked, liked, AND purchased. A product can only be engaged once,
+        regardless of how many engagement types it received.
+        """
         if self.products_shown == 0:
             return 0.0
-        engaged = self.products_clicked + self.products_liked + self.products_purchased
-        return min(1.0, engaged / self.products_shown)
+        # Use the highest engagement count as a proxy for unique engaged products
+        # This prevents inflating the rate by counting same product multiple times
+        max_engaged = max(self.products_clicked, self.products_liked, self.products_purchased)
+        return min(1.0, max_engaged / self.products_shown)
 
 
 @dataclass

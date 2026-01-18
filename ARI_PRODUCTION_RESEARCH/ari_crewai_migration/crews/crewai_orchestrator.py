@@ -14,9 +14,12 @@ import sys
 import os
 from typing import Dict, List, Any, Optional, Union
 
-# Add parent directory to path for imports
-sys.path.insert(0, '/home/leo/AIStylist/ARI_PRODUCTION_CAMEL_0.27')
-sys.path.insert(0, '/home/leo/AIStylist/ARI_PRODUCTION_CAMEL_0.27/ari_crewai_migration')
+# Add parent directory to path for imports (using relative paths)
+_current_dir = os.path.dirname(os.path.abspath(__file__))
+_migration_dir = os.path.dirname(_current_dir)
+_project_dir = os.path.dirname(_migration_dir)
+sys.path.insert(0, _project_dir)
+sys.path.insert(0, _migration_dir)
 
 from crews.product_search_crew import ProductSearchCrew, load_and_create_crew
 from crews.mini_crews import (
@@ -36,7 +39,7 @@ logger = logging.getLogger("crewai.orchestrator")
 
 # Import ML Intelligence Coordinator
 try:
-    sys.path.insert(0, '/home/leo/AIStylist/ARI_PRODUCTION_CAMEL_0.27')
+    # Path already added above via relative paths
     from services.ml.intelligence.coordinator import IntelligenceCoordinator
     ML_INTELLIGENCE_AVAILABLE = True
 except ImportError as e:

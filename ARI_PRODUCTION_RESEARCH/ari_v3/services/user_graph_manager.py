@@ -94,6 +94,51 @@ class UserGraphManager:
         if not user_id.strip():
             raise ValueError("user_id cannot be empty")
 
+    # Whitelist of allowed profile property names to prevent Cypher injection
+    ALLOWED_PROFILE_FIELDS = frozenset({
+        # Basic user info
+        "name", "username", "email", "phone", "avatar_url",
+        # Demographics
+        "age", "gender", "gender_identity", "location", "city", "region", "country",
+        "ethnicity", "cultural_background",
+        # Life context
+        "occupation", "industry", "work_style", "relationship_status",
+        "parental_status", "life_stage",
+        # Style preferences
+        "style_goals", "style_motivation", "root_value", "validation_source",
+        # Budget
+        "budget_monthly", "budget_flexibility", "budget_min", "budget_max",
+        # Process preferences
+        "adventurousness", "creative_control", "brand_loyalty", "trend_following",
+        "decision_speed", "research_depth", "exploration_preference",
+        # Body data
+        "height", "body_type", "skin_tone", "hair_color", "eye_color",
+        # Social
+        "instagram_handle", "pinterest_handle", "tiktok_handle",
+        # System fields
+        "onboarding_completed", "onboarding_step", "last_active",
+        "total_searches", "total_products_viewed", "total_products_saved", "total_purchases",
+    })
+
+    @classmethod
+    def _validate_profile_fields(cls, profile_data: Dict[str, Any]) -> None:
+        """
+        Validate that all profile field names are in the allowed whitelist.
+        Prevents Cypher injection attacks through malicious property names.
+
+        Args:
+            profile_data: Dictionary of properties to validate
+
+        Raises:
+            ValueError: If any field name is not in the allowed whitelist
+        """
+        invalid_fields = set(profile_data.keys()) - cls.ALLOWED_PROFILE_FIELDS
+        if invalid_fields:
+            raise ValueError(
+                f"Invalid profile field(s): {', '.join(sorted(invalid_fields))}. "
+                f"Allowed fields: {', '.join(sorted(cls.ALLOWED_PROFILE_FIELDS))}"
+            )
+
     # ======================
     # USER CREATION
     # ======================
@@ -141,8 +186,14 @@ class UserGraphManager:
 
         Returns:
             Success boolean
+
+        Raises:
+            ValueError: If any field name is not in the allowed whitelist
         """
-        # Build SET clause dynamically
+        self._validate_user_id(user_id)
+        self._validate_profile_fields(profile_data)
+
+        # Build SET clause dynamically (safe now due to whitelist validation)
         set_clauses = []
         params = {'user_id': user_id, 'updated_at': datetime.now()}
 

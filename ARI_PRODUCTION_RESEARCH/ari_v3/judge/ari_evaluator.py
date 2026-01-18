@@ -253,8 +253,13 @@ class ARIEvaluator:
         # 3. Budget fit
         breakdown.budget_fit_score = self._score_budget_fit(product, nav_context)
 
-        # 4. Brand match
-        breakdown.brand_match_score = self._score_brand_match(product, brand_preferences)
+        # 4. Brand match - factor in brand_affinity_weight from nav_params
+        brand_affinity_weight = 0.5  # Default
+        if nav_context.computed_state and nav_context.computed_state.nav_params:
+            brand_affinity_weight = nav_context.computed_state.nav_params.brand_affinity_weight
+        breakdown.brand_match_score = self._score_brand_match(
+            product, brand_preferences, brand_affinity_weight
+        )
 
         # 5. Behavioral consistency
         breakdown.behavioral_consistency_score = self._score_behavioral_consistency(
@@ -369,8 +374,9 @@ class ARIEvaluator:
         traj_normalized = traj_dir / traj_norm
 
         dot_product = np.dot(movement_normalized, traj_normalized)
-        # Map from [-1, 1] to [0, 1]
-        coherence = (dot_product + 1.0) / 2.0
+        # Align with pseudocode spec: trajectory_dot + 0.5, clamped to [0, 1]
+        # This maps [-0.5, 0.5] to [0, 1], being stricter about divergent movements
+        coherence = max(0.0, min(1.0, dot_product + 0.5))
 
         return float(coherence)
 
@@ -400,27 +406,44 @@ class ARIEvaluator:
         if min_budget <= price <= max_budget:
             return 1.0  # Perfect fit
 
-        # Calculate how far outside budget
+        # Calculate how far outside budget (aligned with pseudocode spec)
         if price < min_budget:
-            # Below budget - might be too cheap
-            ratio = price / min_budget if min_budget > 0 else 1.0
-            return max(0.3, ratio)  # Don't penalize too harshly
+            # Below budget is acceptable per pseudocode (0.8 score)
+            return 0.8
         else:
-            # Above budget
-            ratio = max_budget / price if price > 0 else 0.0
-            return max(0.0, ratio)
+            # Above budget - penalize based on how far over
+            # Formula: max(0, 1.0 - (price - max_budget) / max_budget)
+            if max_budget > 0:
+                penalty = (price - max_budget) / max_budget
+                return max(0.0, 1.0 - penalty)
+            return 0.0
 
     def _score_brand_match(
         self,
         product: Dict[str, Any],
         brand_preferences: List[str],
+        brand_affinity_weight: float = 0.5,
     ) -> float:
         """
         Score brand match - alignment with preferred brands.
 
+        Uses brand_affinity_weight to determine how much brand matters:
+        - High affinity (0.8-1.0): Strong preference for known brands
+        - Medium affinity (0.4-0.7): Some brand preference
+        - Low affinity (0.0-0.3): Brand-agnostic, neutral scores
+
+        Args:
+            product: Product to score
+            brand_preferences: List of user's preferred brands
+            brand_affinity_weight: User's brand loyalty (0-1 from nav_params)
+
         Returns:
             Score 0-1 (1 = preferred brand, 0.5 = neutral)
         """
+        # Low brand affinity = brand doesn't matter much, return neutral
+        if brand_affinity_weight < 0.3:
+            return 0.5  # Brand-agnostic users get neutral scores
+
         if not brand_preferences:
             return 0.5  # No preferences = neutral
 
@@ -431,9 +454,16 @@ class ARIEvaluator:
         # Check if brand matches preferences
         for pref_brand in brand_preferences:
             if pref_brand.lower() in product_brand or product_brand in pref_brand.lower():
-                return 1.0  # Match!
+                # Scale the bonus by brand affinity
+                # High affinity (1.0) -> full 1.0 score
+                # Medium affinity (0.5) -> 0.75 score
+                return 0.5 + (0.5 * brand_affinity_weight)
 
-        return 0.3  # No match - slight penalty
+        # No match - penalty scales with affinity
+        # High affinity users get penalized more for non-preferred brands
+        # Low affinity users barely notice
+        penalty = 0.2 * brand_affinity_weight
+        return max(0.3, 0.5 - penalty)
 
     def _score_behavioral_consistency(
         self,
@@ -477,8 +507,14 @@ class ARIEvaluator:
         """
         Score multi-agent confidence - agreement between recommendation agents.
 
+        Aligned with pseudocode spec:
+        - 1 agent present: 0.6
+        - 2 agents present: 0.8
+        - 3 agents present: 1.0
+        Formula: 0.6 + (agent_count - 1) * 0.2
+
         Returns:
-            Score 0-1 (1 = all agents agree, 0 = single agent)
+            Score 0-1 (1 = all agents agree, lower = fewer agents)
         """
         if not agent_scores or product_id not in agent_scores:
             return 0.5  # No agent scores = neutral
@@ -488,18 +524,12 @@ class ARIEvaluator:
 
         if num_agents == 0:
             return 0.5
-        elif num_agents == 1:
-            # Single agent - use that agent's confidence
-            return list(product_scores.values())[0]
-        else:
-            # Multiple agents - score based on agreement
-            scores = list(product_scores.values())
-            avg_score = sum(scores) / len(scores)
 
-            # Bonus for consensus (multiple agents)
-            consensus_bonus = min(0.2, (num_agents - 1) * 0.1)
+        # Use pseudocode formula: 0.6 + (agent_count - 1) * 0.2
+        # This gives: 1 agent = 0.6, 2 agents = 0.8, 3 agents = 1.0
+        base_score = 0.6 + (num_agents - 1) * 0.2
 
-            return min(1.0, avg_score + consensus_bonus)
+        return min(1.0, base_score)
 
     def _score_rule_compliance(
         self,

@@ -14,10 +14,11 @@ import re
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 
 from ari_v3.navigation.navigation_context import NavigationContext
 from ari_v3.navigation.constants import SYNTHESIS_MODEL
+from ari_v3.core.prompt_sanitizer import sanitize_user_input, sanitize_list
 
 logger = logging.getLogger(__name__)
 
@@ -126,16 +127,19 @@ class NarrativeLLM:
     def __init__(
         self,
         openai_client: Optional[OpenAI] = None,
+        async_openai_client: Optional[AsyncOpenAI] = None,
         model: str = NARRATIVE_MODEL,
     ):
         """
         Initialize the Narrative LLM.
 
         Args:
-            openai_client: OpenAI client instance
+            openai_client: OpenAI sync client instance
+            async_openai_client: OpenAI async client instance (for async methods)
             model: Model to use for narrative generation
         """
         self.client = openai_client or OpenAI()
+        self.async_client = async_openai_client or AsyncOpenAI()
         self.model = model
 
     def generate_narrative(
@@ -244,9 +248,16 @@ Guidelines:
     ) -> str:
         """Build the narrative generation prompt."""
 
-        # Format style wants/avoids
-        wants_text = ", ".join(user_profile.style_wants[:MAX_STYLE_PREFERENCES]) if user_profile.style_wants else "versatile, quality pieces"
-        avoids_text = ", ".join(user_profile.style_avoids[:MAX_STYLE_PREFERENCES]) if user_profile.style_avoids else "nothing specific"
+        # Sanitize user-provided values to prevent prompt injection
+        safe_wants = sanitize_list(user_profile.style_wants[:MAX_STYLE_PREFERENCES]) if user_profile.style_wants else []
+        safe_avoids = sanitize_list(user_profile.style_avoids[:MAX_STYLE_PREFERENCES]) if user_profile.style_avoids else []
+
+        wants_text = ", ".join(safe_wants) if safe_wants else "versatile, quality pieces"
+        avoids_text = ", ".join(safe_avoids) if safe_avoids else "nothing specific"
+
+        # Sanitize other user-controlled fields
+        safe_root_value = sanitize_user_input(user_profile.root_value, max_length=200)
+        safe_style_motivation = sanitize_user_input(user_profile.style_motivation, max_length=300)
 
         # Format navigation description
         # understood_intent is what user is looking for (their goal)
@@ -256,27 +267,31 @@ Guidelines:
 
         if nav_context.synthesis:
             if nav_context.synthesis.understood_intent:
-                intent_desc = nav_context.synthesis.understood_intent
+                intent_desc = sanitize_user_input(nav_context.synthesis.understood_intent, max_length=300)
             if nav_context.synthesis.style_descriptors:
-                destination_desc = ", ".join(nav_context.synthesis.style_descriptors[:MAX_STYLE_PREFERENCES])
+                safe_descriptors = sanitize_list(nav_context.synthesis.style_descriptors[:MAX_STYLE_PREFERENCES])
+                destination_desc = ", ".join(safe_descriptors)
 
-        # Safely get query (could be None)
-        query_text = nav_context.query or "general style request"
+        # Safely get query (could be None) and sanitize
+        query_text = sanitize_user_input(nav_context.query, max_length=500) if nav_context.query else "general style request"
+        safe_occasion = sanitize_user_input(nav_context.occasion, max_length=100) if nav_context.occasion else "general"
 
         # Format products
         products_text = self._format_products_for_prompt(products)
 
         prompt = f"""You've just helped someone find products. Now create a brief narrative that:
-1. Connects to their ROOT VALUE: "{user_profile.root_value}"
+1. Connects to their ROOT VALUE: "{safe_root_value}"
 2. Frames recommendations around: {framing}
 3. Explains WHY each piece works for them specifically
 
 USER CONTEXT:
-- Style motivation: {user_profile.style_motivation}
+- Style motivation: {safe_style_motivation}
 - They want MORE: {wants_text}
 - They AVOID: {avoids_text}
-- Query: "{query_text}"
-- Occasion: {nav_context.occasion or "general"}
+<USER_QUERY>
+{query_text}
+</USER_QUERY>
+- Occasion: {safe_occasion}
 
 NAVIGATION:
 - What they're looking for: {intent_desc}
@@ -478,12 +493,69 @@ CLOSING: [optional 1 sentence closing - can be empty]"""
         """
         Async version of narrative generation.
 
-        Note: Currently wraps sync OpenAI client. For true async,
-        use AsyncOpenAI client.
+        Uses AsyncOpenAI client to avoid blocking the event loop.
+
+        Args:
+            nav_context: Navigation context with query, occasion, synthesis
+            products: List of selected products with metadata
+            user_profile: User profile for personalization
+
+        Returns:
+            JourneyNarrative with opening, product explanations, and closing
         """
-        # For now, delegate to sync version
-        # TODO: Implement with AsyncOpenAI for true async
-        return self.generate_narrative(nav_context, products, user_profile)
+        # Use default profile if not provided
+        if user_profile is None:
+            user_profile = UserProfileForNarrative()
+
+        # Determine framing based on validation source
+        framing = self._get_validation_framing(user_profile.primary_validation_source)
+
+        # Build prompt
+        prompt = self._build_narrative_prompt(
+            nav_context=nav_context,
+            products=products,
+            user_profile=user_profile,
+            framing=framing,
+        )
+
+        try:
+            response = await self.async_client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {
+                        "role": "system",
+                        "content": self._get_system_prompt(),
+                    },
+                    {"role": "user", "content": prompt},
+                ],
+                temperature=NARRATIVE_TEMPERATURE,
+                max_tokens=MAX_TOKENS,
+                timeout=API_TIMEOUT,
+            )
+
+            # Validate response
+            if not response.choices or not response.choices[0].message.content:
+                logger.warning("Empty response from async Narrative LLM")
+                return self._fallback_narrative(products, framing, user_profile.root_value)
+
+            raw_response = response.choices[0].message.content
+
+            # Parse the response into structured narrative
+            narrative = self._parse_narrative_response(
+                response=raw_response,
+                products=products,
+                framing=framing,
+                root_value=user_profile.root_value,
+            )
+
+            logger.debug(f"Async narrative generated successfully with {len(narrative.product_explanations)} product explanations")
+            return narrative
+
+        except (KeyboardInterrupt, SystemExit):
+            raise  # Don't catch system-level interrupts
+        except Exception as e:
+            logger.error(f"Async Narrative LLM failed: {e}")
+            return self._fallback_narrative(products, framing, user_profile.root_value)
 
 
 def create_user_profile_for_narrative(

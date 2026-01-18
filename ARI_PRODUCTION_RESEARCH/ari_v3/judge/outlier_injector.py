@@ -159,9 +159,12 @@ def _inject_into_selected(
     outliers: List[ScoredProduct],
 ) -> List[ScoredProduct]:
     """
-    Inject outliers into selected products by replacing lowest-scoring items.
+    Inject outliers into selected products by interspersing them at strategic positions.
 
     Outliers are marked with '_is_outlier' flag in product dict.
+    Instead of sorting by relevance (which pushes outliers to the end),
+    we place outliers at specific positions (e.g., positions 3, 7, etc.)
+    to ensure they're actually visible to users.
     """
     if not outliers:
         return selected
@@ -171,9 +174,13 @@ def _inject_into_selected(
 
     # Replace lowest-scoring items with outliers
     num_to_replace = len(outliers)
-    final = sorted_selected[num_to_replace:]  # Keep higher-scoring items
+    main_items = sorted_selected[num_to_replace:]  # Keep higher-scoring items
 
-    # Mark and add outliers (copy product dict to avoid mutating input)
+    # Sort main items by relevance (descending)
+    main_items.sort(key=lambda x: x.relevance_score, reverse=True)
+
+    # Prepare outliers with markers (copy product dict to avoid mutating input)
+    marked_outliers = []
     for outlier in outliers:
         outlier_copy = ScoredProduct(
             product=outlier.product.copy(),
@@ -182,10 +189,30 @@ def _inject_into_selected(
         )
         outlier_copy.product['_is_outlier'] = True
         outlier_copy.product['_outlier_reason'] = 'exploration_injection'
-        final.append(outlier_copy)
+        marked_outliers.append(outlier_copy)
 
-    # Re-sort by relevance (descending) for final order
-    final.sort(key=lambda x: x.relevance_score, reverse=True)
+    # Intersperse outliers at strategic positions instead of just appending
+    # Place first outlier at position 3 (0-indexed: 2), then every 4 positions
+    final = []
+    outlier_positions = [2 + i * 4 for i in range(len(marked_outliers))]
+    outlier_idx = 0
+    main_idx = 0
+
+    for pos in range(len(main_items) + len(marked_outliers)):
+        if outlier_idx < len(marked_outliers) and pos in outlier_positions:
+            final.append(marked_outliers[outlier_idx])
+            outlier_idx += 1
+        elif main_idx < len(main_items):
+            final.append(main_items[main_idx])
+            main_idx += 1
+
+    # Add any remaining items
+    while main_idx < len(main_items):
+        final.append(main_items[main_idx])
+        main_idx += 1
+    while outlier_idx < len(marked_outliers):
+        final.append(marked_outliers[outlier_idx])
+        outlier_idx += 1
 
     return final
 

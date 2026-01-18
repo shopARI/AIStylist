@@ -504,16 +504,22 @@ class ReinterpretationChecker:
         if not self.neo4j_driver:
             return BehavioralSummary()
 
-        # Query for behavioral data
+        # Query for behavioral data with brand, category, and style information
         # Note: Purchase info is stored in OUTCOME relationship with type='purchased'
         query = """
             MATCH (u:User {id: $user_id})-[:HAD_SESSION]->(s)-[o:OUTCOME]->(p:ProductRef)
 
             // Get session contexts and interaction count
             WITH u, s, o, p,
-                 CASE WHEN o.type = 'purchased' THEN p.price ELSE null END as purchase_price
+                 CASE WHEN o.type = 'purchased' THEN p.price ELSE null END as purchase_price,
+                 CASE WHEN o.type = 'purchased' THEN p.brand ELSE null END as purchase_brand,
+                 CASE WHEN o.type = 'purchased' THEN p.product_category ELSE null END as purchase_category,
+                 CASE WHEN o.type = 'purchased' THEN p.style_tags ELSE null END as style_tags
             RETURN
                 collect(DISTINCT purchase_price) as prices,
+                collect(purchase_brand) as brands,
+                collect(DISTINCT purchase_category) as categories,
+                collect(DISTINCT style_tags) as all_style_tags,
                 collect(DISTINCT s.active_context) as contexts,
                 collect(DISTINCT p.product_id) as products,
                 count(o) as interaction_count
@@ -528,28 +534,142 @@ class ReinterpretationChecker:
 
             prices = [p for p in record["prices"] if p is not None]
             contexts = [c for c in record["contexts"] if c is not None]
+            brands = [b for b in record.get("brands", []) if b is not None]
+            categories = [c for c in record.get("categories", []) if c is not None]
+            all_style_tags = record.get("all_style_tags", [])
 
-            # Calculate median spending
+            # Calculate median spending (correctly handle even-length lists)
             median_spending = None
             if prices:
                 sorted_prices = sorted(prices)
-                mid = len(sorted_prices) // 2
-                median_spending = sorted_prices[mid]
+                n = len(sorted_prices)
+                mid = n // 2
+                if n % 2 == 0:
+                    # Even number of prices: average the two middle values
+                    median_spending = (sorted_prices[mid - 1] + sorted_prices[mid]) / 2.0
+                else:
+                    # Odd number of prices: take the middle value
+                    median_spending = sorted_prices[mid]
 
-            # Calculate style variance (placeholder - would need embedding analysis)
-            style_variance = 0.5  # Default mid-range
+            # Calculate style variance based on category distribution
+            # High variance (close to 1.0) = many different categories purchased
+            # Low variance (close to 0.0) = purchases concentrated in few categories
+            style_variance = self._calculate_style_variance(categories)
 
-            # Calculate brand repeat rate (placeholder)
-            brand_repeat_rate = 0.3  # Default low
+            # Calculate brand repeat rate
+            # High rate (close to 1.0) = loyal to few brands
+            # Low rate (close to 0.0) = explores many different brands
+            brand_repeat_rate = self._calculate_brand_repeat_rate(brands)
+
+            # Extract purchased styles from style tags
+            purchased_styles = self._extract_purchased_styles(all_style_tags, categories)
 
             return BehavioralSummary(
                 median_spending=median_spending,
                 style_variance=style_variance,
                 brand_repeat_rate=brand_repeat_rate,
-                purchased_styles=[],  # Would need product category analysis
+                purchased_styles=purchased_styles,
                 observed_contexts=contexts,
                 interaction_count=record["interaction_count"],
             )
+
+    def _calculate_style_variance(self, categories: List[str]) -> Optional[float]:
+        """
+        Calculate style variance based on category distribution.
+
+        Returns:
+            Float 0-1 where:
+            - 0.0 = all purchases in same category (low adventurousness)
+            - 1.0 = spread evenly across many categories (high adventurousness)
+        """
+        if not categories:
+            return None
+
+        # Count category frequencies
+        from collections import Counter
+        category_counts = Counter(categories)
+
+        if len(category_counts) == 0:
+            return None
+
+        total = sum(category_counts.values())
+        if total == 0:
+            return None
+
+        # Calculate normalized entropy (0-1 scale)
+        # Maximum entropy = log(n) when all categories have equal frequency
+        import math
+        max_entropy = math.log(len(category_counts)) if len(category_counts) > 1 else 1.0
+
+        entropy = 0.0
+        for count in category_counts.values():
+            prob = count / total
+            if prob > 0:
+                entropy -= prob * math.log(prob)
+
+        # Normalize to 0-1 range
+        if max_entropy > 0:
+            return entropy / max_entropy
+        return 0.0
+
+    def _calculate_brand_repeat_rate(self, brands: List[str]) -> Optional[float]:
+        """
+        Calculate brand repeat purchase rate.
+
+        Returns:
+            Float 0-1 where:
+            - 0.0 = each purchase from different brand (no loyalty)
+            - 1.0 = all purchases from same brand (high loyalty)
+        """
+        if not brands or len(brands) < 2:
+            return None
+
+        # Count brand frequencies
+        from collections import Counter
+        brand_counts = Counter(brands)
+
+        total_purchases = len(brands)
+        unique_brands = len(brand_counts)
+
+        if total_purchases == 0 or unique_brands == 0:
+            return None
+
+        # Calculate repeat rate
+        # If 10 purchases from 2 brands, repeat rate is high (0.8)
+        # If 10 purchases from 10 brands, repeat rate is low (0.0)
+        repeat_rate = 1.0 - (unique_brands / total_purchases)
+        return max(0.0, min(1.0, repeat_rate))
+
+    def _extract_purchased_styles(
+        self,
+        style_tags: List[Any],
+        categories: List[str]
+    ) -> List[str]:
+        """
+        Extract purchased style descriptors from style tags and categories.
+
+        Returns:
+            List of style descriptors (e.g., ["casual", "minimalist", "bohemian"])
+        """
+        styles = set()
+
+        # Extract from style tags (may be nested lists or strings)
+        for tag_item in style_tags:
+            if tag_item is None:
+                continue
+            if isinstance(tag_item, list):
+                for tag in tag_item:
+                    if tag and isinstance(tag, str):
+                        styles.add(tag.lower())
+            elif isinstance(tag_item, str):
+                styles.add(tag_item.lower())
+
+        # Also include category names as style indicators
+        for cat in categories:
+            if cat:
+                styles.add(cat.lower())
+
+        return list(styles)[:20]  # Limit to 20 most common styles
 
     async def _get_raw_conversations(self, user_id: str) -> List[Dict[str, Any]]:
         """Get raw onboarding conversations for re-interpretation."""
