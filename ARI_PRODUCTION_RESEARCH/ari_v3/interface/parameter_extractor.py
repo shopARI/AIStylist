@@ -102,7 +102,9 @@ class ParameterExtractor:
         self.common_brands = [
             "nike", "adidas", "puma", "zara", "h&m", "uniqlo", "gap", "levi's",
             "calvin klein", "tommy hilfiger", "ralph lauren", "coach",
-            "michael kors", "kate spade", "tory burch"
+            "michael kors", "kate spade", "tory burch", "theory", "vince",
+            "eileen fisher", "equipment", "rag & bone", "allsaints", "cos",
+            "everlane", "reformation", "madewell", "anthropologie", "free people"
         ]
 
         # Pre-compiled regex patterns
@@ -199,6 +201,7 @@ class ParameterExtractor:
             occasions=self._extract_vocab_items(message_lower, "occasions"),
             price_range=self._extract_price_range(message),
             brand_preferences=self._extract_brands(message),
+            excluded_brands=self._extract_excluded_brands(message),
             style_modifiers=self._extract_vocab_items(message_lower, "styles"),
             sizes=self._extract_sizes(message_lower),
             materials=self._extract_vocab_items(message_lower, "materials"),
@@ -379,6 +382,44 @@ class ParameterExtractor:
                     brands.append(brand)
 
         return list(set(brands))
+
+    def _extract_excluded_brands(self, text: str) -> List[str]:
+        """
+        Extract brands that the user wants to EXCLUDE.
+
+        Detects patterns like:
+        - "don't want Theory"
+        - "no Theory"
+        - "not Theory"
+        - "except Theory"
+        - "but not Theory"
+        - "I said no Theory"
+        """
+        excluded = []
+        text_lower = text.lower()
+
+        # Patterns that indicate brand exclusion
+        exclusion_patterns = [
+            r"(?:don'?t|do not|didn'?t)\s+(?:want|like|show|include|recommend)\s+(\w+)",
+            r"(?:no|not|except|without|exclude|skip|avoid)\s+(\w+)",
+            r"(?:but\s+)?not\s+(\w+)",
+            r"i\s+(?:said|told you)\s+(?:no|not)\s+(\w+)",
+            r"(?:hate|dislike)\s+(\w+)",
+            r"(\w+)\s+(?:is|are)\s+(?:out|excluded|off the table)",
+        ]
+
+        all_known_brands = set(b.lower() for b in self.luxury_brands + self.common_brands)
+
+        for pattern in exclusion_patterns:
+            matches = re.finditer(pattern, text_lower, re.IGNORECASE)
+            for match in matches:
+                potential_brand = match.group(1).strip().lower()
+                # Check if it's a known brand
+                if potential_brand in all_known_brands:
+                    proper_name = potential_brand.title()
+                    excluded.append(proper_name)
+
+        return list(set(excluded))
 
     def _extract_time_reference(self, text: str) -> Optional[str]:
         """Extract time reference for memory queries."""

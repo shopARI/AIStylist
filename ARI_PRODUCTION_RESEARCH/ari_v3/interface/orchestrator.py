@@ -319,6 +319,23 @@ class ARIOrchestrator:
                 else:
                     logger.warning("No embedding available for search")
 
+            # Filter out excluded brands
+            if products and params.excluded_brands:
+                excluded_lower = [b.lower() for b in params.excluded_brands]
+                original_count = len(products)
+                products = [
+                    p for p in products
+                    if not any(
+                        excl in (p.get('brand', '') or '').lower() or
+                        excl in (p.get('title', '') or '').lower() or
+                        excl in (p.get('vendor', '') or '').lower()
+                        for excl in excluded_lower
+                    )
+                ]
+                filtered_count = original_count - len(products)
+                if filtered_count > 0:
+                    logger.info(f"Filtered out {filtered_count} products from excluded brands: {params.excluded_brands}")
+
             if not products:
                 return ARIResponse(
                     response_type=ResponseType.PRODUCTS,

@@ -76,6 +76,7 @@ class ExtractedParameters:
     occasions: List[str] = field(default_factory=list)
     price_range: Optional[Dict[str, float]] = None
     brand_preferences: List[str] = field(default_factory=list)
+    excluded_brands: List[str] = field(default_factory=list)  # Brands to filter out
     style_modifiers: List[str] = field(default_factory=list)
     sizes: List[str] = field(default_factory=list)
     materials: List[str] = field(default_factory=list)
@@ -97,6 +98,8 @@ class ExtractedParameters:
             result["price_range"] = self.price_range
         if self.brand_preferences:
             result["brand_preferences"] = self.brand_preferences
+        if self.excluded_brands:
+            result["excluded_brands"] = self.excluded_brands
         if self.style_modifiers:
             result["style_modifiers"] = self.style_modifiers
         if self.sizes:
