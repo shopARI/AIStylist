@@ -99,7 +99,14 @@ class IntentDetector:
                 r"what do you mean", r"can you explain", r"i don't understand",
                 r"tell me more about", r"elaborate on", r"what exactly",
                 r"i'm confused", r"that doesn't make sense", r"can you clarify",
+                # "Why" questions for explanatory power
                 r"why did you recommend", r"why this", r"how come",
+                r"why did you (suggest|pick|choose)", r"why (that|those|these)",
+                r"how did you know", r"how do you know (i like|about me|my)",
+                r"what made you think", r"how did you arrive",
+                r"explain (your|the) reasoning", r"explain why",
+                r"walk me through", r"break.?down (the|your)",
+                r"why (is|was) this a good", r"what's the reasoning",
             ],
             SearchIntent.SYSTEM_STATUS: [
                 r"how do you find products", r"what's your process",

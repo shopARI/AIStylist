@@ -40,6 +40,11 @@ from ari_v3.core.serialization import (
     deserialize_to_onboarding_profile,
     deserialize_to_navigation_params,
 )
+from ari_v3.interface.types import (
+    ExplanationTrace,
+    EvidenceItem,
+    ScoreComponent,
+)
 
 
 # Minimum interactions needed per context before computing position
@@ -211,7 +216,8 @@ class Pillar1_Personalization:
     def compute_user_state(
         self,
         raw_data: RawUserData,
-        query_context: QueryContext
+        query_context: QueryContext,
+        trace: Optional[ExplanationTrace] = None,
     ) -> ComputedUserState:
         """
         Compute user state with per-context trajectories and social signals.
@@ -222,6 +228,7 @@ class Pillar1_Personalization:
         Args:
             raw_data: Complete user data from Neo4j
             query_context: Context for the current query
+            trace: Optional ExplanationTrace to populate with provenance
 
         Returns:
             ComputedUserState with all computed values
@@ -275,10 +282,11 @@ class Pillar1_Personalization:
             active_position = self._compute_cold_start_position(raw_data, active_context)
             positions_by_context[active_context] = active_position
 
-        # Step 4: Detect universal preferences
+        # Step 4: Detect universal preferences (with provenance)
         universal_preferences = self._detect_universal_preferences(
             positions_by_context,
-            raw_data.onboarding_profile
+            raw_data.onboarding_profile,
+            trace
         )
 
         # Step 5: Compute unified embeddings (interactions + social)
@@ -292,12 +300,13 @@ class Pillar1_Personalization:
             user_weight
         )
 
-        # Step 6: Compute patterns
+        # Step 6: Compute patterns (with provenance)
         spending_patterns = self._analyze_spending_patterns(
             raw_data.interactions,
-            raw_data.onboarding_profile
+            raw_data.onboarding_profile,
+            trace
         )
-        behavioral_patterns = self._detect_behavioral_patterns(raw_data.interactions)
+        behavioral_patterns = self._detect_behavioral_patterns(raw_data.interactions, trace)
 
         # Build default nav params if not present
         nav_params = raw_data.navigation_parameters
@@ -816,10 +825,12 @@ class Pillar1_Personalization:
     def _detect_universal_preferences(
         self,
         positions_by_context: Dict[StyleContext, ContextualPosition],
-        onboarding_profile: Optional[OnboardingProfile]
+        onboarding_profile: Optional[OnboardingProfile],
+        trace: Optional[ExplanationTrace] = None,
     ) -> UniversalPreferences:
         """
         Detect preferences that are stable across all contexts.
+        Populates trace with provenance for conclusions.
         """
         always_preferred: List[str] = []
         always_avoided: List[str] = []
@@ -830,7 +841,47 @@ class Pillar1_Personalization:
             # Parse avoids string into list
             avoids = onboarding_profile.taste.style_avoids
             if avoids:
-                always_avoided.extend([a.strip() for a in avoids.split(",") if a.strip()])
+                avoided_items = [a.strip() for a in avoids.split(",") if a.strip()]
+                always_avoided.extend(avoided_items)
+
+                # Track provenance: where did style_avoids come from?
+                if trace and avoided_items:
+                    trace.add_profile_conclusion(
+                        key="style_avoids",
+                        conclusion=f"Avoids: {', '.join(avoided_items)}",
+                        evidence=[
+                            EvidenceItem(
+                                source_type="onboarding",
+                                source_id="style_avoids",
+                                source_description=f"Stated during onboarding: '{avoids}'",
+                                weight=1.0,
+                            )
+                        ],
+                        confidence=0.9,  # High confidence for explicit statements
+                        method="explicit_statement",
+                    )
+
+        # Track style loves with provenance
+        if onboarding_profile and onboarding_profile.taste.style_loves:
+            loves = onboarding_profile.taste.style_loves
+            loved_items = [l.strip() for l in loves.split(",") if l.strip()]
+            always_preferred.extend(loved_items)
+
+            if trace and loved_items:
+                trace.add_profile_conclusion(
+                    key="style_loves",
+                    conclusion=f"Prefers: {', '.join(loved_items)}",
+                    evidence=[
+                        EvidenceItem(
+                            source_type="onboarding",
+                            source_id="style_loves",
+                            source_description=f"Stated during onboarding: '{loves}'",
+                            weight=1.0,
+                        )
+                    ],
+                    confidence=0.9,
+                    method="explicit_statement",
+                )
 
         # TODO: Analyze positions to find stable dimensions
         # This requires comparing embeddings across contexts
@@ -898,15 +949,41 @@ class Pillar1_Personalization:
     def _analyze_spending_patterns(
         self,
         interactions: List[Interaction],
-        onboarding_profile: Optional[OnboardingProfile]
+        onboarding_profile: Optional[OnboardingProfile],
+        trace: Optional[ExplanationTrace] = None,
     ) -> SpendingPatterns:
         """
         Analyze user's spending behavior from interactions.
+        Populates trace with budget provenance.
         """
         # Get stated budget from onboarding
         stated_budget = 200.0
+        budget_source = "default"
+
         if onboarding_profile:
             stated_budget = float(onboarding_profile.practicality.budget.monthly)
+            budget_source = "onboarding"
+
+        # Track provenance for budget
+        if trace:
+            trace.add_profile_conclusion(
+                key="budget",
+                conclusion=f"Monthly budget: ${stated_budget:.0f}",
+                evidence=[
+                    EvidenceItem(
+                        source_type=budget_source,
+                        source_id="budget_monthly",
+                        source_description=(
+                            f"Stated ${stated_budget:.0f}/month during onboarding"
+                            if budget_source == "onboarding"
+                            else "Default budget (no onboarding data)"
+                        ),
+                        weight=1.0 if budget_source == "onboarding" else 0.3,
+                    )
+                ],
+                confidence=0.9 if budget_source == "onboarding" else 0.3,
+                method="explicit_statement" if budget_source == "onboarding" else "default",
+            )
 
         # TODO: Load actual purchase prices from product data
         # For now, return placeholder based on onboarding
@@ -922,10 +999,12 @@ class Pillar1_Personalization:
 
     def _detect_behavioral_patterns(
         self,
-        interactions: List[Interaction]
+        interactions: List[Interaction],
+        trace: Optional[ExplanationTrace] = None,
     ) -> BehavioralPatterns:
         """
         Detect behavioral patterns from interaction history.
+        Populates trace with behavioral provenance.
         """
         # Calculate exploration rate
         unique_products = len(set(i.product_id for i in interactions))
@@ -945,6 +1024,51 @@ class Pillar1_Personalization:
 
         # Calculate seasonal preference from timestamps
         seasonal_preference = self._calculate_seasonal_preference(interactions)
+
+        # Track provenance for behavioral patterns
+        if trace and total_interactions > 0:
+            # Exploration pattern
+            exploration_label = (
+                "adventurous explorer" if exploration_rate > 0.7
+                else "focused shopper" if exploration_rate < 0.3
+                else "balanced explorer"
+            )
+            trace.add_profile_conclusion(
+                key="exploration_pattern",
+                conclusion=f"Shopping style: {exploration_label} (exploration rate: {exploration_rate:.0%})",
+                evidence=[
+                    EvidenceItem(
+                        source_type="behavior",
+                        source_id="interactions",
+                        source_description=f"Viewed {unique_products} unique products across {total_interactions} interactions",
+                        weight=1.0,
+                    )
+                ],
+                confidence=min(0.9, total_interactions / 20),  # More data = more confidence
+                method="frequency_analysis",
+            )
+
+            # Decision speed pattern
+            speed_label = (
+                "quick decider" if decision_speed > 0.7
+                else "deliberate researcher" if decision_speed < 0.3
+                else "moderate pace"
+            )
+            if purchased > 0:
+                trace.add_profile_conclusion(
+                    key="decision_speed",
+                    conclusion=f"Decision style: {speed_label}",
+                    evidence=[
+                        EvidenceItem(
+                            source_type="behavior",
+                            source_id="purchase_timing",
+                            source_description=f"Based on {purchased} purchases and view-to-buy timing",
+                            weight=1.0,
+                        )
+                    ],
+                    confidence=min(0.8, purchased / 5),
+                    method="timing_analysis",
+                )
 
         return BehavioralPatterns(
             exploration_rate=exploration_rate,

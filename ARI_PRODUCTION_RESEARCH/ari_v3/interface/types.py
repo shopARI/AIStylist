@@ -288,6 +288,221 @@ class ARIResponse:
         return result
 
 
+# =============================================================================
+# EXPLANATORY POWER SYSTEM (V3.2)
+# =============================================================================
+
+@dataclass
+class EvidenceItem:
+    """A single piece of evidence supporting a conclusion."""
+    source_type: str  # "purchase", "browse", "onboarding", "feedback", "stated"
+    source_id: Optional[str] = None  # ID of the source item (product_id, etc.)
+    source_description: str = ""  # Human-readable description
+    timestamp: Optional[str] = None  # When this evidence was created
+    weight: float = 1.0  # How much this evidence contributed
+
+
+@dataclass
+class ProvenanceRecord:
+    """
+    Tracks the origin and evidence for a single conclusion.
+
+    Example:
+        conclusion: "Prefers minimalist styles"
+        evidence: [
+            EvidenceItem("purchase", "prod_123", "Bought Theory Minimalist Blazer"),
+            EvidenceItem("purchase", "prod_456", "Bought COS Clean-Line Dress"),
+            EvidenceItem("onboarding", None, "Stated preference for 'clean lines'"),
+        ]
+        confidence: 0.85
+    """
+    conclusion: str  # What was concluded
+    evidence: List[EvidenceItem] = field(default_factory=list)
+    confidence: float = 0.0  # 0-1, how confident we are
+    computation_method: str = ""  # How it was computed (e.g., "frequency_analysis")
+
+
+@dataclass
+class ScoreComponent:
+    """
+    Breakdown of a single scoring component.
+
+    Example:
+        name: "personalization"
+        value: 0.32
+        max_possible: 0.40
+        factors: {"style_match": 0.85, "budget_fit": 0.90, "brand_affinity": 0.70}
+        explanation: "High style match based on minimalist preference"
+    """
+    name: str  # Component name (personalization, social, trend, diversity)
+    value: float  # Contribution to final score
+    max_possible: float = 1.0  # Maximum this component could contribute
+    factors: Dict[str, float] = field(default_factory=dict)  # Sub-factors
+    explanation: str = ""  # Brief explanation of this component
+
+
+@dataclass
+class ProductScoreBreakdown:
+    """
+    Complete score breakdown for a single product.
+
+    Allows answering "Why did you recommend this product?"
+    """
+    product_id: str
+    product_title: str
+    final_score: float
+    components: List[ScoreComponent] = field(default_factory=list)
+    rank: int = 0  # Position in results (1-indexed)
+    selection_reason: str = ""  # Why it was included (e.g., "top relevance", "diversity pick")
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "product_id": self.product_id,
+            "product_title": self.product_title,
+            "final_score": self.final_score,
+            "rank": self.rank,
+            "selection_reason": self.selection_reason,
+            "components": [
+                {
+                    "name": c.name,
+                    "value": c.value,
+                    "max_possible": c.max_possible,
+                    "factors": c.factors,
+                    "explanation": c.explanation,
+                }
+                for c in self.components
+            ],
+        }
+
+
+@dataclass
+class ExplanationTrace:
+    """
+    Accumulates reasoning evidence as the pipeline processes a request.
+
+    Passed through the computation pipeline and populated at each step.
+    Can be queried to answer "why" questions about any conclusion.
+
+    Usage:
+        trace = ExplanationTrace()
+        # Pillar1 adds profile conclusions
+        trace.add_profile_conclusion("minimalist_preference", evidence=[...])
+        # Scoring adds product breakdowns
+        trace.add_product_breakdown(product_id, components=[...])
+        # User asks "why this?"
+        explanation = await explain_from_trace(trace, "why this product?")
+    """
+    # Profile conclusions with provenance
+    profile_conclusions: Dict[str, ProvenanceRecord] = field(default_factory=dict)
+
+    # Score breakdowns per product
+    product_breakdowns: Dict[str, ProductScoreBreakdown] = field(default_factory=dict)
+
+    # Exclusions applied with reasons
+    exclusions_applied: Dict[str, str] = field(default_factory=dict)  # value -> reason
+
+    # Query interpretation
+    query_interpretation: Dict[str, Any] = field(default_factory=dict)
+
+    # Navigation decisions
+    navigation_decisions: List[str] = field(default_factory=list)
+
+    # Timing for each step (for debugging)
+    step_timings: Dict[str, float] = field(default_factory=dict)
+
+    def add_profile_conclusion(
+        self,
+        key: str,
+        conclusion: str,
+        evidence: List[EvidenceItem],
+        confidence: float,
+        method: str = "",
+    ) -> None:
+        """Add a profile-level conclusion with its evidence."""
+        self.profile_conclusions[key] = ProvenanceRecord(
+            conclusion=conclusion,
+            evidence=evidence,
+            confidence=confidence,
+            computation_method=method,
+        )
+
+    def add_product_breakdown(
+        self,
+        product_id: str,
+        product_title: str,
+        final_score: float,
+        components: List[ScoreComponent],
+        rank: int = 0,
+        selection_reason: str = "",
+    ) -> None:
+        """Add score breakdown for a product."""
+        self.product_breakdowns[product_id] = ProductScoreBreakdown(
+            product_id=product_id,
+            product_title=product_title,
+            final_score=final_score,
+            components=components,
+            rank=rank,
+            selection_reason=selection_reason,
+        )
+
+    def add_exclusion(self, value: str, reason: str) -> None:
+        """Record an exclusion that was applied."""
+        self.exclusions_applied[value] = reason
+
+    def add_navigation_decision(self, decision: str) -> None:
+        """Record a navigation decision made during processing."""
+        self.navigation_decisions.append(decision)
+
+    def record_timing(self, step: str, duration: float) -> None:
+        """Record timing for a processing step."""
+        self.step_timings[step] = duration
+
+    def get_evidence_for_conclusion(self, key: str) -> Optional[ProvenanceRecord]:
+        """Get evidence for a specific profile conclusion."""
+        return self.profile_conclusions.get(key)
+
+    def get_product_breakdown(self, product_id: str) -> Optional[ProductScoreBreakdown]:
+        """Get score breakdown for a specific product."""
+        return self.product_breakdowns.get(product_id)
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert to dictionary for serialization."""
+        return {
+            "profile_conclusions": {
+                k: {
+                    "conclusion": v.conclusion,
+                    "evidence": [
+                        {
+                            "source_type": e.source_type,
+                            "source_id": e.source_id,
+                            "source_description": e.source_description,
+                            "weight": e.weight,
+                        }
+                        for e in v.evidence
+                    ],
+                    "confidence": v.confidence,
+                    "computation_method": v.computation_method,
+                }
+                for k, v in self.profile_conclusions.items()
+            },
+            "product_breakdowns": {
+                k: v.to_dict() for k, v in self.product_breakdowns.items()
+            },
+            "exclusions_applied": self.exclusions_applied,
+            "query_interpretation": self.query_interpretation,
+            "navigation_decisions": self.navigation_decisions,
+            "step_timings": self.step_timings,
+        }
+
+    def summary(self) -> str:
+        """Get a brief summary of the trace."""
+        return (
+            f"ExplanationTrace: {len(self.profile_conclusions)} conclusions, "
+            f"{len(self.product_breakdowns)} products scored, "
+            f"{len(self.exclusions_applied)} exclusions"
+        )
+
+
 # Type aliases for clarity
 ProductID = str
 UserID = str

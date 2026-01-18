@@ -18,6 +18,7 @@ from typing import Any, Dict, List, Optional, Tuple, TYPE_CHECKING
 
 from .types import (
     ARIResponse,
+    ExplanationTrace,
     IntentResult,
     ResponseType,
     SearchIntent,
@@ -143,6 +144,10 @@ class ARIOrchestrator:
         # session_id -> {query, params, products_shown}
         self._last_search_context: Dict[str, Dict[str, Any]] = {}
 
+        # Explanation traces per session (for "why" questions)
+        # session_id -> ExplanationTrace from last product search
+        self._explanation_traces: Dict[str, ExplanationTrace] = {}
+
         logger.info(
             f"ARIOrchestrator initialized with "
             f"navigation={'enabled' if navigation_intelligence else 'disabled'}, "
@@ -249,6 +254,11 @@ class ARIOrchestrator:
         user_profile: Optional[OnboardingProfile] = None,
     ) -> ARIResponse:
         """Handle product search intents via Navigation Intelligence."""
+        # Create explanation trace for this request
+        trace = ExplanationTrace()
+        trace.query_interpretation["original_query"] = query
+        trace.query_interpretation["detected_intent"] = intent.primary_intent.value
+
         if not self.navigation:
             return ARIResponse(
                 response_type=ResponseType.CONVERSATION,
@@ -367,7 +377,8 @@ class ARIOrchestrator:
                 )
 
             # Step 3: Evaluate and select best products (using cached evaluator)
-            selected = self._evaluate_products(products, nav_context, limit=10)
+            # Pass trace to accumulate score breakdowns
+            selected = self._evaluate_products(products, nav_context, limit=10, trace=trace)
 
             # Step 4: Generate narrative (using cached narrative LLM)
             narrative = self._generate_narrative(nav_context, selected[:5])
@@ -384,6 +395,8 @@ class ARIOrchestrator:
                     "brands_shown": list(set(p.get('brand') or p.get('vendor') for p in selected if p.get('brand') or p.get('vendor'))),
                     "timestamp": datetime.now(),
                 }
+                # Store explanation trace for "why" questions
+                self._explanation_traces[session_id] = trace
 
             return ARIResponse(
                 response_type=ResponseType.PRODUCTS,
@@ -414,6 +427,7 @@ class ARIOrchestrator:
         products: List[Any],
         nav_context: Any,
         limit: int = 10,
+        trace: Optional[ExplanationTrace] = None,
     ) -> List[Any]:
         """Evaluate and select best products using cached evaluator (thread-safe)."""
         EvaluatorClass = _get_evaluator_class()
@@ -432,6 +446,7 @@ class ARIOrchestrator:
                 products=products,
                 nav_context=nav_context,
                 limit=limit,
+                trace=trace,  # Pass trace for score breakdown tracking
             )
             logger.info(f"Selected {len(selected)} products after evaluation")
             return selected
@@ -492,6 +507,26 @@ class ARIOrchestrator:
     ) -> ARIResponse:
         """Handle conversation intents via Conversation Handler."""
         try:
+            # Special handling for CLARIFICATION ("why this?") with explanation trace
+            if intent.primary_intent == SearchIntent.CLARIFICATION:
+                trace = self._explanation_traces.get(session_id)
+                if trace and trace.product_breakdowns:
+                    # Use explain_why with the trace
+                    explanation = await self.conversation_handler.explain_why(
+                        question=query,
+                        trace=trace,
+                        user_context=user_context,
+                    )
+                    return ARIResponse(
+                        response_type=ResponseType.CONVERSATION,
+                        text=explanation,
+                        suggestions=[
+                            "Show me more like this",
+                            "What else do you know about my style?",
+                            "Try a different search",
+                        ],
+                    )
+
             response = await self.conversation_handler.handle_conversation(
                 session_id=session_id,
                 query=query,

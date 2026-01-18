@@ -497,6 +497,7 @@ class ARIDemoCLI:
                         break
 
         print("\n" + "-"*60)
+        print("  Tip: Ask 'why this?' or 'how did you know?' to understand my reasoning")
 
     async def collect_feedback(self, products: List[Dict]):
         """

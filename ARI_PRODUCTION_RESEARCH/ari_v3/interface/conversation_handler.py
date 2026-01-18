@@ -20,6 +20,7 @@ from openai import AsyncOpenAI
 
 from .types import (
     ConversationResponse,
+    ExplanationTrace,
     IntentResult,
     SearchIntent,
 )
@@ -609,3 +610,160 @@ Current time: {current_time}
                 "model": self.model,
                 "session_ttl_hours": self.session_ttl.total_seconds() / 3600,
             }
+
+    # =========================================================================
+    # EXPLANATORY POWER SYSTEM (V3.2)
+    # =========================================================================
+
+    async def explain_why(
+        self,
+        question: str,
+        trace: ExplanationTrace,
+        user_context: Optional[Dict[str, Any]] = None,
+    ) -> str:
+        """
+        Answer "why" questions using the ExplanationTrace.
+
+        Converts technical trace data into natural human-readable explanations.
+
+        Args:
+            question: The user's question (e.g., "Why did you recommend this?")
+            trace: ExplanationTrace from the last recommendation
+            user_context: Optional user context for personalization
+
+        Returns:
+            Natural language explanation
+        """
+        # Build context from trace
+        trace_context = self._build_trace_context(trace)
+
+        # Build the LLM prompt
+        system_prompt = """You are Ari, a fashion stylist AI explaining your reasoning.
+
+ROLE:
+- Convert technical scoring data into warm, human explanations
+- Be honest about what influenced your recommendations
+- Make the user feel understood, not analyzed
+
+GUIDELINES:
+- Speak naturally, not like a data readout
+- Reference specific evidence when available
+- If asked about a specific product, focus on that product's breakdown
+- If asked about profile conclusions, trace back to the evidence
+- Keep explanations concise (2-4 sentences unless more detail is requested)
+
+EXAMPLE EXPLANATIONS:
+- "I suggested this blazer because it matches the minimalist style you mentioned loving during our chat, and at $180, it's right in your sweet spot budget-wise."
+- "Based on your recent purchases of clean-lined pieces from Theory and COS, I can see you gravitate toward minimalist design. That's why I weighted that aesthetic highly in my picks."
+- "This dress scored high for you because it aligns with where your style seems to be heading - I noticed you've been exploring bolder colors recently."
+"""
+
+        user_prompt = f"""The user asked: "{question}"
+
+TRACE DATA (use this to answer):
+{trace_context}
+
+Answer their question naturally, referencing the relevant data from the trace.
+If the question is vague (like "why this?"), explain the top factors that influenced the recommendation.
+"""
+
+        try:
+            response = await self.openai_client.chat.completions.create(
+                model=self.model,
+                messages=[
+                    {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_prompt},
+                ],
+                max_tokens=400,
+                temperature=0.7,
+            )
+            return response.choices[0].message.content.strip()
+
+        except Exception as e:
+            logger.error(f"Explain why failed: {e}")
+            # Fallback to basic explanation from trace
+            return self._fallback_explanation(trace, question)
+
+    def _build_trace_context(self, trace: ExplanationTrace) -> str:
+        """Build a text summary of the trace for the LLM."""
+        parts = []
+
+        # Profile conclusions (why we think what we think about the user)
+        if trace.profile_conclusions:
+            parts.append("PROFILE CONCLUSIONS (what I know about the user):")
+            for key, record in trace.profile_conclusions.items():
+                evidence_str = "; ".join(
+                    e.source_description for e in record.evidence[:3]
+                )
+                parts.append(
+                    f"  - {record.conclusion} "
+                    f"(confidence: {record.confidence:.0%}, evidence: {evidence_str})"
+                )
+
+        # Product breakdowns (why each product was recommended)
+        if trace.product_breakdowns:
+            parts.append("\nPRODUCT SCORE BREAKDOWNS:")
+            # Sort by rank
+            sorted_breakdowns = sorted(
+                trace.product_breakdowns.values(),
+                key=lambda b: b.rank if b.rank else 999
+            )
+            for breakdown in sorted_breakdowns[:5]:  # Top 5 only
+                parts.append(f"\n  {breakdown.product_title} (rank #{breakdown.rank}, score: {breakdown.final_score:.2f}):")
+                parts.append(f"    Selection reason: {breakdown.selection_reason}")
+                for comp in breakdown.components:
+                    if comp.value > 0.01:  # Only show meaningful contributions
+                        parts.append(
+                            f"    - {comp.name}: {comp.value:.2f}/{comp.max_possible:.2f} - {comp.explanation}"
+                        )
+
+        # Exclusions applied
+        if trace.exclusions_applied:
+            parts.append("\nEXCLUSIONS APPLIED:")
+            for value, reason in trace.exclusions_applied.items():
+                parts.append(f"  - Excluded '{value}': {reason}")
+
+        # Navigation decisions
+        if trace.navigation_decisions:
+            parts.append("\nNAVIGATION DECISIONS:")
+            for decision in trace.navigation_decisions[:5]:
+                parts.append(f"  - {decision}")
+
+        return "\n".join(parts) if parts else "No detailed trace data available."
+
+    def _fallback_explanation(self, trace: ExplanationTrace, question: str) -> str:
+        """Generate basic explanation when LLM fails."""
+        # Try to determine what they're asking about
+        question_lower = question.lower()
+
+        # Product-specific question
+        if "this" in question_lower or "recommend" in question_lower:
+            if trace.product_breakdowns:
+                # Get top product
+                top = min(
+                    trace.product_breakdowns.values(),
+                    key=lambda b: b.rank if b.rank else 999
+                )
+                top_factors = sorted(
+                    top.components,
+                    key=lambda c: c.value,
+                    reverse=True
+                )[:3]
+                factor_strs = [f.explanation for f in top_factors]
+                return (
+                    f"I recommended {top.product_title} primarily because: "
+                    f"{'. '.join(factor_strs)}"
+                )
+
+        # Profile question
+        if "know" in question_lower or "think" in question_lower:
+            if trace.profile_conclusions:
+                conclusions = list(trace.profile_conclusions.values())[:3]
+                summary = ". ".join(c.conclusion for c in conclusions)
+                return f"Based on our interactions, I understand: {summary}"
+
+        return (
+            "I based my recommendations on your stated preferences, "
+            "browsing history, and style patterns. Feel free to ask about "
+            "any specific recommendation!"
+        )

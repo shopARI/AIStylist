@@ -18,6 +18,7 @@ import numpy as np
 from ari_v3.judge.mmr_selector import ScoredProduct, mmr_select, create_scored_products
 from ari_v3.judge.outlier_injector import inject_outliers, calculate_exploration_appetite_percentage
 from ari_v3.navigation.navigation_context import NavigationContext, NavigationPath
+from ari_v3.interface.types import ExplanationTrace, ScoreComponent
 
 logger = logging.getLogger(__name__)
 
@@ -117,6 +118,7 @@ class ARIEvaluator:
         agent_scores: Optional[Dict[str, Dict[str, float]]] = None,
         styling_rules: Optional[List[str]] = None,
         brand_preferences: Optional[List[str]] = None,
+        trace: Optional[ExplanationTrace] = None,
     ) -> List[Dict[str, Any]]:
         """
         Evaluate products and select final recommendations.
@@ -134,6 +136,7 @@ class ARIEvaluator:
             agent_scores: Optional dict of {product_id: {agent_name: score}}
             styling_rules: Optional list of styling rules to check compliance
             brand_preferences: Optional list of preferred brands
+            trace: Optional ExplanationTrace to populate with score breakdowns
 
         Returns:
             List of products with scores, sorted by rank
@@ -150,6 +153,7 @@ class ARIEvaluator:
             agent_scores=agent_scores or {},
             styling_rules=styling_rules or [],
             brand_preferences=brand_preferences or [],
+            trace=trace,
         )
 
         # Step 2: Apply MMR selection
@@ -185,7 +189,7 @@ class ARIEvaluator:
         )
 
         # Step 4: Convert to output format and add metadata
-        result = self._prepare_output(final_products, len(products))
+        result = self._prepare_output(final_products, len(products), trace)
 
         logger.info(
             f"Selection complete: {len(result)} products "
@@ -201,6 +205,7 @@ class ARIEvaluator:
         agent_scores: Dict[str, Dict[str, float]],
         styling_rules: List[str],
         brand_preferences: List[str],
+        trace: Optional[ExplanationTrace] = None,
     ) -> List[ScoredProduct]:
         """Score all products on 7 dimensions."""
         scored = []
@@ -230,6 +235,71 @@ class ARIEvaluator:
                 relevance_score=breakdown.total_score,
                 embedding=embedding,
             ))
+
+            # Add to explanation trace if provided
+            if trace:
+                product_id = product.get('id', str(id(product)))
+                product_title = product.get('title', product.get('name', 'Unknown'))
+
+                # Convert breakdown to ScoreComponents for the trace
+                components = [
+                    ScoreComponent(
+                        name="smoothness",
+                        value=breakdown.smoothness_score * self.weights.smoothness,
+                        max_possible=self.weights.smoothness,
+                        factors={"step_distance": breakdown.smoothness_score},
+                        explanation=self._explain_smoothness(breakdown.smoothness_score),
+                    ),
+                    ScoreComponent(
+                        name="coherence",
+                        value=breakdown.coherence_score * self.weights.coherence,
+                        max_possible=self.weights.coherence,
+                        factors={"trajectory_alignment": breakdown.coherence_score},
+                        explanation=self._explain_coherence(breakdown.coherence_score),
+                    ),
+                    ScoreComponent(
+                        name="budget_fit",
+                        value=breakdown.budget_fit_score * self.weights.budget_fit,
+                        max_possible=self.weights.budget_fit,
+                        factors={"price_within_budget": breakdown.budget_fit_score},
+                        explanation=self._explain_budget_fit(breakdown.budget_fit_score, product),
+                    ),
+                    ScoreComponent(
+                        name="brand_match",
+                        value=breakdown.brand_match_score * self.weights.brand_match,
+                        max_possible=self.weights.brand_match,
+                        factors={"brand_preference_match": breakdown.brand_match_score},
+                        explanation=self._explain_brand_match(breakdown.brand_match_score, product),
+                    ),
+                    ScoreComponent(
+                        name="behavioral_consistency",
+                        value=breakdown.behavioral_consistency_score * self.weights.behavioral_consistency,
+                        max_possible=self.weights.behavioral_consistency,
+                        factors={"behavior_pattern_match": breakdown.behavioral_consistency_score},
+                        explanation=self._explain_behavioral(breakdown.behavioral_consistency_score),
+                    ),
+                    ScoreComponent(
+                        name="multi_agent_confidence",
+                        value=breakdown.multi_agent_confidence_score * self.weights.multi_agent_confidence,
+                        max_possible=self.weights.multi_agent_confidence,
+                        factors={"agent_agreement": breakdown.multi_agent_confidence_score},
+                        explanation=self._explain_agent_confidence(breakdown.multi_agent_confidence_score),
+                    ),
+                    ScoreComponent(
+                        name="rule_compliance",
+                        value=breakdown.rule_compliance_score * self.weights.rule_compliance,
+                        max_possible=self.weights.rule_compliance,
+                        factors={"styling_rules_met": breakdown.rule_compliance_score},
+                        explanation=self._explain_rule_compliance(breakdown.rule_compliance_score),
+                    ),
+                ]
+
+                trace.add_product_breakdown(
+                    product_id=product_id,
+                    product_title=product_title,
+                    final_score=breakdown.total_score,
+                    components=components,
+                )
 
         return scored
 
@@ -579,6 +649,7 @@ class ARIEvaluator:
         self,
         scored_products: List[ScoredProduct],
         total_candidates: int,
+        trace: Optional[ExplanationTrace] = None,
     ) -> List[Dict[str, Any]]:
         """Prepare final output with metadata."""
         result = []
@@ -590,4 +661,99 @@ class ARIEvaluator:
             product['_total_candidates'] = total_candidates
             result.append(product)
 
+            # Update trace with final rank and selection reason
+            if trace:
+                product_id = product.get('id', str(id(product)))
+                breakdown = trace.get_product_breakdown(product_id)
+                if breakdown:
+                    breakdown.rank = rank
+                    # Determine selection reason
+                    if product.get('_is_outlier'):
+                        breakdown.selection_reason = "exploration_outlier"
+                    elif rank <= 3:
+                        breakdown.selection_reason = "top_relevance"
+                    else:
+                        breakdown.selection_reason = "diversity_pick"
+
         return result
+
+    # =========================================================================
+    # Explanation Helper Methods (for ExplanationTrace)
+    # =========================================================================
+
+    def _explain_smoothness(self, score: float) -> str:
+        """Generate human explanation for smoothness score."""
+        if score >= 0.9:
+            return "Fits naturally within your style comfort zone"
+        elif score >= 0.7:
+            return "A comfortable step from your current preferences"
+        elif score >= 0.5:
+            return "Slightly adventurous for your typical style"
+        else:
+            return "A bold departure from your usual choices"
+
+    def _explain_coherence(self, score: float) -> str:
+        """Generate human explanation for coherence score."""
+        if score >= 0.8:
+            return "Aligns well with your style evolution direction"
+        elif score >= 0.6:
+            return "Compatible with your recent style trajectory"
+        elif score >= 0.4:
+            return "Neutral to your current style direction"
+        else:
+            return "Diverges from your recent style evolution"
+
+    def _explain_budget_fit(self, score: float, product: Dict[str, Any]) -> str:
+        """Generate human explanation for budget fit."""
+        price = product.get('price', 0)
+        if score >= 1.0:
+            return f"${price:.0f} fits perfectly within your budget"
+        elif score >= 0.8:
+            return f"${price:.0f} is below your typical spend"
+        elif score >= 0.5:
+            return f"${price:.0f} is slightly above your budget"
+        else:
+            return f"${price:.0f} exceeds your budget range"
+
+    def _explain_brand_match(self, score: float, product: Dict[str, Any]) -> str:
+        """Generate human explanation for brand match."""
+        brand = product.get('brand', 'This brand')
+        if score >= 0.8:
+            return f"{brand} is among your preferred brands"
+        elif score >= 0.5:
+            return f"{brand} is a neutral choice for you"
+        else:
+            return f"{brand} isn't typically in your preferences"
+
+    def _explain_behavioral(self, score: float) -> str:
+        """Generate human explanation for behavioral consistency."""
+        if score >= 0.8:
+            return "Matches your shopping patterns closely"
+        elif score >= 0.6:
+            return "Consistent with your browsing history"
+        elif score >= 0.4:
+            return "Different from your usual picks"
+        else:
+            return "Outside your typical selection patterns"
+
+    def _explain_agent_confidence(self, score: float) -> str:
+        """Generate human explanation for multi-agent confidence."""
+        if score >= 0.9:
+            return "Multiple recommendation systems agree on this"
+        elif score >= 0.7:
+            return "Good agreement across recommendations"
+        elif score >= 0.5:
+            return "Moderate confidence in this pick"
+        else:
+            return "Single perspective recommendation"
+
+    def _explain_rule_compliance(self, score: float) -> str:
+        """Generate human explanation for rule compliance."""
+        if score >= 0.8:
+            return "Follows your style guidelines well"
+        elif score >= 0.6:
+            return "Generally aligns with your preferences"
+        elif score >= 0.4:
+            return "Partially matches your criteria"
+        else:
+            return "May not fully match your stated preferences"
