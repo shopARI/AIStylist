@@ -65,6 +65,14 @@ class ResponseType(str, Enum):
 
 
 @dataclass
+class Exclusion:
+    """A single exclusion criterion with reasoning."""
+    field: str  # "brand", "color", "category", "price", "style", "material", etc.
+    value: str  # The value to exclude
+    reason: Optional[str] = None  # Why it should be excluded
+
+
+@dataclass
 class ExtractedParameters:
     """
     Parameters extracted from user query.
@@ -76,10 +84,12 @@ class ExtractedParameters:
     occasions: List[str] = field(default_factory=list)
     price_range: Optional[Dict[str, float]] = None
     brand_preferences: List[str] = field(default_factory=list)
-    excluded_brands: List[str] = field(default_factory=list)  # Brands to filter out
     style_modifiers: List[str] = field(default_factory=list)
     sizes: List[str] = field(default_factory=list)
     materials: List[str] = field(default_factory=list)
+
+    # General exclusions - can be any field type (brand, color, category, style, etc.)
+    exclusions: List[Exclusion] = field(default_factory=list)
 
     # For memory/clarification intents
     time_reference: Optional[str] = None
@@ -98,8 +108,11 @@ class ExtractedParameters:
             result["price_range"] = self.price_range
         if self.brand_preferences:
             result["brand_preferences"] = self.brand_preferences
-        if self.excluded_brands:
-            result["excluded_brands"] = self.excluded_brands
+        if self.exclusions:
+            result["exclusions"] = [
+                {"field": e.field, "value": e.value, "reason": e.reason}
+                for e in self.exclusions
+            ]
         if self.style_modifiers:
             result["style_modifiers"] = self.style_modifiers
         if self.sizes:

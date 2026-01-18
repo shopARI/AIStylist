@@ -319,22 +319,14 @@ class ARIOrchestrator:
                 else:
                     logger.warning("No embedding available for search")
 
-            # Filter out excluded brands
-            if products and params.excluded_brands:
-                excluded_lower = [b.lower() for b in params.excluded_brands]
+            # Apply exclusions (brand, color, category, style, etc.)
+            if products and params.exclusions:
                 original_count = len(products)
-                products = [
-                    p for p in products
-                    if not any(
-                        excl in (p.get('brand', '') or '').lower() or
-                        excl in (p.get('title', '') or '').lower() or
-                        excl in (p.get('vendor', '') or '').lower()
-                        for excl in excluded_lower
-                    )
-                ]
+                products = self._apply_exclusions(products, params.exclusions)
                 filtered_count = original_count - len(products)
                 if filtered_count > 0:
-                    logger.info(f"Filtered out {filtered_count} products from excluded brands: {params.excluded_brands}")
+                    exclusion_summary = [f"{e.field}:{e.value}" for e in params.exclusions]
+                    logger.info(f"Filtered out {filtered_count} products based on exclusions: {exclusion_summary}")
 
             if not products:
                 return ARIResponse(
@@ -627,6 +619,55 @@ class ARIOrchestrator:
         return [
             {"role": msg.role.value, "content": msg.content}
             for msg in messages[-5:]  # Last 5 messages
+        ]
+
+    def _apply_exclusions(self, products: List[Dict], exclusions: List) -> List[Dict]:
+        """
+        Filter products based on exclusion criteria.
+
+        Handles exclusions by field type:
+        - brand: checks brand, vendor, title
+        - color: checks color, title, description
+        - category: checks category, productType, title
+        - style: checks style, tags, title
+        - material: checks material, description
+        - general: checks title, description
+        """
+        if not exclusions:
+            return products
+
+        def matches_exclusion(product: Dict, exclusion) -> bool:
+            value_lower = exclusion.value.lower()
+            field = exclusion.field
+
+            # Get product fields (handle None values)
+            title = (product.get('title') or '').lower()
+            description = (product.get('description') or '').lower()
+            brand = (product.get('brand') or product.get('vendor') or '').lower()
+            color = (product.get('color') or '').lower()
+            category = (product.get('category') or product.get('productType') or '').lower()
+            tags = ' '.join(product.get('tags') or []).lower()
+            material = (product.get('material') or '').lower()
+
+            if field == "brand":
+                return value_lower in brand or value_lower in title
+            elif field == "color":
+                return value_lower in color or value_lower in title or value_lower in description
+            elif field == "category":
+                return value_lower in category or value_lower in title
+            elif field == "style":
+                return value_lower in tags or value_lower in title or value_lower in description
+            elif field == "material":
+                return value_lower in material or value_lower in description
+            elif field == "occasion":
+                return value_lower in tags or value_lower in description
+            else:  # general
+                return value_lower in title or value_lower in description
+
+        # Filter out products matching any exclusion
+        return [
+            p for p in products
+            if not any(matches_exclusion(p, excl) for excl in exclusions)
         ]
 
     def _format_product_response(

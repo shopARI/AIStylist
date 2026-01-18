@@ -12,7 +12,7 @@ import re
 import threading
 from typing import Any, Dict, List, Optional, Pattern
 
-from .types import ExtractedParameters
+from .types import ExtractedParameters, Exclusion
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +201,7 @@ class ParameterExtractor:
             occasions=self._extract_vocab_items(message_lower, "occasions"),
             price_range=self._extract_price_range(message),
             brand_preferences=self._extract_brands(message),
-            excluded_brands=self._extract_excluded_brands(message),
+            exclusions=self._extract_exclusions(message),
             style_modifiers=self._extract_vocab_items(message_lower, "styles"),
             sizes=self._extract_sizes(message_lower),
             materials=self._extract_vocab_items(message_lower, "materials"),
@@ -383,43 +383,108 @@ class ParameterExtractor:
 
         return list(set(brands))
 
-    def _extract_excluded_brands(self, text: str) -> List[str]:
+    def _extract_exclusions(self, text: str) -> List[Exclusion]:
         """
-        Extract brands that the user wants to EXCLUDE.
+        Extract things the user wants to EXCLUDE from results.
 
         Detects patterns like:
-        - "don't want Theory"
-        - "no Theory"
-        - "not Theory"
-        - "except Theory"
-        - "but not Theory"
-        - "I said no Theory"
+        - "don't want Theory" -> brand exclusion
+        - "no black" -> color exclusion
+        - "not dresses" -> category exclusion
+        - "nothing over $200" -> price exclusion
+        - "skip formal stuff" -> style exclusion
         """
-        excluded = []
+        exclusions = []
         text_lower = text.lower()
 
-        # Patterns that indicate brand exclusion
+        # Build lookup sets for classification
+        all_brands = set(b.lower() for b in self.luxury_brands + self.common_brands)
+        all_colors = set(self.colors)
+        all_categories = set(self.categories)
+        all_occasions = set(self.occasions)
+        all_styles = set(self.styles)
+        all_materials = set(self.materials)
+
+        # Patterns that indicate exclusion (captures the excluded term)
         exclusion_patterns = [
-            r"(?:don'?t|do not|didn'?t)\s+(?:want|like|show|include|recommend)\s+(\w+)",
-            r"(?:no|not|except|without|exclude|skip|avoid)\s+(\w+)",
-            r"(?:but\s+)?not\s+(\w+)",
-            r"i\s+(?:said|told you)\s+(?:no|not)\s+(\w+)",
-            r"(?:hate|dislike)\s+(\w+)",
-            r"(\w+)\s+(?:is|are)\s+(?:out|excluded|off the table)",
+            (r"(?:don'?t|do not|didn'?t)\s+(?:want|like|show|include|recommend)\s+(?:any\s+)?(\w+(?:\s+\w+)?)", "user doesn't want"),
+            (r"(?:no|not|except|without|exclude|skip|avoid)\s+(?:any\s+)?(\w+(?:\s+\w+)?)", "explicitly excluded"),
+            (r"(?:but\s+)?not\s+(\w+(?:\s+\w+)?)", "negated"),
+            (r"i\s+(?:said|told you)\s+(?:no|not)\s+(\w+)", "user repeated exclusion"),
+            (r"(?:hate|dislike)\s+(\w+)", "user dislikes"),
+            (r"(\w+)\s+(?:is|are)\s+(?:out|excluded|off the table)", "marked as excluded"),
+            (r"nothing\s+(?:too\s+)?(\w+)", "nothing matching"),
+            (r"stay\s+away\s+from\s+(\w+)", "avoid"),
         ]
 
-        all_known_brands = set(b.lower() for b in self.luxury_brands + self.common_brands)
+        seen_exclusions = set()
 
-        for pattern in exclusion_patterns:
+        for pattern, reason in exclusion_patterns:
             matches = re.finditer(pattern, text_lower, re.IGNORECASE)
             for match in matches:
-                potential_brand = match.group(1).strip().lower()
-                # Check if it's a known brand
-                if potential_brand in all_known_brands:
-                    proper_name = potential_brand.title()
-                    excluded.append(proper_name)
+                raw_term = match.group(1).strip().lower()
 
-        return list(set(excluded))
+                # Clean up the term - remove articles and common filler words
+                clean_words = []
+                for word in raw_term.split():
+                    if word not in {"the", "a", "an", "any", "some", "items", "stuff", "things", "too"}:
+                        clean_words.append(word)
+                term = " ".join(clean_words) if clean_words else raw_term
+
+                # Skip if nothing left after cleaning
+                if not term or term in {"and", "for", "with", "that", "this", "it", "them", "those", "something", "anything"}:
+                    continue
+
+                # Try to match each word individually for classification
+                field = None
+                value = term
+                matched_word = None
+
+                # Check each word in the term
+                for word in term.split():
+                    if word in all_brands:
+                        field = "brand"
+                        matched_word = word.title()
+                        break
+                    elif word in all_colors:
+                        field = "color"
+                        matched_word = word
+                        break
+                    elif word in all_categories or word.rstrip('es').rstrip('s') in all_categories:
+                        field = "category"
+                        matched_word = word
+                        break
+                    elif word in all_occasions:
+                        field = "occasion"
+                        matched_word = word
+                        break
+                    elif word in all_styles or word in {"formal", "casual", "dressy", "sporty", "elegant", "basic", "fancy"}:
+                        field = "style"
+                        matched_word = word
+                        break
+                    elif word in all_materials:
+                        field = "material"
+                        matched_word = word
+                        break
+
+                if matched_word:
+                    value = matched_word
+                elif not field:
+                    # Try to infer - could be brand we don't know
+                    # Check if it looks like a proper noun (capitalized in original)
+                    if any(word[0].isupper() for word in term.split() if word):
+                        field = "brand"
+                        value = term.title()
+                    else:
+                        field = "general"
+
+                # Avoid duplicates
+                key = (field, value.lower())
+                if key not in seen_exclusions:
+                    seen_exclusions.add(key)
+                    exclusions.append(Exclusion(field=field, value=value, reason=reason))
+
+        return exclusions
 
     def _extract_time_reference(self, text: str) -> Optional[str]:
         """Extract time reference for memory queries."""
