@@ -154,20 +154,16 @@ class ConversationHandler:
         self._add_message(session_id, user_message)
 
         # Route based on intent
+        # Most intents now go to LLM for natural responses
         if intent.primary_intent == SearchIntent.GREETING:
             response_text = await self._handle_greeting(user_context)
         elif intent.primary_intent == SearchIntent.GOODBYE:
             response_text = await self._handle_goodbye(user_context)
-        elif intent.primary_intent == SearchIntent.SYSTEM_STATUS:
-            response_text = await self._handle_system_status(query)
         elif intent.primary_intent == SearchIntent.CONVERSATION_HISTORY:
             response_text = await self._handle_history_query(session_id, query)
-        elif intent.primary_intent == SearchIntent.MEMORY_QUERY:
-            response_text = await self._handle_memory_query(session_id, query, user_context)
-        elif intent.primary_intent == SearchIntent.CLARIFICATION:
-            response_text = await self._handle_clarification(session_id, query)
         else:
-            # General conversation
+            # Let LLM handle: MEMORY_QUERY, SYSTEM_STATUS, CLARIFICATION, GENERAL_CONVERSATION
+            # This provides natural, context-aware responses
             response_text = await self._handle_general_conversation(
                 session_id, query, history, user_context
             )
