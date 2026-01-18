@@ -162,6 +162,14 @@ class IntentDetector:
             SearchIntent.FEEDBACK: [
                 r"i like", r"i love", r"i hate", r"don't like",
                 r"perfect", r"terrible", r"not my style",
+                # Negative feedback about shown items
+                r"that's not", r"that isn't", r"these aren't", r"this isn't",
+                r"not quite", r"not what i", r"wrong", r"nope",
+                r"too (expensive|cheap|formal|casual|bold|plain)",
+                r"doesn't (fit|match|work)", r"don't (fit|match|work)",
+                # Positive feedback
+                r"yes", r"exactly", r"that's it", r"bingo", r"spot on",
+                r"more like (this|that|these)", r"similar to",
             ],
         }
 
@@ -183,6 +191,9 @@ class IntentDetector:
             QueryType.FEEDBACK: [
                 r"(like|love|hate|don't like)",
                 r"(perfect|great|terrible|awful|amazing)",
+                r"(that's not|that isn't|these aren't|this isn't)",
+                r"(not quite|not what i|wrong|nope)",
+                r"(yes|exactly|bingo|spot on)",
             ],
             QueryType.CONVERSATION: [
                 r"tell me", r"i think", r"in my opinion", r"what do you think",
