@@ -2,12 +2,14 @@
 ARI V3 - Parameter Extractor
 
 Extracts structured parameters from natural language queries.
-Adapted from V2's parameter_extractor.py with improvements.
+Uses LLM reasoning for complex understanding, with regex fallback.
 """
 
 from __future__ import annotations
 
+import json
 import logging
+import os
 import re
 import threading
 from typing import Any, Dict, List, Optional, Pattern
@@ -15,6 +17,105 @@ from typing import Any, Dict, List, Optional, Pattern
 from .types import ExtractedParameters, Exclusion
 
 logger = logging.getLogger(__name__)
+
+
+# ============================================================================
+# LLM-BASED EXTRACTION
+# ============================================================================
+
+async def extract_with_llm(
+    query: str,
+    openai_client=None,
+    extraction_type: str = "exclusions",
+) -> Dict[str, Any]:
+    """
+    Use LLM to reason about user intent and extract structured data.
+
+    Args:
+        query: User's natural language query
+        openai_client: AsyncOpenAI client
+        extraction_type: What to extract ("exclusions", "preferences", "all")
+
+    Returns:
+        Dictionary with extracted data
+    """
+    if not openai_client:
+        try:
+            from openai import AsyncOpenAI
+            openai_client = AsyncOpenAI()
+        except Exception as e:
+            logger.warning(f"Could not create OpenAI client: {e}")
+            return {}
+
+    system_prompt = """You are a fashion search assistant that extracts structured information from user queries.
+
+Analyze the user's message and extract:
+
+1. **exclusions**: Things they DON'T want (brands, colors, styles, categories, materials, price ranges, etc.)
+2. **preferences**: Things they DO want
+3. **context**: Occasion, mood, intent
+
+For exclusions, identify:
+- Explicit negations: "no X", "not X", "don't want X", "skip X", "avoid X"
+- Implicit dislikes: "hate X", "tired of X", "sick of X"
+- Comparative rejections: "nothing like X", "different from X"
+- Abstract exclusions: "nothing too formal", "not something my mom would wear"
+
+Return valid JSON:
+{
+  "exclusions": [
+    {"field": "brand|color|category|style|material|price|occasion|abstract", "value": "...", "reason": "why excluded"}
+  ],
+  "preferences": [
+    {"field": "...", "value": "...", "strength": "must_have|nice_to_have|slight"}
+  ],
+  "context": {
+    "occasion": "...",
+    "mood": "...",
+    "intent": "browse|specific_search|comparison|inspiration"
+  }
+}
+
+Only include fields that are actually present in the query. Use "abstract" field for complex/subjective exclusions."""
+
+    try:
+        response = await openai_client.chat.completions.create(
+            model="gpt-4o-mini",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": query}
+            ],
+            response_format={"type": "json_object"},
+            max_tokens=500,
+            temperature=0.1,  # Low temp for consistent extraction
+        )
+
+        result = json.loads(response.choices[0].message.content)
+        logger.debug(f"LLM extraction result: {result}")
+        return result
+
+    except Exception as e:
+        logger.warning(f"LLM extraction failed: {e}")
+        return {}
+
+
+def parse_llm_exclusions(llm_result: Dict[str, Any]) -> List[Exclusion]:
+    """Convert LLM extraction result to Exclusion objects."""
+    exclusions = []
+
+    for excl in llm_result.get("exclusions", []):
+        field = excl.get("field", "general")
+        value = excl.get("value", "")
+        reason = excl.get("reason", "")
+
+        if value:
+            exclusions.append(Exclusion(
+                field=field,
+                value=value,
+                reason=reason,
+            ))
+
+    return exclusions
 
 # Thread lock for singleton
 _extractor_lock = threading.Lock()
@@ -225,6 +326,50 @@ class ParameterExtractor:
             Dictionary of extracted parameters
         """
         return self.extract(message).to_dict()
+
+    async def extract_async(
+        self,
+        message: str,
+        openai_client=None,
+        use_llm: bool = True,
+    ) -> ExtractedParameters:
+        """
+        Extract parameters using LLM reasoning (async).
+
+        Uses LLM for nuanced understanding of exclusions and preferences,
+        with regex fallback for basic extraction.
+
+        Args:
+            message: User message
+            openai_client: AsyncOpenAI client (creates one if not provided)
+            use_llm: Whether to use LLM for extraction (default True)
+
+        Returns:
+            ExtractedParameters with LLM-reasoned exclusions
+        """
+        # Start with regex-based extraction
+        params = self.extract(message)
+
+        # Enhance with LLM reasoning for exclusions if enabled
+        if use_llm:
+            try:
+                llm_result = await extract_with_llm(
+                    query=message,
+                    openai_client=openai_client,
+                    extraction_type="exclusions",
+                )
+
+                if llm_result:
+                    # Replace regex exclusions with LLM-reasoned ones
+                    llm_exclusions = parse_llm_exclusions(llm_result)
+                    if llm_exclusions:
+                        params.exclusions = llm_exclusions
+                        logger.info(f"LLM extracted {len(llm_exclusions)} exclusions")
+
+            except Exception as e:
+                logger.warning(f"LLM extraction failed, using regex fallback: {e}")
+
+        return params
 
     def _apply_text_corrections(self, text: str) -> str:
         """Apply typo and plural corrections to text."""

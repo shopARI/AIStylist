@@ -253,6 +253,22 @@ class ARIOrchestrator:
             # Extract filters from intent parameters
             params = intent.extracted_parameters
 
+            # Use LLM to reason about exclusions (async)
+            if self.async_openai_client:
+                try:
+                    from .parameter_extractor import get_parameter_extractor
+                    extractor = get_parameter_extractor()
+                    enhanced_params = await extractor.extract_async(
+                        message=query,
+                        openai_client=self.async_openai_client,
+                        use_llm=True,
+                    )
+                    # Use LLM-reasoned exclusions
+                    if enhanced_params.exclusions:
+                        params.exclusions = enhanced_params.exclusions
+                except Exception as e:
+                    logger.warning(f"LLM exclusion extraction failed: {e}")
+
             # Use occasion from parameters if not explicitly provided
             if not occasion and params.occasions:
                 occasion = params.occasions[0]
@@ -629,8 +645,10 @@ class ARIOrchestrator:
         - brand: checks brand, vendor, title
         - color: checks color, title, description
         - category: checks category, productType, title
-        - style: checks style, tags, title
+        - style: checks style, tags, title, description
         - material: checks material, description
+        - price: checks price against threshold
+        - abstract: checks title, description, tags for semantic match
         - general: checks title, description
         """
         if not exclusions:
@@ -648,6 +666,7 @@ class ARIOrchestrator:
             category = (product.get('category') or product.get('productType') or '').lower()
             tags = ' '.join(product.get('tags') or []).lower()
             material = (product.get('material') or '').lower()
+            price = product.get('price', 0)
 
             if field == "brand":
                 return value_lower in brand or value_lower in title
@@ -661,6 +680,30 @@ class ARIOrchestrator:
                 return value_lower in material or value_lower in description
             elif field == "occasion":
                 return value_lower in tags or value_lower in description
+            elif field == "price":
+                # Handle price exclusions like "expensive", "over $100"
+                try:
+                    if "expensive" in value_lower or "pricey" in value_lower:
+                        return price > 200  # Consider >$200 as expensive
+                    elif "cheap" in value_lower:
+                        return price < 30  # Consider <$30 as cheap
+                    # Try to extract number
+                    import re
+                    match = re.search(r'\$?(\d+)', value_lower)
+                    if match:
+                        threshold = float(match.group(1))
+                        if "over" in value_lower or "above" in value_lower:
+                            return price > threshold
+                        elif "under" in value_lower or "below" in value_lower:
+                            return price < threshold
+                except:
+                    pass
+                return False
+            elif field == "abstract":
+                # Abstract exclusions - search broadly
+                all_text = f"{title} {description} {tags} {category}"
+                # Check for the value and common synonyms
+                return value_lower in all_text
             else:  # general
                 return value_lower in title or value_lower in description
 
