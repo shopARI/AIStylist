@@ -418,7 +418,9 @@ class ARIEvaluator:
         if product_emb is None:
             return 0.5
 
-        # Get current position embedding
+        # Get current position embedding (null check for current_position first)
+        if nav_context.current_position is None:
+            return 0.5
         current_emb = nav_context.current_position.embedding
         if current_emb is None:
             return 0.5
@@ -460,7 +462,9 @@ class ARIEvaluator:
         if product_emb is None:
             return 0.5
 
-        # Get current position
+        # Get current position (null check for current_position first)
+        if nav_context.current_position is None:
+            return 0.5
         current_emb = nav_context.current_position.embedding
         if current_emb is None:
             return 0.5

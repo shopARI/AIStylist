@@ -26,21 +26,55 @@ from typing import Any, Dict, List, Optional, Union
 
 # Patterns that might indicate injection attempts
 INJECTION_PATTERNS = [
+    # Direct override attempts
     r"ignore\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)",
     r"disregard\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)",
     r"forget\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)",
     r"override\s+(all\s+)?(previous|above|prior)\s+(instructions?|prompts?|rules?)",
+    r"do\s+not\s+follow\s+(the\s+)?(above|previous|prior)",
+    r"skip\s+(the\s+)?(above|previous|prior)\s+instructions?",
+
+    # Role manipulation
     r"you\s+are\s+now\s+",
+    r"pretend\s+(you\s+are|to\s+be)",
+    r"act\s+as\s+(if\s+you\s+are|a)",
+    r"roleplay\s+as",
+    r"switch\s+(to|into)\s+(a\s+)?different\s+(mode|role)",
+    r"enter\s+(developer|debug|admin|god)\s+mode",
+    r"enable\s+(developer|debug|admin)\s+mode",
+
+    # System prompt manipulation
     r"new\s+instruction[s]?:",
     r"system\s*prompt:",
+    r"update\s+(your\s+)?(system|base)\s+prompt",
+    r"modify\s+(your\s+)?(instructions|rules)",
+    r"your\s+(new\s+)?instructions\s+are",
+
+    # Markup injection
     r"<\s*system\s*>",
     r"<\s*/?\s*instruction[s]?\s*>",
+    r"<\s*/?\s*rules?\s*>",
+    r"<\s*jailbreak\s*>",
     r"```\s*(system|instruction|prompt)",
     r"\[\s*INST\s*\]",
     r"\[\s*/?\s*SYS\s*\]",
+
+    # Role markers
     r"human:\s*$",
     r"assistant:\s*$",
     r"user:\s*$",
+    r"###\s*(human|assistant|system|user):",
+
+    # Output manipulation
+    r"output\s+only\s+(json|xml|code)",
+    r"respond\s+with\s+only",
+    r"from\s+now\s+on\s+only\s+respond",
+
+    # Dan/Jailbreak patterns
+    r"dan\s*(\d+)?",
+    r"jailbreak(ed)?",
+    r"do\s+anything\s+now",
+    r"bypass\s+(safety|filter|restriction)",
 ]
 
 # Compile patterns for efficiency

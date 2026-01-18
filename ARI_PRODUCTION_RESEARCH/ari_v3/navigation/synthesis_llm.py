@@ -199,6 +199,8 @@ class SynthesisLLM:
                 raw_response=result,
             )
 
+        except (KeyboardInterrupt, SystemExit):
+            raise  # Don't catch system-level interrupts
         except Exception as e:
             logger.error(f"Synthesis LLM failed: {e}")
             # Return fallback output
@@ -271,6 +273,8 @@ class SynthesisLLM:
                 raw_response=result,
             )
 
+        except (KeyboardInterrupt, SystemExit):
+            raise  # Don't catch system-level interrupts
         except Exception as e:
             logger.error(f"Async Synthesis LLM failed: {e}")
             return self._fallback_synthesis(query, occasion)

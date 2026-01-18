@@ -4,11 +4,95 @@ Phase 2: True async tools that don't block the event loop.
 """
 import os
 import logging
-from typing import Dict, List, Any, Optional
+import re
+from typing import Dict, List, Any, Optional, Set
 from crewai.tools import tool
 from neo4j import AsyncGraphDatabase
 
 logger = logging.getLogger("crewai.tools.async_neo4j")
+
+
+# =============================================================================
+# CYPHER QUERY VALIDATION (Security)
+# =============================================================================
+
+# Whitelisted Cypher operations for read-only queries
+ALLOWED_CYPHER_OPERATIONS = frozenset({
+    "MATCH", "WHERE", "RETURN", "LIMIT", "ORDER", "BY", "ASC", "DESC",
+    "WITH", "OPTIONAL", "UNWIND", "CALL", "YIELD", "AND", "OR", "NOT",
+    "IN", "AS", "IS", "NULL", "TRUE", "FALSE", "CONTAINS", "STARTS",
+    "ENDS", "COUNT", "SUM", "AVG", "MIN", "MAX", "COLLECT", "DISTINCT",
+    "SKIP", "toLower", "toUpper", "toString", "toInteger", "toFloat",
+})
+
+# Disallowed operations that could modify data
+DISALLOWED_CYPHER_OPERATIONS = frozenset({
+    "CREATE", "DELETE", "DETACH", "SET", "REMOVE", "MERGE", "DROP",
+    "LOAD", "CSV", "FOREACH", "PERIODIC", "COMMIT", "USING",
+})
+
+# Whitelisted fields for property access to prevent injection
+ALLOWED_PROPERTY_FIELDS = frozenset({
+    "id", "_id", "title", "name", "description", "price", "category",
+    "brand", "vendor", "color", "size", "material", "tags", "productType",
+    "imageUrl", "url", "sku", "embedding", "score", "created_at", "updated_at",
+})
+
+
+def validate_cypher_query(cypher: str) -> tuple[bool, str]:
+    """
+    Validate a Cypher query for security.
+
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    if not cypher or not isinstance(cypher, str):
+        return False, "Query must be a non-empty string"
+
+    cypher_upper = cypher.upper()
+
+    # Check for disallowed operations (write/modify operations)
+    for op in DISALLOWED_CYPHER_OPERATIONS:
+        # Match as whole word to avoid false positives
+        if re.search(rf'\b{op}\b', cypher_upper):
+            return False, f"Disallowed operation: {op}"
+
+    # Check for suspicious patterns
+    suspicious_patterns = [
+        r'//.*',           # Comments (could hide malicious code)
+        r'/\*.*\*/',       # Block comments
+        r'CALL\s+dbms\.',  # Admin procedures
+        r'CALL\s+db\.(?!index)',  # Most db.* procedures (except fulltext index)
+        r'\$\{',           # Template injection
+        r'apoc\.',         # APOC procedures (unless explicitly allowed)
+    ]
+
+    for pattern in suspicious_patterns:
+        if re.search(pattern, cypher, re.IGNORECASE):
+            return False, f"Suspicious pattern detected"
+
+    return True, ""
+
+
+def validate_property_access(cypher: str) -> tuple[bool, str]:
+    """
+    Validate that only whitelisted property fields are accessed.
+
+    Returns:
+        Tuple of (is_valid, error_message)
+    """
+    # Extract property accesses like p.field or node.field
+    property_pattern = r'[a-zA-Z_][a-zA-Z0-9_]*\.([a-zA-Z_][a-zA-Z0-9_]*)'
+    matches = re.findall(property_pattern, cypher)
+
+    for field in matches:
+        if field.lower() not in {f.lower() for f in ALLOWED_PROPERTY_FIELDS}:
+            # Allow common Neo4j methods/functions
+            if field not in {'keys', 'labels', 'type', 'id', 'properties'}:
+                logger.warning(f"Unwhitelisted property field accessed: {field}")
+                # We warn but don't block - new fields may be legitimate
+
+    return True, ""
 
 
 # ============================================================================
@@ -16,17 +100,43 @@ logger = logging.getLogger("crewai.tools.async_neo4j")
 # These can be called internally by other functions
 # ============================================================================
 
-async def _execute_neo4j_query(cypher: str, parameters: Dict[str, Any] = None) -> List[Dict]:
+# Default database name (use environment variable for production)
+DEFAULT_NEO4J_DATABASE = "neo4j"
+
+
+async def _execute_neo4j_query(
+    cypher: str,
+    parameters: Dict[str, Any] = None,
+    validate: bool = True,
+) -> List[Dict]:
     """
     Core implementation: Execute Cypher query against Neo4j (internal use).
+
+    Args:
+        cypher: The Cypher query to execute
+        parameters: Query parameters for safe binding
+        validate: Whether to validate the query for security (default: True)
+
+    Returns:
+        List of records as dictionaries, or empty list on error
     """
+    # Validate query for security (prevents Cypher injection)
+    if validate:
+        is_valid, error_msg = validate_cypher_query(cypher)
+        if not is_valid:
+            logger.error(f"Cypher query validation failed: {error_msg}")
+            return []
+
+        # Also validate property access (warning only)
+        validate_property_access(cypher)
+
     driver = None
     try:
         # Get Neo4j connection from environment (support both naming conventions)
         neo4j_uri = os.getenv("NEO4J_URI") or os.getenv("NEO4J_URL", "bolt://localhost:7687")
         neo4j_user = os.getenv("NEO4J_USER") or os.getenv("NEO4J_USERNAME", "neo4j")
         neo4j_password = os.getenv("NEO4J_PASSWORD", "")
-        neo4j_database = os.getenv("NEO4J_DATABASE", "productionbackup2")
+        neo4j_database = os.getenv("NEO4J_DATABASE", DEFAULT_NEO4J_DATABASE)
 
         driver = AsyncGraphDatabase.driver(
             neo4j_uri,
