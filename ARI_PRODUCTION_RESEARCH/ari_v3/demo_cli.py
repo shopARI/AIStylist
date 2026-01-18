@@ -29,7 +29,7 @@ load_dotenv()
 # Imports
 from neo4j import GraphDatabase, AsyncGraphDatabase
 from qdrant_client import QdrantClient, AsyncQdrantClient
-from openai import OpenAI
+from openai import OpenAI, AsyncOpenAI
 
 # V3 Interface imports
 from ari_v3.interface import (
@@ -215,6 +215,10 @@ class ARIDemoCLI:
         self.current_user = None
         self.current_profile = None
 
+        # OpenAI clients
+        self.openai_client = None
+        self.openai_client_async = None
+
         # V3 Interface components
         self.orchestrator: Optional[ARIOrchestrator] = None
         self.intent_detector: Optional[HybridIntentDetector] = None
@@ -251,9 +255,10 @@ class ARIDemoCLI:
             info = self.qdrant_client.get_collection("fashion_products")
             print(f"  [OK] Qdrant connected ({info.points_count:,} products)")
 
-            # OpenAI
+            # OpenAI (sync + async for performance)
             self.openai_client = OpenAI()
-            print(f"  [OK] OpenAI connected")
+            self.openai_client_async = AsyncOpenAI()
+            print(f"  [OK] OpenAI connected (sync + async)")
 
             # Initialize V3 Navigation Intelligence
             print("  Initializing Navigation Intelligence...")
@@ -262,6 +267,7 @@ class ARIDemoCLI:
                 neo4j_driver=self.neo4j_driver_sync,
                 qdrant_client=self.qdrant_client_async,
                 openai_client=self.openai_client,
+                async_openai_client=self.openai_client_async,
             )
             print(f"  [OK] Navigation Intelligence ready")
 
@@ -278,6 +284,7 @@ class ARIDemoCLI:
                 conversation_handler=self.conversation_handler,
                 qdrant_client=self.qdrant_client_async,
                 openai_client=self.openai_client,
+                async_openai_client=self.openai_client_async,
             )
             print(f"  [OK] Conversational interface ready")
 
@@ -465,9 +472,13 @@ class ARIDemoCLI:
             else:
                 print(f"      Price: {price} | Category: {category}")
 
-            # Show score as stars (handle 0 score gracefully)
+            # Show score as percentage with visual bar
             if score and score > 0:
-                print(f"      Match Score: {'*' * max(1, int(score * 5))}")
+                pct = int(score * 100)
+                filled = int(score * 5)
+                empty = 5 - filled
+                bar = "[" + "*" * filled + "-" * empty + "]"
+                print(f"      Match: {pct}% {bar}")
 
             # Show product explanation if available (handle various structures)
             if narrative:
@@ -479,7 +490,10 @@ class ARIDemoCLI:
 
                     if exp_product_id == product.get("_id") or (exp_title and exp_title in title):
                         if exp_text:
-                            print(f"      \"{exp_text[:100]}...\"")
+                            # Wrap text to ~70 chars per line for readability
+                            import textwrap
+                            wrapped = textwrap.fill(exp_text, width=65, initial_indent='      "', subsequent_indent='       ')
+                            print(f"{wrapped}\"")
                         break
 
         print("\n" + "-"*60)
@@ -666,6 +680,100 @@ class ARIDemoCLI:
 
         return "continue"
 
+    def _is_profile_query(self, text: str) -> bool:
+        """Detect if user is asking about their profile/preferences."""
+        text_lower = text.lower()
+        patterns = [
+            "what do you know about me",
+            "what do you know",
+            "my preferences",
+            "my profile",
+            "my style",
+            "know about me",
+            "remember about me",
+            "extract",
+            "show my",
+            "tell me about me",
+        ]
+        return any(p in text_lower for p in patterns)
+
+    def _is_score_query(self, text: str) -> bool:
+        """Detect if user is asking about match scores/ratings."""
+        text_lower = text.lower()
+        patterns = [
+            "match score", "match rating",
+            "asterisk", "stars", "star rating",
+            "score mean", "rating mean",
+            "out of", "maximum", "max score",
+            "how many stars", "what does the score",
+            "scoring", "how do you score",
+            "percent", "percentage",
+        ]
+        return any(p in text_lower for p in patterns)
+
+    def _explain_scoring(self):
+        """Explain the match scoring system."""
+        print("\nARI: Great question! Here's how the Match Score works:")
+        print()
+        print("     The score shows how well each item matches YOUR style:")
+        print()
+        print("     90-100%  [*****]  Perfect match - hits all your preferences")
+        print("     70-89%   [****-]  Strong match - aligns well with your style")
+        print("     50-69%   [***--]  Good match - solid choice for you")
+        print("     30-49%   [**---]  Moderate - might work in some contexts")
+        print("     10-29%   [*----]  Light match - outside your usual style")
+        print()
+        print("     Factors that affect your score:")
+        print("     - Style alignment (bold vs minimal, etc.)")
+        print("     - Color preferences")
+        print("     - Budget fit")
+        print("     - Occasion appropriateness")
+        print("     - Brand affinity")
+        print()
+        print("     Want me to explain why a specific item scored the way it did?")
+
+    def _show_user_profile(self):
+        """Display what ARI knows about the current user."""
+        if not self.current_profile:
+            print("\nARI: I don't have a profile loaded for you yet. You can:")
+            print("     - Say 'I'm Emma' to load a demo profile")
+            print("     - Say 'set up my profile' to create your own")
+            print("     - Or just tell me what you're looking for!")
+            return
+
+        print("\nARI: Here's what I know about your style:")
+        print()
+
+        # Extract from profile
+        if hasattr(self.current_profile, 'taste') and self.current_profile.taste:
+            taste = self.current_profile.taste
+            if hasattr(taste, 'style_words') and taste.style_words:
+                print(f"     Style: {', '.join(taste.style_words)}")
+            if hasattr(taste, 'color_preferences') and taste.color_preferences:
+                print(f"     Favorite colors: {', '.join(taste.color_preferences)}")
+            if hasattr(taste, 'style_avoids') and taste.style_avoids:
+                print(f"     You avoid: {', '.join(taste.style_avoids)}")
+            if hasattr(taste, 'adventurousness'):
+                adv = taste.adventurousness
+                adv_label = "very adventurous" if adv >= 7 else "moderate" if adv >= 4 else "classic"
+                print(f"     Adventurousness: {adv}/10 ({adv_label})")
+
+        if hasattr(self.current_profile, 'practicality') and self.current_profile.practicality:
+            prac = self.current_profile.practicality
+            if hasattr(prac, 'budget_monthly') and prac.budget_monthly:
+                print(f"     Monthly budget: ${prac.budget_monthly}")
+
+        if hasattr(self.current_profile, 'personal') and self.current_profile.personal:
+            personal = self.current_profile.personal
+            if hasattr(personal, 'style_goal') and personal.style_goal:
+                print(f"     Style goal: {personal.style_goal}")
+            if hasattr(personal, 'occasions') and personal.occasions:
+                occ_names = [o.get('name', o) if isinstance(o, dict) else str(o) for o in personal.occasions[:3]]
+                print(f"     Key occasions: {', '.join(occ_names)}")
+
+        print()
+        print("     Would you like to find something that matches your style?")
+
     def _show_natural_help(self):
         """Show help in a natural, conversational way."""
         print("\nARI: I'm here to help you find the perfect pieces! Just tell me")
@@ -673,18 +781,68 @@ class ARIDemoCLI:
         print("     whatever's on your mind. The more you share about your style")
         print("     and what you're after, the better I can help. What's the occasion?")
 
+    def _show_user_menu(self) -> Optional[Dict]:
+        """Show menu to select a demo user or continue as guest."""
+        print("\n" + "-"*60)
+        print("  SELECT A USER PROFILE")
+        print("-"*60)
+        print()
+
+        # List demo users
+        user_list = list(DEMO_USERS.items())
+        for i, (key, user_data) in enumerate(user_list, 1):
+            name = user_data["name"]
+            desc = user_data["description"]
+            print(f"  [{i}] {name} - {desc}")
+
+        print(f"  [{len(user_list) + 1}] New User - Create your own profile")
+        print(f"  [{len(user_list) + 2}] Guest - Browse without a profile")
+        print()
+
+        choice = input("Select (1-5): ").strip()
+
+        try:
+            choice_num = int(choice)
+            if 1 <= choice_num <= len(user_list):
+                return user_list[choice_num - 1][1]  # Return the user_data dict
+            elif choice_num == len(user_list) + 1:
+                return "onboarding"  # Signal to run onboarding
+            else:
+                return None  # Guest
+        except ValueError:
+            # Check if they typed a name
+            for key, user_data in DEMO_USERS.items():
+                if key in choice.lower() or user_data["name"].lower() in choice.lower():
+                    return user_data
+            return None  # Guest
+
     async def run(self):
         """Main run loop - fully naturalistic conversational interface."""
         if not await self.initialize():
             return
 
-        # Start as guest - user can switch profiles naturally
-        user_id = f"guest_{datetime.now().strftime('%H%M%S')}"
+        # Show user selection menu
+        selected = self._show_user_menu()
 
-        # Natural greeting - like a real stylist
-        print("\n")
-        print("ARI: Hey there! I'm ARI. What brings you in today - looking for")
-        print("     something specific, or just browsing for inspiration?")
+        if selected == "onboarding":
+            # Run onboarding for new user
+            print("\nARI: Welcome! Let's get to know your style...")
+            user_id = await self.run_simple_onboarding()
+            if not user_id:
+                user_id = f"guest_{datetime.now().strftime('%H%M%S')}"
+        elif selected:
+            # Load selected demo user
+            user_id = await self.setup_demo_user(selected)
+            print(f"\nARI: Hey {selected['name']}! Great to see you.")
+            print(f"     I remember your style - {selected['profile']['taste']['style_words'][0]},")
+            print(f"     {selected['profile']['taste']['style_words'][1]}. What can I help you find today?")
+        else:
+            # Guest mode
+            user_id = f"guest_{datetime.now().strftime('%H%M%S')}"
+            print("\nARI: Hey there! I'm ARI. Since you're browsing as a guest,")
+            print("     I don't have your style preferences yet. You can say")
+            print("     'I'm Emma' to load a demo profile, or just tell me")
+            print("     what you're looking for!")
 
         # Run the interactive session
         await self.interactive_session(user_id, show_welcome=False)

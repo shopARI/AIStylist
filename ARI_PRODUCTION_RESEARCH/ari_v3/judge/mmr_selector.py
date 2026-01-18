@@ -11,7 +11,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
 
@@ -52,9 +52,10 @@ def mmr_select(
         List of selected ScoredProduct in order of selection
 
     Algorithm:
-        1. Start with highest relevance product
-        2. Iteratively add product with best MMR score
-        3. MMR = lambda * relevance - (1 - lambda) * max_similarity_to_selected
+        1. Deduplicate by product ID (keep highest relevance)
+        2. Start with highest relevance product
+        3. Iteratively add product with best MMR score
+        4. MMR = lambda * relevance - (1 - lambda) * max_similarity_to_selected
     """
     if not candidates:
         return []
@@ -62,9 +63,24 @@ def mmr_select(
     if limit <= 0:
         return []
 
+    # Deduplicate by product ID, keeping highest relevance score
+    seen_ids: Dict[str, ScoredProduct] = {}
+    for c in candidates:
+        pid = c.product_id
+        # Also check by title as fallback (some products may not have id)
+        title = c.product.get('title', c.product.get('name', ''))
+        key = pid if pid and pid != str(id(c.product)) else title
+
+        if key not in seen_ids or c.relevance_score > seen_ids[key].relevance_score:
+            seen_ids[key] = c
+
+    deduped_candidates = list(seen_ids.values())
+    if len(deduped_candidates) < len(candidates):
+        logger.info(f"MMR: Deduplicated {len(candidates)} -> {len(deduped_candidates)} unique products")
+
     # Filter candidates with valid embeddings for MMR
-    candidates_with_embeddings = [c for c in candidates if c.embedding is not None]
-    candidates_without_embeddings = [c for c in candidates if c.embedding is None]
+    candidates_with_embeddings = [c for c in deduped_candidates if c.embedding is not None]
+    candidates_without_embeddings = [c for c in deduped_candidates if c.embedding is None]
 
     # If no embeddings, fall back to pure relevance ranking
     if not candidates_with_embeddings:

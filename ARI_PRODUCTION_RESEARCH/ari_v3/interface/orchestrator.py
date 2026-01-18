@@ -93,6 +93,7 @@ class ARIOrchestrator:
         cache_ttl: Optional[timedelta] = None,
         qdrant_client: Optional[AsyncQdrantClient] = None,
         openai_client: Optional[OpenAI] = None,
+        async_openai_client=None,
         qdrant_collection: str = "fashion_products",
     ):
         """
@@ -107,6 +108,7 @@ class ARIOrchestrator:
             cache_ttl: How long to cache user contexts (default: 1 hour)
             qdrant_client: AsyncQdrantClient for product search
             openai_client: OpenAI client for narrative generation
+            async_openai_client: Async OpenAI client for non-blocking calls
             qdrant_collection: Name of Qdrant collection for products
         """
         self.navigation = navigation_intelligence
@@ -118,6 +120,7 @@ class ARIOrchestrator:
         # Product search components
         self.qdrant_client = qdrant_client
         self.openai_client = openai_client
+        self.async_openai_client = async_openai_client
         self.qdrant_collection = qdrant_collection
 
         # Cached instances (created lazily, reused) - protected by _instance_lock
@@ -408,7 +411,10 @@ class ARIOrchestrator:
             if self._narrative_llm is None:
                 with self._instance_lock:
                     if self._narrative_llm is None:
-                        self._narrative_llm = NarrativeClass(openai_client=self.openai_client)
+                        self._narrative_llm = NarrativeClass(
+                            openai_client=self.openai_client,
+                            async_openai_client=self.async_openai_client,
+                        )
 
             narrative = self._narrative_llm.generate_narrative(
                 nav_context=nav_context,
@@ -551,7 +557,7 @@ class ARIOrchestrator:
             context: Dict[str, Any] = {"user_id": user_id}
 
             if user_profile:
-                # Extract relevant fields from profile
+                # Extract all relevant fields from profile for rich context
                 if hasattr(user_profile, 'taste') and user_profile.taste:
                     taste = user_profile.taste
                     if hasattr(taste, 'style_words'):
@@ -560,16 +566,31 @@ class ARIOrchestrator:
                         context["color_preferences"] = taste.color_preferences
                     if hasattr(taste, 'style_avoids'):
                         context["style_avoids"] = taste.style_avoids
+                    if hasattr(taste, 'adventurousness'):
+                        context["adventurousness"] = taste.adventurousness
+                    if hasattr(taste, 'pattern_comfort'):
+                        context["pattern_comfort"] = taste.pattern_comfort
 
                 if hasattr(user_profile, 'practicality') and user_profile.practicality:
                     prac = user_profile.practicality
                     if hasattr(prac, 'budget_monthly'):
                         context["budget_monthly"] = prac.budget_monthly
+                    if hasattr(prac, 'budget_flexibility'):
+                        context["budget_flexibility"] = prac.budget_flexibility
 
                 if hasattr(user_profile, 'personal') and user_profile.personal:
                     personal = user_profile.personal
                     if hasattr(personal, 'style_goal'):
                         context["style_goal"] = personal.style_goal
+                    if hasattr(personal, 'occasions'):
+                        context["occasions"] = personal.occasions
+                    if hasattr(personal, 'root_value'):
+                        context["root_value"] = personal.root_value
+
+                if hasattr(user_profile, 'process') and user_profile.process:
+                    process = user_profile.process
+                    if hasattr(process, 'brand_loyalty'):
+                        context["brand_loyalty"] = process.brand_loyalty
 
             # Cache it with current timestamp
             self._user_context_cache[user_id] = (context, now)

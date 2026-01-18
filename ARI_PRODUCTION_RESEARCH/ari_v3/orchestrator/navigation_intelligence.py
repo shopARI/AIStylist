@@ -94,6 +94,7 @@ class NavigationIntelligence:
         neo4j_driver=None,
         qdrant_client=None,
         openai_client: Optional[OpenAI] = None,
+        async_openai_client=None,
         embedding_service=None,
     ):
         """
@@ -103,11 +104,13 @@ class NavigationIntelligence:
             neo4j_driver: Neo4j driver for user data
             qdrant_client: Qdrant client for vector search
             openai_client: OpenAI client for LLM and embeddings
+            async_openai_client: Async OpenAI client for non-blocking calls
             embedding_service: Service for computing embeddings
         """
         self.neo4j_driver = neo4j_driver
         self.qdrant_client = qdrant_client
         self.openai_client = openai_client or OpenAI()
+        self.async_openai_client = async_openai_client
         self.embedding_service = embedding_service
 
         # Initialize pillar modules
@@ -121,6 +124,7 @@ class NavigationIntelligence:
         )
         self.synthesis_llm = SynthesisLLM(
             openai_client=self.openai_client,
+            async_openai_client=async_openai_client,
         )
 
     async def generate_navigation_context(

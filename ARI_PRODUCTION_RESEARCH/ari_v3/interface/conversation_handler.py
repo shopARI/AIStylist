@@ -395,26 +395,66 @@ class ConversationHandler:
         current_date = now.strftime("%A, %B %d, %Y")
         current_time = now.strftime("%I:%M %p")
 
-        # Build user context string
+        # Build rich user context string from all available profile data
         user_context_str = ""
         if user_context:
-            name = user_context.get("name", "the user")
-            style = user_context.get("style_words", [])
-            if style:
-                user_context_str = f"\n\nUSER PROFILE:\nName: {name}\nStyle preferences: {', '.join(style)}"
+            profile_parts = []
 
-        # System prompt (note: conversation history is passed via messages, not system prompt)
-        system_prompt = f"""You are Ari, a friendly and knowledgeable fashion stylist AI.
-You can discuss any topic that users bring up, not just fashion.
-Be helpful, informative, and conversational.
+            name = user_context.get("name")
+            if name:
+                profile_parts.append(f"Name: {name}")
 
-When users ask about non-fashion topics, engage naturally while maintaining your warm personality.
-If the conversation naturally flows back to fashion, you can mention your expertise.
+            style_words = user_context.get("style_words", [])
+            if style_words:
+                profile_parts.append(f"Style identity: {', '.join(style_words)}")
+
+            colors = user_context.get("color_preferences", [])
+            if colors:
+                profile_parts.append(f"Favorite colors: {', '.join(colors)}")
+
+            avoids = user_context.get("style_avoids", [])
+            if avoids:
+                profile_parts.append(f"Avoids: {', '.join(avoids)}")
+
+            budget = user_context.get("budget_monthly")
+            if budget:
+                profile_parts.append(f"Monthly budget: ${budget}")
+
+            goal = user_context.get("style_goal")
+            if goal:
+                profile_parts.append(f"Style goal: {goal}")
+
+            adventurousness = user_context.get("adventurousness")
+            if adventurousness:
+                profile_parts.append(f"Adventurousness: {adventurousness}/10")
+
+            occasions = user_context.get("occasions", [])
+            if occasions:
+                occ_names = [o.get('name', str(o)) if isinstance(o, dict) else str(o) for o in occasions[:3]]
+                profile_parts.append(f"Key occasions: {', '.join(occ_names)}")
+
+            if profile_parts:
+                user_context_str = "\n\nUSER PROFILE (use this to personalize responses):\n" + "\n".join(profile_parts)
+
+        # System prompt with rich context
+        system_prompt = f"""You are Ari, a warm and perceptive fashion stylist AI.
+
+PERSONALITY:
+- Conversational and natural, never robotic or formulaic
+- Curious about the person behind the style preferences
+- Avoids stereotyping - recognizes people are multifaceted
+- When asked about what you know, share it conversationally, not as a list
+- If asked about match scores: they're 0-100% based on style alignment, colors, budget fit, and occasion
+
+GUIDELINES:
+- When users ask "what do you know about me", share your understanding naturally and invite them to tell you more
+- Be open to learning that their style has dimensions you haven't captured yet
+- Acknowledge when your data might not capture their full complexity
+- Match scores show how well items fit their stated preferences (not absolute quality)
 
 Current date: {current_date}
 Current time: {current_time}
-
-Keep responses concise and friendly (2-3 sentences for casual chat).{user_context_str}"""
+{user_context_str}"""
 
         # Build messages with system prompt
         messages = [{"role": "system", "content": system_prompt}]

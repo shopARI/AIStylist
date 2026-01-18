@@ -72,16 +72,18 @@ class Pillar1_Personalization:
     including per-context positions, trajectories, and unified embeddings.
     """
 
-    def __init__(self, neo4j_driver=None, embedding_service=None):
+    def __init__(self, neo4j_driver=None, embedding_service=None, database: str = "users"):
         """
         Initialize the personalization engine.
 
         Args:
             neo4j_driver: Neo4j driver instance (optional, for testing)
             embedding_service: Service for computing embeddings (optional)
+            database: Neo4j database name (default: "users")
         """
         self.neo4j_driver = neo4j_driver
         self.embedding_service = embedding_service
+        self.database = database
 
     def load_raw_user_data(self, user_id: str) -> Optional[RawUserData]:
         """
@@ -128,7 +130,7 @@ class Pillar1_Personalization:
                    collect(DISTINCT c) as conversations
         """
 
-        with self.neo4j_driver.session() as session:
+        with self.neo4j_driver.session(database=self.database) as session:
             result = session.run(query, user_id=user_id)
             record = result.single()
 
