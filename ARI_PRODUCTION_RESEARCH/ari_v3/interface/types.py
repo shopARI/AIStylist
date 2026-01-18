@@ -503,6 +503,79 @@ class ExplanationTrace:
         )
 
 
+# =============================================================================
+# VISUAL FEATURE FLAGS (V3.2)
+# =============================================================================
+
+@dataclass
+class VisualFeatureFlags:
+    """
+    Feature flags for visual/multimodal capabilities.
+
+    Allows gradual rollout and A/B testing of visual features.
+    All flags default to False for backward compatibility.
+
+    Usage:
+        flags = VisualFeatureFlags(
+            enable_visual_search=True,
+            enable_visual_scoring=True,
+        )
+        orchestrator = ARIOrchestrator(visual_flags=flags)
+    """
+    # Core visual search
+    enable_visual_search: bool = False  # Query FashionSigLIP collection alongside semantic
+    visual_collection: str = "fashion_fashionsig_neo4j_1024d"  # Visual embeddings collection
+
+    # Scoring enhancements
+    enable_visual_scoring: bool = False  # Add visual similarity to scoring dimensions
+    visual_score_weight: float = 0.15  # Weight for visual component (redistributed from others)
+
+    # Color/style analysis
+    enable_color_harmony: bool = False  # Score color harmony between user preferences and products
+    enable_style_dimensions: bool = False  # Use InterpretableDimensions for matching
+
+    # User visual profile
+    enable_social_visual: bool = False  # Use Pinterest/Instagram visual embeddings
+
+    # Multimodal fusion
+    fusion_strategy: str = "weighted_average"  # "weighted_average", "max", "cascade"
+    semantic_weight: float = 0.6  # Weight for semantic search results
+    visual_weight: float = 0.4  # Weight for visual search results
+
+    # Fallback behavior
+    fallback_on_visual_error: bool = True  # If visual service fails, continue with semantic only
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "enable_visual_search": self.enable_visual_search,
+            "visual_collection": self.visual_collection,
+            "enable_visual_scoring": self.enable_visual_scoring,
+            "visual_score_weight": self.visual_score_weight,
+            "enable_color_harmony": self.enable_color_harmony,
+            "enable_style_dimensions": self.enable_style_dimensions,
+            "enable_social_visual": self.enable_social_visual,
+            "fusion_strategy": self.fusion_strategy,
+            "semantic_weight": self.semantic_weight,
+            "visual_weight": self.visual_weight,
+            "fallback_on_visual_error": self.fallback_on_visual_error,
+        }
+
+    def summary(self) -> str:
+        """Get a summary of enabled features."""
+        enabled = []
+        if self.enable_visual_search:
+            enabled.append("visual_search")
+        if self.enable_visual_scoring:
+            enabled.append("visual_scoring")
+        if self.enable_color_harmony:
+            enabled.append("color_harmony")
+        if self.enable_style_dimensions:
+            enabled.append("style_dimensions")
+        if self.enable_social_visual:
+            enabled.append("social_visual")
+        return f"Visual features: {', '.join(enabled) if enabled else 'none'}"
+
+
 # Type aliases for clarity
 ProductID = str
 UserID = str

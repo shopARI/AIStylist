@@ -22,6 +22,7 @@ from .types import (
     IntentResult,
     ResponseType,
     SearchIntent,
+    VisualFeatureFlags,
 )
 from .intent_detector import (
     DetectionStrategy,
@@ -96,6 +97,7 @@ class ARIOrchestrator:
         openai_client: Optional[OpenAI] = None,
         async_openai_client=None,
         qdrant_collection: str = "fashion_products",
+        visual_flags: Optional[VisualFeatureFlags] = None,
     ):
         """
         Initialize orchestrator.
@@ -111,6 +113,7 @@ class ARIOrchestrator:
             openai_client: OpenAI client for narrative generation
             async_openai_client: Async OpenAI client for non-blocking calls
             qdrant_collection: Name of Qdrant collection for products
+            visual_flags: Feature flags for visual/multimodal capabilities
         """
         self.navigation = navigation_intelligence
         self.intent_detector = intent_detector or get_intent_detector(detection_strategy)
@@ -148,10 +151,15 @@ class ARIOrchestrator:
         # session_id -> ExplanationTrace from last product search
         self._explanation_traces: Dict[str, ExplanationTrace] = {}
 
+        # Visual feature flags (V3.2)
+        self.visual_flags = visual_flags or VisualFeatureFlags()
+        self._visual_qdrant_client = None  # Lazy-loaded visual Qdrant client
+
         logger.info(
             f"ARIOrchestrator initialized with "
             f"navigation={'enabled' if navigation_intelligence else 'disabled'}, "
-            f"detection_strategy={detection_strategy.value}"
+            f"detection_strategy={detection_strategy.value}, "
+            f"{self.visual_flags.summary()}"
         )
 
     async def process_input(
@@ -344,14 +352,45 @@ class ARIOrchestrator:
 
                 if query_vector:
                     try:
+                        # Semantic search (always runs)
                         results = await self.qdrant_client.query_points(
                             collection_name=self.qdrant_collection,
                             query=query_vector,
                             limit=50,
                             timeout=30,  # 30 second timeout
                         )
-                        products = [hit.payload for hit in results.points]
-                        logger.info(f"Found {len(products)} candidate products from {self.qdrant_collection}")
+                        semantic_products = [hit.payload for hit in results.points]
+                        semantic_scores = {
+                            hit.payload.get('id', hit.payload.get('_id', str(i))): hit.score
+                            for i, hit in enumerate(results.points)
+                        }
+                        logger.info(f"Found {len(semantic_products)} products from semantic search")
+
+                        # Visual search (if enabled)
+                        visual_products = []
+                        visual_scores = {}
+                        if self.visual_flags.enable_visual_search:
+                            visual_products, visual_scores = await self._visual_search(
+                                query=query,
+                                nav_context=nav_context,
+                                limit=50,
+                                trace=trace,
+                            )
+
+                        # Fuse results
+                        if visual_products and self.visual_flags.enable_visual_search:
+                            products = self._fuse_search_results(
+                                semantic_products=semantic_products,
+                                semantic_scores=semantic_scores,
+                                visual_products=visual_products,
+                                visual_scores=visual_scores,
+                                trace=trace,
+                            )
+                            logger.info(f"Fused {len(products)} products from semantic + visual")
+                        else:
+                            products = semantic_products
+                            logger.info(f"Using {len(products)} products from semantic search only")
+
                     except Exception as qdrant_err:
                         logger.error(f"Qdrant query failed: {qdrant_err}")
                         # Return empty results instead of error
@@ -969,7 +1008,222 @@ If you can't interpret the feedback, return "UNCLEAR"."""
             "session_ttl_hours": self.session_ttl.total_seconds() / 3600,
             "cache_ttl_hours": self.cache_ttl.total_seconds() / 3600,
             "conversation": conv_stats,
+            "visual_flags": self.visual_flags.to_dict(),
         }
+
+    # =========================================================================
+    # VISUAL SEARCH METHODS (V3.2)
+    # =========================================================================
+
+    async def _visual_search(
+        self,
+        query: str,
+        nav_context: Optional[Any],
+        limit: int = 50,
+        trace: Optional[ExplanationTrace] = None,
+    ) -> Tuple[List[Dict], Dict[str, float]]:
+        """
+        Perform visual similarity search using FashionSigLIP embeddings.
+
+        Args:
+            query: Search query
+            nav_context: Navigation context with user visual profile
+            limit: Max products to return
+            trace: Explanation trace to update
+
+        Returns:
+            Tuple of (products, scores dict)
+        """
+        if not self.visual_flags.enable_visual_search:
+            return [], {}
+
+        visual_products = []
+        visual_scores = {}
+
+        try:
+            # Get or create visual Qdrant client
+            if self._visual_qdrant_client is None:
+                await self._init_visual_client()
+
+            if self._visual_qdrant_client is None:
+                logger.warning("Visual Qdrant client not available")
+                if trace:
+                    trace.add_navigation_decision("Visual search skipped: client unavailable")
+                return [], {}
+
+            # Get visual query embedding
+            visual_embedding = await self._get_visual_embedding(query, nav_context)
+
+            if visual_embedding is None:
+                logger.warning("Could not generate visual embedding for query")
+                if trace:
+                    trace.add_navigation_decision("Visual search skipped: no embedding")
+                return [], {}
+
+            # Query visual collection
+            results = await self._visual_qdrant_client.query_points(
+                collection_name=self.visual_flags.visual_collection,
+                query=visual_embedding,
+                limit=limit,
+                timeout=30,
+            )
+
+            visual_products = [hit.payload for hit in results.points]
+            visual_scores = {
+                hit.payload.get('id', hit.payload.get('_id', str(i))): hit.score
+                for i, hit in enumerate(results.points)
+            }
+
+            logger.info(f"Visual search found {len(visual_products)} products")
+            if trace:
+                trace.add_navigation_decision(
+                    f"Visual search: {len(visual_products)} products from {self.visual_flags.visual_collection}"
+                )
+
+        except Exception as e:
+            logger.error(f"Visual search failed: {e}")
+            if trace:
+                trace.add_navigation_decision(f"Visual search error: {str(e)[:50]}")
+
+            # Fallback behavior
+            if not self.visual_flags.fallback_on_visual_error:
+                raise
+
+        return visual_products, visual_scores
+
+    async def _init_visual_client(self):
+        """Initialize visual Qdrant client lazily."""
+        try:
+            # Try to use the same Qdrant client with different collection
+            if self.qdrant_client:
+                self._visual_qdrant_client = self.qdrant_client
+                logger.info(f"Using shared Qdrant client for visual collection: {self.visual_flags.visual_collection}")
+            else:
+                logger.warning("No Qdrant client available for visual search")
+        except Exception as e:
+            logger.error(f"Failed to init visual client: {e}")
+            self._visual_qdrant_client = None
+
+    async def _get_visual_embedding(
+        self,
+        query: str,
+        nav_context: Optional[Any],
+    ) -> Optional[List[float]]:
+        """
+        Get visual embedding for the search query.
+
+        Strategy:
+        1. If user has Pinterest/Instagram visual profile, use that as base
+        2. Otherwise, use FashionSigLIP text-to-visual encoding
+        3. Fallback to None if unavailable
+        """
+        # Try user's social visual embedding first
+        if self.visual_flags.enable_social_visual and nav_context:
+            try:
+                if hasattr(nav_context, 'current_position'):
+                    pos = nav_context.current_position
+                    if hasattr(pos, 'visual_embedding') and pos.visual_embedding is not None:
+                        import numpy as np
+                        emb = pos.visual_embedding
+                        if not np.allclose(emb, 0):
+                            logger.debug("Using user's visual embedding from social profile")
+                            return emb.tolist() if hasattr(emb, 'tolist') else list(emb)
+            except Exception as e:
+                logger.debug(f"Could not use social visual embedding: {e}")
+
+        # Try FashionSigLIP text-to-visual encoding
+        try:
+            from services.ml.fashionsig_encoder import get_fashionsig_encoder
+            encoder = get_fashionsig_encoder()
+            if encoder.model is not None:
+                embedding = await encoder.encode_text_async(query)
+                logger.debug(f"Generated FashionSigLIP text embedding, dim={len(embedding)}")
+                return embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
+        except ImportError:
+            logger.debug("FashionSigLIP encoder not available")
+        except Exception as e:
+            logger.debug(f"FashionSigLIP encoding failed: {e}")
+
+        return None
+
+    def _fuse_search_results(
+        self,
+        semantic_products: List[Dict],
+        semantic_scores: Dict[str, float],
+        visual_products: List[Dict],
+        visual_scores: Dict[str, float],
+        trace: Optional[ExplanationTrace] = None,
+    ) -> List[Dict]:
+        """
+        Fuse semantic and visual search results using configured strategy.
+
+        Strategies:
+        - weighted_average: Combine scores with weights, return union
+        - max: Take the higher score for each product
+        - cascade: Visual re-ranks semantic top-N
+
+        Returns:
+            Merged and re-ranked products
+        """
+        strategy = self.visual_flags.fusion_strategy
+        semantic_weight = self.visual_flags.semantic_weight
+        visual_weight = self.visual_flags.visual_weight
+
+        # Build product lookup
+        all_products = {}
+        for p in semantic_products:
+            pid = p.get('id', p.get('_id', str(id(p))))
+            all_products[pid] = p.copy()
+            all_products[pid]['_semantic_score'] = semantic_scores.get(pid, 0)
+            all_products[pid]['_visual_score'] = 0
+
+        for p in visual_products:
+            pid = p.get('id', p.get('_id', str(id(p))))
+            if pid in all_products:
+                all_products[pid]['_visual_score'] = visual_scores.get(pid, 0)
+            else:
+                all_products[pid] = p.copy()
+                all_products[pid]['_semantic_score'] = 0
+                all_products[pid]['_visual_score'] = visual_scores.get(pid, 0)
+
+        # Calculate fused scores
+        for pid, product in all_products.items():
+            sem = product.get('_semantic_score', 0)
+            vis = product.get('_visual_score', 0)
+
+            if strategy == "weighted_average":
+                # Normalize: only count weights for available scores
+                if sem > 0 and vis > 0:
+                    product['_fused_score'] = sem * semantic_weight + vis * visual_weight
+                elif sem > 0:
+                    product['_fused_score'] = sem
+                else:
+                    product['_fused_score'] = vis
+            elif strategy == "max":
+                product['_fused_score'] = max(sem, vis)
+            elif strategy == "cascade":
+                # Visual score boosts semantic-selected products
+                product['_fused_score'] = sem + (vis * 0.2 if vis > 0 else 0)
+            else:
+                product['_fused_score'] = sem * semantic_weight + vis * visual_weight
+
+        # Sort by fused score
+        ranked = sorted(all_products.values(), key=lambda p: p.get('_fused_score', 0), reverse=True)
+
+        # Log fusion stats
+        semantic_only = sum(1 for p in ranked if p.get('_visual_score', 0) == 0)
+        visual_only = sum(1 for p in ranked if p.get('_semantic_score', 0) == 0)
+        both = len(ranked) - semantic_only - visual_only
+
+        logger.info(f"Fusion ({strategy}): {len(ranked)} total, {both} in both, {semantic_only} semantic-only, {visual_only} visual-only")
+
+        if trace:
+            trace.add_navigation_decision(
+                f"Result fusion ({strategy}): {len(ranked)} products, "
+                f"weights={semantic_weight:.1f}S/{visual_weight:.1f}V"
+            )
+
+        return ranked
 
 
 def create_orchestrator(
@@ -978,6 +1232,7 @@ def create_orchestrator(
     qdrant_client: Optional[AsyncQdrantClient] = None,
     openai_client: Optional[OpenAI] = None,
     qdrant_collection: str = "fashion_products",
+    visual_flags: Optional[VisualFeatureFlags] = None,
 ) -> ARIOrchestrator:
     """
     Factory function to create an ARIOrchestrator.
@@ -988,6 +1243,7 @@ def create_orchestrator(
         qdrant_client: AsyncQdrantClient for product search
         openai_client: OpenAI client for narrative generation
         qdrant_collection: Name of Qdrant collection for products
+        visual_flags: Feature flags for visual/multimodal capabilities
 
     Returns:
         Configured ARIOrchestrator
@@ -998,4 +1254,5 @@ def create_orchestrator(
         qdrant_client=qdrant_client,
         openai_client=openai_client,
         qdrant_collection=qdrant_collection,
+        visual_flags=visual_flags,
     )

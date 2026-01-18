@@ -10,8 +10,11 @@ A fully functional CLI demo that:
 5. **Conversational interface** - detects intent and responds naturally
 
 Run: python ari_v3/demo_cli.py
+      python ari_v3/demo_cli.py --visual  # Enable visual search
+      python ari_v3/demo_cli.py --visual --visual-scoring  # Enable visual scoring
 """
 
+import argparse
 import asyncio
 import os
 import sys
@@ -40,6 +43,7 @@ from ari_v3.interface import (
     ResponseType,
     SearchIntent,
 )
+from ari_v3.interface.types import VisualFeatureFlags
 
 # Configure logging
 logging.basicConfig(level=logging.WARNING)
@@ -203,7 +207,7 @@ DEMO_USERS = {
 class ARIDemoCLI:
     """Interactive ARI V3 Demo CLI with Conversational Interface."""
 
-    def __init__(self):
+    def __init__(self, visual_flags: Optional[VisualFeatureFlags] = None):
         # Database connections
         self.neo4j_driver_sync = None
         self.neo4j_driver_async = None
@@ -224,6 +228,9 @@ class ARIDemoCLI:
         self.intent_detector: Optional[HybridIntentDetector] = None
         self.conversation_handler: Optional[ConversationHandler] = None
         self.navigation_intelligence = None
+
+        # Visual feature flags (V3.2)
+        self.visual_flags = visual_flags or VisualFeatureFlags()
 
     async def initialize(self) -> bool:
         """Initialize all connections."""
@@ -285,8 +292,10 @@ class ARIDemoCLI:
                 qdrant_client=self.qdrant_client_async,
                 openai_client=self.openai_client,
                 async_openai_client=self.openai_client_async,
+                visual_flags=self.visual_flags,
             )
             print(f"  [OK] Conversational interface ready")
+            print(f"  [OK] {self.visual_flags.summary()}")
 
             return True
 
@@ -861,9 +870,70 @@ class ARIDemoCLI:
 # MAIN
 # =============================================================================
 
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="ARI V3 Demo CLI - Fashion Recommendation System",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  python demo_cli.py                     # Default (semantic search only)
+  python demo_cli.py --visual            # Enable visual search
+  python demo_cli.py --visual --visual-scoring   # Enable visual scoring too
+  python demo_cli.py --all-visual        # Enable all visual features
+        """
+    )
+
+    # Visual feature flags
+    visual_group = parser.add_argument_group("Visual Features (V3.2)")
+    visual_group.add_argument(
+        "--visual", action="store_true",
+        help="Enable visual search (FashionSigLIP collection)"
+    )
+    visual_group.add_argument(
+        "--visual-scoring", action="store_true",
+        help="Enable visual similarity in scoring (requires --visual)"
+    )
+    visual_group.add_argument(
+        "--visual-weight", type=float, default=0.4,
+        help="Weight for visual results in fusion (default: 0.4)"
+    )
+    visual_group.add_argument(
+        "--social-visual", action="store_true",
+        help="Use Pinterest/Instagram visual embeddings if available"
+    )
+    visual_group.add_argument(
+        "--all-visual", action="store_true",
+        help="Enable all visual features"
+    )
+    visual_group.add_argument(
+        "--fusion-strategy", choices=["weighted_average", "max", "cascade"],
+        default="weighted_average",
+        help="Strategy for fusing semantic and visual results (default: weighted_average)"
+    )
+
+    return parser.parse_args()
+
+
 def main():
     """Entry point."""
-    demo = ARIDemoCLI()
+    args = parse_args()
+
+    # Build visual feature flags from CLI args
+    visual_flags = VisualFeatureFlags(
+        enable_visual_search=args.visual or args.all_visual,
+        enable_visual_scoring=args.visual_scoring or args.all_visual,
+        enable_social_visual=args.social_visual or args.all_visual,
+        visual_weight=args.visual_weight,
+        semantic_weight=1.0 - args.visual_weight,
+        fusion_strategy=args.fusion_strategy,
+    )
+
+    # If visual scoring enabled, set a default weight
+    if visual_flags.enable_visual_scoring:
+        visual_flags.visual_score_weight = 0.15
+
+    demo = ARIDemoCLI(visual_flags=visual_flags)
     asyncio.run(demo.run())
 
 

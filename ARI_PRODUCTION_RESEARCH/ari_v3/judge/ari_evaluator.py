@@ -29,7 +29,7 @@ logger = logging.getLogger(__name__)
 
 @dataclass
 class ScoringWeights:
-    """Weights for the 7-dimension scoring system."""
+    """Weights for the 7(+1) dimension scoring system."""
     smoothness: float = 0.15          # Step distance score
     coherence: float = 0.10           # Trajectory alignment
     budget_fit: float = 0.15          # Price within budget
@@ -38,14 +38,37 @@ class ScoringWeights:
     multi_agent_confidence: float = 0.10  # Agreement between agents
     rule_compliance: float = 0.20     # Styling rule adherence
 
+    # Visual scoring (V3.2) - when enabled, redistributes from other weights
+    visual_similarity: float = 0.0    # Visual match from FashionSigLIP (default: disabled)
+
     def validate(self) -> bool:
         """Validate weights sum to 1.0."""
         total = (
             self.smoothness + self.coherence + self.budget_fit +
             self.brand_match + self.behavioral_consistency +
-            self.multi_agent_confidence + self.rule_compliance
+            self.multi_agent_confidence + self.rule_compliance +
+            self.visual_similarity
         )
         return abs(total - 1.0) < 0.001
+
+    @classmethod
+    def with_visual(cls, visual_weight: float = 0.15) -> 'ScoringWeights':
+        """
+        Create weights with visual scoring enabled.
+
+        Redistributes weight from smoothness and coherence to visual.
+        """
+        # Take visual weight from smoothness (0.10) and coherence (0.05)
+        return cls(
+            smoothness=0.10,
+            coherence=0.05,
+            budget_fit=0.15,
+            brand_match=0.10,
+            behavioral_consistency=0.20,
+            multi_agent_confidence=0.10,
+            rule_compliance=0.15,
+            visual_similarity=visual_weight,
+        )
 
 
 DEFAULT_WEIGHTS = ScoringWeights()
@@ -65,6 +88,7 @@ class ProductScoreBreakdown:
     behavioral_consistency_score: float = 0.0
     multi_agent_confidence_score: float = 0.0
     rule_compliance_score: float = 0.0
+    visual_similarity_score: float = 0.0  # V3.2: FashionSigLIP visual match
 
     total_score: float = 0.0
     weights_used: ScoringWeights = field(default_factory=ScoringWeights)
@@ -79,6 +103,7 @@ class ProductScoreBreakdown:
             'behavioral_consistency': self.behavioral_consistency_score,
             'multi_agent_confidence': self.multi_agent_confidence_score,
             'rule_compliance': self.rule_compliance_score,
+            'visual_similarity': self.visual_similarity_score,
             'total': self.total_score,
         }
 
@@ -294,6 +319,18 @@ class ARIEvaluator:
                     ),
                 ]
 
+                # Add visual similarity component if enabled (V3.2)
+                if self.weights.visual_similarity > 0:
+                    components.append(
+                        ScoreComponent(
+                            name="visual_similarity",
+                            value=breakdown.visual_similarity_score * self.weights.visual_similarity,
+                            max_possible=self.weights.visual_similarity,
+                            factors={"fashionsig_match": breakdown.visual_similarity_score},
+                            explanation=self._explain_visual_similarity(breakdown.visual_similarity_score, product),
+                        )
+                    )
+
                 trace.add_product_breakdown(
                     product_id=product_id,
                     product_title=product_title,
@@ -345,6 +382,9 @@ class ARIEvaluator:
         # 7. Rule compliance
         breakdown.rule_compliance_score = self._score_rule_compliance(product, styling_rules)
 
+        # 8. Visual similarity (V3.2) - uses pre-computed visual score from fusion
+        breakdown.visual_similarity_score = self._score_visual_similarity(product)
+
         # Calculate total weighted score
         breakdown.total_score = (
             breakdown.smoothness_score * self.weights.smoothness +
@@ -353,7 +393,8 @@ class ARIEvaluator:
             breakdown.brand_match_score * self.weights.brand_match +
             breakdown.behavioral_consistency_score * self.weights.behavioral_consistency +
             breakdown.multi_agent_confidence_score * self.weights.multi_agent_confidence +
-            breakdown.rule_compliance_score * self.weights.rule_compliance
+            breakdown.rule_compliance_score * self.weights.rule_compliance +
+            breakdown.visual_similarity_score * self.weights.visual_similarity
         )
 
         return breakdown
@@ -633,6 +674,34 @@ class ARIEvaluator:
 
         return min(1.0, compliance_score)
 
+    def _score_visual_similarity(
+        self,
+        product: Dict[str, Any],
+    ) -> float:
+        """
+        Score visual similarity (V3.2) - uses FashionSigLIP visual match score.
+
+        The visual score is pre-computed during search fusion and attached
+        to the product as '_visual_score'. If visual search wasn't enabled,
+        returns neutral score.
+
+        Returns:
+            Score 0-1 (1 = high visual similarity)
+        """
+        # Check for pre-computed visual score from fusion step
+        visual_score = product.get('_visual_score', 0)
+
+        if visual_score > 0:
+            # Visual search was performed and this product was found
+            # Normalize the score (Qdrant scores can vary)
+            return min(1.0, visual_score)
+
+        # No visual score available - return neutral
+        # This happens when:
+        # - Visual search wasn't enabled
+        # - Product was found only by semantic search
+        return 0.5
+
     def _cosine_distance(self, v1: np.ndarray, v2: np.ndarray) -> float:
         """Calculate cosine distance between two vectors."""
         dot_product = np.dot(v1, v2)
@@ -757,3 +826,24 @@ class ARIEvaluator:
             return "Partially matches your criteria"
         else:
             return "May not fully match your stated preferences"
+
+    def _explain_visual_similarity(self, score: float, product: Dict[str, Any]) -> str:
+        """Generate human explanation for visual similarity (V3.2)."""
+        # Check if this had both visual and semantic scores
+        has_visual = product.get('_visual_score', 0) > 0
+        has_semantic = product.get('_semantic_score', 0) > 0
+
+        if score >= 0.8:
+            if has_visual:
+                return "Visually matches your aesthetic preferences very well"
+            return "Strong visual alignment with your style"
+        elif score >= 0.6:
+            if has_visual and has_semantic:
+                return "Good visual and semantic match"
+            return "Visually compatible with your preferences"
+        elif score >= 0.5:
+            return "Neutral visual match (found by text search)"
+        elif score >= 0.3:
+            return "Visual style differs from your typical preferences"
+        else:
+            return "Visually distinct from your usual aesthetic"
