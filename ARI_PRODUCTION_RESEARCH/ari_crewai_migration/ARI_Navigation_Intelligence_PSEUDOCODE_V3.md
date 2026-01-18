@@ -393,8 +393,17 @@ STRUCTURE IntentResult:
         occasions: LIST[STRING],         # ["wedding", "casual"]
         price_range: {min: FLOAT, max: FLOAT},
         brand_preferences: LIST[STRING],
-        style_modifiers: LIST[STRING]    # ["minimalist", "bold"]
+        style_modifiers: LIST[STRING],   # ["minimalist", "bold"]
+
+        # V3.1: Real-time exclusions from user text
+        exclusions: LIST[Exclusion]      # Things user explicitly doesn't want
     }
+
+    # V3.1: Exclusion structure for filtering
+    STRUCTURE Exclusion:
+        field: STRING      # "brand", "color", "category", "style", "material", "price", "abstract"
+        value: STRING      # The value to exclude (e.g., "Theory", "black", "formal")
+        reason: STRING     # Why excluded (for debugging/transparency)
 
     # For memory/clarification intents
     time_reference: STRING               # "yesterday", "last week"
@@ -506,6 +515,175 @@ CLASS IntentDetector:
             confidence=0.3,
             detection_method="rule"
         )
+```
+
+### 0.5.1.1 Real-Time Exclusion Extraction (V3.1)
+
+```
+CLASS ExclusionExtractor:
+    """
+    V3.1: Extract exclusions from natural language in real-time.
+
+    Complements historical exclusions (Neo4j rejected/returned products)
+    with immediate exclusions from user text.
+
+    Examples:
+    - "I don't want Theory" → brand: Theory
+    - "no black items" → color: black
+    - "nothing too formal" → style: formal
+    - "skip items my mom would wear" → abstract: mature styles
+    """
+
+    ASYNC FUNCTION extract_exclusions_with_llm(query: STRING) → LIST[Exclusion]:
+        """
+        Use LLM to understand nuanced exclusions that regex can't capture.
+        """
+        prompt = f"""
+        Analyze the user's message and extract exclusions (things they DON'T want).
+
+        User message: "{query}"
+
+        Return JSON:
+        {{
+            "exclusions": [
+                {{"field": "brand|color|category|style|material|price|abstract",
+                  "value": "...",
+                  "reason": "why excluded"}}
+            ]
+        }}
+
+        Field types:
+        - brand: Specific brands (Theory, Nike, etc.)
+        - color: Colors (black, red, etc.)
+        - category: Product types (dresses, pants, etc.)
+        - style: Style descriptors (formal, casual, trendy, etc.)
+        - material: Fabrics (silk, polyester, etc.)
+        - price: Price-related (expensive, cheap, over $100)
+        - abstract: Complex/subjective exclusions ("what my mom would wear")
+        """
+
+        response = await llm.complete(prompt, model="gpt-4o-mini")
+        parsed = json.parse(response)
+
+        RETURN [
+            Exclusion(field=e.field, value=e.value, reason=e.reason)
+            FOR e IN parsed.exclusions
+        ]
+
+    FUNCTION apply_exclusions(products: LIST[Product], exclusions: LIST[Exclusion]) → LIST[Product]:
+        """
+        Filter products based on exclusion criteria.
+        """
+        FUNCTION matches_exclusion(product, exclusion) → BOOL:
+            value = exclusion.value.lower()
+
+            IF exclusion.field == "brand":
+                RETURN value IN product.brand.lower() OR value IN product.title.lower()
+            ELIF exclusion.field == "color":
+                RETURN value IN product.color.lower() OR value IN product.description.lower()
+            ELIF exclusion.field == "category":
+                RETURN value IN product.category.lower()
+            ELIF exclusion.field == "style":
+                RETURN value IN product.tags OR value IN product.description.lower()
+            ELIF exclusion.field == "price":
+                # Handle "expensive", "over $X", etc.
+                RETURN evaluate_price_exclusion(product.price, value)
+            ELIF exclusion.field == "abstract":
+                # Broad search across all text fields
+                RETURN value IN (product.title + product.description + product.tags).lower()
+            ELSE:
+                RETURN value IN product.title.lower()
+
+        RETURN [p FOR p IN products IF NOT ANY(matches_exclusion(p, e) FOR e IN exclusions)]
+```
+
+### 0.5.1.2 Session Feedback Refinement (V3.1)
+
+```
+CLASS SessionFeedbackHandler:
+    """
+    V3.1: Handle immediate feedback within a session.
+
+    Different from Section 8 (long-term feedback loop):
+    - Section 8: Learn from outcomes over days/weeks, update user profile
+    - This: Immediate refinement within a conversation session
+
+    Flow:
+    1. User searches: "show me luxury bags"
+    2. ARI shows results (Theory, Coach, etc.)
+    3. User says: "that's not Gucci"
+    4. System understands: User wanted Gucci, refines and re-searches
+    """
+
+    # Store last search context per session
+    last_search_context: MAP[session_id → SearchContext]
+
+    STRUCTURE SearchContext:
+        query: STRING
+        params: ExtractedParameters
+        products_shown: LIST[STRING]      # Product titles shown
+        brands_shown: LIST[STRING]        # Brands in results
+        timestamp: DATETIME
+
+    ASYNC FUNCTION handle_feedback(
+        session_id: STRING,
+        user_id: STRING,
+        feedback: STRING,
+        intent: IntentResult
+    ) → ARIResponse:
+        """
+        Handle feedback by refining previous search.
+        """
+        prev_context = self.last_search_context.get(session_id)
+
+        IF prev_context IS NULL:
+            # No previous search, handle as conversation
+            RETURN conversation_handler.handle(feedback)
+
+        # Use LLM to interpret feedback in context
+        refined_query = await self._interpret_feedback(
+            original_query=prev_context.query,
+            feedback=feedback,
+            brands_shown=prev_context.brands_shown
+        )
+
+        IF refined_query:
+            # Re-run product search with refined understanding
+            RETURN await product_search(
+                query=refined_query,
+                user_id=user_id,
+                session_id=session_id
+            )
+        ELSE:
+            # Couldn't interpret, ask for clarification
+            RETURN conversation_handler.handle(feedback)
+
+    ASYNC FUNCTION _interpret_feedback(
+        original_query: STRING,
+        feedback: STRING,
+        brands_shown: LIST[STRING]
+    ) → STRING OR NULL:
+        """
+        Use LLM to understand feedback and generate refined query.
+        """
+        prompt = f"""
+        User searched for: "{original_query}"
+        Results showed brands: {brands_shown}
+        User feedback: "{feedback}"
+
+        Interpret their feedback and generate a refined search query.
+        - "that's not X" usually means they wanted X specifically
+        - "too formal" means they want more casual
+        - "not my style" needs clarification
+
+        Return ONLY the refined query, or "UNCLEAR" if can't interpret.
+        """
+
+        response = await llm.complete(prompt, model="gpt-4o-mini")
+
+        IF response != "UNCLEAR":
+            RETURN response
+        RETURN NULL
 ```
 
 ### 0.5.2 Conversation Handler
