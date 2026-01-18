@@ -139,6 +139,10 @@ class ARIOrchestrator:
         # Last search session ID (for feedback tracking) - protected by _session_lock
         self._last_search_session_id: Optional[str] = None
 
+        # Last search context per session (for feedback refinement)
+        # session_id -> {query, params, products_shown}
+        self._last_search_context: Dict[str, Dict[str, Any]] = {}
+
         logger.info(
             f"ARIOrchestrator initialized with "
             f"navigation={'enabled' if navigation_intelligence else 'disabled'}, "
@@ -200,6 +204,16 @@ class ARIOrchestrator:
                     intent=intent,
                     occasion=occasion,
                     user_profile=user_profile,
+                )
+            elif intent.primary_intent == SearchIntent.FEEDBACK:
+                # Check if we have previous search context to refine
+                response = await self._handle_feedback_intent(
+                    session_id=session_id,
+                    user_id=user_id,
+                    query=query,
+                    intent=intent,
+                    user_profile=user_profile,
+                    user_context=user_context,
                 )
             else:
                 response = await self._handle_conversation_intent(
@@ -362,6 +376,14 @@ class ARIOrchestrator:
             search_session_id = str(uuid.uuid4())
             with self._session_lock:
                 self._last_search_session_id = search_session_id
+                # Store search context for feedback refinement
+                self._last_search_context[session_id] = {
+                    "query": query,
+                    "params": params,
+                    "products_shown": [p.get('title', '')[:50] for p in selected[:5]],
+                    "brands_shown": list(set(p.get('brand') or p.get('vendor') for p in selected if p.get('brand') or p.get('vendor'))),
+                    "timestamp": datetime.now(),
+                }
 
             return ARIResponse(
                 response_type=ResponseType.PRODUCTS,
@@ -503,6 +525,117 @@ class ARIOrchestrator:
                     "Tell me about my style",
                 ],
             )
+
+    async def _handle_feedback_intent(
+        self,
+        session_id: str,
+        user_id: str,
+        query: str,
+        intent: IntentResult,
+        user_profile=None,
+        user_context: Optional[Dict[str, Any]] = None,
+    ) -> ARIResponse:
+        """
+        Handle feedback about previous recommendations.
+
+        If we have context from a previous search, this will:
+        1. Understand what the feedback means (e.g., "that's not Gucci" = wanted Gucci)
+        2. Refine the search with the feedback
+        3. Return new, better-matched results
+        """
+        # Check if we have previous search context
+        prev_context = self._last_search_context.get(session_id)
+
+        if prev_context:
+            logger.info(f"Feedback with previous context: {prev_context.get('query')}")
+
+            # Use LLM to understand feedback in context
+            refined_query = await self._interpret_feedback(
+                original_query=prev_context.get("query", ""),
+                feedback=query,
+                brands_shown=prev_context.get("brands_shown", []),
+            )
+
+            if refined_query:
+                logger.info(f"Refined query from feedback: {refined_query}")
+
+                # Re-run product search with refined query
+                # Create a new intent for product search
+                from .types import ExtractedParameters
+                refined_intent = IntentResult(
+                    primary_intent=SearchIntent.PRODUCT_SEARCH,
+                    confidence=0.9,
+                    detection_method="feedback_refinement",
+                    extracted_parameters=intent.extracted_parameters,
+                )
+
+                return await self._handle_product_intent(
+                    session_id=session_id,
+                    user_id=user_id,
+                    query=refined_query,
+                    intent=refined_intent,
+                    occasion=None,
+                    user_profile=user_profile,
+                )
+
+        # No previous context or couldn't refine - handle as conversation
+        return await self._handle_conversation_intent(
+            session_id=session_id,
+            query=query,
+            intent=intent,
+            user_context=user_context,
+        )
+
+    async def _interpret_feedback(
+        self,
+        original_query: str,
+        feedback: str,
+        brands_shown: List[str],
+    ) -> Optional[str]:
+        """
+        Use LLM to interpret feedback and generate a refined search query.
+
+        Args:
+            original_query: What the user originally searched for
+            feedback: The feedback they gave (e.g., "that's not Gucci")
+            brands_shown: Brands that were in the results
+
+        Returns:
+            Refined search query, or None if can't interpret
+        """
+        if not self.async_openai_client:
+            return None
+
+        try:
+            prompt = f"""The user searched for: "{original_query}"
+They were shown products from brands: {', '.join(brands_shown) if brands_shown else 'various brands'}
+They gave this feedback: "{feedback}"
+
+Interpret their feedback and generate a refined search query.
+If they said "that's not X", they likely wanted X specifically.
+If they said "too formal/casual/etc", adjust the style.
+
+Return ONLY the refined search query, nothing else.
+If you can't interpret the feedback, return "UNCLEAR"."""
+
+            response = await self.async_openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You refine fashion search queries based on user feedback. Return only the refined query."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=100,
+                temperature=0.3,
+            )
+
+            refined = response.choices[0].message.content.strip()
+            if refined and refined != "UNCLEAR":
+                return refined
+            return None
+
+        except Exception as e:
+            logger.warning(f"Failed to interpret feedback: {e}")
+            return None
 
     def _update_session(self, session_id: str, user_id: str):
         """Update or create session with TTL tracking."""
