@@ -367,14 +367,24 @@ class ARIOrchestrator:
                         query_filter = self._build_qdrant_filter(params)
 
                         # Semantic search (always runs)
+                        # Include vectors for MMR diversity calculation
                         results = await self.qdrant_client.query_points(
                             collection_name=self.qdrant_collection,
                             query=query_vector,
                             query_filter=query_filter,
                             limit=50,
                             timeout=30,  # 30 second timeout
+                            with_vectors=True,  # Include embeddings for MMR
                         )
-                        semantic_products = [hit.payload for hit in results.points]
+                        # Attach embeddings to product payloads for MMR
+                        semantic_products = []
+                        for hit in results.points:
+                            product = hit.payload.copy()
+                            # Attach vector as 'embedding' field for MMR selector
+                            if hit.vector is not None:
+                                product['embedding'] = hit.vector
+                            semantic_products.append(product)
+
                         semantic_scores = {
                             hit.payload.get('id', hit.payload.get('_id', str(i))): hit.score
                             for i, hit in enumerate(results.points)
@@ -1149,15 +1159,23 @@ If you can't interpret the feedback, return "UNCLEAR"."""
                     trace.add_navigation_decision("Visual search skipped: no embedding")
                 return [], {}
 
-            # Query visual collection
+            # Query visual collection (include vectors for MMR)
             results = await self._visual_qdrant_client.query_points(
                 collection_name=self.visual_flags.visual_collection,
                 query=visual_embedding,
                 limit=limit,
                 timeout=30,
+                with_vectors=True,  # Include embeddings for MMR
             )
 
-            visual_products = [hit.payload for hit in results.points]
+            # Attach embeddings to product payloads
+            visual_products = []
+            for hit in results.points:
+                product = hit.payload.copy()
+                if hit.vector is not None:
+                    product['embedding'] = hit.vector
+                visual_products.append(product)
+
             visual_scores = {
                 hit.payload.get('id', hit.payload.get('_id', str(i))): hit.score
                 for i, hit in enumerate(results.points)
