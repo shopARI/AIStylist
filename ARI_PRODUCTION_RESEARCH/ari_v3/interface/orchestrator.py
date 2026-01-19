@@ -371,10 +371,45 @@ class ARIOrchestrator:
                         logger.warning("Navigation embedding is all zeros, falling back to direct query embedding")
                         query_vector = None
 
-                # Fall back to direct query embedding if navigation failed
+                # Fall back to semantic query expansion + embedding if navigation failed
+                semantic_expansion = None
+                if query_vector is None and self.async_openai_client:
+                    try:
+                        logger.info("Using SemanticQueryGenerator for query expansion")
+                        from ari_v3.tools.semantic_query import SemanticQueryGenerator
+                        from ari_v3.navigation.constants import EMBEDDING_MODEL
+
+                        generator = SemanticQueryGenerator(async_openai_client=self.async_openai_client)
+                        semantic_expansion = await generator.expand_query_async(query)
+
+                        # Use expanded query for embedding
+                        response = await self.async_openai_client.embeddings.create(
+                            model=EMBEDDING_MODEL,
+                            input=semantic_expansion.expanded_query,
+                        )
+                        query_vector = response.data[0].embedding
+
+                        # Track expansion in trace
+                        trace.query_interpretation["semantic_expansion"] = {
+                            "original": query,
+                            "expanded": semantic_expansion.expanded_query[:100],
+                            "styles": semantic_expansion.style_terms[:5],
+                            "colors": semantic_expansion.color_terms,
+                            "occasion": semantic_expansion.occasion,
+                        }
+
+                        logger.info(
+                            f"Semantic expansion: styles={semantic_expansion.style_terms[:3]}, "
+                            f"colors={semantic_expansion.color_terms}, "
+                            f"expanded='{semantic_expansion.expanded_query[:50]}...'"
+                        )
+                    except Exception as emb_err:
+                        logger.warning(f"Semantic expansion failed: {emb_err}, trying direct embedding")
+
+                # Final fallback to sync client if async failed
                 if query_vector is None and self.openai_client:
                     try:
-                        logger.info("Using direct query embedding for search")
+                        logger.info("Using direct query embedding for search (sync fallback)")
                         from ari_v3.navigation.constants import EMBEDDING_MODEL
                         response = self.openai_client.embeddings.create(
                             model=EMBEDDING_MODEL,
@@ -387,8 +422,8 @@ class ARIOrchestrator:
 
                 if query_vector:
                     try:
-                        # Build Qdrant filter based on extracted parameters
-                        query_filter = self._build_qdrant_filter(params)
+                        # Build Qdrant filter based on extracted parameters + semantic expansion
+                        query_filter = self._build_qdrant_filter(params, semantic_expansion)
 
                         # Semantic search (always runs)
                         # Include vectors for MMR diversity calculation
@@ -902,15 +937,16 @@ If you can't interpret the feedback, return "UNCLEAR"."""
             for msg in messages[-5:]  # Last 5 messages
         ]
 
-    def _build_qdrant_filter(self, params) -> Optional[Filter]:
+    def _build_qdrant_filter(self, params, semantic_expansion=None) -> Optional[Filter]:
         """
-        Build Qdrant filter based on extracted parameters.
+        Build Qdrant filter based on extracted parameters and semantic expansion.
 
         Uses Qdrant's filtering to narrow results BEFORE vector similarity,
         which is more efficient and accurate than post-filtering.
 
         Args:
             params: ExtractedParameters with price_tier, require_premium, price_range
+            semantic_expansion: Optional SemanticQuery with LLM-suggested filters
 
         Returns:
             Qdrant Filter object or None if no filters needed
@@ -921,15 +957,28 @@ If you can't interpret the feedback, return "UNCLEAR"."""
 
         conditions = []
 
-        # Filter by price tier (luxury/premium/budget queries)
+        # Merge semantic expansion filters if available
+        semantic_filters = {}
+        if semantic_expansion and hasattr(semantic_expansion, 'filters'):
+            semantic_filters = semantic_expansion.filters or {}
+            if semantic_filters:
+                logger.info(f"Merging semantic expansion filters: {semantic_filters}")
+
+        # Filter by price tier (from params or semantic expansion)
+        price_tier = None
         if hasattr(params, 'price_tier') and params.price_tier:
+            price_tier = params.price_tier
+        elif semantic_filters.get('price_tier'):
+            price_tier = semantic_filters['price_tier']
+
+        if price_tier:
             conditions.append(
                 FieldCondition(
                     key="price_tier",
-                    match=MatchValue(value=params.price_tier)
+                    match=MatchValue(value=price_tier)
                 )
             )
-            logger.info(f"Adding price_tier filter: {params.price_tier}")
+            logger.info(f"Adding price_tier filter: {price_tier}")
 
         # Filter for premium products
         if hasattr(params, 'require_premium') and params.require_premium:
