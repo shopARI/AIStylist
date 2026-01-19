@@ -1468,17 +1468,24 @@ If you can't interpret the feedback, return "UNCLEAR"."""
 
     def _build_qdrant_filter(self, params, semantic_expansion=None) -> Optional[Filter]:
         """
-        Build Qdrant filter based on extracted parameters and semantic expansion.
+        Build Qdrant filter for EXPLICIT NUMERIC constraints only.
 
-        Uses Qdrant's filtering to narrow results BEFORE vector similarity,
-        which is more efficient and accurate than post-filtering.
+        PHILOSOPHY: ARI navigates style space through semantic understanding,
+        NOT through hardcoded category/tier filters. The embedding model and
+        semantic query expansion naturally navigate to the correct region.
+
+        Only explicit numeric price constraints (e.g., "under $50", "$100-200")
+        use hard filters. Everything else flows through semantic search:
+        - "luxury" / "premium" → semantic query includes luxury descriptors
+        - "budget" / "affordable" → semantic query includes budget-friendly terms
+        - categories, styles, vibes → all handled by embedding similarity
 
         Args:
-            params: ExtractedParameters with price_tier, require_premium, price_range
-            semantic_expansion: Optional SemanticQuery with LLM-suggested filters
+            params: ExtractedParameters - only price_range (explicit $) used
+            semantic_expansion: Optional SemanticQuery (expanded_query used, not filters)
 
         Returns:
-            Qdrant Filter object or None if no filters needed
+            Qdrant Filter object or None if no explicit numeric constraints
         """
         if not QDRANT_FILTER_AVAILABLE:
             logger.debug("Qdrant filter not available, skipping")
@@ -1486,40 +1493,8 @@ If you can't interpret the feedback, return "UNCLEAR"."""
 
         conditions = []
 
-        # Merge semantic expansion filters if available
-        semantic_filters = {}
-        if semantic_expansion and hasattr(semantic_expansion, 'filters'):
-            semantic_filters = semantic_expansion.filters or {}
-            if semantic_filters:
-                logger.info(f"Merging semantic expansion filters: {semantic_filters}")
-
-        # Filter by price tier (from params or semantic expansion)
-        price_tier = None
-        if hasattr(params, 'price_tier') and params.price_tier:
-            price_tier = params.price_tier
-        elif semantic_filters.get('price_tier'):
-            price_tier = semantic_filters['price_tier']
-
-        if price_tier:
-            conditions.append(
-                FieldCondition(
-                    key="price_tier",
-                    match=MatchValue(value=price_tier)
-                )
-            )
-            logger.info(f"Adding price_tier filter: {price_tier}")
-
-        # Filter for premium products
-        if hasattr(params, 'require_premium') and params.require_premium:
-            conditions.append(
-                FieldCondition(
-                    key="is_premium",
-                    match=MatchValue(value=True)
-                )
-            )
-            logger.info("Adding is_premium=True filter")
-
-        # Filter by price range
+        # ONLY filter by explicit numeric price range (actual dollar amounts)
+        # All other attributes flow through semantic search for style space navigation
         if hasattr(params, 'price_range') and params.price_range:
             price_range = params.price_range
             range_filter = {}
@@ -1535,17 +1510,15 @@ If you can't interpret the feedback, return "UNCLEAR"."""
                         range=Range(**range_filter)
                     )
                 )
-                logger.info(f"Adding price range filter: {range_filter}")
+                logger.info(f"Price constraint (explicit $): {range_filter}")
 
-        # NOTE: We intentionally do NOT filter by extracted categories here.
-        # Extracted categories (e.g., "professional attire", "casual wear") are
-        # inferred/abstract terms that don't match exact database category values.
-        # Instead, we let the semantic search handle category matching naturally
-        # through the embedding similarity of the full query.
-        # Only price_tier, is_premium, and price_range are used as hard filters
-        # since those have exact matches in the database.
-        if hasattr(params, 'categories') and params.categories:
-            logger.debug(f"Category hint (not filtered): {params.categories[0]}")
+        # All other attributes handled by semantic navigation:
+        # - price_tier → expanded in semantic query ("luxury designer high-end")
+        # - premium → expanded in semantic query ("premium quality upscale")
+        # - categories → expanded in semantic query (navigation destination)
+        # - styles/vibes → core of semantic understanding
+        #
+        # This aligns with ARI's philosophy: navigate style space, don't filter it
 
         if not conditions:
             return None

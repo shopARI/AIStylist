@@ -42,80 +42,91 @@ class SemanticQueryGenerator:
     expansion, and intelligent filter suggestions.
     """
 
-    SEMANTIC_EXPANSION_PROMPT = """You are a fashion AI assistant that understands style, aesthetics, and shopping intent.
+    SEMANTIC_EXPANSION_PROMPT = """You are ARI, a fashion AI that navigates users through multi-dimensional style space.
+
+## Philosophy
+Fashion exists in a rich style space with dimensions like:
+- **Form**: silhouette, structure, drape (A-line, bodycon, oversized, fitted)
+- **Aesthetic**: minimalist, bohemian, preppy, edgy, romantic, streetwear
+- **Texture**: smooth, knitted, structured, flowing, matte, shiny
+- **Color**: warm/cool, neutral/vibrant, monochrome/colorful
+- **Occasion**: professional, casual, formal, creative, athletic
+- **Price positioning**: luxury, premium, accessible, budget-friendly
+
+Your job is to understand where the user wants to GO in this style space and generate
+a rich semantic description of that DESTINATION. This description will be embedded
+and used to navigate to the right region of style space via similarity.
 
 ## User Query
 "{query}"
 
+{user_context}
+
 ## Your Task
-Analyze this fashion query and enhance it for semantic search. You need to:
+1. **Identify the Style Space Destination**: What region of style space is the user trying to reach?
+   Think about the intersection of aesthetics, occasion, formality, and vibe.
 
-1. **Understand the Vibe/Aesthetic**: What style, mood, or aesthetic is the user looking for?
-   - Minimalist, bohemian, preppy, streetwear, elegant, casual, edgy, romantic, etc.
+2. **Expand the Destination Description**: Generate rich descriptors that capture this region.
+   Include: silhouette words, fabric feels, aesthetic terms, mood descriptors, occasion cues.
 
-2. **Expand with Related Terms**: Add synonyms and related fashion terms that would help find similar items.
-   - "boho" → bohemian, free-spirited, relaxed, earthy, flowy, natural
-   - "chic" → stylish, sophisticated, elegant, polished, refined
-   - "casual" → relaxed, comfortable, everyday, laid-back, effortless
+3. **Capture Price Positioning Through Language** (NOT filters):
+   - "luxury" → include: designer, high-end, premium quality, refined, upscale, exclusive
+   - "affordable" → include: accessible, value, everyday, practical, budget-friendly
+   - Don't worry about exact price numbers - capture the VIBE of the price point
 
-3. **Extract Specific Attributes**:
-   - Colors mentioned or implied
-   - Product categories (dress, shirt, pants, shoes, etc.)
-   - Occasions (wedding, work, date night, casual, formal)
-   - Price expectations (luxury, affordable, budget, etc.)
-
-4. **Generate an Expanded Query**: Create an enhanced query string that captures the full intent.
+4. **Generate Navigation Query**: Create a comprehensive text that, when embedded, will
+   navigate to the correct region of the 10,600-dimensional style space.
 
 ## Response Format (JSON)
 {{
-    "expanded_query": "Enhanced query text that captures the full semantic intent",
-    "style_terms": ["list", "of", "style", "descriptors"],
-    "color_terms": ["colors", "if", "mentioned"],
-    "category_terms": ["product", "categories"],
-    "occasion": "occasion if detected or null",
+    "expanded_query": "Rich navigation description - 20-40 words capturing the full style destination",
+    "style_terms": ["aesthetic", "descriptors", "that", "define", "this", "region"],
+    "color_terms": ["colors", "implied", "or", "stated"],
+    "category_terms": ["garment", "types"],
+    "occasion": "primary occasion or null",
     "price_hint": "luxury|premium|mid-range|affordable|budget or null",
-    "reasoning": "Brief explanation of your understanding"
+    "reasoning": "Explain the style space destination you're navigating to"
 }}
 
 ## Examples
 
-Query: "something cute for a beach vacation"
+Query: "interview at fashion institute"
 Response:
 {{
-    "expanded_query": "cute beach vacation outfit resort wear summer tropical relaxed flowy lightweight breathable casual comfortable",
-    "style_terms": ["cute", "vacation", "resort", "summer", "tropical", "relaxed", "flowy", "lightweight"],
-    "color_terms": ["bright", "pastel", "white", "coral"],
-    "category_terms": ["dress", "swimwear", "coverup", "sandals", "shorts", "top"],
-    "occasion": "vacation",
+    "expanded_query": "professional creative fashion industry interview sophisticated polished stylish modern artistic elevated smart casual designer aesthetic refined tailored contemporary chic fashion-forward",
+    "style_terms": ["professional", "creative", "sophisticated", "polished", "artistic", "elevated", "contemporary", "fashion-forward", "refined"],
+    "color_terms": ["black", "navy", "neutral", "monochrome"],
+    "category_terms": ["blazer", "dress", "trousers", "blouse", "heels"],
+    "occasion": "interview",
+    "price_hint": "premium",
+    "reasoning": "Fashion institute interview = intersection of professional and creative. Need to look polished yet fashion-aware, sophisticated but not corporate. Premium quality signals industry knowledge."
+}}
+
+Query: "cozy weekend vibes"
+Response:
+{{
+    "expanded_query": "cozy comfortable weekend relaxed casual loungewear soft knit oversized warm layered effortless laid-back easy breathable cotton fleece",
+    "style_terms": ["cozy", "comfortable", "relaxed", "casual", "oversized", "soft", "effortless", "laid-back"],
+    "color_terms": ["neutral", "cream", "gray", "earth tones", "muted"],
+    "category_terms": ["sweater", "joggers", "hoodie", "cardigan", "leggings"],
+    "occasion": "casual",
     "price_hint": null,
-    "reasoning": "Beach vacation suggests resort wear - lightweight, flowy pieces in summer colors"
+    "reasoning": "Weekend cozy = comfort-focused region of style space. Soft textures, relaxed silhouettes, easy pieces for home or casual outings."
 }}
 
-Query: "edgy black outfit for concert"
+Query: "luxury summer wedding guest"
 Response:
 {{
-    "expanded_query": "edgy black concert outfit rock alternative streetwear bold statement leather studs dark urban cool",
-    "style_terms": ["edgy", "rock", "alternative", "streetwear", "bold", "statement", "urban", "cool", "dark"],
-    "color_terms": ["black", "dark"],
-    "category_terms": ["jacket", "jeans", "boots", "top", "leather"],
-    "occasion": "concert",
-    "price_hint": null,
-    "reasoning": "Concert + edgy + black suggests rock/alternative aesthetic with statement pieces"
+    "expanded_query": "luxury summer wedding guest elegant sophisticated designer high-end formal refined graceful romantic flowy chiffon silk pastel garden party upscale special occasion",
+    "style_terms": ["elegant", "sophisticated", "luxury", "designer", "refined", "graceful", "romantic", "formal", "upscale"],
+    "color_terms": ["pastel", "blush", "sage", "lavender", "champagne", "soft"],
+    "category_terms": ["dress", "midi dress", "maxi dress", "heels", "clutch"],
+    "occasion": "wedding",
+    "price_hint": "luxury",
+    "reasoning": "Luxury + summer wedding = high-end elegant region. Destination is sophisticated formal with seasonal lightness. Premium quality fabrics, refined silhouettes."
 }}
 
-Query: "affordable work blazer"
-Response:
-{{
-    "expanded_query": "affordable work blazer professional office business formal structured tailored polished classic",
-    "style_terms": ["professional", "office", "business", "formal", "structured", "tailored", "polished", "classic"],
-    "color_terms": ["navy", "black", "gray", "neutral"],
-    "category_terms": ["blazer", "jacket"],
-    "occasion": "work",
-    "price_hint": "affordable",
-    "reasoning": "Work blazer with budget constraint - classic professional pieces in neutral colors"
-}}
-
-Now analyze the user query above:"""
+Now analyze the user query and navigate to the right region of style space:"""
 
     def __init__(
         self,
@@ -141,30 +152,41 @@ Now analyze the user query above:"""
         user_context: Optional[Dict[str, Any]] = None,
     ) -> SemanticQuery:
         """
-        Expand a query with semantic understanding (async).
+        Expand a query with semantic understanding for style space navigation.
+
+        The expanded query is a rich description of the user's DESTINATION in
+        style space. This description will be embedded and used for similarity
+        search to navigate to the correct region.
 
         Args:
             query: Natural language query
-            user_context: Optional user preferences/history
+            user_context: Optional user style position/preferences for navigation
 
         Returns:
-            SemanticQuery with expanded terms and filter suggestions
+            SemanticQuery with expanded navigation description
         """
         if not self.async_openai_client:
             raise ValueError("Async OpenAI client not configured")
 
-        prompt = self.SEMANTIC_EXPANSION_PROMPT.format(query=query)
-
-        # Add user context if available
+        # Build user context string for the prompt
+        context_str = ""
         if user_context:
-            context_str = f"\n\nUser Context:\n"
+            context_parts = []
             if user_context.get("preferred_styles"):
-                context_str += f"- Preferred styles: {user_context['preferred_styles']}\n"
+                context_parts.append(f"Current style position: {user_context['preferred_styles']}")
             if user_context.get("preferred_colors"):
-                context_str += f"- Preferred colors: {user_context['preferred_colors']}\n"
-            if user_context.get("budget_range"):
-                context_str += f"- Budget: ${user_context['budget_range'].get('min', 0)}-${user_context['budget_range'].get('max', 'unlimited')}\n"
-            prompt += context_str
+                context_parts.append(f"Color preferences: {user_context['preferred_colors']}")
+            if user_context.get("style_trajectory"):
+                context_parts.append(f"Style evolution: {user_context['style_trajectory']}")
+            if user_context.get("occasion_context"):
+                context_parts.append(f"Typical occasions: {user_context['occasion_context']}")
+            if context_parts:
+                context_str = "## User's Current Position in Style Space\n" + "\n".join(f"- {p}" for p in context_parts)
+
+        prompt = self.SEMANTIC_EXPANSION_PROMPT.format(
+            query=query,
+            user_context=context_str
+        )
 
         try:
             response = await self.async_openai_client.chat.completions.create(
@@ -277,34 +299,29 @@ Now analyze the user query above:"""
         result: Dict[str, Any],
         price_range: Optional[Tuple[float, float]],
     ) -> Dict[str, Any]:
-        """Build Qdrant filter suggestions from expansion result."""
-        filters = {}
+        """
+        Build filter dict - ONLY for explicit numeric price ranges.
 
-        # Price filter
-        if price_range:
-            filters["price"] = {
-                "min": price_range[0],
-                "max": price_range[1] if price_range[1] != float('inf') else None,
-            }
+        PHILOSOPHY: All style attributes (including price positioning like
+        "luxury" or "budget") flow through the semantic query expansion.
+        The expanded_query includes terms like "high-end designer premium"
+        or "affordable everyday practical" which the embedding model uses
+        to navigate to the right region of style space.
 
-        # NOTE: Category filter intentionally NOT included here.
-        # Extracted categories are abstract terms that don't match DB values.
-        # Semantic search handles category matching through embeddings.
-
-        # Price tier based on hint
-        price_hint = result.get("price_hint")
-        if price_hint:
-            tier_mapping = {
-                "budget": "budget",
-                "affordable": "budget",
-                "mid-range": "mid_range",
-                "premium": "premium",
-                "luxury": "premium",
-            }
-            if price_hint.lower() in tier_mapping:
-                filters["price_tier"] = tier_mapping[price_hint.lower()]
-
-        return filters
+        Hard filters are ONLY used for explicit numeric constraints
+        (e.g., "under $50" → price.max = 50).
+        """
+        # NOTE: We intentionally return empty filters here.
+        # The orchestrator's _build_qdrant_filter handles explicit numeric
+        # price ranges from ExtractedParameters.price_range.
+        #
+        # All other attributes flow through semantic navigation:
+        # - "luxury" → expanded_query includes luxury descriptors
+        # - "affordable" → expanded_query includes budget-friendly terms
+        # - categories → expanded_query includes garment types
+        #
+        # This prevents 0-result queries from mismatched filter values.
+        return {}
 
     def _fallback_expansion(self, query: str) -> SemanticQuery:
         """Generate a basic expansion without LLM."""
