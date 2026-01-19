@@ -369,6 +369,7 @@
                             <span class="tag">PRODUCT_SEARCH</span>
                             <span class="tag">BROWSE</span>
                             <span class="tag">FEEDBACK</span>
+                            <span class="tag new">PROFILE_UPDATE</span>
                             <span class="tag">CLARIFICATION</span>
                             <span class="tag">CONVERSATION</span>
                         </div>
@@ -572,6 +573,23 @@
                         <li>LLM fallback for ambiguous</li>
                         <li>Entity extraction</li>
                         <li>Confidence scoring</li>
+                    </ul>
+                </div>
+
+                <div class="component">
+                    <div class="component-header">
+                        <div class="component-icon">U</div>
+                        <div>
+                            <div class="component-name">Profile Update Handler</div>
+                            <div class="component-file">interface/orchestrator.py</div>
+                        </div>
+                    </div>
+                    <div class="component-desc">Extracts and persists user identity/preferences</div>
+                    <ul class="component-list">
+                        <li>Gender extraction (identity + expression)</li>
+                        <li>Name-based inference via LLM</li>
+                        <li>Neo4j profile persistence</li>
+                        <li>Complaint detection & re-search</li>
                     </ul>
                 </div>
 
