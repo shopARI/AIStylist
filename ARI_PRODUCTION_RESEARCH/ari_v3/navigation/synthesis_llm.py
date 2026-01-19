@@ -358,9 +358,11 @@ class SynthesisLLM:
         # Format spending patterns
         spending_desc = ""
         if pillars.spending_patterns:
+            # Use investment_categories (where they splurge) as category preferences
+            category_prefs = pillars.spending_patterns.investment_categories or []
             spending_desc = f"""
 - Typical spend: ${pillars.spending_patterns.median_spend:.0f}
-- Category preferences: {', '.join(pillars.spending_patterns.category_preferences[:3]) if pillars.spending_patterns.category_preferences else 'varied'}"""
+- Splurge categories: {', '.join(category_prefs[:3]) if category_prefs else 'varied'}"""
 
         # Infer category from query
         category = self._infer_category(query)

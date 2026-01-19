@@ -296,6 +296,9 @@ class ParameterExtractor:
         """
         message_lower = message.lower()
 
+        # Detect luxury/premium tier from keywords
+        price_tier, require_premium = self._extract_price_tier(message_lower)
+
         params = ExtractedParameters(
             categories=self._extract_vocab_items(message_lower, "categories"),
             colors=self._extract_vocab_items(message_lower, "colors"),
@@ -308,10 +311,48 @@ class ParameterExtractor:
             materials=self._extract_vocab_items(message_lower, "materials"),
             time_reference=self._extract_time_reference(message_lower),
             entity_reference=self._extract_entity_reference(message_lower),
+            price_tier=price_tier,
+            require_premium=require_premium,
         )
 
         logger.debug(f"Extracted parameters: {params.to_dict()}")
         return params
+
+    def _extract_price_tier(self, text: str) -> tuple[Optional[str], bool]:
+        """
+        Extract price tier from luxury/premium keywords.
+
+        Returns:
+            Tuple of (price_tier, require_premium)
+            - price_tier: "budget", "mid_range", "premium", or None
+            - require_premium: True if premium products required
+        """
+        # Luxury/high-end keywords -> require premium tier
+        luxury_keywords = [
+            "luxury", "luxurious", "high-end", "high end", "designer",
+            "premium", "upscale", "exclusive", "high quality", "top tier",
+            "expensive", "splurge", "investment piece", "luxury brand"
+        ]
+
+        # Budget keywords -> budget tier
+        budget_keywords = [
+            "cheap", "budget", "affordable", "inexpensive", "low cost",
+            "bargain", "deal", "sale", "discount", "value"
+        ]
+
+        # Check for luxury/premium
+        for keyword in luxury_keywords:
+            if keyword in text:
+                logger.info(f"Detected luxury keyword: '{keyword}' -> price_tier=premium, require_premium=True")
+                return ("premium", True)
+
+        # Check for budget
+        for keyword in budget_keywords:
+            if keyword in text:
+                logger.info(f"Detected budget keyword: '{keyword}' -> price_tier=budget")
+                return ("budget", False)
+
+        return (None, False)
 
     def extract_parameters(self, message: str) -> Dict[str, Any]:
         """

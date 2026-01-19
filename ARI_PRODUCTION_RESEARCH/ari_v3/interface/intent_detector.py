@@ -161,6 +161,10 @@ class IntentDetector:
             SearchIntent.BRAND: [
                 r"from (\w+)", r"by (\w+)", r"(\w+) brand",
                 r"\b(nike|adidas|gucci|zara|h&m|uniqlo)\b",
+                # Luxury/premium tier queries
+                r"\bluxury\b", r"\bhigh[- ]?end\b", r"\bdesigner\b",
+                r"\bpremium\b", r"\bupscale\b", r"\bexclusive\b",
+                r"\bluxe\b", r"\bhigh[- ]?quality\b",
             ],
             SearchIntent.SALE: [
                 r"sale", r"discount", r"deal", r"clearance",

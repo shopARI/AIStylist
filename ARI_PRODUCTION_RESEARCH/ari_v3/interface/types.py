@@ -88,6 +88,13 @@ class ExtractedParameters:
     sizes: List[str] = field(default_factory=list)
     materials: List[str] = field(default_factory=list)
 
+    # Price tier filter (maps to Qdrant price_tier field)
+    # Values: "budget", "mid_range", "premium", or None for any
+    price_tier: Optional[str] = None
+
+    # Whether to require premium products (maps to Qdrant is_premium field)
+    require_premium: bool = False
+
     # General exclusions - can be any field type (brand, color, category, style, etc.)
     exclusions: List[Exclusion] = field(default_factory=list)
 

@@ -37,6 +37,17 @@ if TYPE_CHECKING:
     from qdrant_client import AsyncQdrantClient
     from openai import OpenAI
 
+# Qdrant filter imports (lazy-loaded to avoid import errors if qdrant not installed)
+try:
+    from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
+    QDRANT_FILTER_AVAILABLE = True
+except ImportError:
+    QDRANT_FILTER_AVAILABLE = False
+    Filter = None
+    FieldCondition = None
+    MatchValue = None
+    Range = None
+
 logger = logging.getLogger(__name__)
 
 # Lazy-loaded module references (avoid import on every call)
@@ -352,10 +363,14 @@ class ARIOrchestrator:
 
                 if query_vector:
                     try:
+                        # Build Qdrant filter based on extracted parameters
+                        query_filter = self._build_qdrant_filter(params)
+
                         # Semantic search (always runs)
                         results = await self.qdrant_client.query_points(
                             collection_name=self.qdrant_collection,
                             query=query_vector,
+                            query_filter=query_filter,
                             limit=50,
                             timeout=30,  # 30 second timeout
                         )
@@ -364,7 +379,8 @@ class ARIOrchestrator:
                             hit.payload.get('id', hit.payload.get('_id', str(i))): hit.score
                             for i, hit in enumerate(results.points)
                         }
-                        logger.info(f"Found {len(semantic_products)} products from semantic search")
+                        filter_desc = f" (filter: {query_filter})" if query_filter else ""
+                        logger.info(f"Found {len(semantic_products)} products from semantic search{filter_desc}")
 
                         # Visual search (if enabled)
                         visual_products = []
@@ -843,6 +859,79 @@ If you can't interpret the feedback, return "UNCLEAR"."""
             {"role": msg.role.value, "content": msg.content}
             for msg in messages[-5:]  # Last 5 messages
         ]
+
+    def _build_qdrant_filter(self, params) -> Optional[Filter]:
+        """
+        Build Qdrant filter based on extracted parameters.
+
+        Uses Qdrant's filtering to narrow results BEFORE vector similarity,
+        which is more efficient and accurate than post-filtering.
+
+        Args:
+            params: ExtractedParameters with price_tier, require_premium, price_range
+
+        Returns:
+            Qdrant Filter object or None if no filters needed
+        """
+        if not QDRANT_FILTER_AVAILABLE:
+            logger.debug("Qdrant filter not available, skipping")
+            return None
+
+        conditions = []
+
+        # Filter by price tier (luxury/premium/budget queries)
+        if hasattr(params, 'price_tier') and params.price_tier:
+            conditions.append(
+                FieldCondition(
+                    key="price_tier",
+                    match=MatchValue(value=params.price_tier)
+                )
+            )
+            logger.info(f"Adding price_tier filter: {params.price_tier}")
+
+        # Filter for premium products
+        if hasattr(params, 'require_premium') and params.require_premium:
+            conditions.append(
+                FieldCondition(
+                    key="is_premium",
+                    match=MatchValue(value=True)
+                )
+            )
+            logger.info("Adding is_premium=True filter")
+
+        # Filter by price range
+        if hasattr(params, 'price_range') and params.price_range:
+            price_range = params.price_range
+            range_filter = {}
+            if price_range.get('min'):
+                range_filter['gte'] = price_range['min']
+            if price_range.get('max'):
+                range_filter['lte'] = price_range['max']
+
+            if range_filter:
+                conditions.append(
+                    FieldCondition(
+                        key="price",
+                        range=Range(**range_filter)
+                    )
+                )
+                logger.info(f"Adding price range filter: {range_filter}")
+
+        # Filter by category if specified
+        if hasattr(params, 'categories') and params.categories:
+            # Use first category for now (Qdrant doesn't support OR easily)
+            conditions.append(
+                FieldCondition(
+                    key="category",
+                    match=MatchValue(value=params.categories[0])
+                )
+            )
+            logger.info(f"Adding category filter: {params.categories[0]}")
+
+        if not conditions:
+            return None
+
+        return Filter(must=conditions)
 
     def _apply_exclusions(self, products: List[Dict], exclusions: List) -> List[Dict]:
         """
