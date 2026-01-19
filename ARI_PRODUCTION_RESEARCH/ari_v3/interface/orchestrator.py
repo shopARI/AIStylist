@@ -304,6 +304,15 @@ class ARIOrchestrator:
         trace.query_interpretation["original_query"] = query
         trace.query_interpretation["detected_intent"] = intent.primary_intent.value
 
+        # Expand vague queries using conversation history
+        # e.g., "show me some" after discussing Prada → "show me some Prada products"
+        conversation_history = self._get_conversation_history(session_id)
+        expanded_query = await self._expand_vague_query(query, conversation_history)
+        if expanded_query != query:
+            logger.info(f"Expanded vague query: '{query}' → '{expanded_query}'")
+            trace.query_interpretation["expanded_from_conversation"] = expanded_query
+            query = expanded_query
+
         # Check for previous context - use it for follow-up queries
         previous_context = self._last_search_context.get(session_id)
         previous_products = previous_context.get("products", []) if previous_context else []
@@ -1259,6 +1268,100 @@ Return JSON:
                 text="I heard you! Tell me more about your style and I'll keep it in mind.",
                 suggestions=["I like minimalist fashion", "My style is casual", "I prefer quality over quantity"],
             )
+
+    async def _expand_vague_query(
+        self,
+        query: str,
+        conversation_history: List[Dict[str, str]],
+    ) -> str:
+        """
+        Expand vague queries using conversation history context.
+
+        When user says "show me some" or "yes please" after discussing a brand
+        or category, we expand the query to include that context.
+
+        Args:
+            query: The current (possibly vague) query
+            conversation_history: Recent conversation messages
+
+        Returns:
+            Expanded query if vague, otherwise original query
+        """
+        # Quick check: is this query vague enough to need expansion?
+        vague_patterns = [
+            "show me", "show some", "yes", "yeah", "sure", "ok", "please",
+            "let me see", "i want to see", "can i see", "display", "list",
+        ]
+        query_lower = query.lower().strip()
+
+        # If query is specific enough (has brand/category/style words), don't expand
+        if len(query.split()) > 4:
+            return query
+
+        is_vague = any(p in query_lower for p in vague_patterns) or len(query.split()) <= 3
+
+        if not is_vague or not conversation_history:
+            return query
+
+        # No LLM client - try simple keyword extraction
+        if not self.async_openai_client:
+            # Extract potential topics from recent conversation
+            recent_text = " ".join(
+                msg.get("content", "") for msg in conversation_history[-4:]
+            ).lower()
+
+            # Look for brand names mentioned
+            common_brands = [
+                "prada", "gucci", "louis vuitton", "chanel", "dior", "versace",
+                "balenciaga", "fendi", "burberry", "armani", "valentino", "hermes",
+                "nike", "adidas", "zara", "h&m", "uniqlo", "mango",
+            ]
+            for brand in common_brands:
+                if brand in recent_text:
+                    return f"{query} {brand} products"
+
+            return query
+
+        # Use LLM to understand context and expand query
+        try:
+            # Build conversation context
+            conv_text = "\n".join(
+                f"{msg.get('role', 'user')}: {msg.get('content', '')}"
+                for msg in conversation_history[-4:]
+            )
+
+            prompt = f"""The user is shopping and just said: "{query}"
+
+Recent conversation:
+{conv_text}
+
+If the user's query is vague (like "show me some", "yes please") and refers to something mentioned earlier in the conversation (a brand, category, style, etc.), expand it to be specific.
+
+If the query is already specific or doesn't need context, return it unchanged.
+
+Return ONLY the expanded query, nothing else. Keep it natural and concise."""
+
+            response = await self.async_openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You expand vague shopping queries using conversation context. Return only the expanded query."},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=50,
+                temperature=0.3,
+            )
+
+            expanded = response.choices[0].message.content.strip()
+
+            # Sanity check - don't return something wildly different
+            if expanded and len(expanded) < 100:
+                return expanded
+
+            return query
+
+        except Exception as e:
+            logger.warning(f"Query expansion failed: {e}")
+            return query
 
     async def _interpret_feedback(
         self,
