@@ -236,6 +236,7 @@ class ARIDemoCLI:
         self.intent_detector: Optional[HybridIntentDetector] = None
         self.conversation_handler: Optional[ConversationHandler] = None
         self.navigation_intelligence = None
+        self.user_graph_manager = None  # For recording user activity (Pillar 3)
 
         # Visual feature flags (V3.2)
         self.visual_flags = visual_flags or VisualFeatureFlags()
@@ -276,6 +277,11 @@ class ARIDemoCLI:
                 result = session.run("MATCH (u:User) RETURN count(u) as count")
                 count = result.single()["count"]
             print(f"  [OK] Neo4j connected ({count} users)")
+
+            # Initialize UserGraphManager for activity recording (Pillar 3)
+            from ari_v3.services.user_graph_manager import UserGraphManager
+            self.user_graph_manager = UserGraphManager()
+            print(f"  [OK] UserGraphManager initialized (activity recording)")
 
             # Qdrant
             qdrant_url = os.getenv("QDRANT_URL", "http://localhost:6333")
@@ -487,11 +493,30 @@ class ARIDemoCLI:
 
         return SimpleProfile(profile_data)
 
-    async def display_results(self, products: List[Dict], narrative):
-        """Display recommendation results."""
+    async def display_results(self, products: List[Dict], narrative, user_id: str = None, session_id: str = None):
+        """Display recommendation results and record views for Pillar 3."""
         print("\n" + "="*60)
         print("  YOUR PERSONALIZED RECOMMENDATIONS")
         print("="*60)
+
+        # Record product views for Pillar 3 (User Activity)
+        if self.user_graph_manager and user_id and session_id:
+            for product in products[:5]:  # Only record displayed products
+                product_id = product.get("_id") or product.get("id") or product.get("product_id")
+                if product_id:
+                    try:
+                        self.user_graph_manager.record_product_view(
+                            user_id=user_id,
+                            product_id=str(product_id),
+                            session_id=session_id,
+                            product_title=product.get("title", "")[:100],
+                            product_category=product.get("category", ""),
+                        )
+                    except Exception as e:
+                        pass  # Don't fail display if recording fails
+
+        # Save products for like/save commands
+        self._last_products = products[:5]
 
         # Show narrative opening (handle various attribute names)
         if narrative:
@@ -662,6 +687,9 @@ class ARIDemoCLI:
         # Create session ID
         session_id = str(uuid.uuid4())
 
+        # Track last displayed products for like/save commands
+        self._last_products = []
+
         if show_welcome:
             print("\n")
             print("ARI: Hey there! I'm ARI. What brings you in today - looking for")
@@ -707,6 +735,32 @@ class ARIDemoCLI:
                 self._show_natural_help()
                 continue
 
+            # Check for like/save command (e.g., "like 1", "save #2", "love the first one")
+            like_match = self._detect_like_command(query)
+            if like_match and self._last_products:
+                idx = like_match - 1  # Convert to 0-indexed
+                if 0 <= idx < len(self._last_products):
+                    product = self._last_products[idx]
+                    product_id = product.get("_id") or product.get("id") or product.get("product_id")
+                    if product_id and self.user_graph_manager:
+                        try:
+                            self.user_graph_manager.record_product_save(
+                                user_id=user_id,
+                                product_id=str(product_id),
+                                product_title=product.get("title", "")[:100],
+                                product_category=product.get("category", ""),
+                            )
+                            title = product.get("title", "that item")[:40]
+                            print(f"\nARI: Great choice! I've saved \"{title}\" to your likes.")
+                            print("     This helps me learn your style better!")
+                        except Exception as e:
+                            print(f"\nARI: I love that one too! (Note: couldn't save - {e})")
+                    else:
+                        print(f"\nARI: I love that one too!")
+                else:
+                    print(f"\nARI: Hmm, I don't see item #{like_match}. Try 1-{len(self._last_products)}.")
+                continue
+
             # Debug: Show pipeline modules BEFORE processing
             if self.debug_mode:
                 self._show_debug_pre_processing(query)
@@ -719,6 +773,19 @@ class ARIDemoCLI:
                 user_profile=self.current_profile,
             )
 
+            # Record search for Pillar 3 (User Activity)
+            if self.user_graph_manager and response.response_type == ResponseType.PRODUCTS:
+                try:
+                    result_count = len(response.products) if response.products else 0
+                    self.user_graph_manager.record_search(
+                        user_id=user_id,
+                        query=query[:200],  # Truncate long queries
+                        category=response.intent.extracted_params.categories[0] if response.intent and response.intent.extracted_params and response.intent.extracted_params.categories else "",
+                        result_count=result_count,
+                    )
+                except Exception as e:
+                    pass  # Don't fail if recording fails
+
             # Debug: Show pipeline trace AFTER processing
             if self.debug_mode:
                 self._show_debug_post_processing(response, session_id)
@@ -727,8 +794,8 @@ class ARIDemoCLI:
             if response.response_type == ResponseType.PRODUCTS:
                 # Product search completed by orchestrator
                 if response.products:
-                    # Display results from orchestrator
-                    await self.display_results(response.products, response.narrative)
+                    # Display results from orchestrator (also records views for Pillar 3)
+                    await self.display_results(response.products, response.narrative, user_id=user_id, session_id=session_id)
 
                     # Offer feedback collection (now just continues conversation)
                     await self.collect_feedback(response.products)
@@ -764,6 +831,47 @@ class ARIDemoCLI:
             "tell me about me",
         ]
         return any(p in text_lower for p in patterns)
+
+    def _detect_like_command(self, text: str) -> Optional[int]:
+        """
+        Detect if user wants to like/save a product.
+        Returns the product number (1-indexed) or None.
+        """
+        import re
+        text_lower = text.lower().strip()
+
+        # Patterns: "like 1", "save #2", "love 3", "like the first", etc.
+        patterns = [
+            r"^(?:like|love|save|want|favorite)\s*#?(\d+)$",
+            r"^(?:like|love|save|want|favorite)\s+(?:the\s+)?(?:first|1st)\s*(?:one)?$",
+            r"^(?:like|love|save|want|favorite)\s+(?:the\s+)?(?:second|2nd)\s*(?:one)?$",
+            r"^(?:like|love|save|want|favorite)\s+(?:the\s+)?(?:third|3rd)\s*(?:one)?$",
+            r"^(?:like|love|save|want|favorite)\s+(?:the\s+)?(?:fourth|4th)\s*(?:one)?$",
+            r"^(?:like|love|save|want|favorite)\s+(?:the\s+)?(?:fifth|5th)\s*(?:one)?$",
+            r"^#(\d+)$",
+        ]
+
+        # Check numeric patterns
+        for pattern in patterns[:2]:
+            match = re.match(pattern, text_lower)
+            if match:
+                try:
+                    return int(match.group(1))
+                except (ValueError, IndexError):
+                    pass
+
+        # Check ordinal patterns
+        ordinals = {"first": 1, "1st": 1, "second": 2, "2nd": 2, "third": 3, "3rd": 3, "fourth": 4, "4th": 4, "fifth": 5, "5th": 5}
+        for ordinal, num in ordinals.items():
+            if ordinal in text_lower and any(word in text_lower for word in ["like", "love", "save", "want", "favorite"]):
+                return num
+
+        # Check bare number with # prefix
+        match = re.match(r"^#(\d+)$", text_lower)
+        if match:
+            return int(match.group(1))
+
+        return None
 
     def _is_score_query(self, text: str) -> bool:
         """Detect if user is asking about match scores/ratings."""
@@ -880,6 +988,7 @@ class ARIDemoCLI:
         ran_enrichment = False
         ran_evaluator = False
         ran_narrative = False
+        ran_activity = False  # Pillar 3 activity recording
 
         # Check what actually ran based on response
         if response.intent:
@@ -946,6 +1055,9 @@ class ARIDemoCLI:
             ran_qdrant = True  # We always use Qdrant for product searches
             if response.products:
                 ran_evaluator = True
+                # Activity recording runs when products are displayed
+                if self.user_graph_manager:
+                    ran_activity = True
             if response.text and len(response.text) > 100:
                 ran_narrative = True
 
@@ -977,6 +1089,7 @@ class ARIDemoCLI:
             print(f"  Neo4jEnrichment          [{status(ran_enrichment)}]  Fill missing metadata")
         print(f"  ARIEvaluator             [{status(ran_evaluator)}]  Product scoring/ranking")
         print(f"  NarrativeLLM             [{status(ran_narrative)}]  Response generation")
+        print(f"  ActivityRecorder         [{status(ran_activity)}]  Pillar 3: views/searches → Neo4j")
 
         print("-"*60)
 

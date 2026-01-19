@@ -348,8 +348,17 @@ class ARIOrchestrator:
                     query=query,
                     occasion=occasion,
                 )
+                # Record navigation decisions for debug tracing
+                if nav_context:
+                    trace.navigation_decisions = {
+                        "ran": True,
+                        "has_destination": nav_context.destination is not None,
+                        "synthesis_descriptors": getattr(nav_context, 'synthesis_output', {}).get('style_descriptors', []) if hasattr(nav_context, 'synthesis_output') else [],
+                        "user_id": user_id,
+                    }
             except Exception as nav_err:
                 logger.warning(f"Navigation pipeline failed: {nav_err}, will use direct embedding")
+                trace.navigation_decisions = {"ran": False, "error": str(nav_err)}
 
             # Step 2: Search products
             # Use Text2Cypher for queries needing Neo4j's structured data
