@@ -1537,16 +1537,15 @@ If you can't interpret the feedback, return "UNCLEAR"."""
                 )
                 logger.info(f"Adding price range filter: {range_filter}")
 
-        # Filter by category if specified
+        # NOTE: We intentionally do NOT filter by extracted categories here.
+        # Extracted categories (e.g., "professional attire", "casual wear") are
+        # inferred/abstract terms that don't match exact database category values.
+        # Instead, we let the semantic search handle category matching naturally
+        # through the embedding similarity of the full query.
+        # Only price_tier, is_premium, and price_range are used as hard filters
+        # since those have exact matches in the database.
         if hasattr(params, 'categories') and params.categories:
-            # Use first category for now (Qdrant doesn't support OR easily)
-            conditions.append(
-                FieldCondition(
-                    key="category",
-                    match=MatchValue(value=params.categories[0])
-                )
-            )
-            logger.info(f"Adding category filter: {params.categories[0]}")
+            logger.debug(f"Category hint (not filtered): {params.categories[0]}")
 
         if not conditions:
             return None
