@@ -144,9 +144,9 @@ def display_product_grid(products: list, columns: int = 3):
 async def process_message(query: str, orchestrator: ARIOrchestrator, user_profile: dict) -> dict:
     """Process a user message through the orchestrator."""
     response = await orchestrator.process_input(
-        user_input=query,
         session_id=st.session_state.session_id,
         user_id=user_profile["id"],
+        query=query,
         user_context={
             "name": user_profile["name"],
             "style_words": user_profile.get("style_words", []),
