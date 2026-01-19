@@ -416,6 +416,7 @@ class ARIOrchestrator:
 
             if needs_neo4j and self.async_openai_client:
                 logger.info(f"Query needs structured data, using Text2Cypher")
+                trace.query_interpretation["cypher_query"] = True  # Track for debug panel
                 try:
                     products = await self._search_neo4j_text2cypher(
                         query=query,
@@ -423,9 +424,11 @@ class ARIOrchestrator:
                     )
                     if products:
                         used_neo4j_search = True
+                        trace.query_interpretation["neo4j_results"] = len(products)
                         logger.info(f"Using {len(products)} products from Text2Cypher search")
                 except Exception as neo4j_err:
                     logger.warning(f"Text2Cypher search failed: {neo4j_err}")
+                    trace.query_interpretation["cypher_error"] = str(neo4j_err)
 
             # Fall back to Qdrant semantic search if Neo4j didn't return results
             if not products and not self.qdrant_client:
