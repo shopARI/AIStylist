@@ -346,6 +346,21 @@ class ARIOrchestrator:
             # Extract filters from intent parameters
             params = intent.extracted_parameters
 
+            # Re-extract parameters from EXPANDED query (original params were from pre-expansion)
+            # This ensures brand_preferences etc. are updated if context added a brand
+            if expanded_query != trace.query_interpretation.get("original_query"):
+                from .parameter_extractor import get_parameter_extractor
+                extractor = get_parameter_extractor()
+                expanded_params = extractor.extract(expanded_query)
+                # Merge: use expanded params if they have more info
+                if expanded_params.brand_preferences and not params.brand_preferences:
+                    params.brand_preferences = expanded_params.brand_preferences
+                    logger.info(f"Extracted brand from expanded query: {params.brand_preferences}")
+                if expanded_params.categories and not params.categories:
+                    params.categories = expanded_params.categories
+                if expanded_params.colors and not params.colors:
+                    params.colors = expanded_params.colors
+
             # Use LLM to reason about exclusions (async)
             if self.async_openai_client:
                 try:
@@ -1980,6 +1995,19 @@ If you can't interpret the feedback, return "UNCLEAR"."""
         semantic embedding search.
         """
         query_lower = query.lower()
+
+        # Check for known brand names directly in query
+        known_brands = [
+            "prada", "gucci", "louis vuitton", "chanel", "dior", "versace",
+            "balenciaga", "fendi", "burberry", "armani", "valentino", "hermes",
+            "nike", "adidas", "zara", "h&m", "uniqlo", "mango", "coach",
+            "michael kors", "kate spade", "tory burch", "ralph lauren",
+            "calvin klein", "tommy hilfiger", "levi's", "gap", "banana republic",
+        ]
+        for brand in known_brands:
+            if brand in query_lower:
+                logger.debug(f"Query contains brand name '{brand}', needs structured search")
+                return True
 
         # Brand-related patterns (Neo4j has extracted_brand, Qdrant doesn't)
         brand_patterns = [
