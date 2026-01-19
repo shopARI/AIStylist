@@ -2482,7 +2482,103 @@ FUNCTION compute_destination_from_synthesis(
     )
 ```
 
-### 3.4 LLM #4: Narrative (V3)
+### 3.4 Query Agents (V3.2 Addition)
+
+Two LLM-powered query agents enhance search quality by understanding natural language intent:
+
+```
+CLASS Text2CypherGenerator:
+    """
+    Converts natural language to Cypher queries for Neo4j.
+    Works with ANY field: brand, color, price, style, material, etc.
+
+    Neo4j has structured data (extracted_brand, extracted_colors, extracted_styles)
+    that Qdrant embeddings cannot filter precisely.
+    """
+
+    FUNCTION generate_cypher(query: STRING) → CypherQuery:
+        """
+        Use LLM to generate appropriate Cypher from natural language.
+
+        Example:
+            Input:  "Show me Gucci bags under $500"
+            Output: MATCH (p:Product)
+                    WHERE toLower(p.extracted_brand) = 'gucci'
+                    AND p.price < 500
+                    RETURN p LIMIT 50
+        """
+
+        prompt = format_cypher_prompt(
+            schema=NEO4J_PRODUCT_SCHEMA,  # id, title, extracted_brand, price, etc.
+            query=query
+        )
+
+        response = llm.generate(prompt, response_format="json")
+
+        RETURN CypherQuery(
+            cypher=response.cypher,
+            parameters=response.parameters,
+            search_fields=response.fields_used
+        )
+
+
+CLASS SemanticQueryGenerator:
+    """
+    Expands queries with style understanding for Qdrant embedding search.
+    Understands fashion aesthetics, vibes, and occasions.
+    """
+
+    FUNCTION expand_query(query: STRING) → SemanticQuery:
+        """
+        Use LLM to expand query with synonyms, style terms, and context.
+
+        Example:
+            Input:  "boho chic summer dress"
+            Output: SemanticQuery(
+                expanded="boho chic summer dress bohemian relaxed
+                         flowy earthy natural free-spirited lightweight",
+                style_terms=["boho", "chic", "relaxed", "flowy"],
+                color_terms=["earth tones", "pastels"],
+                occasion="summer",
+                price_hint="mid-range"
+            )
+        """
+
+        prompt = format_semantic_prompt(query)
+        response = llm.generate(prompt, response_format="json")
+
+        RETURN SemanticQuery(
+            original_query=query,
+            expanded_query=response.expanded,
+            style_terms=response.styles,
+            color_terms=response.colors,
+            occasion=response.occasion,
+            filters=build_qdrant_filters(response)
+        )
+```
+
+**Query Routing Logic:**
+```
+FUNCTION route_query(query: STRING, params: ExtractedParameters) → SearchStrategy:
+    """
+    Determine whether to use Neo4j (structured) or Qdrant (semantic) search.
+    """
+
+    # Neo4j for structured field queries (brand, specific attributes)
+    IF params.brand_preferences OR query_needs_structured_search(query):
+        cypher = Text2CypherGenerator.generate_cypher(query)
+        products = neo4j.execute(cypher)
+        RETURN products
+
+    # Qdrant for semantic/vibe queries (style, aesthetic, mood)
+    ELSE:
+        semantic = SemanticQueryGenerator.expand_query(query)
+        embedding = openai.embed(semantic.expanded_query)
+        products = qdrant.search(embedding, filters=semantic.filters)
+        RETURN products
+```
+
+### 3.5 LLM #4: Narrative (V3)
 
 ```
 CLASS NarrativeLLM:
