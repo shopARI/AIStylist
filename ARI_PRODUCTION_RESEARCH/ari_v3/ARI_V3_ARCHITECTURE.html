@@ -399,14 +399,12 @@
                         <div class="stage-line"></div>
                     </div>
                     <div class="stage-content">
-                        <div class="stage-name">Personalization (Pillar 1)</div>
-                        <div class="stage-desc">Compute user state: embeddings, trajectory, context position</div>
+                        <div class="stage-name">Three Pillars → Navigation Context</div>
+                        <div class="stage-desc">Combine personalization, knowledge, and activity into unified navigation</div>
                         <div class="stage-details">
-                            <span class="tag">User Embeddings</span>
-                            <span class="tag">Style Trajectory</span>
-                            <span class="tag">Context Detection</span>
-                            <span class="tag">Spending Patterns</span>
-                            <span class="tag new">Provenance Tracking</span>
+                            <span class="tag">Pillar 1: Personalization</span>
+                            <span class="tag">Pillar 2: Stylist Knowledge</span>
+                            <span class="tag">Pillar 3: User Activity</span>
                         </div>
                     </div>
                 </div>
@@ -612,9 +610,9 @@
 
                 <div class="component">
                     <div class="component-header">
-                        <div class="component-icon">P</div>
+                        <div class="component-icon">1</div>
                         <div>
-                            <div class="component-name">Personalization</div>
+                            <div class="component-name">Pillar 1: Personalization</div>
                             <div class="component-file">pillars/personalization.py</div>
                         </div>
                     </div>
@@ -624,6 +622,40 @@
                         <li>Style trajectory tracking</li>
                         <li>Context-aware positions</li>
                         <li>Spending pattern analysis</li>
+                    </ul>
+                </div>
+
+                <div class="component">
+                    <div class="component-header">
+                        <div class="component-icon">2</div>
+                        <div>
+                            <div class="component-name">Pillar 2: Stylist Knowledge</div>
+                            <div class="component-file">pillars/stylist_knowledge.py</div>
+                        </div>
+                    </div>
+                    <div class="component-desc">RAG over fashion literature and styling rules (future)</div>
+                    <ul class="component-list">
+                        <li>Fashion rule retrieval</li>
+                        <li>Occasion-appropriate guidance</li>
+                        <li>Color/pattern harmony</li>
+                        <li>Body type recommendations</li>
+                    </ul>
+                </div>
+
+                <div class="component">
+                    <div class="component-header">
+                        <div class="component-icon">3</div>
+                        <div>
+                            <div class="component-name">Pillar 3: User Activity</div>
+                            <div class="component-file">services/user_graph_manager.py</div>
+                        </div>
+                    </div>
+                    <div class="component-desc">Behavioral patterns from views, saves, purchases</div>
+                    <ul class="component-list">
+                        <li>Product view tracking</li>
+                        <li>Save/like recording</li>
+                        <li>Search history</li>
+                        <li>Session patterns</li>
                     </ul>
                 </div>
 
