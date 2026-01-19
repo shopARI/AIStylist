@@ -726,8 +726,13 @@ If the question is vague (like "why this?"), explain the top factors that influe
         # Navigation decisions
         if trace.navigation_decisions:
             parts.append("\nNAVIGATION DECISIONS:")
-            for decision in trace.navigation_decisions[:5]:
+            # navigation_decisions is a Dict with "decisions" list and metadata
+            decisions_list = trace.navigation_decisions.get("decisions", [])
+            for decision in decisions_list[:5]:
                 parts.append(f"  - {decision}")
+            # Also show key metadata if available
+            if trace.navigation_decisions.get("ran"):
+                parts.append(f"  - Navigation ran: has_destination={trace.navigation_decisions.get('has_destination', False)}")
 
         return "\n".join(parts) if parts else "No detailed trace data available."
 

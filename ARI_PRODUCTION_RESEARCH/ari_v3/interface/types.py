@@ -422,8 +422,8 @@ class ExplanationTrace:
     # Query interpretation
     query_interpretation: Dict[str, Any] = field(default_factory=dict)
 
-    # Navigation decisions
-    navigation_decisions: List[str] = field(default_factory=list)
+    # Navigation decisions (can be dict with metadata or list of decision strings)
+    navigation_decisions: Dict[str, Any] = field(default_factory=dict)
 
     # Timing for each step (for debugging)
     step_timings: Dict[str, float] = field(default_factory=dict)
@@ -469,7 +469,9 @@ class ExplanationTrace:
 
     def add_navigation_decision(self, decision: str) -> None:
         """Record a navigation decision made during processing."""
-        self.navigation_decisions.append(decision)
+        if "decisions" not in self.navigation_decisions:
+            self.navigation_decisions["decisions"] = []
+        self.navigation_decisions["decisions"].append(decision)
 
     def record_timing(self, step: str, duration: float) -> None:
         """Record timing for a processing step."""

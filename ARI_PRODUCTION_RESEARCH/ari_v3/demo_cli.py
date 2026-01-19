@@ -780,7 +780,7 @@ class ARIDemoCLI:
                     self.user_graph_manager.record_search(
                         user_id=user_id,
                         query=query[:200],  # Truncate long queries
-                        category=response.intent.extracted_params.categories[0] if response.intent and response.intent.extracted_params and response.intent.extracted_params.categories else "",
+                        category=response.intent.extracted_parameters.categories[0] if response.intent and response.intent.extracted_parameters and response.intent.extracted_parameters.categories else "",
                         result_count=result_count,
                     )
                 except Exception as e:
@@ -1189,6 +1189,8 @@ class ARIDemoCLI:
         await self.interactive_session(user_id, show_welcome=False)
 
         # Cleanup
+        if self.user_graph_manager:
+            self.user_graph_manager.close()
         if self.neo4j_driver_sync:
             self.neo4j_driver_sync.close()
         if self.neo4j_driver_async:

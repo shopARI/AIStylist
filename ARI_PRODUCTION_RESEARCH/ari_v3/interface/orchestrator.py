@@ -990,6 +990,7 @@ Return JSON:
             updated_items = []
 
             if self.enable_neo4j and style_data and self.navigation and hasattr(self.navigation, 'neo4j_driver'):
+                user_graph = None
                 try:
                     from ari_v3.services.user_graph_manager import UserGraphManager
                     user_graph = UserGraphManager()
@@ -1012,7 +1013,6 @@ Return JSON:
                         user_graph.add_values(user_id, values)
                         updated_items.extend(values)
 
-                    user_graph.close()
                     logger.info(f"Updated profile for {user_id}: {updated_items}")
 
                     # Invalidate user cache so fresh profile is loaded next time
@@ -1021,6 +1021,9 @@ Return JSON:
 
                 except Exception as e:
                     logger.warning(f"Failed to update Neo4j profile: {e}")
+                finally:
+                    if user_graph:
+                        user_graph.close()
             elif style_data and not self.enable_neo4j:
                 # User shared style info but Neo4j is disabled - warn about this
                 logger.warning(f"Profile update detected but Neo4j is disabled. Style data not saved: {list(style_data.keys())}")

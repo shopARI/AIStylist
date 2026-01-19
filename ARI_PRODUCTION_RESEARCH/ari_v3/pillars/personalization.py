@@ -118,19 +118,22 @@ class Pillar1_Personalization:
             // Get navigation parameters
             OPTIONAL MATCH (u)-[:HAS_NAV_PARAMS]->(np:NavigationParameters)
 
-            // Get interactions (products connected to user)
-            OPTIONAL MATCH (u)-[r:INTERACTED_WITH]->(p:Product)
+            // Get interactions (views and saves to ProductRef nodes from Pillar 3)
+            // UserGraphManager creates [:VIEWED] and [:SAVED] relationships to ProductRef
+            OPTIONAL MATCH (u)-[r:VIEWED|SAVED]->(p:ProductRef)
 
             // Get conversations
             OPTIONAL MATCH (u)-[:HAD_CONVERSATION]->(c:Conversation)
 
             RETURN u, ob, bd, st, np,
                    collect(DISTINCT {
-                       product_id: p.id,
-                       type: r.type,
+                       product_id: p.product_id,
+                       type: type(r),
                        timestamp: r.timestamp,
                        context: r.context,
-                       feedback: r.feedback
+                       feedback: r.feedback,
+                       session_id: r.session_id,
+                       view_count: r.count
                    }) as interactions,
                    collect(DISTINCT c) as conversations
         """
@@ -368,13 +371,20 @@ class Pillar1_Personalization:
             if not i_data.get("product_id"):
                 continue
 
-            # Parse interaction type
+            # Parse interaction type (from Neo4j relationship type or property)
             i_type_raw = i_data.get("type", "viewed")
             i_type_str = str(i_type_raw).lower() if i_type_raw else "viewed"
-            try:
-                i_type = InteractionType(i_type_str)
-            except ValueError:
-                i_type = InteractionType.VIEWED
+
+            # Map Neo4j relationship types to InteractionType
+            # UserGraphManager creates [:VIEWED] and [:SAVED] relationships
+            type_mapping = {
+                "viewed": InteractionType.VIEWED,
+                "saved": InteractionType.LIKED,  # SAVED maps to LIKED semantically
+                "liked": InteractionType.LIKED,
+                "purchased": InteractionType.PURCHASED,
+                "returned": InteractionType.RETURNED,
+            }
+            i_type = type_mapping.get(i_type_str, InteractionType.VIEWED)
 
             # Parse timestamp
             timestamp = self._parse_datetime(i_data.get("timestamp"))
