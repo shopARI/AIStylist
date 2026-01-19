@@ -376,6 +376,7 @@ ENUM SearchIntent:
     # Special intents
     ONBOARDING               # User in onboarding flow
     FEEDBACK                 # "I liked that one" / "Not my style"
+    PROFILE_UPDATE           # "I'm a girl" / "I prefer minimalist style"
 
 
 STRUCTURE IntentResult:
@@ -860,6 +861,172 @@ CLASS ARIOrchestrator:
             SearchIntent.OUTFIT_BUILDING
         }
         RETURN intent IN product_intents
+
+
+### 0.5.4 Profile Update Handler
+
+```
+CLASS ProfileUpdateHandler:
+    """
+    Handle PROFILE_UPDATE intents - user sharing identity/preference information.
+
+    Examples:
+    - "I'm a girl" → Extract gender, update Neo4j
+    - "I prefer minimalist style" → Extract style, update profile
+    - "I'm Sophia" → Infer gender from name for product recommendations
+
+    Philosophy:
+    - Gender IDENTITY is a spectrum (0-1), stored as user's own words
+    - Gender EXPRESSION (what products to show) can differ from identity
+    - Use LLM reasoning, not hardcoded mappings
+    - Name-based inference: "Sophia" → likely women's products (unless told otherwise)
+    """
+
+    FUNCTION handle_profile_update(
+        session_id: STRING,
+        user_id: STRING,
+        query: STRING,
+        intent: IntentResult
+    ) → ARIResponse:
+        """
+        Extract and persist user profile information.
+        """
+        # Step 1: LLM extracts profile information
+        extracted = await _extract_profile_info(query)
+
+        # Step 2: Persist to Neo4j (survives restarts)
+        IF extracted.gender:
+            user_graph.update_user_profile(user_id, {
+                "gender": extracted.gender,           # Identity (user's words)
+                "gender_expression": extracted.gender_expression  # Shopping preference
+            })
+            # Also store in session for immediate use
+            session.update(session_id, {"gender": extracted.gender})
+
+        IF extracted.style_adjectives:
+            user_graph.add_style_adjectives(user_id, extracted.style_adjectives)
+
+        # Step 3: Invalidate cache so fresh profile is loaded
+        invalidate_user_cache(user_id)
+
+        # Step 4: Check if this was a correction after wrong results
+        IF extracted.is_complaint AND has_previous_search_context(session_id):
+            RETURN ARIResponse(
+                type="conversation",
+                text="My apologies! I'll keep that in mind. What would you like me to find?",
+                suggestions=["Search again", "Show me something else"]
+            )
+
+        RETURN ARIResponse(
+            type="conversation",
+            text="Got it, noted! What would you like to look for today?",
+            suggestions=["Show me something in my style", "Find me an outfit"]
+        )
+
+    FUNCTION _extract_profile_info(query: STRING) → ProfileExtraction:
+        """
+        Use LLM to extract profile information from natural language.
+
+        Extracts:
+        - gender: "female", "male", "non-binary", or user's own words
+        - gender_expression: What products they want (may differ from identity)
+        - style_adjectives: ["minimalist", "boho", "preppy"]
+        - is_complaint: True if correcting previous results
+        """
+        prompt = """
+        Extract profile information from user message: "{query}"
+
+        Return JSON:
+        {
+            "gender": "female" or "male" or "non-binary" or user's exact words or null,
+            "gender_expression": "women's" or "men's" or null (shopping preference),
+            "is_complaint": true if user is correcting previous wrong results,
+            "style_adjectives": ["list", "of", "style", "words"],
+            "colors": ["color", "preferences"],
+            "fits": ["fit", "preferences"]
+        }
+
+        Note:
+        - "I'm a girl/woman" → gender: "female"
+        - "I prefer men's fashion" → gender_expression: "men's"
+        - Identity and expression can differ
+        """
+        RETURN llm.extract(prompt)
+```
+
+### 0.5.5 Gender-Aware Query Expansion
+
+```
+CLASS SemanticQueryGenerator:
+    """
+    Enhanced to use gender context for product recommendations.
+
+    Philosophy: Use LLM reasoning, not hardcoded mappings.
+    - Name suggests gender: "Sophia" → likely women's products
+    - Explicit statement overrides: "I prefer men's fashion"
+    - Gender expression (what to show) can differ from identity
+    """
+
+    FUNCTION expand_query_async(query: STRING, user_context: DICT) → SemanticQuery:
+        """
+        Expand query with user context including gender.
+        """
+        context_parts = []
+
+        # Name helps LLM infer appropriate products
+        IF user_context.user_name:
+            context_parts.append(f"User's name: {user_context.user_name}")
+
+        # Explicit gender/expression preference overrides name inference
+        IF user_context.gender_expression:
+            context_parts.append(f"Prefers: {user_context.gender_expression} products")
+        ELIF user_context.gender:
+            context_parts.append(f"Identified as: {user_context.gender}")
+
+        # LLM prompt includes instructions to:
+        # 1. Infer product gender from name if no explicit preference
+        # 2. Include gendered product terms when known ("women's blazer")
+        # 3. Handle non-binary gracefully
+
+        RETURN llm.expand_with_context(query, context_parts)
+```
+
+### 0.5.6 User Context Loading
+
+```
+FUNCTION load_user_context(user_id: STRING, session_id: STRING) → UserContext:
+    """
+    Load user context from session (fast) and Neo4j (persistent).
+
+    Priority:
+    1. Session data (in-memory, current session)
+    2. Neo4j profile (persisted, survives restarts)
+    3. Onboarding profile (structured data)
+    """
+    context = {"user_id": user_id}
+
+    # Check session first (fast, current session data)
+    session = get_session(session_id)
+    IF session.gender:
+        context.gender = session.gender
+    IF session.user_name:
+        context.user_name = session.user_name
+
+    # Fall back to Neo4j for persistent data
+    IF "gender" NOT IN context:
+        profile = user_graph.get_user_profile(user_id)
+        IF profile:
+            context.gender = profile.gender
+            context.user_name = profile.username
+            context.gender_expression = profile.gender_expression
+
+    # Load onboarding profile for style preferences
+    IF onboarding_profile:
+        context.style_words = onboarding_profile.taste.style_words
+        context.color_preferences = onboarding_profile.taste.color_preferences
+
+    RETURN context
+```
 
 
 STRUCTURE ARIResponse:
