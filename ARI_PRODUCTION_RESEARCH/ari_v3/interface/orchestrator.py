@@ -304,6 +304,21 @@ class ARIOrchestrator:
         trace.query_interpretation["original_query"] = query
         trace.query_interpretation["detected_intent"] = intent.primary_intent.value
 
+        # Check for previous context - use it for follow-up queries
+        previous_context = self._last_search_context.get(session_id)
+        previous_products = previous_context.get("products", []) if previous_context else []
+
+        # For outfit_building with previous products, provide outfit advice
+        if intent.primary_intent == SearchIntent.OUTFIT_BUILDING and previous_products:
+            return await self._handle_outfit_building_with_context(
+                session_id=session_id,
+                user_id=user_id,
+                query=query,
+                previous_products=previous_products,
+                user_context=user_context,
+                trace=trace,
+            )
+
         if not self.navigation:
             return ARIResponse(
                 response_type=ResponseType.CONVERSATION,
@@ -570,9 +585,15 @@ class ARIOrchestrator:
                 self._last_search_session_id = search_session_id
                 # Store search context for feedback refinement (handle None items safely)
                 safe_selected = [p for p in (selected or []) if p is not None]
+                # Strip embeddings from products before storing (saves memory, not needed for context)
+                context_products = [
+                    {k: v for k, v in p.items() if k != 'embedding'}
+                    for p in safe_selected[:10]
+                ]
                 self._last_search_context[session_id] = {
                     "query": query,
                     "params": params,
+                    "products": context_products,  # Store products for follow-up context (no embeddings)
                     "products_shown": [(p.get('title') or '')[:50] for p in safe_selected[:5]],
                     "brands_shown": list(set(p.get('brand') or p.get('vendor') for p in safe_selected if p.get('brand') or p.get('vendor'))),
                     "timestamp": datetime.now(),
@@ -920,6 +941,153 @@ class ARIOrchestrator:
             intent=intent,
             user_context=user_context,
         )
+
+    async def _handle_outfit_building_with_context(
+        self,
+        session_id: str,
+        user_id: str,
+        query: str,
+        previous_products: List[Dict],
+        user_context: Optional[Dict[str, Any]] = None,
+        trace: Optional[ExplanationTrace] = None,
+    ) -> ARIResponse:
+        """
+        Handle outfit building queries using previous search results as context.
+
+        When the user says "so I put them together?" or similar follow-ups after
+        seeing products, we use those products to provide outfit advice instead
+        of doing a fresh search.
+
+        Args:
+            session_id: Session identifier
+            user_id: User identifier
+            query: User's query (e.g., "so I put them together?")
+            previous_products: Products from the previous search
+            user_context: User context (style preferences, etc.)
+            trace: Explanation trace for debugging
+
+        Returns:
+            ARIResponse with outfit building advice
+        """
+        if not self.async_openai_client:
+            # Fallback if no LLM available
+            product_titles = [p.get('title', 'item')[:50] for p in previous_products[:5]]
+            return ARIResponse(
+                response_type=ResponseType.CONVERSATION,
+                text=(
+                    f"Yes! The items I showed you can work well together. "
+                    f"Here's what you have: {', '.join(product_titles)}. "
+                    "Would you like me to find complementary pieces?"
+                ),
+                products=previous_products[:5],
+                suggestions=[
+                    "Find matching accessories",
+                    "Show me similar items",
+                    "Start a new search",
+                ],
+            )
+
+        try:
+            # Format products for LLM context
+            product_descriptions = []
+            for i, p in enumerate(previous_products[:5], 1):
+                title = p.get('title', 'Unknown item')
+                brand = p.get('brand') or p.get('vendor') or ''
+                price = p.get('price', '')
+                color = p.get('color') or ''
+                desc = f"{i}. {title}"
+                if brand:
+                    desc += f" by {brand}"
+                if price:
+                    desc += f" (${price})"
+                if color:
+                    desc += f" - {color}"
+                product_descriptions.append(desc)
+
+            products_text = "\n".join(product_descriptions)
+
+            # Build user context string
+            context_parts = []
+            if user_context:
+                if user_context.get('gender'):
+                    context_parts.append(f"Gender: {user_context['gender']}")
+                if user_context.get('style_words'):
+                    context_parts.append(f"Style: {', '.join(user_context['style_words'][:3])}")
+            context_str = "; ".join(context_parts) if context_parts else "No specific preferences"
+
+            # Get the original search context for occasion info
+            prev_context = self._last_search_context.get(session_id, {})
+            original_query = prev_context.get('query', 'fashion items')
+
+            prompt = f"""The user previously searched for: "{original_query}"
+I showed them these products:
+{products_text}
+
+Now they asked: "{query}"
+
+User context: {context_str}
+
+Provide helpful outfit advice:
+1. How do these items work together (or not)?
+2. What specific combinations would look good?
+3. What's missing to complete the outfit?
+
+Keep response conversational and concise (2-3 sentences max).
+Focus on practical styling tips, not generic fashion advice."""
+
+            response = await self.async_openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {
+                        "role": "system",
+                        "content": (
+                            "You are a personal fashion stylist. Give practical, "
+                            "specific outfit advice based on the items shown. "
+                            "Be warm but concise."
+                        )
+                    },
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=200,
+                temperature=0.7,
+            )
+
+            outfit_advice = response.choices[0].message.content.strip()
+
+            if trace:
+                trace.add_navigation_decision(
+                    f"Outfit building with {len(previous_products)} previous products"
+                )
+
+            # Generate suggestions based on what might be missing
+            suggestions = [
+                "Find complementary accessories",
+                "Show me shoes to match",
+                "Start a new search",
+            ]
+
+            return ARIResponse(
+                response_type=ResponseType.PRODUCTS,
+                products=previous_products[:5],
+                text=outfit_advice,
+                suggestions=suggestions,
+            )
+
+        except Exception as e:
+            logger.error(f"Outfit building advice failed: {e}")
+            return ARIResponse(
+                response_type=ResponseType.PRODUCTS,
+                products=previous_products[:5],
+                text=(
+                    "These pieces can definitely work together! "
+                    "Would you like me to find complementary items to complete the look?"
+                ),
+                suggestions=[
+                    "Find matching accessories",
+                    "Show me similar items",
+                    "Start a new search",
+                ],
+            )
 
     async def _handle_profile_update_intent(
         self,
