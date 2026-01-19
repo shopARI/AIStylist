@@ -287,10 +287,9 @@ Now analyze the user query above:"""
                 "max": price_range[1] if price_range[1] != float('inf') else None,
             }
 
-        # Category filter (if single clear category)
-        categories = result.get("category_terms", [])
-        if len(categories) == 1:
-            filters["category"] = categories[0]
+        # NOTE: Category filter intentionally NOT included here.
+        # Extracted categories are abstract terms that don't match DB values.
+        # Semantic search handles category matching through embeddings.
 
         # Price tier based on hint
         price_hint = result.get("price_hint")
