@@ -2023,8 +2023,6 @@ If you can't interpret the feedback, return "UNCLEAR"."""
                 return products
 
             # Fetch points from Qdrant with vectors
-            from qdrant_client.models import PointIdsList
-
             retrieved = await self.qdrant_client.retrieve(
                 collection_name=self.qdrant_collection,
                 ids=uuids,
