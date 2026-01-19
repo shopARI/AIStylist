@@ -300,7 +300,6 @@ class ARIOrchestrator:
     ) -> ARIResponse:
         """Handle product search intents via Navigation Intelligence."""
         # Record user query to conversation history (so "what did I ask?" works)
-        from .conversation_handler import Message, MessageRole
         user_message = Message(role=MessageRole.USER, content=query)
         self.conversation_handler._add_message(session_id, user_message)
 
