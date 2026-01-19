@@ -172,6 +172,12 @@ Now analyze the user query and navigate to the right region of style space:"""
         context_str = ""
         if user_context:
             context_parts = []
+            # Gender is critical for fashion - determines which products to show
+            if user_context.get("gender"):
+                gender = user_context["gender"]
+                gender_label = "women's" if gender == "female" else "men's" if gender == "male" else None
+                if gender_label:
+                    context_parts.append(f"Shopping for: {gender_label} fashion/clothing")
             if user_context.get("preferred_styles"):
                 context_parts.append(f"Current style position: {user_context['preferred_styles']}")
             if user_context.get("preferred_colors"):

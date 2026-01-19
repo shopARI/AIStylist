@@ -209,8 +209,8 @@ class ARIOrchestrator:
         # Initialize/update session with TTL
         self._update_session(session_id, user_id)
 
-        # Load user context
-        user_context = self._load_user_context(user_id, user_profile)
+        # Load user context (including gender from session if available)
+        user_context = self._load_user_context(user_id, user_profile, session_id)
 
         # Get conversation history for context
         conversation_history = self._get_conversation_history(session_id)
@@ -244,6 +244,7 @@ class ARIOrchestrator:
                     intent=intent,
                     occasion=occasion,
                     user_profile=user_profile,
+                    user_context=user_context,
                 )
             elif intent.primary_intent == SearchIntent.FEEDBACK:
                 # Check if we have previous search context to refine
@@ -295,6 +296,7 @@ class ARIOrchestrator:
         intent: IntentResult,
         occasion: Optional[str] = None,
         user_profile: Optional[OnboardingProfile] = None,
+        user_context: Optional[Dict[str, Any]] = None,
     ) -> ARIResponse:
         """Handle product search intents via Navigation Intelligence."""
         # Create explanation trace for this request
@@ -414,7 +416,7 @@ class ARIOrchestrator:
                         from ari_v3.navigation.constants import EMBEDDING_MODEL
 
                         generator = SemanticQueryGenerator(async_openai_client=self.async_openai_client)
-                        semantic_expansion = await generator.expand_query_async(query)
+                        semantic_expansion = await generator.expand_query_async(query, user_context=user_context)
 
                         # Use expanded query for embedding
                         response = await self.async_openai_client.embeddings.create(
@@ -908,6 +910,7 @@ class ARIOrchestrator:
                     intent=refined_intent,
                     occasion=None,
                     user_profile=user_profile,
+                    user_context=user_context,
                 )
 
         # No previous context or couldn't refine - handle as conversation
@@ -940,18 +943,22 @@ class ARIOrchestrator:
 
         try:
             # Use LLM to extract style information from user message
-            extraction_prompt = f"""Extract style preferences from this user message.
+            extraction_prompt = f"""Extract style/profile information from this user message.
 User said: "{query}"
 
-Extract any style/fashion preferences mentioned:
+Extract any information mentioned:
+- Gender (if they say "I'm a girl/woman/female" → "female", "I'm a guy/man/male" → "male", else null)
 - Style adjectives (e.g., minimalist, boho, hipster, preppy, streetwear, vintage)
 - Fashion cultures/aesthetics (e.g., Scandinavian, Japanese, punk, goth)
 - Color preferences
 - Fit preferences (e.g., oversized, fitted, loose)
 - Values (e.g., sustainable, quality, affordable)
+- Is this a complaint about previous results? (true if they're saying results were wrong)
 
 Return JSON:
 {{
+    "gender": "female" or "male" or null,
+    "is_complaint": true or false,
     "style_adjectives": ["list of style words"],
     "cultures_aesthetics": ["cultural influences"],
     "colors": ["color preferences"],
@@ -986,14 +993,27 @@ Return JSON:
             except (json.JSONDecodeError, IndexError):
                 style_data = {}
 
-            # Update user profile in Neo4j if we have data and Neo4j is enabled
+            # Extract key fields
+            gender = style_data.get("gender")
+            is_complaint = style_data.get("is_complaint", False)
             updated_items = []
 
+            # Update user profile in Neo4j if we have data and Neo4j is enabled
             if self.enable_neo4j and style_data and self.navigation and hasattr(self.navigation, 'neo4j_driver'):
                 user_graph = None
                 try:
                     from ari_v3.services.user_graph_manager import UserGraphManager
                     user_graph = UserGraphManager()
+
+                    # Store gender if extracted
+                    if gender:
+                        user_graph.update_user_profile(user_id, {"gender": gender})
+                        updated_items.append(f"gender:{gender}")
+                        logger.info(f"Updated gender for {user_id}: {gender}")
+                        # Also store in session for immediate use
+                        with self._session_lock:
+                            if session_id in self._sessions:
+                                self._sessions[session_id]["gender"] = gender
 
                     # Add style adjectives
                     adjectives = style_data.get("style_adjectives", []) + style_data.get("cultures_aesthetics", [])
@@ -1028,25 +1048,46 @@ Return JSON:
                 # User shared style info but Neo4j is disabled - warn about this
                 logger.warning(f"Profile update detected but Neo4j is disabled. Style data not saved: {list(style_data.keys())}")
 
-            # Build response - subtle acknowledgment without echoing labels
-            # Don't repeat style labels back as that sounds stereotypical
-            if updated_items:
+            # Build response based on what was updated
+            # Check if this was a correction after seeing wrong results
+            prev_context = self._last_search_context.get(session_id)
+            gender_corrected = gender is not None
+
+            if gender_corrected and (is_complaint or prev_context):
+                # User corrected their gender after seeing wrong results
+                gender_word = "women's" if gender == "female" else "men's"
+                response_text = (
+                    f"My apologies! Let me search again for {gender_word} options. "
+                    f"What would you like me to find?"
+                )
+                suggestions = [
+                    f"Show me {gender_word} interview outfits",
+                    "Search again",
+                    "Try something different",
+                ]
+            elif updated_items:
                 response_text = (
                     "Got it, noted! What would you like to look for today?"
                 )
+                suggestions = [
+                    "Show me something in my style",
+                    "What else should I tell you?",
+                    "Find me an outfit",
+                ]
             else:
                 response_text = (
                     "Thanks for sharing! What can I help you find?"
                 )
+                suggestions = [
+                    "Show me something in my style",
+                    "What else should I tell you?",
+                    "Find me an outfit",
+                ]
 
             return ARIResponse(
                 response_type=ResponseType.CONVERSATION,
                 text=response_text,
-                suggestions=[
-                    "Show me something in my style",
-                    "What else should I tell you?",
-                    "Find me an outfit",
-                ],
+                suggestions=suggestions,
             )
 
         except Exception as e:
@@ -1399,8 +1440,9 @@ If you can't interpret the feedback, return "UNCLEAR"."""
         self,
         user_id: str,
         user_profile: Optional[OnboardingProfile] = None,
+        session_id: Optional[str] = None,
     ) -> Dict[str, Any]:
-        """Load user context from profile or cache with TTL."""
+        """Load user context from profile, session, or cache with TTL."""
         now = datetime.now()
 
         with self._cache_lock:
@@ -1414,6 +1456,12 @@ If you can't interpret the feedback, return "UNCLEAR"."""
                 if now - last_access <= self.cache_ttl:
                     # Update last access time
                     self._user_context_cache[user_id] = (context, now)
+                    # Merge session data (e.g., gender) if available
+                    if session_id:
+                        with self._session_lock:
+                            session = self._sessions.get(session_id, {})
+                            if session.get("gender"):
+                                context["gender"] = session["gender"]
                     return context
                 else:
                     # Cache expired, remove it
@@ -1421,6 +1469,13 @@ If you can't interpret the feedback, return "UNCLEAR"."""
 
             # Build context from profile
             context: Dict[str, Any] = {"user_id": user_id}
+
+            # Check session for gender
+            if session_id:
+                with self._session_lock:
+                    session = self._sessions.get(session_id, {})
+                    if session.get("gender"):
+                        context["gender"] = session["gender"]
 
             if user_profile:
                 # Extract all relevant fields from profile for rich context
