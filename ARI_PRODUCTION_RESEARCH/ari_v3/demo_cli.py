@@ -1051,6 +1051,8 @@ class ARIDemoCLI:
                     ran_semantic = True
                 if qi.get("cypher_query"):
                     ran_text2cypher = True
+                if qi.get("neo4j_results"):
+                    ran_neo4j = True  # Neo4j returned actual results
             if trace.product_breakdowns:
                 ran_evaluator = True
 
