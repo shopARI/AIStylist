@@ -304,12 +304,12 @@ class ARIOrchestrator:
         trace.query_interpretation["original_query"] = query
         trace.query_interpretation["detected_intent"] = intent.primary_intent.value
 
-        # Expand vague queries using conversation history
-        # e.g., "show me some" after discussing Prada → "show me some Prada products"
+        # Always expand queries using conversation history context
+        # LLM judges if this is a continuation (weave in context) or new topic (keep as-is)
         conversation_history = self._get_conversation_history(session_id)
-        expanded_query = await self._expand_vague_query(query, conversation_history)
+        expanded_query = await self._expand_query_with_context(query, conversation_history)
         if expanded_query != query:
-            logger.info(f"Expanded vague query: '{query}' → '{expanded_query}'")
+            logger.info(f"Context expansion: '{query}' → '{expanded_query}'")
             trace.query_interpretation["expanded_from_conversation"] = expanded_query
             query = expanded_query
 
@@ -1269,60 +1269,55 @@ Return JSON:
                 suggestions=["I like minimalist fashion", "My style is casual", "I prefer quality over quantity"],
             )
 
-    async def _expand_vague_query(
+    async def _expand_query_with_context(
         self,
         query: str,
         conversation_history: List[Dict[str, str]],
     ) -> str:
         """
-        Expand vague queries using conversation history context.
+        Always expand queries using conversation history context.
 
-        When user says "show me some" or "yes please" after discussing a brand
-        or category, we expand the query to include that context.
+        LLM judges whether the current query is:
+        - A CONTINUATION of previous topic → weave in context
+        - A NEW TOPIC → return query as-is
 
         Args:
-            query: The current (possibly vague) query
+            query: The current query
             conversation_history: Recent conversation messages
 
         Returns:
-            Expanded query if vague, otherwise original query
+            Context-aware expanded query
         """
-        # Quick check: is this query vague enough to need expansion?
-        vague_patterns = [
-            "show me", "show some", "yes", "yeah", "sure", "ok", "please",
-            "let me see", "i want to see", "can i see", "display", "list",
-        ]
-        query_lower = query.lower().strip()
-
-        # If query is specific enough (has brand/category/style words), don't expand
-        if len(query.split()) > 4:
+        # No conversation history - nothing to expand with
+        if not conversation_history:
             return query
 
-        is_vague = any(p in query_lower for p in vague_patterns) or len(query.split()) <= 3
-
-        if not is_vague or not conversation_history:
-            return query
-
-        # No LLM client - try simple keyword extraction
+        # No LLM client - try simple heuristic
         if not self.async_openai_client:
+            # Check for explicit "new topic" signals
+            new_topic_signals = ["actually", "instead", "different", "forget", "never mind", "something else"]
+            query_lower = query.lower()
+            if any(signal in query_lower for signal in new_topic_signals):
+                return query
+
             # Extract potential topics from recent conversation
             recent_text = " ".join(
                 msg.get("content", "") for msg in conversation_history[-4:]
             ).lower()
 
-            # Look for brand names mentioned
+            # Look for brand names mentioned - add to query if found
             common_brands = [
                 "prada", "gucci", "louis vuitton", "chanel", "dior", "versace",
                 "balenciaga", "fendi", "burberry", "armani", "valentino", "hermes",
                 "nike", "adidas", "zara", "h&m", "uniqlo", "mango",
             ]
             for brand in common_brands:
-                if brand in recent_text:
-                    return f"{query} {brand} products"
+                if brand in recent_text and brand not in query_lower:
+                    return f"{query} {brand}"
 
             return query
 
-        # Use LLM to understand context and expand query
+        # Use LLM to judge context relevance and expand appropriately
         try:
             # Build conversation context
             conv_text = "\n".join(
@@ -1330,37 +1325,58 @@ Return JSON:
                 for msg in conversation_history[-4:]
             )
 
-            prompt = f"""The user is shopping and just said: "{query}"
+            prompt = f"""User's current query: "{query}"
 
 Recent conversation:
 {conv_text}
 
-If the user's query is vague (like "show me some", "yes please") and refers to something mentioned earlier in the conversation (a brand, category, style, etc.), expand it to be specific.
+Decide if the current query CONTINUES the previous topic or is a NEW topic.
 
-If the query is already specific or doesn't need context, return it unchanged.
+CONTINUATION signals: query relates to brands/categories/styles discussed earlier
+NEW TOPIC signals: "actually", "instead", "different", "forget that", explicitly mentions a different brand/category, or clearly unrelated
 
-Return ONLY the expanded query, nothing else. Keep it natural and concise."""
+If CONTINUATION: Return an expanded query that weaves in relevant context from the conversation.
+Examples:
+- "blue dress" after Prada discussion → "blue Prada dress"
+- "under $200" after handbag discussion → "handbags under $200"
+- "show me some" after Nike discussion → "show me Nike products"
+
+If NEW TOPIC: Return the query unchanged.
+
+Return ONLY the final query, nothing else."""
 
             response = await self.async_openai_client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "You expand vague shopping queries using conversation context. Return only the expanded query."},
+                    {
+                        "role": "system",
+                        "content": (
+                            "You help maintain conversation continuity in a shopping assistant. "
+                            "Expand queries with relevant context from conversation history, "
+                            "but recognize when the user wants to start a new topic. "
+                            "Return only the query, no explanation."
+                        )
+                    },
                     {"role": "user", "content": prompt}
                 ],
-                max_tokens=50,
+                max_tokens=60,
                 temperature=0.3,
             )
 
             expanded = response.choices[0].message.content.strip()
 
-            # Sanity check - don't return something wildly different
-            if expanded and len(expanded) < 100:
+            # Remove quotes if LLM wrapped it
+            if expanded.startswith('"') and expanded.endswith('"'):
+                expanded = expanded[1:-1]
+
+            # Sanity check - don't return something wildly different or too long
+            if expanded and len(expanded) < 150:
                 return expanded
 
             return query
 
         except Exception as e:
-            logger.warning(f"Query expansion failed: {e}")
+            logger.warning(f"Query context expansion failed: {e}")
             return query
 
     async def _interpret_feedback(
