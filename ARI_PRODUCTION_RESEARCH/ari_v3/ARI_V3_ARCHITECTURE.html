@@ -416,10 +416,12 @@
                         <div class="stage-line"></div>
                     </div>
                     <div class="stage-content">
-                        <div class="stage-name">Dual Search</div>
-                        <div class="stage-desc">Query semantic and visual embedding spaces</div>
+                        <div class="stage-name">Intelligent Search</div>
+                        <div class="stage-desc">LLM-powered query agents for Neo4j (structured) and Qdrant (semantic)</div>
                         <div class="stage-details">
-                            <span class="tag">Semantic (OpenAI 1536d)</span>
+                            <span class="tag new">Text2CypherGenerator</span>
+                            <span class="tag new">SemanticQueryGenerator</span>
+                            <span class="tag">Qdrant (OpenAI 1536d)</span>
                             <span class="tag new">Visual (SigLIP 1024d)</span>
                             <span class="tag new">Fusion Strategy</span>
                         </div>
@@ -702,9 +704,9 @@
                     <div class="store-name">Qdrant (Semantic)</div>
                     <div class="store-type">Vector Database</div>
                     <div class="store-details">
-                        OpenAI text-embedding-ada-002<br>
+                        OpenAI text-embedding-3-small<br>
                         1536 dimensions<br>
-                        ~500K products
+                        6.4M products
                     </div>
                 </div>
                 <div class="store">
@@ -713,16 +715,49 @@
                     <div class="store-details">
                         FashionSigLIP<br>
                         1024 dimensions<br>
-                        ~500K products
+                        6.4M products
                     </div>
                 </div>
                 <div class="store">
                     <div class="store-name">Neo4j</div>
                     <div class="store-type">Graph Database</div>
                     <div class="store-details">
+                        6.4M products (extracted_brand, colors, styles)<br>
                         User profiles & interactions<br>
-                        Product relationships<br>
-                        Session history
+                        UUIDs match Qdrant embeddings
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Query Agents -->
+        <div class="section">
+            <div class="section-title">LLM-Powered Query Agents <span class="version">NEW</span></div>
+            <div class="components" style="grid-template-columns: repeat(2, 1fr);">
+                <div class="component">
+                    <div class="component-name">Text2CypherGenerator</div>
+                    <div class="component-desc" style="margin-top: 10px;">
+                        <strong>Neo4j Queries</strong><br>
+                        Converts natural language to Cypher queries for ANY field.<br><br>
+                        <code style="font-size: 11px; display: block; background: #f5f5f5; padding: 8px; border-radius: 4px;">
+                        "Gucci bags under $500"<br>
+                        → WHERE extracted_brand = 'Gucci'<br>
+                        &nbsp;&nbsp;AND price < 500
+                        </code><br>
+                        <em>Works for: brand, color, price, style, material...</em>
+                    </div>
+                </div>
+                <div class="component">
+                    <div class="component-name">SemanticQueryGenerator</div>
+                    <div class="component-desc" style="margin-top: 10px;">
+                        <strong>Qdrant Queries</strong><br>
+                        Expands queries with style understanding and synonyms.<br><br>
+                        <code style="font-size: 11px; display: block; background: #f5f5f5; padding: 8px; border-radius: 4px;">
+                        "boho chic dress"<br>
+                        → "bohemian relaxed flowy<br>
+                        &nbsp;&nbsp;earthy natural free-spirited"
+                        </code><br>
+                        <em>Extracts: styles, colors, occasion, price hints</em>
                     </div>
                 </div>
             </div>
