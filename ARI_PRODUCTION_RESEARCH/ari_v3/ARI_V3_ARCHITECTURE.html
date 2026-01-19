@@ -1,0 +1,765 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ARI V3 - Navigation Intelligence Architecture</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #fafafa;
+            color: #1a1a1a;
+            line-height: 1.5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        h1 {
+            font-size: 32px;
+            font-weight: 600;
+            margin-bottom: 8px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 18px;
+            margin-bottom: 40px;
+        }
+        .version {
+            display: inline-block;
+            background: #1a1a1a;
+            color: #fff;
+            padding: 4px 12px;
+            font-size: 12px;
+            border-radius: 4px;
+            margin-left: 10px;
+            vertical-align: middle;
+        }
+
+        /* Flow Diagram */
+        .flow {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 40px;
+            margin-bottom: 40px;
+        }
+        .flow-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 30px;
+            padding-bottom: 15px;
+            border-bottom: 2px solid #1a1a1a;
+        }
+
+        .pipeline {
+            display: flex;
+            flex-direction: column;
+            gap: 0;
+        }
+        .stage {
+            display: flex;
+            align-items: stretch;
+        }
+        .stage-number {
+            width: 60px;
+            flex-shrink: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        .stage-num {
+            width: 32px;
+            height: 32px;
+            background: #1a1a1a;
+            color: #fff;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 600;
+            font-size: 14px;
+        }
+        .stage-line {
+            width: 2px;
+            flex: 1;
+            background: #e0e0e0;
+            min-height: 20px;
+        }
+        .stage-content {
+            flex: 1;
+            padding: 0 0 30px 20px;
+        }
+        .stage-name {
+            font-weight: 600;
+            font-size: 16px;
+            margin-bottom: 6px;
+        }
+        .stage-desc {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 10px;
+        }
+        .stage-details {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .tag {
+            background: #f5f5f5;
+            border: 1px solid #e0e0e0;
+            padding: 4px 10px;
+            font-size: 12px;
+            border-radius: 4px;
+            color: #444;
+        }
+        .tag.new {
+            background: #e8f5e9;
+            border-color: #c8e6c9;
+            color: #2e7d32;
+        }
+
+        /* Input/Output boxes */
+        .io-box {
+            border: 2px solid #1a1a1a;
+            padding: 20px;
+            margin: 20px 0;
+            background: #fafafa;
+        }
+        .io-box.input { border-style: dashed; }
+        .io-box.output { background: #f0f0f0; }
+        .io-label {
+            font-size: 12px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            color: #666;
+            margin-bottom: 8px;
+        }
+        .io-content {
+            font-size: 15px;
+        }
+
+        /* Components Grid */
+        .components {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .component {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 24px;
+        }
+        .component-header {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+        }
+        .component-icon {
+            width: 40px;
+            height: 40px;
+            background: #1a1a1a;
+            color: #fff;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+            margin-right: 12px;
+        }
+        .component-name {
+            font-weight: 600;
+            font-size: 16px;
+        }
+        .component-file {
+            font-size: 12px;
+            color: #888;
+            font-family: monospace;
+        }
+        .component-desc {
+            font-size: 14px;
+            color: #666;
+            margin-bottom: 15px;
+        }
+        .component-list {
+            list-style: none;
+        }
+        .component-list li {
+            font-size: 13px;
+            padding: 4px 0;
+            padding-left: 16px;
+            position: relative;
+            color: #444;
+        }
+        .component-list li::before {
+            content: "→";
+            position: absolute;
+            left: 0;
+            color: #999;
+        }
+
+        /* Feature Flags */
+        .flags {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 40px;
+        }
+        .flags-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .flag-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        .flag {
+            display: flex;
+            align-items: center;
+            padding: 12px 15px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+        .flag-toggle {
+            width: 36px;
+            height: 20px;
+            background: #ccc;
+            border-radius: 10px;
+            margin-right: 12px;
+            position: relative;
+        }
+        .flag-toggle.on {
+            background: #1a1a1a;
+        }
+        .flag-toggle::after {
+            content: "";
+            width: 16px;
+            height: 16px;
+            background: #fff;
+            border-radius: 50%;
+            position: absolute;
+            top: 2px;
+            left: 2px;
+            transition: left 0.2s;
+        }
+        .flag-toggle.on::after {
+            left: 18px;
+        }
+        .flag-name {
+            font-size: 13px;
+            font-weight: 500;
+        }
+
+        /* Data Stores */
+        .stores {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 20px;
+            margin-top: 30px;
+        }
+        .store {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 24px;
+            text-align: center;
+        }
+        .store-name {
+            font-weight: 600;
+            font-size: 18px;
+            margin-bottom: 8px;
+        }
+        .store-type {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 12px;
+        }
+        .store-details {
+            font-size: 13px;
+            color: #666;
+        }
+
+        /* Scoring */
+        .scoring {
+            background: #fff;
+            border: 1px solid #e0e0e0;
+            border-radius: 8px;
+            padding: 30px;
+            margin-bottom: 40px;
+        }
+        .scoring-title {
+            font-size: 18px;
+            font-weight: 600;
+            margin-bottom: 20px;
+        }
+        .score-dimensions {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+        }
+        .dimension {
+            text-align: center;
+            padding: 15px;
+            background: #f9f9f9;
+            border-radius: 6px;
+        }
+        .dimension-name {
+            font-size: 13px;
+            font-weight: 500;
+            margin-bottom: 4px;
+        }
+        .dimension-weight {
+            font-size: 12px;
+            color: #888;
+        }
+
+        /* Section */
+        .section {
+            margin-bottom: 40px;
+        }
+        .section-title {
+            font-size: 20px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #1a1a1a;
+        }
+
+        @media (max-width: 768px) {
+            .stores { grid-template-columns: 1fr; }
+            .stage { flex-direction: column; }
+            .stage-number { flex-direction: row; width: 100%; margin-bottom: 10px; }
+            .stage-line { width: 100%; height: 2px; min-height: auto; }
+            .stage-content { padding-left: 0; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>ARI Navigation Intelligence <span class="version">V3.2</span></h1>
+        <p class="subtitle">Adaptive Recommendation Intelligence - System Architecture</p>
+
+        <!-- Main Pipeline Flow -->
+        <div class="flow">
+            <div class="flow-title">Request Pipeline</div>
+
+            <div class="io-box input">
+                <div class="io-label">User Input</div>
+                <div class="io-content">"I need something for a casual Friday at work, nothing too formal, under $200"</div>
+            </div>
+
+            <div class="pipeline">
+                <div class="stage">
+                    <div class="stage-number">
+                        <div class="stage-num">1</div>
+                        <div class="stage-line"></div>
+                    </div>
+                    <div class="stage-content">
+                        <div class="stage-name">Intent Detection</div>
+                        <div class="stage-desc">Classify intent and extract entities from natural language query</div>
+                        <div class="stage-details">
+                            <span class="tag">PRODUCT_SEARCH</span>
+                            <span class="tag">BROWSE</span>
+                            <span class="tag">FEEDBACK</span>
+                            <span class="tag">CLARIFICATION</span>
+                            <span class="tag">CONVERSATION</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stage">
+                    <div class="stage-number">
+                        <div class="stage-num">2</div>
+                        <div class="stage-line"></div>
+                    </div>
+                    <div class="stage-content">
+                        <div class="stage-name">Synthesis LLM</div>
+                        <div class="stage-desc">Combine user profile + query into search strategy</div>
+                        <div class="stage-details">
+                            <span class="tag">Style Descriptors</span>
+                            <span class="tag">Budget Interpretation</span>
+                            <span class="tag">Occasion Mapping</span>
+                            <span class="tag">Exclusions</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stage">
+                    <div class="stage-number">
+                        <div class="stage-num">3</div>
+                        <div class="stage-line"></div>
+                    </div>
+                    <div class="stage-content">
+                        <div class="stage-name">Personalization (Pillar 1)</div>
+                        <div class="stage-desc">Compute user state: embeddings, trajectory, context position</div>
+                        <div class="stage-details">
+                            <span class="tag">User Embeddings</span>
+                            <span class="tag">Style Trajectory</span>
+                            <span class="tag">Context Detection</span>
+                            <span class="tag">Spending Patterns</span>
+                            <span class="tag new">Provenance Tracking</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stage">
+                    <div class="stage-number">
+                        <div class="stage-num">4</div>
+                        <div class="stage-line"></div>
+                    </div>
+                    <div class="stage-content">
+                        <div class="stage-name">Dual Search</div>
+                        <div class="stage-desc">Query semantic and visual embedding spaces</div>
+                        <div class="stage-details">
+                            <span class="tag">Semantic (OpenAI 1536d)</span>
+                            <span class="tag new">Visual (SigLIP 1024d)</span>
+                            <span class="tag new">Fusion Strategy</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stage">
+                    <div class="stage-number">
+                        <div class="stage-num">5</div>
+                        <div class="stage-line"></div>
+                    </div>
+                    <div class="stage-content">
+                        <div class="stage-name">Judge (Evaluator)</div>
+                        <div class="stage-desc">Score products across 7 dimensions, apply MMR diversity, inject outliers</div>
+                        <div class="stage-details">
+                            <span class="tag">7-Dimension Scoring</span>
+                            <span class="tag">MMR Selection</span>
+                            <span class="tag">Outlier Injection</span>
+                            <span class="tag new">Score Breakdown</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="stage">
+                    <div class="stage-number">
+                        <div class="stage-num">6</div>
+                        <div class="stage-line"></div>
+                    </div>
+                    <div class="stage-content">
+                        <div class="stage-name">Narrative LLM</div>
+                        <div class="stage-desc">Generate natural language response with product explanations</div>
+                        <div class="stage-details">
+                            <span class="tag">Product Descriptions</span>
+                            <span class="tag">Match Explanations</span>
+                            <span class="tag new">Why Reasoning</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="io-box output">
+                <div class="io-label">ARI Output</div>
+                <div class="io-content">
+                    "Here are some pieces that blend professional polish with weekend ease..."<br>
+                    <span style="color: #666; font-size: 13px;">+ 8 scored products + match explanations + provenance trace</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Feature Flags -->
+        <div class="flags">
+            <div class="flags-title">V3.2 Feature Flags</div>
+            <div class="flag-grid">
+                <div class="flag">
+                    <div class="flag-toggle on"></div>
+                    <div class="flag-name">enable_visual_search</div>
+                </div>
+                <div class="flag">
+                    <div class="flag-toggle on"></div>
+                    <div class="flag-name">enable_visual_scoring</div>
+                </div>
+                <div class="flag">
+                    <div class="flag-toggle"></div>
+                    <div class="flag-name">enable_color_harmony</div>
+                </div>
+                <div class="flag">
+                    <div class="flag-toggle"></div>
+                    <div class="flag-name">enable_style_dimensions</div>
+                </div>
+                <div class="flag">
+                    <div class="flag-toggle on"></div>
+                    <div class="flag-name">explanatory_mode</div>
+                </div>
+                <div class="flag">
+                    <div class="flag-toggle"></div>
+                    <div class="flag-name">debug_output</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Scoring Dimensions -->
+        <div class="scoring">
+            <div class="scoring-title">7-Dimension Scoring</div>
+            <div class="score-dimensions">
+                <div class="dimension">
+                    <div class="dimension-name">Relevance</div>
+                    <div class="dimension-weight">0.30</div>
+                </div>
+                <div class="dimension">
+                    <div class="dimension-name">User Fit</div>
+                    <div class="dimension-weight">0.25</div>
+                </div>
+                <div class="dimension">
+                    <div class="dimension-name">Budget Fit</div>
+                    <div class="dimension-weight">0.15</div>
+                </div>
+                <div class="dimension">
+                    <div class="dimension-name">Visual</div>
+                    <div class="dimension-weight">0.10</div>
+                </div>
+                <div class="dimension">
+                    <div class="dimension-name">Smoothness</div>
+                    <div class="dimension-weight">0.08</div>
+                </div>
+                <div class="dimension">
+                    <div class="dimension-name">Coherence</div>
+                    <div class="dimension-weight">0.07</div>
+                </div>
+                <div class="dimension">
+                    <div class="dimension-name">Brand</div>
+                    <div class="dimension-weight">0.05</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Core Components -->
+        <div class="section">
+            <div class="section-title">Core Components</div>
+            <div class="components">
+                <div class="component">
+                    <div class="component-header">
+                        <div class="component-icon">O</div>
+                        <div>
+                            <div class="component-name">Orchestrator</div>
+                            <div class="component-file">interface/orchestrator.py</div>
+                        </div>
+                    </div>
+                    <div class="component-desc">Central coordinator managing the full request lifecycle</div>
+                    <ul class="component-list">
+                        <li>Session management with TTL</li>
+                        <li>User context caching</li>
+                        <li>Dual-collection search</li>
+                        <li>Feature flag routing</li>
+                    </ul>
+                </div>
+
+                <div class="component">
+                    <div class="component-header">
+                        <div class="component-icon">I</div>
+                        <div>
+                            <div class="component-name">Intent Detector</div>
+                            <div class="component-file">interface/intent_detector.py</div>
+                        </div>
+                    </div>
+                    <div class="component-desc">Classifies user intent with rule + LLM hybrid approach</div>
+                    <ul class="component-list">
+                        <li>Pattern-based fast path</li>
+                        <li>LLM fallback for ambiguous</li>
+                        <li>Entity extraction</li>
+                        <li>Confidence scoring</li>
+                    </ul>
+                </div>
+
+                <div class="component">
+                    <div class="component-header">
+                        <div class="component-icon">S</div>
+                        <div>
+                            <div class="component-name">Synthesis LLM</div>
+                            <div class="component-file">navigation/synthesis_llm.py</div>
+                        </div>
+                    </div>
+                    <div class="component-desc">Fuses user profile with query into search strategy</div>
+                    <ul class="component-list">
+                        <li>Style descriptor generation</li>
+                        <li>Budget interpretation</li>
+                        <li>Occasion → context mapping</li>
+                        <li>Exclusion detection</li>
+                    </ul>
+                </div>
+
+                <div class="component">
+                    <div class="component-header">
+                        <div class="component-icon">P</div>
+                        <div>
+                            <div class="component-name">Personalization</div>
+                            <div class="component-file">pillars/personalization.py</div>
+                        </div>
+                    </div>
+                    <div class="component-desc">Computes user state from interactions and profile</div>
+                    <ul class="component-list">
+                        <li>User embedding computation</li>
+                        <li>Style trajectory tracking</li>
+                        <li>Context-aware positions</li>
+                        <li>Spending pattern analysis</li>
+                    </ul>
+                </div>
+
+                <div class="component">
+                    <div class="component-header">
+                        <div class="component-icon">E</div>
+                        <div>
+                            <div class="component-name">Evaluator (Judge)</div>
+                            <div class="component-file">judge/ari_evaluator.py</div>
+                        </div>
+                    </div>
+                    <div class="component-desc">Scores and ranks products across multiple dimensions</div>
+                    <ul class="component-list">
+                        <li>7-dimension weighted scoring</li>
+                        <li>Score component breakdown</li>
+                        <li>Natural language explanations</li>
+                        <li>Visual similarity scoring</li>
+                    </ul>
+                </div>
+
+                <div class="component">
+                    <div class="component-header">
+                        <div class="component-icon">M</div>
+                        <div>
+                            <div class="component-name">MMR Selector</div>
+                            <div class="component-file">judge/mmr_selector.py</div>
+                        </div>
+                    </div>
+                    <div class="component-desc">Balances relevance with diversity in final selection</div>
+                    <ul class="component-list">
+                        <li>Maximal Marginal Relevance</li>
+                        <li>Lambda parameter tuning</li>
+                        <li>Deduplication</li>
+                        <li>Embedding-based diversity</li>
+                    </ul>
+                </div>
+
+                <div class="component">
+                    <div class="component-header">
+                        <div class="component-icon">X</div>
+                        <div>
+                            <div class="component-name">Outlier Injector</div>
+                            <div class="component-file">judge/outlier_injector.py</div>
+                        </div>
+                    </div>
+                    <div class="component-desc">Injects exploration products for serendipity</div>
+                    <ul class="component-list">
+                        <li>Distance-based qualification</li>
+                        <li>Strategic positioning (3,7,11)</li>
+                        <li>Exploration appetite scaling</li>
+                        <li>Outlier markers</li>
+                    </ul>
+                </div>
+
+                <div class="component">
+                    <div class="component-header">
+                        <div class="component-icon">N</div>
+                        <div>
+                            <div class="component-name">Narrative LLM</div>
+                            <div class="component-file">narrative/narrative_llm.py</div>
+                        </div>
+                    </div>
+                    <div class="component-desc">Generates natural language product narratives</div>
+                    <ul class="component-list">
+                        <li>Per-product explanations</li>
+                        <li>Overall response framing</li>
+                        <li>Score-to-language mapping</li>
+                        <li>Personality consistency</li>
+                    </ul>
+                </div>
+
+                <div class="component">
+                    <div class="component-header">
+                        <div class="component-icon">T</div>
+                        <div>
+                            <div class="component-name">Explanation Trace</div>
+                            <div class="component-file">interface/types.py</div>
+                        </div>
+                    </div>
+                    <div class="component-desc">Tracks provenance for "why" explanations</div>
+                    <ul class="component-list">
+                        <li>ProvenanceRecord accumulation</li>
+                        <li>ScoreComponent breakdown</li>
+                        <li>Navigation decisions log</li>
+                        <li>Exclusions tracking</li>
+                    </ul>
+                </div>
+            </div>
+        </div>
+
+        <!-- Data Stores -->
+        <div class="section">
+            <div class="section-title">Data Stores</div>
+            <div class="stores">
+                <div class="store">
+                    <div class="store-name">Qdrant (Semantic)</div>
+                    <div class="store-type">Vector Database</div>
+                    <div class="store-details">
+                        OpenAI text-embedding-ada-002<br>
+                        1536 dimensions<br>
+                        ~500K products
+                    </div>
+                </div>
+                <div class="store">
+                    <div class="store-name">Qdrant (Visual)</div>
+                    <div class="store-type">Vector Database</div>
+                    <div class="store-details">
+                        FashionSigLIP<br>
+                        1024 dimensions<br>
+                        ~500K products
+                    </div>
+                </div>
+                <div class="store">
+                    <div class="store-name">Neo4j</div>
+                    <div class="store-type">Graph Database</div>
+                    <div class="store-details">
+                        User profiles & interactions<br>
+                        Product relationships<br>
+                        Session history
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Fusion Strategies -->
+        <div class="section">
+            <div class="section-title">Visual Fusion Strategies</div>
+            <div class="components" style="grid-template-columns: repeat(3, 1fr);">
+                <div class="component">
+                    <div class="component-name">weighted_average</div>
+                    <div class="component-desc" style="margin-top: 10px;">
+                        Combines semantic and visual scores with configurable weights.<br>
+                        <code style="font-size: 12px;">score = 0.6 * semantic + 0.4 * visual</code>
+                    </div>
+                </div>
+                <div class="component">
+                    <div class="component-name">max</div>
+                    <div class="component-desc" style="margin-top: 10px;">
+                        Takes the higher score from either search.<br>
+                        <code style="font-size: 12px;">score = max(semantic, visual)</code>
+                    </div>
+                </div>
+                <div class="component">
+                    <div class="component-name">cascade</div>
+                    <div class="component-desc" style="margin-top: 10px;">
+                        Visual re-ranks semantic results.<br>
+                        <code style="font-size: 12px;">semantic_top → visual_rerank</code>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div style="text-align: center; color: #888; font-size: 13px; margin-top: 40px; padding-top: 20px; border-top: 1px solid #e0e0e0;">
+            ARI V3.2 - January 2026 - Navigation Intelligence Architecture
+        </div>
+    </div>
+</body>
+</html>
