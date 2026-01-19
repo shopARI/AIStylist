@@ -1898,10 +1898,11 @@ If you can't interpret the feedback, return "UNCLEAR"."""
             if session_id in self._sessions:
                 self._sessions[session_id].update(data)
             else:
-                # Create session if it doesn't exist
+                # Create session if it doesn't exist (include required fields)
                 self._sessions[session_id] = {
                     "created_at": datetime.now(),
                     "last_access": datetime.now(),
+                    "query_count": 0,
                     **data,
                 }
 
