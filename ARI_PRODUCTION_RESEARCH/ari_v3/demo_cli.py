@@ -49,9 +49,10 @@ from ari_v3.interface.types import VisualFeatureFlags
 logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
-# Suppress noisy loggers
-for name in ["neo4j", "httpx", "openai", "qdrant_client"]:
-    logging.getLogger(name).setLevel(logging.WARNING)
+# Suppress noisy loggers (set to ERROR to hide warnings)
+for name in ["neo4j", "neo4j.notifications", "neo4j.io", "neo4j.pool",
+             "httpx", "httpcore", "openai", "qdrant_client"]:
+    logging.getLogger(name).setLevel(logging.ERROR)
 
 
 # =============================================================================
