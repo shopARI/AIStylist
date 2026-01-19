@@ -216,6 +216,33 @@ class UserGraphManager:
             result = session.run(query, **params)
             return result.single() is not None
 
+    def get_user_profile(self, user_id: str) -> Optional[Dict[str, Any]]:
+        """
+        Get basic user profile properties (gender, username, etc.).
+
+        Args:
+            user_id: User ID
+
+        Returns:
+            Dict with user properties, or None if user not found
+        """
+        self._validate_user_id(user_id)
+
+        query = """
+            MATCH (u:User {id: $user_id})
+            RETURN u.gender as gender,
+                   u.username as username,
+                   u.gender_expression as gender_expression,
+                   u.created_at as created_at
+        """
+
+        with self.driver.session(database=self.database) as session:
+            result = session.run(query, user_id=user_id)
+            record = result.single()
+            if record:
+                return {k: v for k, v in dict(record).items() if v is not None}
+            return None
+
     # ======================
     # RELATIONSHIPS
     # ======================

@@ -1480,6 +1480,25 @@ If you can't interpret the feedback, return "UNCLEAR"."""
                     if session.get("user_name"):
                         context["user_name"] = session["user_name"]
 
+            # If gender not in session, try to load from Neo4j (persistent storage)
+            if "gender" not in context and self.enable_neo4j:
+                try:
+                    from ari_v3.services.user_graph_manager import UserGraphManager
+                    user_graph = UserGraphManager()
+                    try:
+                        profile = user_graph.get_user_profile(user_id)
+                        if profile:
+                            if profile.get("gender"):
+                                context["gender"] = profile["gender"]
+                            if profile.get("username"):
+                                context["user_name"] = profile["username"]
+                            if profile.get("gender_expression"):
+                                context["gender_expression"] = profile["gender_expression"]
+                    finally:
+                        user_graph.close()
+                except Exception as e:
+                    logger.debug(f"Could not load user profile from Neo4j: {e}")
+
             if user_profile:
                 # Extract all relevant fields from profile for rich context
                 if hasattr(user_profile, 'taste') and user_profile.taste:
