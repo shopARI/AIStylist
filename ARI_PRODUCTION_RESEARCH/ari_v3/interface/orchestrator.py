@@ -433,6 +433,14 @@ class ARIOrchestrator:
                     exclusion_summary = [f"{e.field}:{e.value}" for e in params.exclusions]
                     logger.info(f"Filtered out {filtered_count} products based on exclusions: {exclusion_summary}")
 
+            # Apply brand filtering (if specific brands requested)
+            # Since Qdrant has no brand field, filter by brand name in title
+            if products and params.brand_preferences:
+                original_count = len(products)
+                products = self._apply_brand_filter(products, params.brand_preferences)
+                filtered_count = original_count - len(products)
+                logger.info(f"Brand filter: kept {len(products)}/{original_count} products matching brands: {params.brand_preferences}")
+
             if not products:
                 return ARIResponse(
                     response_type=ResponseType.PRODUCTS,
@@ -942,6 +950,40 @@ If you can't interpret the feedback, return "UNCLEAR"."""
             return None
 
         return Filter(must=conditions)
+
+    def _apply_brand_filter(self, products: List[Dict], brand_preferences: List[str]) -> List[Dict]:
+        """
+        Filter products to only include those matching requested brands.
+
+        Since Qdrant has no 'brand' field, we check if brand name appears
+        in title, vendor, or brand fields of the product.
+
+        Args:
+            products: List of product dicts
+            brand_preferences: List of brand names to filter for
+
+        Returns:
+            Filtered list containing only products from requested brands
+        """
+        if not brand_preferences:
+            return products
+
+        # Normalize brand names for comparison
+        brands_lower = [b.lower() for b in brand_preferences]
+
+        filtered = []
+        for product in products:
+            title = (product.get('title') or '').lower()
+            vendor = (product.get('vendor') or '').lower()
+            brand = (product.get('brand') or '').lower()
+
+            # Check if any requested brand appears in product
+            for brand_name in brands_lower:
+                if brand_name in title or brand_name in vendor or brand_name in brand:
+                    filtered.append(product)
+                    break
+
+        return filtered
 
     def _apply_exclusions(self, products: List[Dict], exclusions: List) -> List[Dict]:
         """
