@@ -327,11 +327,28 @@ class ARIOrchestrator:
             except Exception as nav_err:
                 logger.warning(f"Navigation pipeline failed: {nav_err}, will use direct embedding")
 
-            # Step 2: Search products using destination embedding
+            # Step 2: Search products
+            # For brand-specific queries, use Neo4j first (has proper brand field)
             products = []
-            if not self.qdrant_client:
+            used_neo4j_brand_search = False
+
+            if params.brand_preferences:
+                logger.info(f"Brand-specific query detected: {params.brand_preferences}")
+                try:
+                    products = await self._search_by_brand_neo4j(
+                        params.brand_preferences,
+                        limit=50,
+                    )
+                    if products:
+                        used_neo4j_brand_search = True
+                        logger.info(f"Using {len(products)} products from Neo4j brand search")
+                except Exception as neo4j_err:
+                    logger.warning(f"Neo4j brand search failed: {neo4j_err}")
+
+            # Fall back to Qdrant semantic search if Neo4j didn't return results
+            if not products and not self.qdrant_client:
                 logger.warning("Qdrant client not configured, cannot search products")
-            else:
+            elif not products:
                 # Get embedding to use for search
                 query_vector = None
 
@@ -434,8 +451,8 @@ class ARIOrchestrator:
                     logger.info(f"Filtered out {filtered_count} products based on exclusions: {exclusion_summary}")
 
             # Apply brand filtering (if specific brands requested)
-            # Since Qdrant has no brand field, filter by brand name in title
-            if products and params.brand_preferences:
+            # Skip if we already used Neo4j brand search (products are already filtered)
+            if products and params.brand_preferences and not used_neo4j_brand_search:
                 original_count = len(products)
                 products = self._apply_brand_filter(products, params.brand_preferences)
                 filtered_count = original_count - len(products)
@@ -951,12 +968,56 @@ If you can't interpret the feedback, return "UNCLEAR"."""
 
         return Filter(must=conditions)
 
+    async def _search_by_brand_neo4j(
+        self,
+        brand_names: List[str],
+        limit: int = 50,
+    ) -> List[Dict]:
+        """
+        Search for products by brand using Neo4j graph database.
+
+        Neo4j has proper 'extracted_brand' field while Qdrant fashion_products
+        collection does not have reliable brand data.
+
+        Args:
+            brand_names: List of brand names to search for
+            limit: Maximum products per brand
+
+        Returns:
+            List of product dicts with brand, title, price, etc.
+        """
+        try:
+            from ari_v3.tools.neo4j_tools import get_products_by_brand
+
+            all_products = []
+            for brand_name in brand_names:
+                products = await get_products_by_brand(brand_name, limit=limit)
+                for p in products:
+                    # Normalize to orchestrator's expected format
+                    all_products.append({
+                        'uuid': p.get('uuid') or p.get('id'),
+                        'title': p.get('title') or p.get('name'),
+                        'brand': p.get('brand'),
+                        'vendor': p.get('brand'),  # Use brand as vendor for display
+                        'price': p.get('price'),
+                        'description': p.get('description'),
+                        'styles': p.get('styles') or [],
+                        'colors': p.get('colors') or [],
+                    })
+
+            logger.info(f"Neo4j brand search found {len(all_products)} products for brands: {brand_names}")
+            return all_products
+
+        except Exception as e:
+            logger.warning(f"Neo4j brand search failed: {e}, falling back to post-filter")
+            return []
+
     def _apply_brand_filter(self, products: List[Dict], brand_preferences: List[str]) -> List[Dict]:
         """
         Filter products to only include those matching requested brands.
 
-        Since Qdrant has no 'brand' field, we check if brand name appears
-        in title, vendor, or brand fields of the product.
+        Fallback method when Neo4j brand search is unavailable.
+        Checks if brand name appears in title, vendor, or brand fields.
 
         Args:
             products: List of product dicts

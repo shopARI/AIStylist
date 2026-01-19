@@ -6,7 +6,19 @@ import os
 import logging
 import re
 from typing import Dict, List, Any, Optional, Set
-from crewai.tools import tool
+
+# CrewAI is optional - only needed for agent tool wrappers
+try:
+    from crewai.tools import tool
+    CREWAI_AVAILABLE = True
+except ImportError:
+    CREWAI_AVAILABLE = False
+    # Create a no-op decorator when crewai is not installed
+    def tool(name: str):
+        def decorator(func):
+            return func
+        return decorator
+
 from neo4j import AsyncGraphDatabase
 
 logger = logging.getLogger("crewai.tools.async_neo4j")
@@ -36,6 +48,7 @@ ALLOWED_PROPERTY_FIELDS = frozenset({
     "id", "_id", "title", "name", "description", "price", "category",
     "brand", "vendor", "color", "size", "material", "tags", "productType",
     "imageUrl", "url", "sku", "embedding", "score", "created_at", "updated_at",
+    "extracted_brand", "extracted_styles", "extracted_colors",  # Neo4j extracted fields
 })
 
 
@@ -167,6 +180,123 @@ async def _execute_neo4j_query(
     finally:
         if driver:
             await driver.close()
+
+
+# ============================================================================
+# BRAND LOOKUP FUNCTIONS
+# Used by orchestrator for brand-specific product queries
+# ============================================================================
+
+async def get_products_by_brand(
+    brand_name: str,
+    limit: int = 50,
+) -> List[Dict[str, Any]]:
+    """
+    Lookup products by brand name from Neo4j.
+
+    Neo4j has proper extracted_brand field while Qdrant fashion_products does not.
+    Used for brand-specific queries like "show me Gucci products".
+
+    Prioritizes exact brand matches, then partial brand matches, then title matches.
+
+    Args:
+        brand_name: Brand name to search for (case-insensitive)
+        limit: Maximum number of products to return
+
+    Returns:
+        List of product dicts with id, title, brand, price, description, category
+    """
+    # Prioritize exact brand matches first, then partial matches
+    # Exclude title-only matches to avoid false positives like "Gucci Mane" t-shirts
+    cypher = """
+        MATCH (p:Product)
+        WHERE p.extracted_brand IS NOT NULL
+          AND (
+            toLower(p.extracted_brand) = toLower($brand_name)
+            OR toLower(p.extracted_brand) STARTS WITH toLower($brand_name)
+            OR toLower(p.extracted_brand) ENDS WITH toLower($brand_name)
+          )
+        RETURN
+            p.id as uuid,
+            p.title as title,
+            p.extracted_brand as brand,
+            p.price as price,
+            p.description as description,
+            p.extracted_styles as styles,
+            p.extracted_colors as colors
+        ORDER BY
+            CASE
+                WHEN toLower(p.extracted_brand) = toLower($brand_name) THEN 0
+                WHEN toLower(p.extracted_brand) STARTS WITH toLower($brand_name) THEN 1
+                ELSE 2
+            END
+        LIMIT $limit
+    """
+
+    # Use internal function with validation disabled (parameterized query is safe)
+    records = await _execute_neo4j_query(
+        cypher,
+        parameters={"brand_name": brand_name, "limit": limit},
+        validate=True  # Still validate for other security checks
+    )
+
+    logger.info(f"Brand lookup for '{brand_name}' returned {len(records)} products")
+    return records
+
+
+async def list_available_brands(limit: int = 100) -> List[Dict[str, Any]]:
+    """
+    Get list of available brands with product counts.
+
+    Args:
+        limit: Maximum number of brands to return
+
+    Returns:
+        List of dicts with brand name and count, sorted by count descending
+    """
+    cypher = """
+        MATCH (p:Product)
+        WHERE p.extracted_brand IS NOT NULL AND p.extracted_brand <> ''
+        RETURN p.extracted_brand as brand, count(*) as product_count
+        ORDER BY product_count DESC
+        LIMIT $limit
+    """
+
+    records = await _execute_neo4j_query(
+        cypher,
+        parameters={"limit": limit},
+        validate=True
+    )
+
+    return records
+
+
+async def search_brands(query: str, limit: int = 20) -> List[str]:
+    """
+    Search for brands matching a query string.
+
+    Args:
+        query: Search string (partial match)
+        limit: Maximum number of brands to return
+
+    Returns:
+        List of matching brand names
+    """
+    cypher = """
+        MATCH (p:Product)
+        WHERE p.extracted_brand IS NOT NULL
+          AND toLower(p.extracted_brand) CONTAINS toLower($query)
+        RETURN DISTINCT p.extracted_brand as brand
+        LIMIT $limit
+    """
+
+    records = await _execute_neo4j_query(
+        cypher,
+        parameters={"query": query, "limit": limit},
+        validate=True
+    )
+
+    return [r["brand"] for r in records if r.get("brand")]
 
 
 # ============================================================================
