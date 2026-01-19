@@ -680,12 +680,16 @@ class ARIDemoCLI:
         self.current_profile = self._build_onboarding_profile(profile)
         return user_id
 
-    async def interactive_session(self, user_id: str, show_welcome: bool = True):
+    async def interactive_session(self, user_id: str, show_welcome: bool = True, user_name: str = None):
         """Run interactive recommendation session with conversational interface."""
         self.current_user = user_id
 
         # Create session ID
         session_id = str(uuid.uuid4())
+
+        # Store user_name in session for gender inference (Sophia → women's, etc.)
+        if user_name and self.orchestrator:
+            self.orchestrator.update_session_data(session_id, {"user_name": user_name})
 
         # Track last displayed products for like/save commands
         self._last_products = []
@@ -1165,28 +1169,33 @@ class ARIDemoCLI:
         # Show user selection menu
         selected = self._show_user_menu()
 
+        user_name = None  # Will be set if we know user's name
+
         if selected == "onboarding":
             # Run onboarding for new user
             print("\nARI: Welcome! Let's get to know your style...")
             user_id = await self.run_simple_onboarding()
             if not user_id:
                 user_id = f"guest_{datetime.now().strftime('%H%M%S')}"
+            # Note: user_name could be extracted from onboarding if implemented
         elif selected:
             # Load selected demo user
             user_id = await self.setup_demo_user(selected)
-            print(f"\nARI: Hey {selected['name']}! Great to see you.")
+            user_name = selected['name']
+            print(f"\nARI: Hey {user_name}! Great to see you.")
             print(f"     I remember your style - {selected['profile']['taste']['style_words'][0]},")
             print(f"     {selected['profile']['taste']['style_words'][1]}. What can I help you find today?")
         else:
             # Guest mode
             user_id = f"guest_{datetime.now().strftime('%H%M%S')}"
+            user_name = None
             print("\nARI: Hey there! I'm ARI. Since you're browsing as a guest,")
             print("     I don't have your style preferences yet. You can say")
             print("     'I'm Emma' to load a demo profile, or just tell me")
             print("     what you're looking for!")
 
-        # Run the interactive session
-        await self.interactive_session(user_id, show_welcome=False)
+        # Run the interactive session (pass user_name for gender inference)
+        await self.interactive_session(user_id, show_welcome=False, user_name=user_name)
 
         # Cleanup
         if self.user_graph_manager:

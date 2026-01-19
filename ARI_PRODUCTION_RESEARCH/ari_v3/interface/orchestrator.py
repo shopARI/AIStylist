@@ -1055,14 +1055,13 @@ Return JSON:
 
             if gender_corrected and (is_complaint or prev_context):
                 # User corrected their gender after seeing wrong results
-                gender_word = "women's" if gender == "female" else "men's"
                 response_text = (
-                    f"My apologies! Let me search again for {gender_word} options. "
-                    f"What would you like me to find?"
+                    "My apologies! I'll keep that in mind. "
+                    "What would you like me to find?"
                 )
                 suggestions = [
-                    f"Show me {gender_word} interview outfits",
-                    "Search again",
+                    "Search again for interview outfits",
+                    "Show me something else",
                     "Try something different",
                 ]
             elif updated_items:
@@ -1456,12 +1455,14 @@ If you can't interpret the feedback, return "UNCLEAR"."""
                 if now - last_access <= self.cache_ttl:
                     # Update last access time
                     self._user_context_cache[user_id] = (context, now)
-                    # Merge session data (e.g., gender) if available
+                    # Merge session data (e.g., gender, name) if available
                     if session_id:
                         with self._session_lock:
                             session = self._sessions.get(session_id, {})
                             if session.get("gender"):
                                 context["gender"] = session["gender"]
+                            if session.get("user_name"):
+                                context["user_name"] = session["user_name"]
                     return context
                 else:
                     # Cache expired, remove it
@@ -1470,12 +1471,14 @@ If you can't interpret the feedback, return "UNCLEAR"."""
             # Build context from profile
             context: Dict[str, Any] = {"user_id": user_id}
 
-            # Check session for gender
+            # Check session for user info (gender, name)
             if session_id:
                 with self._session_lock:
                     session = self._sessions.get(session_id, {})
                     if session.get("gender"):
                         context["gender"] = session["gender"]
+                    if session.get("user_name"):
+                        context["user_name"] = session["user_name"]
 
             if user_profile:
                 # Extract all relevant fields from profile for rich context
@@ -1863,6 +1866,25 @@ If you can't interpret the feedback, return "UNCLEAR"."""
         with self._session_lock:
             session = self._sessions.get(session_id)
             return session.copy() if session else None
+
+    def update_session_data(self, session_id: str, data: Dict[str, Any]) -> None:
+        """
+        Update session with additional data (e.g., user_name, gender).
+
+        Args:
+            session_id: Session identifier
+            data: Dictionary of key-value pairs to add to session
+        """
+        with self._session_lock:
+            if session_id in self._sessions:
+                self._sessions[session_id].update(data)
+            else:
+                # Create session if it doesn't exist
+                self._sessions[session_id] = {
+                    "created_at": datetime.now(),
+                    "last_access": datetime.now(),
+                    **data,
+                }
 
     def cleanup_expired(self):
         """Manually trigger cleanup of expired sessions and cache entries."""

@@ -63,18 +63,26 @@ and used to navigate to the right region of style space via similarity.
 {user_context}
 
 ## Your Task
-1. **Identify the Style Space Destination**: What region of style space is the user trying to reach?
+1. **Infer Product Gender** (use common sense):
+   - If user's name suggests gender (Sophia → women's, Marcus → men's), include appropriate product terms
+   - If user explicitly stated their gender/preference, respect that
+   - If user said "I'm a girl/woman" → women's products; "I'm a guy/man" → men's products
+   - Gender expression (what products to show) can differ from identity - focus on what they'd want to WEAR
+   - When uncertain, you can include gender-neutral terms or ask
+
+2. **Identify the Style Space Destination**: What region of style space is the user trying to reach?
    Think about the intersection of aesthetics, occasion, formality, and vibe.
 
-2. **Expand the Destination Description**: Generate rich descriptors that capture this region.
+3. **Expand the Destination Description**: Generate rich descriptors that capture this region.
    Include: silhouette words, fabric feels, aesthetic terms, mood descriptors, occasion cues.
+   IMPORTANT: Include gendered product terms when known (e.g., "women's blazer", "men's suit")
 
-3. **Capture Price Positioning Through Language** (NOT filters):
+4. **Capture Price Positioning Through Language** (NOT filters):
    - "luxury" → include: designer, high-end, premium quality, refined, upscale, exclusive
    - "affordable" → include: accessible, value, everyday, practical, budget-friendly
    - Don't worry about exact price numbers - capture the VIBE of the price point
 
-4. **Generate Navigation Query**: Create a comprehensive text that, when embedded, will
+5. **Generate Navigation Query**: Create a comprehensive text that, when embedded, will
    navigate to the correct region of the 10,600-dimensional style space.
 
 ## Response Format (JSON)
@@ -172,12 +180,14 @@ Now analyze the user query and navigate to the right region of style space:"""
         context_str = ""
         if user_context:
             context_parts = []
-            # Gender is critical for fashion - determines which products to show
-            if user_context.get("gender"):
-                gender = user_context["gender"]
-                gender_label = "women's" if gender == "female" else "men's" if gender == "male" else None
-                if gender_label:
-                    context_parts.append(f"Shopping for: {gender_label} fashion/clothing")
+            # User name helps infer gender expression (Sophia → likely women's, Nico → likely men's)
+            if user_context.get("user_name"):
+                context_parts.append(f"User's name: {user_context['user_name']}")
+            # Explicit gender/expression preference overrides name inference
+            if user_context.get("gender_expression"):
+                context_parts.append(f"Prefers: {user_context['gender_expression']} fashion/products")
+            elif user_context.get("gender"):
+                context_parts.append(f"Identified as: {user_context['gender']}")
             if user_context.get("preferred_styles"):
                 context_parts.append(f"Current style position: {user_context['preferred_styles']}")
             if user_context.get("preferred_colors"):
@@ -187,7 +197,7 @@ Now analyze the user query and navigate to the right region of style space:"""
             if user_context.get("occasion_context"):
                 context_parts.append(f"Typical occasions: {user_context['occasion_context']}")
             if context_parts:
-                context_str = "## User's Current Position in Style Space\n" + "\n".join(f"- {p}" for p in context_parts)
+                context_str = "## User Context\n" + "\n".join(f"- {p}" for p in context_parts)
 
         prompt = self.SEMANTIC_EXPANSION_PROMPT.format(
             query=query,
