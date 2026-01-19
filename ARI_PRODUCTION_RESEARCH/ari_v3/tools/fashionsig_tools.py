@@ -6,7 +6,18 @@ import os
 import logging
 import asyncio
 from typing import Dict, List, Any
-from crewai.tools import tool
+
+# CrewAI is optional - only needed for agent tool wrappers
+try:
+    from crewai.tools import tool
+    CREWAI_AVAILABLE = True
+except ImportError:
+    CREWAI_AVAILABLE = False
+    # Create a no-op decorator when crewai is not installed
+    def tool(name: str):
+        def decorator(func):
+            return func
+        return decorator
 
 # Import internal functions from other tool modules (not the decorated versions)
 from ari_v3.tools.qdrant_tools import _search_qdrant, _generate_embedding

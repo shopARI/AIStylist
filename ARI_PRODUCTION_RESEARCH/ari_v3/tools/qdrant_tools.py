@@ -6,7 +6,19 @@ import os
 import logging
 import warnings
 from typing import Dict, List, Any, Optional
-from crewai.tools import tool
+
+# CrewAI is optional - only needed for agent tool wrappers
+try:
+    from crewai.tools import tool
+    CREWAI_AVAILABLE = True
+except ImportError:
+    CREWAI_AVAILABLE = False
+    # Create a no-op decorator when crewai is not installed
+    def tool(name: str):
+        def decorator(func):
+            return func
+        return decorator
+
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import Filter, FieldCondition, MatchValue, Range
 
