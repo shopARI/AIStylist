@@ -585,15 +585,10 @@ class ARIOrchestrator:
                 self._last_search_session_id = search_session_id
                 # Store search context for feedback refinement (handle None items safely)
                 safe_selected = [p for p in (selected or []) if p is not None]
-                # Strip embeddings from products before storing (saves memory, not needed for context)
-                context_products = [
-                    {k: v for k, v in p.items() if k != 'embedding'}
-                    for p in safe_selected[:10]
-                ]
                 self._last_search_context[session_id] = {
                     "query": query,
                     "params": params,
-                    "products": context_products,  # Store products for follow-up context (no embeddings)
+                    "products": safe_selected[:10],  # Store products with embeddings for follow-up similarity searches
                     "products_shown": [(p.get('title') or '')[:50] for p in safe_selected[:5]],
                     "brands_shown": list(set(p.get('brand') or p.get('vendor') for p in safe_selected if p.get('brand') or p.get('vendor'))),
                     "timestamp": datetime.now(),
