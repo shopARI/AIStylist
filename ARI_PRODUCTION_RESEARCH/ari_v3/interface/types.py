@@ -37,6 +37,9 @@ class SearchIntent(str, Enum):
     CLARIFICATION = "clarification"         # "Why did you recommend that?"
     SYSTEM_STATUS = "system_status"         # "What can you do?"
 
+    # Profile/Preference intents -> Update user profile
+    PROFILE_UPDATE = "profile_update"       # "I'm into hipster culture" / "My style is boho"
+
     # Special intents
     ONBOARDING = "onboarding"               # User in onboarding flow
     FEEDBACK = "feedback"                   # "I liked that one" / "Not my style"
@@ -135,6 +138,13 @@ class ExtractedParameters:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> ExtractedParameters:
         """Create from dictionary."""
+        # Parse exclusions from list of dicts back to Exclusion objects
+        exclusions_data = data.get("exclusions", [])
+        exclusions = [
+            Exclusion(field=e.get("field", ""), value=e.get("value", ""), reason=e.get("reason"))
+            for e in exclusions_data
+        ] if exclusions_data else []
+
         return cls(
             categories=data.get("categories", []),
             colors=data.get("colors", []),
@@ -144,6 +154,7 @@ class ExtractedParameters:
             style_modifiers=data.get("style_modifiers", []),
             sizes=data.get("sizes", []),
             materials=data.get("materials", []),
+            exclusions=exclusions,
             time_reference=data.get("time_reference"),
             entity_reference=data.get("entity_reference"),
         )

@@ -208,7 +208,14 @@ DEMO_USERS = {
 class ARIDemoCLI:
     """Interactive ARI V3 Demo CLI with Conversational Interface."""
 
-    def __init__(self, visual_flags: Optional[VisualFeatureFlags] = None):
+    def __init__(
+        self,
+        visual_flags: Optional[VisualFeatureFlags] = None,
+        debug_mode: bool = False,
+        rule_intent: bool = False,
+        enable_neo4j: bool = False,
+        qdrant_only: bool = False,
+    ):
         # Database connections
         self.neo4j_driver_sync = None
         self.neo4j_driver_async = None
@@ -232,6 +239,21 @@ class ARIDemoCLI:
 
         # Visual feature flags (V3.2)
         self.visual_flags = visual_flags or VisualFeatureFlags()
+
+        # Debug mode (V3.2)
+        self.debug_mode = debug_mode
+
+        # Intent detection mode (V3.2) - LLM is default, rule_intent overrides
+        self.use_llm_intent = not rule_intent
+
+        # Search backend flags (V3.2)
+        # If qdrant_only is set, disable neo4j and visual
+        if qdrant_only:
+            self.enable_neo4j = False
+            self.visual_flags = VisualFeatureFlags()  # All visual off
+        else:
+            self.enable_neo4j = enable_neo4j
+            # visual_flags already set above
 
     async def initialize(self) -> bool:
         """Initialize all connections."""
@@ -281,10 +303,15 @@ class ARIDemoCLI:
 
             # Initialize V3 Interface components
             print("  Initializing conversational interface...")
+            intent_strategy = DetectionStrategy.LLM_FIRST if self.use_llm_intent else DetectionStrategy.RULE_FIRST
             self.intent_detector = HybridIntentDetector(
-                strategy=DetectionStrategy.RULE_FIRST,
+                strategy=intent_strategy,
                 confidence_threshold=0.6,
             )
+            if self.use_llm_intent:
+                print(f"  [OK] Intent detection: LLM-based (default)")
+            else:
+                print(f"  [OK] Intent detection: Rule-based (--rule-intent)")
             self.conversation_handler = ConversationHandler()
             self.orchestrator = ARIOrchestrator(
                 navigation_intelligence=self.navigation_intelligence,
@@ -294,9 +321,20 @@ class ARIDemoCLI:
                 openai_client=self.openai_client,
                 async_openai_client=self.openai_client_async,
                 visual_flags=self.visual_flags,
+                enable_neo4j=self.enable_neo4j,
             )
             print(f"  [OK] Conversational interface ready")
-            print(f"  [OK] {self.visual_flags.summary()}")
+
+            # Show search backend status
+            backends = ["Qdrant (semantic)"]
+            if self.enable_neo4j:
+                backends.append("Neo4j (Text2Cypher + enrichment)")
+            if self.visual_flags.enable_visual_search:
+                backends.append("Visual (FashionSigLIP)")
+            print(f"  [OK] Search backends: {' + '.join(backends)}")
+
+            if self.debug_mode:
+                print(f"  [OK] Debug mode: ENABLED (pipeline tracing active)")
 
             return True
 
@@ -474,7 +512,18 @@ class ARIDemoCLI:
             title = product.get("title", product.get("name", "Unknown"))[:50]
             price = product.get("price", "N/A")
             score = product.get("_total_score", 0)
-            category = product.get("category", product.get("productType", ""))
+            # Try multiple field names for category
+            # Use explicit parentheses for the conditional to avoid operator precedence issues
+            tags = product.get("tags")
+            tags_first = tags[0] if isinstance(tags, list) and tags else ""
+            category = (
+                product.get("category") or
+                product.get("productType") or
+                product.get("product_type") or
+                product.get("type") or
+                tags_first or
+                ""
+            )
 
             print(f"\n  [{i}] {title}")
             if isinstance(price, (int, float)):
@@ -658,6 +707,10 @@ class ARIDemoCLI:
                 self._show_natural_help()
                 continue
 
+            # Debug: Show pipeline modules BEFORE processing
+            if self.debug_mode:
+                self._show_debug_pre_processing(query)
+
             # Use the orchestrator to process input
             response = await self.orchestrator.process_input(
                 session_id=session_id,
@@ -665,6 +718,10 @@ class ARIDemoCLI:
                 query=query,
                 user_profile=self.current_profile,
             )
+
+            # Debug: Show pipeline trace AFTER processing
+            if self.debug_mode:
+                self._show_debug_post_processing(response, session_id)
 
             # Handle different response types
             if response.response_type == ResponseType.PRODUCTS:
@@ -792,6 +849,166 @@ class ARIDemoCLI:
         print("     whatever's on your mind. The more you share about your style")
         print("     and what you're after, the better I can help. What's the occasion?")
 
+    def _show_debug_pre_processing(self, query: str):
+        """Show debug information BEFORE processing a query."""
+        print("\n" + "="*60)
+        print(f"  [DEBUG] Processing: \"{query[:50]}{'...' if len(query) > 50 else ''}\"")
+        print("="*60)
+
+    def _show_debug_post_processing(self, response, session_id: str):
+        """Show debug information AFTER processing a query with verification."""
+        print("\n" + "-"*60)
+        print("  [DEBUG] PIPELINE EXECUTION RESULTS")
+        print("-"*60)
+
+        # Track what ran
+        ran_catalog = False
+        ran_intent = False
+        ran_params = False
+        ran_profile_update = False
+        ran_feedback = False
+        ran_conversation = False
+        ran_navigation = False
+        ran_text2cypher = False
+        ran_semantic = False
+        ran_neo4j = False
+        ran_qdrant = False
+        ran_visual = False
+        ran_exclusions = False
+        ran_brand_filter = False
+        ran_dedup = False
+        ran_enrichment = False
+        ran_evaluator = False
+        ran_narrative = False
+
+        # Check what actually ran based on response
+        if response.intent:
+            ran_intent = True
+            intent = response.intent
+            if intent.extracted_parameters:
+                params = intent.extracted_parameters
+                if (hasattr(params, 'categories') and params.categories) or \
+                   (hasattr(params, 'colors') and params.colors) or \
+                   (hasattr(params, 'exclusions') and params.exclusions):
+                    ran_params = True
+
+        # Check for catalog query
+        if response.response_type.value == "conversation" and response.text:
+            if "brands" in response.text.lower() or "categories" in response.text.lower():
+                ran_catalog = True
+
+        # Check for profile update
+        if response.intent and response.intent.primary_intent.value == "profile_update":
+            ran_profile_update = True
+
+        # Check for feedback handler
+        if response.intent and response.intent.primary_intent.value == "feedback":
+            ran_feedback = True
+
+        # Check for conversation handler (non-product intents)
+        if response.intent and response.response_type.value == "conversation":
+            if response.intent.primary_intent.value not in ["profile_update", "feedback"]:
+                ran_conversation = True
+
+        # Check post-processing steps (only on product searches)
+        if response.response_type.value == "products" and response.products:
+            # Dedup always runs on product searches
+            ran_dedup = True
+
+            # Enrichment runs if neo4j is enabled
+            if self.enable_neo4j:
+                ran_enrichment = True
+
+            # Check if exclusions were applied
+            if response.intent and response.intent.extracted_parameters:
+                params = response.intent.extracted_parameters
+                if hasattr(params, 'exclusions') and params.exclusions:
+                    ran_exclusions = True
+                if hasattr(params, 'brand_preferences') and params.brand_preferences:
+                    ran_brand_filter = True
+
+        # Check trace for what ran
+        trace = self.orchestrator._explanation_traces.get(session_id) if hasattr(self.orchestrator, '_explanation_traces') else None
+        if trace:
+            if trace.navigation_decisions:
+                ran_navigation = True
+            if trace.query_interpretation:
+                qi = trace.query_interpretation
+                if qi.get("semantic_expansion"):
+                    ran_semantic = True
+                if qi.get("cypher_query"):
+                    ran_text2cypher = True
+            if trace.product_breakdowns:
+                ran_evaluator = True
+
+        # Check response for what ran
+        if response.response_type.value == "products":
+            ran_qdrant = True  # We always use Qdrant for product searches
+            if response.products:
+                ran_evaluator = True
+            if response.text and len(response.text) > 100:
+                ran_narrative = True
+
+        # Visual search check
+        if self.visual_flags.enable_visual_search and response.response_type.value == "products":
+            ran_visual = True
+
+        # Print verification table
+        def status(ran: bool) -> str:
+            return "YES" if ran else " - "
+
+        print(f"  CatalogQueryDetector     [{status(ran_catalog)}]  Brand/category metadata lookup")
+        print(f"  HybridIntentDetector     [{status(ran_intent)}]  {response.intent.primary_intent.value if response.intent else 'N/A'} ({response.intent.detection_method if response.intent else 'N/A'})")
+        print(f"  ParameterExtractor       [{status(ran_params)}]  Colors, brands, exclusions")
+        print(f"  ProfileUpdateHandler     [{status(ran_profile_update)}]  User style → Neo4j user graph")
+        print(f"  FeedbackHandler          [{status(ran_feedback)}]  Refine search from feedback")
+        print(f"  ConversationHandler      [{status(ran_conversation)}]  Chat/system response")
+        print(f"  NavigationIntelligence   [{status(ran_navigation)}]  User profile context")
+        print(f"  Text2CypherGenerator     [{status(ran_text2cypher)}]  Structured Neo4j query")
+        print(f"  SemanticQueryGenerator   [{status(ran_semantic)}]  Query expansion for embeddings")
+        print(f"  Neo4j Search             [{status(ran_neo4j)}]  Graph database search")
+        print(f"  Qdrant Semantic Search   [{status(ran_qdrant)}]  Embedding similarity")
+        if self.visual_flags.enable_visual_search:
+            print(f"  Qdrant Visual Search     [{status(ran_visual)}]  Visual similarity")
+        print(f"  ExclusionFilter          [{status(ran_exclusions)}]  Remove excluded items")
+        print(f"  BrandFilter              [{status(ran_brand_filter)}]  Filter by brand preference")
+        print(f"  Deduplication            [{status(ran_dedup)}]  Remove duplicate products")
+        if self.enable_neo4j:
+            print(f"  Neo4jEnrichment          [{status(ran_enrichment)}]  Fill missing metadata")
+        print(f"  ARIEvaluator             [{status(ran_evaluator)}]  Product scoring/ranking")
+        print(f"  NarrativeLLM             [{status(ran_narrative)}]  Response generation")
+
+        print("-"*60)
+
+        # Show key details
+        if response.intent:
+            intent = response.intent
+            print(f"  Intent: {intent.primary_intent.value} (confidence: {intent.confidence:.0%})")
+
+            # Show extracted parameters if any
+            if ran_params and intent.extracted_parameters:
+                params = intent.extracted_parameters
+                details = []
+                if hasattr(params, 'categories') and params.categories:
+                    details.append(f"categories={params.categories}")
+                if hasattr(params, 'colors') and params.colors:
+                    details.append(f"colors={params.colors}")
+                if hasattr(params, 'exclusions') and params.exclusions:
+                    details.append(f"exclusions=[{len(params.exclusions)}]")
+                if details:
+                    print(f"  Params: {', '.join(details)}")
+
+        # Show results
+        if response.response_type.value == "products" and response.products:
+            print(f"  Results: {len(response.products)} products returned")
+        elif ran_catalog:
+            print(f"  Results: Catalog information returned")
+        else:
+            print(f"  Route: {response.response_type.value.upper()}")
+
+        print(f"  Time: {response.execution_time:.2f}s")
+        print("="*60 + "\n")
+
     def _show_user_menu(self) -> Optional[Dict]:
         """Show menu to select a demo user or continue as guest."""
         print("\n" + "-"*60)
@@ -878,11 +1095,36 @@ def parse_args():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python demo_cli.py                     # Default (semantic search only)
-  python demo_cli.py --visual            # Enable visual search
-  python demo_cli.py --visual --visual-scoring   # Enable visual scoring too
-  python demo_cli.py --all-visual        # Enable all visual features
+  python demo_cli.py                     # Default (Qdrant semantic only)
+  python demo_cli.py --neo4j             # Qdrant + Neo4j (Text2Cypher + enrichment)
+  python demo_cli.py --visual            # Qdrant + Visual search
+  python demo_cli.py --neo4j --visual    # Qdrant + Neo4j + Visual (full stack)
+  python demo_cli.py --qdrant-only       # Force Qdrant-only (no Neo4j, no visual)
+  python demo_cli.py --debug             # Show pipeline execution trace
         """
+    )
+
+    # Debug mode
+    parser.add_argument(
+        "--debug", action="store_true",
+        help="Show pipeline modules called during each query (useful for understanding the flow)"
+    )
+
+    # Intent detection mode
+    parser.add_argument(
+        "--rule-intent", action="store_true",
+        help="Use regex-based intent detection instead of LLM (faster but less accurate)"
+    )
+
+    # Search backend flags
+    search_group = parser.add_argument_group("Search Backends")
+    search_group.add_argument(
+        "--neo4j", action="store_true",
+        help="Enable Neo4j features (Text2Cypher + metadata enrichment)"
+    )
+    search_group.add_argument(
+        "--qdrant-only", action="store_true",
+        help="Use only Qdrant semantic search (no Neo4j, no visual)"
     )
 
     # Visual feature flags
@@ -920,6 +1162,13 @@ def main():
     """Entry point."""
     args = parse_args()
 
+    # Validate mutually exclusive flags
+    if args.neo4j and args.qdrant_only:
+        print("Error: --neo4j and --qdrant-only are mutually exclusive.")
+        print("  --neo4j enables Neo4j features (Text2Cypher + metadata)")
+        print("  --qdrant-only forces semantic-only mode (no Neo4j, no visual)")
+        sys.exit(1)
+
     # Build visual feature flags from CLI args
     visual_flags = VisualFeatureFlags(
         enable_visual_search=args.visual or args.all_visual,
@@ -934,7 +1183,24 @@ def main():
     if visual_flags.enable_visual_scoring:
         visual_flags.visual_score_weight = 0.15
 
-    demo = ARIDemoCLI(visual_flags=visual_flags)
+    # Enable debug mode logging
+    if args.debug:
+        # Set ARI-related loggers to DEBUG level
+        for name in ["ari_v3.interface.orchestrator", "ari_v3.tools.text2cypher",
+                     "ari_v3.tools.semantic_query", "ari_v3.orchestrator.navigation_intelligence"]:
+            logging.getLogger(name).setLevel(logging.DEBUG)
+        print("[DEBUG MODE] Pipeline tracing enabled")
+
+    if args.rule_intent:
+        print("[RULE INTENT] Using regex-based intent detection (faster but less accurate)")
+
+    demo = ARIDemoCLI(
+        visual_flags=visual_flags,
+        debug_mode=args.debug,
+        rule_intent=args.rule_intent,
+        enable_neo4j=args.neo4j,
+        qdrant_only=args.qdrant_only,
+    )
     asyncio.run(demo.run())
 
 

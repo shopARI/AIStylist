@@ -109,6 +109,7 @@ class ARIOrchestrator:
         async_openai_client=None,
         qdrant_collection: str = "fashion_products",
         visual_flags: Optional[VisualFeatureFlags] = None,
+        enable_neo4j: bool = False,
     ):
         """
         Initialize orchestrator.
@@ -137,6 +138,9 @@ class ARIOrchestrator:
         self.openai_client = openai_client
         self.async_openai_client = async_openai_client
         self.qdrant_collection = qdrant_collection
+
+        # Search backend flags
+        self.enable_neo4j = enable_neo4j
 
         # Cached instances (created lazily, reused) - protected by _instance_lock
         self._evaluator = None
@@ -219,7 +223,15 @@ class ARIOrchestrator:
                 f"(confidence: {intent.confidence:.2f}, method: {intent.detection_method})"
             )
 
-            # Step 2: Route based on intent
+            # Step 2: Check for catalog/metadata queries first
+            catalog_response = await self._check_catalog_query(query, session_id)
+            if catalog_response:
+                catalog_response.execution_time = time.time() - start_time
+                catalog_response.intent = intent
+                catalog_response.session_id = session_id
+                return catalog_response
+
+            # Step 3: Route based on intent
             if intent.is_product_intent():
                 response = await self._handle_product_intent(
                     session_id=session_id,
@@ -238,6 +250,14 @@ class ARIOrchestrator:
                     intent=intent,
                     user_profile=user_profile,
                     user_context=user_context,
+                )
+            elif intent.primary_intent == SearchIntent.PROFILE_UPDATE:
+                # User is sharing style/preference info to update their profile
+                response = await self._handle_profile_update_intent(
+                    session_id=session_id,
+                    user_id=user_id,
+                    query=query,
+                    intent=intent,
                 )
             else:
                 response = await self._handle_conversation_intent(
@@ -334,7 +354,8 @@ class ARIOrchestrator:
             used_neo4j_search = False
 
             # Detect if query needs Neo4j's structured fields
-            needs_neo4j = (
+            # Only use Neo4j if enabled via --neo4j flag
+            needs_neo4j = self.enable_neo4j and (
                 params.brand_preferences or  # Brand queries need extracted_brand
                 self._query_needs_structured_search(query, params)
             )
@@ -500,6 +521,19 @@ class ARIOrchestrator:
                 filtered_count = original_count - len(products)
                 logger.info(f"Brand filter: kept {len(products)}/{original_count} products matching brands: {params.brand_preferences}")
 
+            # Deduplicate products by title (keep highest scored version)
+            if products:
+                original_count = len(products)
+                products = self._deduplicate_products(products)
+                if len(products) < original_count:
+                    logger.info(f"Deduplicated: {original_count} → {len(products)} products")
+
+            # Enrich products with Neo4j metadata (category, brand, etc.) if missing
+            # Only if Neo4j is enabled via --neo4j flag
+            if self.enable_neo4j and products and self.navigation and hasattr(self.navigation, 'neo4j_driver'):
+                products = await self._enrich_products_from_neo4j(products)
+                logger.info(f"Enriched {len(products)} products with Neo4j metadata")
+
             if not products:
                 return ARIResponse(
                     response_type=ResponseType.PRODUCTS,
@@ -519,12 +553,13 @@ class ARIOrchestrator:
             search_session_id = str(uuid.uuid4())
             with self._session_lock:
                 self._last_search_session_id = search_session_id
-                # Store search context for feedback refinement
+                # Store search context for feedback refinement (handle None items safely)
+                safe_selected = [p for p in (selected or []) if p is not None]
                 self._last_search_context[session_id] = {
                     "query": query,
                     "params": params,
-                    "products_shown": [p.get('title', '')[:50] for p in selected[:5]],
-                    "brands_shown": list(set(p.get('brand') or p.get('vendor') for p in selected if p.get('brand') or p.get('vendor'))),
+                    "products_shown": [(p.get('title') or '')[:50] for p in safe_selected[:5]],
+                    "brands_shown": list(set(p.get('brand') or p.get('vendor') for p in safe_selected if p.get('brand') or p.get('vendor'))),
                     "timestamp": datetime.now(),
                 }
                 # Store explanation trace for "why" questions
@@ -553,6 +588,123 @@ class ARIOrchestrator:
                     "Browse by category",
                 ],
             )
+
+    async def _enrich_products_from_neo4j(self, products: List[Any]) -> List[Any]:
+        """
+        Enrich products with metadata from Neo4j using UUID matching.
+
+        If a product from Qdrant is missing category, brand, or other fields,
+        we look them up in Neo4j using the shared UUID.
+
+        Args:
+            products: List of products from Qdrant
+
+        Returns:
+            Enriched products with Neo4j metadata
+        """
+        if not products:
+            return products
+
+        try:
+            import asyncio
+
+            # Collect UUIDs that need enrichment
+            uuids_to_enrich = []
+            for p in products:
+                # Check if product needs enrichment (missing key fields)
+                needs_enrichment = (
+                    not p.get('category') or
+                    not p.get('productType') or
+                    not p.get('extracted_brand')
+                )
+                if needs_enrichment:
+                    uuid = p.get('uuid') or p.get('id')
+                    if uuid:
+                        uuids_to_enrich.append(str(uuid))
+
+            if not uuids_to_enrich:
+                return products  # Nothing to enrich
+
+            # Query Neo4j for metadata
+            cypher = """
+                UNWIND $uuids AS uuid
+                MATCH (p:Product {id: uuid})
+                RETURN p.id AS uuid,
+                       p.productType AS productType,
+                       p.extracted_brand AS brand,
+                       p.category AS category,
+                       p.tags AS tags
+            """
+
+            driver = self.navigation.neo4j_driver
+
+            def run_cypher():
+                with driver.session(database="neo4j") as session:
+                    result = session.run(cypher, uuids=uuids_to_enrich)
+                    return {r['uuid']: dict(r) for r in result}
+
+            loop = asyncio.get_event_loop()
+            neo4j_data = await loop.run_in_executor(None, run_cypher)
+
+            # Enrich products with Neo4j data
+            enriched_count = 0
+            for product in products:
+                uuid = str(product.get('uuid') or product.get('id') or '')
+                if uuid in neo4j_data:
+                    neo_data = neo4j_data[uuid]
+                    # Fill in missing fields
+                    if not product.get('category') and neo_data.get('category'):
+                        product['category'] = neo_data['category']
+                        enriched_count += 1
+                    if not product.get('productType') and neo_data.get('productType'):
+                        product['productType'] = neo_data['productType']
+                    if not product.get('brand') and neo_data.get('brand'):
+                        product['brand'] = neo_data['brand']
+                    if not product.get('extracted_brand') and neo_data.get('brand'):
+                        product['extracted_brand'] = neo_data['brand']
+
+            if enriched_count > 0:
+                logger.debug(f"Enriched {enriched_count} products with Neo4j category data")
+
+            return products
+
+        except Exception as e:
+            logger.warning(f"Neo4j enrichment failed (continuing without): {e}")
+            return products
+
+    def _deduplicate_products(self, products: List[Any]) -> List[Any]:
+        """
+        Remove duplicate products by title, keeping the highest-scored version.
+
+        Args:
+            products: List of product dictionaries
+
+        Returns:
+            Deduplicated list of products
+        """
+        if not products:
+            return products
+
+        seen_titles = {}
+        for product in products:
+            # Get title (try multiple field names)
+            title = (product.get("title") or product.get("name") or "").strip().lower()
+            if not title:
+                # No title, use ID as key
+                title = str(product.get("id", id(product)))
+
+            # Get score for comparison
+            score = product.get("score", 0) or product.get("_total_score", 0) or 0
+
+            # Keep the higher-scored version
+            if title not in seen_titles or score > seen_titles[title][1]:
+                seen_titles[title] = (product, score)
+
+        # Return deduplicated products in original order (by score)
+        deduped = [item[0] for item in seen_titles.values()]
+        # Sort by score descending
+        deduped.sort(key=lambda p: p.get("score", 0) or p.get("_total_score", 0) or 0, reverse=True)
+        return deduped
 
     def _evaluate_products(
         self,
@@ -753,6 +905,142 @@ class ARIOrchestrator:
             user_context=user_context,
         )
 
+    async def _handle_profile_update_intent(
+        self,
+        session_id: str,
+        user_id: str,
+        query: str,
+        intent: IntentResult,
+    ) -> ARIResponse:
+        """
+        Handle user sharing style/preference information to update their profile.
+
+        Uses LLM to extract style preferences from natural language,
+        then updates the user's Neo4j profile.
+        """
+        if not self.async_openai_client:
+            return ARIResponse(
+                response_type=ResponseType.CONVERSATION,
+                text="I'd love to learn more about your style! Tell me what you like.",
+                suggestions=["I prefer minimalist style", "I love vintage fashion", "My vibe is streetwear"],
+            )
+
+        try:
+            # Use LLM to extract style information from user message
+            extraction_prompt = f"""Extract style preferences from this user message.
+User said: "{query}"
+
+Extract any style/fashion preferences mentioned:
+- Style adjectives (e.g., minimalist, boho, hipster, preppy, streetwear, vintage)
+- Fashion cultures/aesthetics (e.g., Scandinavian, Japanese, punk, goth)
+- Color preferences
+- Fit preferences (e.g., oversized, fitted, loose)
+- Values (e.g., sustainable, quality, affordable)
+
+Return JSON:
+{{
+    "style_adjectives": ["list of style words"],
+    "cultures_aesthetics": ["cultural influences"],
+    "colors": ["color preferences"],
+    "fits": ["fit preferences"],
+    "values": ["value priorities"],
+    "summary": "one sentence summary of their style"
+}}"""
+
+            response = await self.async_openai_client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "You extract style preferences from natural language. Return valid JSON only."},
+                    {"role": "user", "content": extraction_prompt}
+                ],
+                max_tokens=300,
+                temperature=0.3,
+            )
+
+            result_text = response.choices[0].message.content.strip()
+
+            # Parse JSON
+            import json
+            try:
+                # Handle markdown code blocks safely
+                if "```" in result_text:
+                    parts = result_text.split("```")
+                    if len(parts) >= 2:
+                        result_text = parts[1]
+                        if result_text.startswith("json"):
+                            result_text = result_text[4:]
+                style_data = json.loads(result_text)
+            except (json.JSONDecodeError, IndexError):
+                style_data = {}
+
+            # Update user profile in Neo4j if we have data and Neo4j is enabled
+            updated_items = []
+
+            if self.enable_neo4j and style_data and self.navigation and hasattr(self.navigation, 'neo4j_driver'):
+                try:
+                    from ari_v3.services.user_graph_manager import UserGraphManager
+                    user_graph = UserGraphManager()
+
+                    # Add style adjectives
+                    adjectives = style_data.get("style_adjectives", []) + style_data.get("cultures_aesthetics", [])
+                    if adjectives:
+                        user_graph.add_style_adjectives(user_id, adjectives)
+                        updated_items.extend(adjectives)
+
+                    # Add fit preferences
+                    fits = style_data.get("fits", [])
+                    if fits:
+                        user_graph.add_fit_preferences(user_id, fits)
+                        updated_items.extend(fits)
+
+                    # Add values
+                    values = style_data.get("values", [])
+                    if values:
+                        user_graph.add_values(user_id, values)
+                        updated_items.extend(values)
+
+                    user_graph.close()
+                    logger.info(f"Updated profile for {user_id}: {updated_items}")
+
+                    # Invalidate user cache so fresh profile is loaded next time
+                    if updated_items:
+                        self.invalidate_user_cache(user_id)
+
+                except Exception as e:
+                    logger.warning(f"Failed to update Neo4j profile: {e}")
+            elif style_data and not self.enable_neo4j:
+                # User shared style info but Neo4j is disabled - warn about this
+                logger.warning(f"Profile update detected but Neo4j is disabled. Style data not saved: {list(style_data.keys())}")
+
+            # Build response - subtle acknowledgment without echoing labels
+            # Don't repeat style labels back as that sounds stereotypical
+            if updated_items:
+                response_text = (
+                    "Got it, noted! What would you like to look for today?"
+                )
+            else:
+                response_text = (
+                    "Thanks for sharing! What can I help you find?"
+                )
+
+            return ARIResponse(
+                response_type=ResponseType.CONVERSATION,
+                text=response_text,
+                suggestions=[
+                    "Show me something in my style",
+                    "What else should I tell you?",
+                    "Find me an outfit",
+                ],
+            )
+
+        except Exception as e:
+            logger.error(f"Profile update failed: {e}")
+            return ARIResponse(
+                response_type=ResponseType.CONVERSATION,
+                text="I heard you! Tell me more about your style and I'll keep it in mind.",
+                suggestions=["I like minimalist fashion", "My style is casual", "I prefer quality over quantity"],
+            )
+
     async def _interpret_feedback(
         self,
         original_query: str,
@@ -803,6 +1091,243 @@ If you can't interpret the feedback, return "UNCLEAR"."""
         except Exception as e:
             logger.warning(f"Failed to interpret feedback: {e}")
             return None
+
+    async def _check_catalog_query(
+        self,
+        query: str,
+        session_id: str,
+    ) -> Optional[ARIResponse]:
+        """
+        Check if query is asking about catalog metadata (e.g., "what brands do you have?").
+
+        These queries ask about the catalog itself, not for product searches:
+        - "What brands do you have?"
+        - "List all luxury brands"
+        - "Which designers are available?"
+        - "What categories do you carry?"
+
+        Returns:
+            ARIResponse if this is a catalog query, None otherwise
+        """
+        query_lower = query.lower()
+
+        # Patterns that indicate catalog/metadata queries
+        catalog_patterns = [
+            ("brand", ["what brands", "which brands", "list brands", "show brands",
+                      "brands do you have", "brands available", "brands you carry",
+                      "luxury brands", "designer brands", "all your brands"]),
+            ("category", ["what categories", "which categories", "list categories",
+                         "categories do you have", "what do you sell", "what do you carry"]),
+            ("designer", ["what designers", "which designers", "list designers",
+                         "designers do you have", "designers available"]),
+        ]
+
+        catalog_type = None
+        for cat_type, patterns in catalog_patterns:
+            if any(p in query_lower for p in patterns):
+                catalog_type = cat_type
+                break
+
+        if not catalog_type:
+            return None
+
+        logger.info(f"Detected catalog query: type={catalog_type}")
+
+        # Handle brand catalog query
+        if catalog_type in ["brand", "designer"]:
+            return await self._get_brand_catalog(query, session_id)
+
+        # Handle category catalog query
+        if catalog_type == "category":
+            return await self._get_category_catalog(query, session_id)
+
+        return None
+
+    async def _get_brand_catalog(
+        self,
+        query: str,
+        session_id: str,
+    ) -> ARIResponse:
+        """
+        Get list of brands from the catalog.
+
+        Uses Neo4j to query distinct brands.
+        """
+        query_lower = query.lower()
+
+        # Check if user wants luxury/premium brands specifically
+        is_luxury = any(w in query_lower for w in ["luxury", "premium", "designer", "high-end", "high end"])
+
+        try:
+            from ari_v3.tools.text2cypher import Text2CypherGenerator
+
+            # Build appropriate Cypher query
+            if is_luxury:
+                # Query for premium brands (those with products over a certain price threshold)
+                cypher = """
+                    MATCH (p:Product)
+                    WHERE p.extracted_brand IS NOT NULL
+                    AND p.price >= 200
+                    WITH p.extracted_brand AS brand, MAX(p.price) AS max_price, COUNT(p) AS product_count
+                    WHERE product_count >= 5
+                    RETURN DISTINCT brand, max_price, product_count
+                    ORDER BY max_price DESC
+                    LIMIT 30
+                """
+            else:
+                cypher = """
+                    MATCH (p:Product)
+                    WHERE p.extracted_brand IS NOT NULL
+                    WITH p.extracted_brand AS brand, COUNT(p) AS product_count
+                    WHERE product_count >= 10
+                    RETURN DISTINCT brand, product_count
+                    ORDER BY product_count DESC
+                    LIMIT 50
+                """
+
+            # Execute via Neo4j directly (not through Text2Cypher)
+            # Only if Neo4j is enabled
+            if self.enable_neo4j and self.navigation and hasattr(self.navigation, 'neo4j_driver'):
+                import asyncio
+
+                # Use sync driver in executor to avoid blocking
+                driver = self.navigation.neo4j_driver
+
+                def run_cypher():
+                    with driver.session(database="neo4j") as neo_session:
+                        result = neo_session.run(cypher)
+                        return [dict(r) for r in result]
+
+                loop = asyncio.get_event_loop()
+                records = await loop.run_in_executor(None, run_cypher)
+
+                if records:
+                    brands = [r['brand'] for r in records if r.get('brand')]
+
+                    # Format response
+                    if is_luxury:
+                        brand_text = ", ".join(brands[:20])
+                        response_text = (
+                            f"Here are the luxury/premium brands in our catalog:\n\n"
+                            f"**{brand_text}**\n\n"
+                            f"We have {len(brands)} premium brands with products priced at $200+. "
+                            f"Would you like to explore any of these brands?"
+                        )
+                    else:
+                        brand_text = ", ".join(brands[:30])
+                        response_text = (
+                            f"Here are some of the top brands in our catalog:\n\n"
+                            f"**{brand_text}**\n\n"
+                            f"We have {len(brands)}+ brands total. "
+                            f"Would you like to see products from any specific brand?"
+                        )
+
+                    return ARIResponse(
+                        response_type=ResponseType.CONVERSATION,
+                        text=response_text,
+                        suggestions=[
+                            f"Show me {brands[0]} products" if brands else "Browse by brand",
+                            "Filter by price range",
+                            "What categories do you have?",
+                        ],
+                    )
+
+            # Fallback if Neo4j not available
+            return ARIResponse(
+                response_type=ResponseType.CONVERSATION,
+                text=(
+                    "I can help you explore our brands! We carry a wide range including "
+                    "luxury designers like Gucci, Prada, Louis Vuitton, Versace, and many more. "
+                    "What type of brand are you interested in?"
+                ),
+                suggestions=[
+                    "Show me luxury handbags",
+                    "Browse designer sunglasses",
+                    "What's your price range?",
+                ],
+            )
+
+        except Exception as e:
+            logger.error(f"Brand catalog query failed: {e}")
+            return ARIResponse(
+                response_type=ResponseType.CONVERSATION,
+                text=(
+                    "I'd be happy to tell you about our brands! We carry many luxury and "
+                    "designer brands. What type of products or price range are you looking for?"
+                ),
+                suggestions=[
+                    "Show me luxury brands",
+                    "What's in my budget?",
+                    "Browse by category",
+                ],
+            )
+
+    async def _get_category_catalog(
+        self,
+        query: str,
+        session_id: str,
+    ) -> ARIResponse:
+        """Get list of product categories from the catalog."""
+        try:
+            if self.enable_neo4j and self.navigation and hasattr(self.navigation, 'neo4j_driver'):
+                import asyncio
+
+                cypher = """
+                    MATCH (p:Product)
+                    WHERE p.productType IS NOT NULL
+                    WITH p.productType AS category, COUNT(p) AS product_count
+                    WHERE product_count >= 50
+                    RETURN DISTINCT category, product_count
+                    ORDER BY product_count DESC
+                    LIMIT 30
+                """
+
+                driver = self.navigation.neo4j_driver
+
+                def run_cypher():
+                    with driver.session(database="neo4j") as neo_session:
+                        result = neo_session.run(cypher)
+                        return [dict(r) for r in result]
+
+                loop = asyncio.get_event_loop()
+                records = await loop.run_in_executor(None, run_cypher)
+
+                if records:
+                    categories = [r['category'] for r in records if r.get('category')]
+                    cat_text = ", ".join(categories[:20])
+
+                    return ARIResponse(
+                        response_type=ResponseType.CONVERSATION,
+                        text=(
+                            f"Here are the main categories in our catalog:\n\n"
+                            f"**{cat_text}**\n\n"
+                            f"We have {len(categories)}+ product categories. "
+                            f"What would you like to explore?"
+                        ),
+                        suggestions=[
+                            f"Show me {categories[0]}" if categories else "Browse products",
+                            "Filter by brand",
+                            "What's trending?",
+                        ],
+                    )
+
+            # Fallback
+            return ARIResponse(
+                response_type=ResponseType.CONVERSATION,
+                text=(
+                    "We carry a wide range of categories including dresses, tops, pants, "
+                    "shoes, bags, accessories, and more. What are you in the mood for?"
+                ),
+                suggestions=["Show me dresses", "Browse accessories", "What's new?"],
+            )
+
+        except Exception as e:
+            logger.error(f"Category catalog query failed: {e}")
+            return ARIResponse(
+                response_type=ResponseType.CONVERSATION,
+                text="We have many categories to explore! What type of item are you looking for?",
+                suggestions=["Dresses", "Tops", "Accessories"],
+            )
 
     def _update_session(self, session_id: str, user_id: str):
         """Update or create session with TTL tracking."""

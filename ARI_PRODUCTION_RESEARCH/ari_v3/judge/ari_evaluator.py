@@ -562,13 +562,14 @@ class ARIEvaluator:
         if not brand_preferences:
             return 0.5  # No preferences = neutral
 
-        product_brand = product.get('brand', '').lower()
+        product_brand = (product.get('brand') or '').lower()
         if not product_brand:
             return 0.5  # Unknown brand = neutral
 
         # Check if brand matches preferences
         for pref_brand in brand_preferences:
-            if pref_brand.lower() in product_brand or product_brand in pref_brand.lower():
+            pref_lower = (pref_brand or '').lower()
+            if pref_lower in product_brand or product_brand in pref_lower:
                 # Scale the bonus by brand affinity
                 # High affinity (1.0) -> full 1.0 score
                 # Medium affinity (0.5) -> 0.75 score
@@ -597,18 +598,20 @@ class ARIEvaluator:
         score = 0.5  # Base score
 
         # Check category interests
-        category = product.get('category', '').lower()
+        category = (product.get('category') or '').lower()
         if nav_context.behavioral_profile.category_interests:
             for interest in nav_context.behavioral_profile.category_interests:
-                if interest.lower() in category or category in interest.lower():
+                interest_lower = (interest or '').lower()
+                if interest_lower in category or category in interest_lower:
                     score += 0.3
                     break
 
         # Check brand preferences from behavioral profile
-        brand = product.get('brand', '').lower()
+        brand = (product.get('brand') or '').lower()
         if nav_context.behavioral_profile.brand_preferences:
             for pref_brand in nav_context.behavioral_profile.brand_preferences:
-                if pref_brand.lower() in brand:
+                pref_lower = (pref_brand or '').lower()
+                if pref_lower in brand:
                     score += 0.2
                     break
 
@@ -662,11 +665,15 @@ class ARIEvaluator:
 
         # Simple keyword-based compliance check
         # In production, this would use more sophisticated NLP
-        product_text = f"{product.get('title', '')} {product.get('description', '')}".lower()
+        title = product.get('title') or ''
+        description = product.get('description') or ''
+        product_text = f"{title} {description}".lower()
 
         compliance_score = 0.5  # Base score
 
         for rule in styling_rules:
+            if not rule:
+                continue
             rule_lower = rule.lower()
             # Extract key terms from rule
             key_terms = [term for term in rule_lower.split() if len(term) > 3]

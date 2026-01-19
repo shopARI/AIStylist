@@ -114,11 +114,35 @@ class IntentDetector:
                 r"what's your memory", r"tell me about yourself",
                 r"what are you", r"who are you",
             ],
+            # Profile Update - User sharing style/preference info to save
+            SearchIntent.PROFILE_UPDATE: [
+                # Direct style declarations
+                r"(?:my style is|i'm into|i love|i prefer)\s+\w+",
+                r"i (?:like|love|prefer|enjoy)\s+(?:wearing|to wear)",
+                r"i'm (?:a|really into|more of a)\s+\w+\s+(?:person|type|style|aesthetic)",
+                r"my aesthetic is", r"my vibe is",
+                # Culture/subculture references
+                r"i'm into\s+(?:\w+\s+)?(?:culture|aesthetic|style|fashion)",
+                r"(?:hipster|boho|minimalist|streetwear|preppy|punk|goth|vintage)\s+(?:is my|style|vibe)",
+                # Updating preferences
+                r"update my (?:style|preferences?|profile)",
+                r"remember (?:that i|i) (?:like|prefer|love)",
+                r"save (?:that|this) (?:to|in) my (?:profile|preferences)",
+                r"add (?:this|that) to my (?:style|profile)",
+                # Telling about self
+                r"let me tell you (?:about|more about) (?:my style|myself|me)",
+                r"i want (?:you )?to know (?:that i|about me)",
+                r"here's what i like",
+            ],
             SearchIntent.GENERAL_CONVERSATION: [
                 r"nice weather", r"how are you doing", r"good morning",
                 r"hello there", r"thanks for", r"that's interesting",
                 r"cool story", r"talk a little", r"let's chat",
                 r"tell me something", r"how's your day",
+                # User expressing preferences or feelings (not product feedback)
+                r"i don't want you to", r"don't stereotype",
+                r"can i tell you", r"let me tell you",
+                r"i want to share", r"i'd like to share",
             ],
             # Product Search Intents - CHECK AFTER CONVERSATION INTENTS
             SearchIntent.BROWSE: [
@@ -126,18 +150,21 @@ class IntentDetector:
                 r"explore", r"see what", r"looking around",
             ],
             SearchIntent.SPECIFIC_ITEM: [
-                r"looking for (?:a |an )?(\w+)",
-                r"need (?:a |an )?(\w+)",
-                r"want (?:a |an )?(\w+)",
-                r"find me (?:a |an )?(\w+)",
-                r"search for (?:a |an )?(\w+)",
-                r"where can i find",
-                r"i'd like (?:a |an )?(\w+)",
-                r"could you (?:help me )?find",
-                r"recommend (?:some |a |an )?(\w+)",
-                r"suggest (?:some |a |an )?(\w+)",
+                # Product-focused patterns - require article or product word
+                r"looking for (?:a |an |some |the )(\w+)",
+                r"need (?:a |an |some |the )(\w+)",
+                r"want (?:a |an |some |the )(\w+)",
+                r"find me (?:a |an |some |the )(\w+)",
+                r"search for (?:a |an |some |the )(\w+)",
+                r"where can i find (?:a |an |some )",
+                r"i'd like (?:a |an |some |the )(\w+)",
+                r"could you (?:help me )?find (?:a |an |some |the )",
+                r"recommend (?:some |a |an )(\w+)",
+                r"suggest (?:some |a |an )(\w+)",
+                # Direct product mentions (clothing items)
+                r"\b(?:dress|shirt|pants|jacket|shoes|boots|bag|handbag|coat|sweater|jeans|skirt|blouse|top|shorts)(?:es|s)?\b",
                 # Color + item patterns
-                r"\b(?:black|white|red|blue|green|navy|gray|grey)\s+(?:shirt|dress|pants|jacket|shoes)",
+                r"\b(?:black|white|red|blue|green|navy|gray|grey)\s+(?:shirt|dress|pants|jacket|shoes|coat|sweater)",
             ],
             SearchIntent.INSPIRATION: [
                 r"inspire me", r"inspiration", r"ideas for",
@@ -295,6 +322,7 @@ class IntentDetector:
             SearchIntent.SYSTEM_STATUS,
             SearchIntent.GENERAL_CONVERSATION,
             SearchIntent.FEEDBACK,
+            SearchIntent.PROFILE_UPDATE,  # Profile updates should also be boosted
         ]
         for intent in conversation_intents:
             if intent in intent_scores and intent_scores[intent] > 0:
@@ -559,38 +587,55 @@ class HybridIntentDetector:
             if context_items:
                 conversation_context = "\n\nRECENT CONVERSATION:\n" + "\n".join(context_items)
 
-        # Build prompt
-        prompt = f"""Classify this user message and extract relevant parameters.
+        # Build prompt - comprehensive intent detection
+        prompt = f"""You are ARI's intent classifier. Analyze the user message to understand what they ACTUALLY want.
+
+CRITICAL: Many messages LOOK like product requests but are actually CONVERSATIONS about:
+- The user wanting to share more about themselves ("can I tell you more about me?")
+- Questions about your memory/learning ("will you remember?", "do you learn?")
+- Expressing feelings about stereotyping or personalization
+- Asking how the system works
+
 {conversation_context}
 
 CURRENT MESSAGE: "{query}"
 
-INTENTS (choose the most appropriate):
-- GREETING: User is greeting ("hi", "hello")
-- GOODBYE: User is ending conversation
-- PRODUCT_SEARCH: User wants to find/browse products
-- SPECIFIC_ITEM: User wants a specific item ("black dress", "running shoes")
-- STYLE_ADVICE: User wants styling help
-- INSPIRATION: User wants outfit ideas
-- OUTFIT_BUILDING: User wants to build a complete outfit
-- GIFT: Shopping for someone else
-- BRAND: Specific brand search
-- SALE: Looking for deals
-- GENERAL_CONVERSATION: User wants to chat, not shop
-- MEMORY_QUERY: User asking about past interactions
-- CONVERSATION_HISTORY: User asking about this conversation
-- CLARIFICATION: User asking why/how about recommendations
-- SYSTEM_STATUS: User asking about capabilities
-- FEEDBACK: User giving feedback on items
+CLASSIFICATION RULES:
+1. If user asks about YOUR capabilities (memory, learning, remembering) → SYSTEM_STATUS
+2. If user TELLS you about their style/preferences to SAVE → PROFILE_UPDATE
+3. If user mentions specific PRODUCTS/ITEMS they want to FIND → PRODUCT_SEARCH or SPECIFIC_ITEM
+4. "I'm into hipster culture" or "my style is boho" = PROFILE_UPDATE (saving preference)
+5. "show me dresses" or "find me shoes" = PRODUCT_SEARCH
+6. Questions with "?" about you/the system = likely SYSTEM_STATUS
+7. Feedback like "I like that" or "not quite right" after recommendations = FEEDBACK
+8. General chat without style info = GENERAL_CONVERSATION
 
-Output JSON:
+INTENTS:
+- GREETING: Short greetings only ("hi", "hello")
+- GOODBYE: Ending conversation ("bye", "thanks, that's all")
+- PRODUCT_SEARCH: Wants to browse/find products ("show me dresses", "I need a coat")
+- SPECIFIC_ITEM: Wants a specific item type ("black leather jacket", "red heels")
+- INSPIRATION: Wants style ideas ("what should I wear?", "outfit ideas")
+- OUTFIT_BUILDING: Building a complete look ("goes with", "complete outfit")
+- GIFT: Shopping for someone else ("gift for my mom")
+- BRAND: Specific brand search ("Gucci bags", "Nike shoes")
+- SALE: Looking for deals ("on sale", "under $50")
+- PROFILE_UPDATE: User sharing style/preference info to save ("I'm into hipster", "my style is minimalist", "I love vintage")
+- GENERAL_CONVERSATION: Chatting (NOT sharing style preferences)
+- MEMORY_QUERY: Asking about past interactions/preferences
+- CONVERSATION_HISTORY: Asking about THIS conversation
+- CLARIFICATION: Asking "why" about recommendations ("why this?", "how did you know?")
+- SYSTEM_STATUS: Asking about YOUR capabilities ("will you remember?", "can you learn?")
+- FEEDBACK: Giving feedback on shown items ("I like #1", "too expensive")
+
+Output JSON only:
 {{
     "intent": "<INTENT_NAME>",
     "confidence": <0.0-1.0>,
-    "categories": ["list of clothing categories mentioned"],
-    "colors": ["list of colors mentioned"],
-    "occasions": ["list of occasions mentioned"],
-    "reasoning": "<brief reasoning>"
+    "categories": ["clothing categories if product search"],
+    "colors": ["colors mentioned"],
+    "occasions": ["occasions mentioned"],
+    "reasoning": "<why this intent>"
 }}"""
 
         response = await self.openai_client.chat.completions.create(
