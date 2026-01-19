@@ -328,22 +328,29 @@ class ARIOrchestrator:
                 logger.warning(f"Navigation pipeline failed: {nav_err}, will use direct embedding")
 
             # Step 2: Search products
-            # For brand-specific queries, use Neo4j first (has proper brand field)
+            # Use Text2Cypher for queries needing Neo4j's structured data
+            # (brand, specific colors, styles, price ranges with attributes)
             products = []
-            used_neo4j_brand_search = False
+            used_neo4j_search = False
 
-            if params.brand_preferences:
-                logger.info(f"Brand-specific query detected: {params.brand_preferences}")
+            # Detect if query needs Neo4j's structured fields
+            needs_neo4j = (
+                params.brand_preferences or  # Brand queries need extracted_brand
+                self._query_needs_structured_search(query, params)
+            )
+
+            if needs_neo4j and self.async_openai_client:
+                logger.info(f"Query needs structured data, using Text2Cypher")
                 try:
-                    products = await self._search_by_brand_neo4j(
-                        params.brand_preferences,
+                    products = await self._search_neo4j_text2cypher(
+                        query=query,
                         limit=50,
                     )
                     if products:
-                        used_neo4j_brand_search = True
-                        logger.info(f"Using {len(products)} products from Neo4j brand search")
+                        used_neo4j_search = True
+                        logger.info(f"Using {len(products)} products from Text2Cypher search")
                 except Exception as neo4j_err:
-                    logger.warning(f"Neo4j brand search failed: {neo4j_err}")
+                    logger.warning(f"Text2Cypher search failed: {neo4j_err}")
 
             # Fall back to Qdrant semantic search if Neo4j didn't return results
             if not products and not self.qdrant_client:
@@ -451,8 +458,8 @@ class ARIOrchestrator:
                     logger.info(f"Filtered out {filtered_count} products based on exclusions: {exclusion_summary}")
 
             # Apply brand filtering (if specific brands requested)
-            # Skip if we already used Neo4j brand search (products are already filtered)
-            if products and params.brand_preferences and not used_neo4j_brand_search:
+            # Skip if we already used Neo4j search (products are already filtered)
+            if products and params.brand_preferences and not used_neo4j_search:
                 original_count = len(products)
                 products = self._apply_brand_filter(products, params.brand_preferences)
                 filtered_count = original_count - len(products)
@@ -968,49 +975,113 @@ If you can't interpret the feedback, return "UNCLEAR"."""
 
         return Filter(must=conditions)
 
-    async def _search_by_brand_neo4j(
+    async def _search_neo4j_text2cypher(
         self,
-        brand_names: List[str],
+        query: str,
         limit: int = 50,
+        context: Optional[str] = None,
     ) -> List[Dict]:
         """
-        Search for products by brand using Neo4j graph database.
+        Search for products using LLM-powered Text2Cypher query generation.
 
-        Neo4j has proper 'extracted_brand' field while Qdrant fashion_products
-        collection does not have reliable brand data.
+        This is a general-purpose Neo4j search that works with ANY field:
+        brand, color, price, style, material, etc. The LLM generates the
+        appropriate Cypher query based on the natural language input.
 
         Args:
-            brand_names: List of brand names to search for
-            limit: Maximum products per brand
+            query: Natural language query (e.g., "Gucci handbags under $500")
+            limit: Maximum products to return
+            context: Additional context for query generation
 
         Returns:
-            List of product dicts with brand, title, price, etc.
+            List of product dicts with normalized fields
         """
         try:
-            from ari_v3.tools.neo4j_tools import get_products_by_brand
+            from ari_v3.tools.text2cypher import execute_text2cypher_query
 
-            all_products = []
-            for brand_name in brand_names:
-                products = await get_products_by_brand(brand_name, limit=limit)
-                for p in products:
-                    # Normalize to orchestrator's expected format
-                    all_products.append({
-                        'uuid': p.get('uuid') or p.get('id'),
+            records, cypher_query = await execute_text2cypher_query(
+                query=query,
+                async_openai_client=self.async_openai_client,
+                limit=limit,
+                context=context,
+            )
+
+            # Normalize results to orchestrator's expected format
+            products = []
+            for record in records:
+                # Handle both direct dict and 'p' node wrapper
+                p = record.get('p', record)
+                if isinstance(p, dict):
+                    products.append({
+                        'uuid': p.get('id') or p.get('uuid'),
                         'title': p.get('title') or p.get('name'),
-                        'brand': p.get('brand'),
-                        'vendor': p.get('brand'),  # Use brand as vendor for display
+                        'brand': p.get('extracted_brand') or p.get('brand'),
+                        'vendor': p.get('extracted_brand') or p.get('brand'),
                         'price': p.get('price'),
                         'description': p.get('description'),
-                        'styles': p.get('styles') or [],
-                        'colors': p.get('colors') or [],
+                        'styles': p.get('extracted_styles') or p.get('styles') or [],
+                        'colors': p.get('extracted_colors') or p.get('colors') or [],
+                        'images': p.get('images') or [],
                     })
 
-            logger.info(f"Neo4j brand search found {len(all_products)} products for brands: {brand_names}")
-            return all_products
+            logger.info(
+                f"Text2Cypher search returned {len(products)} products. "
+                f"Fields searched: {cypher_query.search_fields}. "
+                f"Reasoning: {cypher_query.reasoning[:100]}"
+            )
+            return products
 
         except Exception as e:
-            logger.warning(f"Neo4j brand search failed: {e}, falling back to post-filter")
+            logger.warning(f"Text2Cypher search failed: {e}")
             return []
+
+    def _query_needs_structured_search(self, query: str, params) -> bool:
+        """
+        Detect if a query would benefit from Neo4j's structured fields.
+
+        Returns True if the query contains patterns that need:
+        - Brand filtering (extracted_brand field)
+        - Specific attribute lookups (extracted_colors, extracted_styles)
+        - Complex price + attribute combinations
+
+        These are better served by Neo4j's structured data than Qdrant's
+        semantic embedding search.
+        """
+        query_lower = query.lower()
+
+        # Brand-related patterns (Neo4j has extracted_brand, Qdrant doesn't)
+        brand_patterns = [
+            "by ", "from ", "brand", " made by",
+            "designer", "luxury brand", "show me all ",
+        ]
+        if any(p in query_lower for p in brand_patterns):
+            return True
+
+        # Specific attribute queries (Neo4j has structured fields)
+        # "all black products", "products in red", etc.
+        color_attribute_patterns = [
+            "all ", "only ", "products in ", "items in ",
+            "everything in ", "show me ", "list all ",
+        ]
+        color_words = ["black", "white", "red", "blue", "green", "navy", "pink", "beige"]
+        for pattern in color_attribute_patterns:
+            for color in color_words:
+                if f"{pattern}{color}" in query_lower:
+                    return True
+
+        # Price + attribute combinations
+        # "cheap Nike", "luxury Gucci", "affordable designer"
+        if params.brand_preferences and (
+            "cheap" in query_lower or
+            "affordable" in query_lower or
+            "luxury" in query_lower or
+            "expensive" in query_lower or
+            "under $" in query_lower or
+            "over $" in query_lower
+        ):
+            return True
+
+        return False
 
     def _apply_brand_filter(self, products: List[Dict], brand_preferences: List[str]) -> List[Dict]:
         """
