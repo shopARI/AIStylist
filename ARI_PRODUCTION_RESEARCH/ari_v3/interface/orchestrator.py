@@ -426,6 +426,12 @@ class ARIOrchestrator:
                         used_neo4j_search = True
                         trace.query_interpretation["neo4j_results"] = len(products)
                         logger.info(f"Using {len(products)} products from Text2Cypher search")
+
+                        # Fetch embeddings from Qdrant for MMR diversity ranking
+                        if self.qdrant_client:
+                            products = await self._attach_embeddings_from_qdrant(products)
+                            embedded_count = sum(1 for p in products if p.get('embedding'))
+                            logger.info(f"Attached embeddings to {embedded_count}/{len(products)} Neo4j products")
                 except Exception as neo4j_err:
                     logger.warning(f"Text2Cypher search failed: {neo4j_err}")
                     trace.query_interpretation["cypher_error"] = str(neo4j_err)
@@ -1984,6 +1990,65 @@ If you can't interpret the feedback, return "UNCLEAR"."""
         except Exception as e:
             logger.warning(f"Text2Cypher search failed: {e}")
             return []
+
+    async def _attach_embeddings_from_qdrant(
+        self,
+        products: List[Dict],
+    ) -> List[Dict]:
+        """
+        Fetch embeddings from Qdrant for Neo4j products using UUID matching.
+
+        Neo4j products have UUIDs that correspond to Qdrant point IDs.
+        This enables MMR diversity ranking for Neo4j search results.
+
+        Args:
+            products: List of products from Neo4j (with uuid field)
+
+        Returns:
+            Products with 'embedding' field attached where available
+        """
+        if not products or not self.qdrant_client:
+            return products
+
+        try:
+            # Extract UUIDs from products
+            uuids = []
+            for p in products:
+                uuid = p.get('uuid') or p.get('id')
+                if uuid:
+                    uuids.append(str(uuid))
+
+            if not uuids:
+                logger.debug("No UUIDs found in Neo4j products for embedding lookup")
+                return products
+
+            # Fetch points from Qdrant with vectors
+            from qdrant_client.models import PointIdsList
+
+            retrieved = await self.qdrant_client.retrieve(
+                collection_name=self.qdrant_collection,
+                ids=uuids,
+                with_vectors=True,
+            )
+
+            # Build UUID -> embedding map
+            embedding_map = {}
+            for point in retrieved:
+                if point.vector is not None:
+                    embedding_map[str(point.id)] = point.vector
+
+            # Attach embeddings to products
+            for product in products:
+                uuid = str(product.get('uuid') or product.get('id') or '')
+                if uuid in embedding_map:
+                    product['embedding'] = embedding_map[uuid]
+
+            logger.debug(f"Fetched {len(embedding_map)} embeddings from Qdrant for {len(products)} Neo4j products")
+            return products
+
+        except Exception as e:
+            logger.warning(f"Failed to fetch embeddings from Qdrant: {e}")
+            return products
 
     def _query_needs_structured_search(self, query: str, params) -> bool:
         """
