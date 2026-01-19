@@ -61,6 +61,11 @@ For exclusions, identify:
 - Comparative rejections: "nothing like X", "different from X"
 - Abstract exclusions: "nothing too formal", "not something my mom would wear"
 
+IMPORTANT - These are PREFERENCES, NOT exclusions:
+- "only X", "just X", "no other X", "X only" = user wants ONLY X (preference with must_have)
+- "prada no other brand" = wants ONLY Prada (preference for Prada, not exclusion of Prada)
+- "only nike" = wants ONLY Nike (preference for Nike)
+
 Return valid JSON:
 {
   "exclusions": [
@@ -397,7 +402,7 @@ class ParameterExtractor:
                 llm_result = await extract_with_llm(
                     query=message,
                     openai_client=openai_client,
-                    extraction_type="exclusions",
+                    extraction_type="all",  # Extract both exclusions and preferences
                 )
 
                 if llm_result:
@@ -406,6 +411,15 @@ class ParameterExtractor:
                     if llm_exclusions:
                         params.exclusions = llm_exclusions
                         logger.info(f"LLM extracted {len(llm_exclusions)} exclusions")
+
+                    # Also extract brand preferences from LLM (handles "only X", "just X")
+                    llm_preferences = llm_result.get("preferences", [])
+                    for pref in llm_preferences:
+                        if pref.get("field") == "brand" and pref.get("value"):
+                            brand = pref["value"].lower().strip()
+                            if brand and brand not in [b.lower() for b in params.brand_preferences]:
+                                params.brand_preferences.append(brand)
+                                logger.info(f"LLM extracted brand preference: {brand}")
 
             except Exception as e:
                 logger.warning(f"LLM extraction failed, using regex fallback: {e}")
