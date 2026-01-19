@@ -609,6 +609,8 @@ CLASSIFICATION RULES:
 6. Questions with "?" about you/the system = likely SYSTEM_STATUS
 7. Feedback like "I like that" or "not quite right" after recommendations = FEEDBACK
 8. General chat without style info = GENERAL_CONVERSATION
+9. "show me more", "can I see more", "only 3?", "more please" = PRODUCT_SEARCH (wants more results)
+10. Requests for MORE of something just shown = PRODUCT_SEARCH, NOT memory_query
 
 INTENTS:
 - GREETING: Short greetings only ("hi", "hello")

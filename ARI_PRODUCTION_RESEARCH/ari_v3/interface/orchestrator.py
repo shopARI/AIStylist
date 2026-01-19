@@ -1295,9 +1295,20 @@ Return JSON:
         # No LLM client - try simple heuristic
         if not self.async_openai_client:
             # Check for explicit "new topic" signals
-            new_topic_signals = ["actually", "instead", "different", "forget", "never mind", "something else"]
+            # Use phrase patterns to avoid false positives (e.g., "actually I love that" is continuation)
             query_lower = query.lower()
-            if any(signal in query_lower for signal in new_topic_signals):
+            new_topic_patterns = [
+                "actually show me",      # "actually show me Nike" = new topic
+                "actually i want",       # "actually I want something different"
+                "instead of",            # "instead of Prada"
+                "something different",   # explicit new topic
+                "forget that",           # explicit reset
+                "never mind",            # explicit reset
+                "something else",        # explicit new topic
+                "start over",            # explicit reset
+                "new search",            # explicit reset
+            ]
+            if any(pattern in query_lower for pattern in new_topic_patterns):
                 return query
 
             # Extract potential topics from recent conversation
