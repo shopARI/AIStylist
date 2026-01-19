@@ -299,6 +299,11 @@ class ARIOrchestrator:
         user_context: Optional[Dict[str, Any]] = None,
     ) -> ARIResponse:
         """Handle product search intents via Navigation Intelligence."""
+        # Record user query to conversation history (so "what did I ask?" works)
+        from .conversation_handler import Message, MessageRole
+        user_message = Message(role=MessageRole.USER, content=query)
+        self.conversation_handler._add_message(session_id, user_message)
+
         # Create explanation trace for this request
         trace = ExplanationTrace()
         trace.query_interpretation["original_query"] = query
@@ -629,11 +634,18 @@ class ARIOrchestrator:
                 # Store explanation trace for "why" questions
                 self._explanation_traces[session_id] = trace
 
+            # Build response
+            response_text = self._format_product_response(selected, narrative, query)
+
+            # Record assistant response to conversation history
+            assistant_message = Message(role=MessageRole.ASSISTANT, content=f"[Showed {len(selected)} products for: {query}]")
+            self.conversation_handler._add_message(session_id, assistant_message)
+
             return ARIResponse(
                 response_type=ResponseType.PRODUCTS,
                 products=selected,
                 narrative=narrative,
-                text=self._format_product_response(selected, narrative, query),
+                text=response_text,
                 suggestions=self._generate_product_suggestions(intent, selected),
             )
 

@@ -291,9 +291,30 @@ Now generate for the user query above:"""
         """
         Generate a safe fallback query using fulltext search.
         """
-        # Extract keywords from query
-        keywords = re.findall(r'\b[a-zA-Z]{3,}\b', query.lower())
-        search_terms = " OR ".join(keywords[:5])  # Limit to 5 keywords
+        # Common stop words to filter out
+        stop_words = {
+            'hey', 'hello', 'hi', 'there', 'the', 'and', 'for', 'are', 'but',
+            'not', 'you', 'all', 'can', 'had', 'her', 'was', 'one', 'our',
+            'out', 'has', 'have', 'been', 'were', 'they', 'this', 'from',
+            'that', 'with', 'what', 'when', 'where', 'which', 'who', 'will',
+            'more', 'some', 'any', 'your', 'just', 'into', 'than', 'them',
+            'then', 'only', 'come', 'its', 'over', 'such', 'also', 'back',
+            'after', 'use', 'how', 'man', 'our', 'well', 'way', 'want',
+            'because', 'does', 'got', 'let', 'see', 'show', 'get', 'find',
+            'looking', 'need', 'like', 'would', 'could', 'should', 'please',
+            'something', 'anything', 'thing', 'things', 'maybe', 'really',
+        }
+
+        # Extract keywords from query, filter stop words
+        all_words = re.findall(r'\b[a-zA-Z]{3,}\b', query.lower())
+        keywords = [w for w in all_words if w not in stop_words]
+
+        # If no keywords left after filtering, use original (minus very common ones)
+        if not keywords:
+            keywords = [w for w in all_words if w not in {'the', 'and', 'for', 'you', 'are'}]
+
+        # Take up to 5 meaningful keywords
+        search_terms = " OR ".join(keywords[:5]) if keywords else query
 
         return CypherQuery(
             cypher="""
