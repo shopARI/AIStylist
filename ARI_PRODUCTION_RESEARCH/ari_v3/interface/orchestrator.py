@@ -101,7 +101,7 @@ class ARIOrchestrator:
         navigation_intelligence: Optional[NavigationIntelligence] = None,
         intent_detector: Optional[HybridIntentDetector] = None,
         conversation_handler: Optional[ConversationHandler] = None,
-        detection_strategy: DetectionStrategy = DetectionStrategy.RULE_FIRST,
+        detection_strategy: DetectionStrategy = DetectionStrategy.LLM_FIRST,
         session_ttl: Optional[timedelta] = None,
         cache_ttl: Optional[timedelta] = None,
         qdrant_client: Optional[AsyncQdrantClient] = None,
@@ -170,10 +170,14 @@ class ARIOrchestrator:
         self.visual_flags = visual_flags or VisualFeatureFlags()
         self._visual_qdrant_client = None  # Lazy-loaded visual Qdrant client
 
+        # Get actual strategy from intent detector (it may have been passed in with different strategy)
+        actual_strategy = getattr(self.intent_detector, 'strategy', detection_strategy)
+        actual_strategy_value = actual_strategy.value if hasattr(actual_strategy, 'value') else str(actual_strategy)
         logger.info(
             f"ARIOrchestrator initialized with "
             f"navigation={'enabled' if navigation_intelligence else 'disabled'}, "
-            f"detection_strategy={detection_strategy.value}, "
+            f"detection_strategy={actual_strategy_value}, "
+            f"neo4j={'enabled' if enable_neo4j else 'disabled'}, "
             f"{self.visual_flags.summary()}"
         )
 
