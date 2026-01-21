@@ -1304,6 +1304,36 @@ class ARIDemoCLI:
 
                 print(f"  {i:<3} {title:<22} {src_display:<8} {sem_score:>8.4f} {vis_score:>8.4f} {fused:>8.4f}")
 
+        # Show original results from each search (before fusion)
+        if trace:
+            final_titles = set()
+            if response.products:
+                final_titles = {(p.get('title') or p.get('name') or '').lower().strip() for p in response.products[:10]}
+
+            # Semantic Search Results
+            if hasattr(trace, 'semantic_results') and trace.semantic_results:
+                print("\n  SEMANTIC SEARCH TOP 5 (before fusion):")
+                print("  " + "-"*50)
+                for i, item in enumerate(trace.semantic_results[:5], 1):
+                    title = item.get('title', 'Unknown')[:30]
+                    score = item.get('score', 0)
+                    in_final = "*" if title.lower().strip() in final_titles else " "
+                    print(f"  {i:<3} {title:<32} {score:>8.4f} {in_final}")
+                print("  " + "-"*50)
+                print("  * = Made it to final recommendations")
+
+            # Visual Search Results
+            if hasattr(trace, 'visual_results') and trace.visual_results:
+                print("\n  VISUAL SEARCH TOP 5 (before fusion):")
+                print("  " + "-"*50)
+                for i, item in enumerate(trace.visual_results[:5], 1):
+                    title = item.get('title', 'Unknown')[:30]
+                    score = item.get('score', 0)
+                    in_final = "*" if title.lower().strip() in final_titles else " "
+                    print(f"  {i:<3} {title:<32} {score:>8.4f} {in_final}")
+                print("  " + "-"*50)
+                print("  * = Made it to final recommendations")
+
         print("~"*60)
 
     def _show_user_menu(self) -> Optional[Dict]:

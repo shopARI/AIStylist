@@ -428,6 +428,10 @@ class ExplanationTrace:
     # Timing for each step (for debugging)
     step_timings: Dict[str, float] = field(default_factory=dict)
 
+    # Original search results before fusion (for debug comparison)
+    semantic_results: List[Dict[str, Any]] = field(default_factory=list)
+    visual_results: List[Dict[str, Any]] = field(default_factory=list)
+
     def add_profile_conclusion(
         self,
         key: str,

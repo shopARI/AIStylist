@@ -563,6 +563,26 @@ class ARIOrchestrator:
                                 trace=trace,
                             )
 
+                        # Store original results in trace for debug comparison
+                        if trace:
+                            # Store top 10 from each search with scores
+                            trace.semantic_results = [
+                                {
+                                    'title': p.get('title') or p.get('name') or 'Unknown',
+                                    'score': semantic_scores.get(p.get('id') or p.get('_id') or f"title:{(p.get('title') or p.get('name') or '').lower().strip()}", 0),
+                                    'id': p.get('id') or p.get('_id'),
+                                }
+                                for p in semantic_products[:10]
+                            ]
+                            trace.visual_results = [
+                                {
+                                    'title': p.get('title') or p.get('name') or 'Unknown',
+                                    'score': visual_scores.get(p.get('id') or p.get('_id') or f"title:{(p.get('title') or p.get('name') or '').lower().strip()}", 0),
+                                    'id': p.get('id') or p.get('_id'),
+                                }
+                                for p in visual_products[:10]
+                            ]
+
                         # Fuse results
                         if visual_products and self.visual_flags.enable_visual_search:
                             products = self._fuse_search_results(
