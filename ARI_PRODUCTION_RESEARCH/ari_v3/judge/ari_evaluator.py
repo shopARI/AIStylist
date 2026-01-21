@@ -432,6 +432,10 @@ class ARIEvaluator:
         if product_vec.size == 0 or current_vec.size == 0:
             return 0.5
 
+        # Handle dimension mismatch (e.g., 1536-dim semantic vs 1024-dim visual)
+        if product_vec.shape != current_vec.shape:
+            return 0.5  # Neutral score when dimensions don't match
+
         distance = self._cosine_distance(current_vec, product_vec)
 
         # Score based on whether distance is within max step
@@ -476,6 +480,10 @@ class ARIEvaluator:
 
         if product_vec.size == 0 or current_vec.size == 0 or traj_dir.size == 0:
             return 0.5
+
+        # Handle dimension mismatch (e.g., 1536-dim semantic vs 1024-dim visual)
+        if product_vec.shape != current_vec.shape or product_vec.shape != traj_dir.shape:
+            return 0.8  # Neutral coherence when dimensions don't match
 
         movement = product_vec - current_vec
         movement_norm = np.linalg.norm(movement)
@@ -715,6 +723,10 @@ class ARIEvaluator:
 
     def _cosine_distance(self, v1: np.ndarray, v2: np.ndarray) -> float:
         """Calculate cosine distance between two vectors."""
+        # Handle dimension mismatch
+        if v1.shape != v2.shape:
+            return 0.5  # Neutral distance for mismatched dimensions
+
         dot_product = np.dot(v1, v2)
         norm1 = np.linalg.norm(v1)
         norm2 = np.linalg.norm(v2)

@@ -9,6 +9,14 @@ Based on Section 0.5.3 of the pseudocode.
 
 from __future__ import annotations
 
+import os
+import sys
+
+# Ensure parent directory is in path for services imports
+_parent_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+if _parent_dir not in sys.path:
+    sys.path.insert(0, _parent_dir)
+
 import logging
 import threading
 import time
@@ -2471,16 +2479,26 @@ If you can't interpret the feedback, return "UNCLEAR"."""
 
         # Try FashionSigLIP text-to-visual encoding
         try:
-            from services.ml.fashionsig_encoder import get_fashionsig_encoder
-            encoder = get_fashionsig_encoder()
-            if encoder.model is not None:
-                embedding = await encoder.encode_text_async(query)
-                logger.debug(f"Generated FashionSigLIP text embedding, dim={len(embedding)}")
-                return embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
-        except ImportError:
-            logger.debug("FashionSigLIP encoder not available")
+            # Ensure services path is available
+            import importlib.util
+            services_path = os.path.join(_parent_dir, "services", "ml", "fashionsig_encoder.py")
+            if os.path.exists(services_path):
+                spec = importlib.util.spec_from_file_location("fashionsig_encoder", services_path)
+                fashionsig_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(fashionsig_module)
+                encoder = fashionsig_module.get_fashionsig_encoder()
+                if encoder.model is not None:
+                    embedding = await encoder.encode_text(query)
+                    logger.debug(f"Generated FashionSigLIP text embedding, dim={len(embedding)}")
+                    return embedding.tolist() if hasattr(embedding, 'tolist') else list(embedding)
+                else:
+                    logger.warning("FashionSigLIP encoder model is None")
+            else:
+                logger.debug(f"FashionSigLIP encoder file not found: {services_path}")
+        except ImportError as e:
+            logger.debug(f"FashionSigLIP encoder not available: {e}")
         except Exception as e:
-            logger.debug(f"FashionSigLIP encoding failed: {e}")
+            logger.warning(f"FashionSigLIP encoding failed: {type(e).__name__}: {e}")
 
         return None
 

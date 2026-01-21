@@ -211,7 +211,7 @@ class ARIDemoCLI:
     def __init__(
         self,
         visual_flags: Optional[VisualFeatureFlags] = None,
-        debug_mode: bool = False,
+        debug_mode: int = 0,  # 0=off, 1=basic, 2=verbose
         rule_intent: bool = False,
         enable_neo4j: bool = False,
         qdrant_only: bool = False,
@@ -339,8 +339,9 @@ class ARIDemoCLI:
                 backends.append("Visual (FashionSigLIP)")
             print(f"  [OK] Search backends: {' + '.join(backends)}")
 
-            if self.debug_mode:
-                print(f"  [OK] Debug mode: ENABLED (pipeline tracing active)")
+            if self.debug_mode >= 1:
+                level_desc = "BASIC (module status)" if self.debug_mode == 1 else "VERBOSE (full details)"
+                print(f"  [OK] Debug mode: Level {self.debug_mode} - {level_desc}")
 
             return True
 
@@ -739,6 +740,34 @@ class ARIDemoCLI:
                 self._show_natural_help()
                 continue
 
+            # Check for /debug command
+            if query.lower().startswith("/debug"):
+                parts = query.split()
+                if len(parts) == 1:
+                    # Toggle: 0 -> 1, 1 -> 0, 2 -> 0
+                    self.debug_mode = 1 if self.debug_mode == 0 else 0
+                elif len(parts) == 2 and parts[1] in ["0", "1", "2"]:
+                    self.debug_mode = int(parts[1])
+                else:
+                    print("\nUsage: /debug [0|1|2]")
+                    print("  0 = Off")
+                    print("  1 = Basic (module status)")
+                    print("  2 = Verbose (full details)")
+                    continue
+
+                if self.debug_mode == 0:
+                    print("\nDebug mode: OFF")
+                elif self.debug_mode == 1:
+                    print("\nDebug mode: Level 1 (module status)")
+                else:
+                    print("\nDebug mode: Level 2 (verbose - full scores, embeddings, queries)")
+                continue
+
+            # Check for /profile command to see current user profile
+            if query.lower() == "/profile":
+                self._show_user_profile()
+                continue
+
             # Check for like/save command (e.g., "like 1", "save #2", "love the first one")
             like_match = self._detect_like_command(query)
             if like_match and self._last_products:
@@ -766,7 +795,7 @@ class ARIDemoCLI:
                 continue
 
             # Debug: Show pipeline modules BEFORE processing
-            if self.debug_mode:
+            if self.debug_mode >= 1:
                 self._show_debug_pre_processing(query)
 
             # Use the orchestrator to process input
@@ -791,7 +820,7 @@ class ARIDemoCLI:
                     pass  # Don't fail if recording fails
 
             # Debug: Show pipeline trace AFTER processing
-            if self.debug_mode:
+            if self.debug_mode >= 1:
                 self._show_debug_post_processing(response, session_id)
 
             # Handle different response types
@@ -1126,7 +1155,130 @@ class ARIDemoCLI:
             print(f"  Route: {response.response_type.value.upper()}")
 
         print(f"  Time: {response.execution_time:.2f}s")
+
+        # VERBOSE MODE (Level 2) - Full details
+        if self.debug_mode >= 2:
+            self._show_debug_verbose(response, session_id, trace)
+
         print("="*60 + "\n")
+
+    def _show_debug_verbose(self, response, session_id: str, trace):
+        """Show verbose debug details (Level 2) - scores, embeddings, queries."""
+        print("\n" + "~"*60)
+        print("  [VERBOSE] DETAILED EXECUTION DATA")
+        print("~"*60)
+
+        # 1. Full Extracted Parameters
+        if response.intent and response.intent.extracted_parameters:
+            params = response.intent.extracted_parameters
+            print("\n  EXTRACTED PARAMETERS:")
+            if hasattr(params, 'categories') and params.categories:
+                print(f"    Categories: {params.categories}")
+            if hasattr(params, 'colors') and params.colors:
+                print(f"    Colors: {params.colors}")
+            if hasattr(params, 'price_range') and params.price_range:
+                print(f"    Price Range: {params.price_range}")
+            if hasattr(params, 'brand_preferences') and params.brand_preferences:
+                print(f"    Brand Preferences: {params.brand_preferences}")
+            if hasattr(params, 'exclusions') and params.exclusions:
+                print(f"    Exclusions: {params.exclusions}")
+            if hasattr(params, 'style_terms') and params.style_terms:
+                print(f"    Style Terms: {params.style_terms}")
+            if hasattr(params, 'occasion') and params.occasion:
+                print(f"    Occasion: {params.occasion}")
+            if hasattr(params, 'gender') and params.gender:
+                print(f"    Gender: {params.gender}")
+
+        # 2. Query Interpretation from trace
+        if trace and trace.query_interpretation:
+            qi = trace.query_interpretation
+            print("\n  QUERY INTERPRETATION:")
+            if qi.get("original_query"):
+                print(f"    Original: \"{qi['original_query']}\"")
+            if qi.get("expanded_from_conversation"):
+                print(f"    Expanded: \"{qi['expanded_from_conversation']}\"")
+            if qi.get("detected_intent"):
+                print(f"    Detected Intent: {qi['detected_intent']}")
+
+            # Semantic expansion details
+            if qi.get("semantic_expansion"):
+                se = qi["semantic_expansion"]
+                print("\n  SEMANTIC EXPANSION:")
+                if se.get("expanded"):
+                    print(f"    Expanded Query: \"{se['expanded'][:80]}...\"" if len(se.get('expanded', '')) > 80 else f"    Expanded Query: \"{se.get('expanded')}\"")
+                if se.get("styles"):
+                    print(f"    Style Terms: {se['styles']}")
+                if se.get("colors"):
+                    print(f"    Color Terms: {se['colors']}")
+                if se.get("occasion"):
+                    print(f"    Occasion: {se['occasion']}")
+
+            # Cypher query if used
+            if qi.get("cypher_query"):
+                print("\n  TEXT2CYPHER:")
+                print(f"    Cypher Generated: Yes")
+                if qi.get("neo4j_results"):
+                    print(f"    Neo4j Results: {qi['neo4j_results']} products")
+                if qi.get("cypher_error"):
+                    print(f"    Error: {qi['cypher_error']}")
+
+        # 3. Navigation Intelligence
+        if trace and trace.navigation_decisions:
+            nd = trace.navigation_decisions
+            print("\n  NAVIGATION INTELLIGENCE:")
+            print(f"    Ran: {nd.get('ran', False)}")
+            if nd.get('has_destination'):
+                print(f"    Has Destination: Yes")
+            if nd.get('synthesis_descriptors'):
+                print(f"    Style Descriptors: {nd['synthesis_descriptors'][:5]}")
+            if nd.get('error'):
+                print(f"    Error: {nd['error']}")
+
+        # 4. Product Score Breakdowns (7-score system)
+        if response.response_type.value == "products" and response.products:
+            print("\n  PRODUCT SCORES (7-Score System):")
+            print("  " + "-"*56)
+            print(f"  {'#':<3} {'Title':<25} {'Total':>6} {'Smth':>5} {'Cohr':>5} {'Budg':>5} {'Brnd':>5}")
+            print("  " + "-"*56)
+
+            for i, product in enumerate(response.products[:5], 1):
+                title = product.get("title", "Unknown")[:24]
+                breakdown = product.get("_score_breakdown", {})
+
+                total = product.get("_total_score", 0) or product.get("score", 0) or 0
+                smooth = breakdown.get("smoothness", 0)
+                cohere = breakdown.get("coherence", 0)
+                budget = breakdown.get("budget_fit", 0)
+                brand = breakdown.get("brand_match", 0)
+
+                print(f"  {i:<3} {title:<25} {total:>5.0%} {smooth:>5.2f} {cohere:>5.2f} {budget:>5.2f} {brand:>5.2f}")
+
+            # Show second row for remaining scores
+            print("\n  " + "-"*56)
+            print(f"  {'#':<3} {'Title':<25} {'Behav':>5} {'Multi':>5} {'Rules':>5} {'Visul':>5}")
+            print("  " + "-"*56)
+
+            for i, product in enumerate(response.products[:5], 1):
+                title = product.get("title", "Unknown")[:24]
+                breakdown = product.get("_score_breakdown", {})
+
+                behav = breakdown.get("behavioral_consistency", 0)
+                multi = breakdown.get("multi_agent_confidence", 0)
+                rules = breakdown.get("rule_compliance", 0)
+                visual = breakdown.get("visual_similarity", 0)
+
+                print(f"  {i:<3} {title:<25} {behav:>5.2f} {multi:>5.2f} {rules:>5.2f} {visual:>5.2f}")
+
+            # Show semantic scores if available
+            has_semantic = any(p.get("_semantic_score") for p in response.products[:5])
+            if has_semantic:
+                print("\n  SEMANTIC SIMILARITY SCORES:")
+                for i, product in enumerate(response.products[:5], 1):
+                    title = product.get("title", "Unknown")[:35]
+                    sem_score = product.get("_semantic_score", 0)
+                    print(f"    [{i}] {title}: {sem_score:.4f}")
+
+        print("~"*60)
 
     def _show_user_menu(self) -> Optional[Dict]:
         """Show menu to select a demo user or continue as guest."""
@@ -1226,14 +1378,15 @@ Examples:
   python demo_cli.py --visual            # Qdrant + Visual search
   python demo_cli.py --neo4j --visual    # Qdrant + Neo4j + Visual (full stack)
   python demo_cli.py --qdrant-only       # Force Qdrant-only (no Neo4j, no visual)
-  python demo_cli.py --debug             # Show pipeline execution trace
+  python demo_cli.py --debug             # Show pipeline execution trace (level 1)
+  python demo_cli.py --debug 2           # Verbose debug (scores, embeddings, queries)
         """
     )
 
     # Debug mode
     parser.add_argument(
-        "--debug", action="store_true",
-        help="Show pipeline modules called during each query (useful for understanding the flow)"
+        "--debug", nargs="?", const=1, type=int, default=0,
+        help="Debug level: 1=module status, 2=verbose (scores/embeddings/queries)"
     )
 
     # Intent detection mode

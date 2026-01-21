@@ -23,33 +23,90 @@ from ari_v3.interface.intent_detector import DetectionStrategy
 from ari_v3.interface.types import ResponseType
 
 
-# Demo user profiles (same as CLI)
+# Demo user profiles (same structure as CLI)
 DEMO_USERS = {
     "emma": {
         "id": "demo_emma_creative",
         "name": "Emma",
         "description": "Creative professional, loves bold colors and unique pieces",
-        "style_words": ["creative", "bold", "artistic", "eclectic"],
-        "body_type": "hourglass",
-        "budget_preference": "mid-range",
+        "taste": {
+            "style_words": ["creative", "bold", "artistic", "eclectic"],
+            "color_preferences": ["red", "orange", "purple"],
+            "adventurousness": 8,
+        },
+        "body": {
+            "body_type": "hourglass",
+        },
+        "practicality": {
+            "budget_preference": "mid-range",
+            "budget_monthly": 500,
+        },
+        "personal": {
+            "style_goal": "Express creativity through fashion",
+            "occasions": ["work", "gallery openings", "creative events"],
+        },
     },
     "marcus": {
         "id": "demo_marcus_finance",
         "name": "Marcus",
         "description": "Finance professional, prefers timeless quality pieces",
-        "style_words": ["classic", "professional", "timeless", "quality"],
-        "body_type": "athletic",
-        "budget_preference": "premium",
+        "taste": {
+            "style_words": ["classic", "professional", "timeless", "quality"],
+            "color_preferences": ["navy", "gray", "white"],
+            "adventurousness": 3,
+        },
+        "body": {
+            "body_type": "athletic",
+        },
+        "practicality": {
+            "budget_preference": "premium",
+            "budget_monthly": 1000,
+        },
+        "personal": {
+            "style_goal": "Look polished and professional",
+            "occasions": ["office", "business meetings", "networking events"],
+        },
     },
     "sophia": {
         "id": "demo_sophia_tech",
         "name": "Sophia",
         "description": "Tech founder, loves minimalist Scandinavian style",
-        "style_words": ["minimalist", "clean", "modern", "scandinavian"],
-        "body_type": "apple",
-        "budget_preference": "mid-range",
+        "taste": {
+            "style_words": ["minimalist", "clean", "modern", "scandinavian"],
+            "color_preferences": ["white", "beige", "black"],
+            "adventurousness": 5,
+        },
+        "body": {
+            "body_type": "apple",
+        },
+        "practicality": {
+            "budget_preference": "mid-range",
+            "budget_monthly": 600,
+        },
+        "personal": {
+            "style_goal": "Effortless chic for busy lifestyle",
+            "occasions": ["startup office", "investor meetings", "tech conferences"],
+        },
     },
 }
+
+
+def build_onboarding_profile(profile_data: dict):
+    """Build an OnboardingProfile-like object from profile data."""
+    class ProfileSection:
+        def __init__(self, data):
+            for k, v in data.items():
+                setattr(self, k, v)
+
+    class SimpleProfile:
+        def __init__(self, data):
+            self.taste = ProfileSection(data.get("taste", {})) if "taste" in data else None
+            self.personal = ProfileSection(data.get("personal", {})) if "personal" in data else None
+            self.practicality = ProfileSection(data.get("practicality", {})) if "practicality" in data else None
+            self.body = ProfileSection(data.get("body", {})) if "body" in data else None
+            self.process = ProfileSection(data.get("process", {})) if "process" in data else None
+
+    return SimpleProfile(profile_data)
 
 
 def init_session_state():
@@ -141,18 +198,16 @@ def display_product_grid(products: list, columns: int = 3):
                 st.divider()
 
 
-async def process_message(query: str, orchestrator: ARIOrchestrator, user_profile: dict) -> dict:
+async def process_message(query: str, orchestrator: ARIOrchestrator, user_profile_data: dict) -> dict:
     """Process a user message through the orchestrator."""
+    # Build the profile object from the dict
+    profile = build_onboarding_profile(user_profile_data)
+
     response = await orchestrator.process_input(
         session_id=st.session_state.session_id,
-        user_id=user_profile["id"],
+        user_id=user_profile_data["id"],
         query=query,
-        user_context={
-            "name": user_profile["name"],
-            "style_words": user_profile.get("style_words", []),
-            "body_type": user_profile.get("body_type"),
-            "budget_preference": user_profile.get("budget_preference"),
-        },
+        user_profile=profile,
     )
     return response
 
@@ -199,7 +254,8 @@ def main():
 
         st.markdown(f"**{user_profile['name']}**")
         st.caption(user_profile["description"])
-        st.markdown(f"Style: {', '.join(user_profile.get('style_words', []))}")
+        style_words = user_profile.get("taste", {}).get("style_words", [])
+        st.markdown(f"Style: {', '.join(style_words)}")
 
         st.markdown("---")
 

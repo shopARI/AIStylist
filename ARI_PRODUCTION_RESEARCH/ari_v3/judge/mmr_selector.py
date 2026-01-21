@@ -169,6 +169,10 @@ def _cosine_similarity(v1: np.ndarray, v2: np.ndarray) -> float:
     if v1.size == 0 or v2.size == 0:
         return 0.0
 
+    # Handle dimension mismatch (e.g., 1536-dim semantic vs 1024-dim visual)
+    if v1.shape != v2.shape:
+        return 0.0
+
     dot_product = np.dot(v1, v2)
     norm1 = np.linalg.norm(v1)
     norm2 = np.linalg.norm(v2)

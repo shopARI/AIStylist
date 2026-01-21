@@ -142,6 +142,10 @@ def _calculate_distance_from_current(
     if current_position.size == 0 or product.embedding.size == 0:
         return 0.5
 
+    # Handle dimension mismatch (e.g., 1536-dim semantic vs 1024-dim visual)
+    if current_position.shape != product.embedding.shape:
+        return 0.5  # Neutral distance for mismatched dimensions
+
     # Cosine distance = 1 - cosine similarity
     dot_product = np.dot(current_position, product.embedding)
     norm_current = np.linalg.norm(current_position)
