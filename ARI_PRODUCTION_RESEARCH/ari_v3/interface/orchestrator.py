@@ -540,10 +540,15 @@ class ARIOrchestrator:
                                 product['embedding'] = hit.vector
                             semantic_products.append(product)
 
-                        semantic_scores = {
-                            hit.payload.get('id', hit.payload.get('_id', str(i))): hit.score
-                            for i, hit in enumerate(results.points)
-                        }
+                        # Store scores using consistent ID lookup (also by title for fallback)
+                        semantic_scores = {}
+                        for hit in results.points:
+                            pid = hit.payload.get('id') or hit.payload.get('_id') or hit.payload.get('product_id')
+                            if pid:
+                                semantic_scores[pid] = hit.score
+                            title = hit.payload.get('title') or hit.payload.get('name')
+                            if title:
+                                semantic_scores[f"title:{title.lower().strip()}"] = hit.score
                         filter_desc = f" (filter: {query_filter})" if query_filter else ""
                         logger.info(f"Found {len(semantic_products)} products from semantic search{filter_desc}")
 
@@ -2415,10 +2420,16 @@ If you can't interpret the feedback, return "UNCLEAR"."""
                     product['embedding'] = hit.vector
                 visual_products.append(product)
 
-            visual_scores = {
-                hit.payload.get('id', hit.payload.get('_id', str(i))): hit.score
-                for i, hit in enumerate(results.points)
-            }
+            # Store scores using the SAME id lookup used in fusion
+            visual_scores = {}
+            for hit in results.points:
+                pid = hit.payload.get('id') or hit.payload.get('_id') or hit.payload.get('product_id')
+                if pid:
+                    visual_scores[pid] = hit.score
+                # Also try to store by title for fallback matching
+                title = hit.payload.get('title') or hit.payload.get('name')
+                if title:
+                    visual_scores[f"title:{title.lower().strip()}"] = hit.score
 
             logger.info(f"Visual search found {len(visual_products)} products")
             if trace:
@@ -2525,35 +2536,58 @@ If you can't interpret the feedback, return "UNCLEAR"."""
         semantic_weight = self.visual_flags.semantic_weight
         visual_weight = self.visual_flags.visual_weight
 
-        # Build product lookup
+        # Build product lookup using consistent ID extraction
         all_products = {}
         for p in semantic_products:
-            pid = p.get('id', p.get('_id', str(id(p))))
-            all_products[pid] = p.copy()
-            all_products[pid]['_semantic_score'] = semantic_scores.get(pid, 0)
-            all_products[pid]['_visual_score'] = 0
+            pid = p.get('id') or p.get('_id') or p.get('product_id')
+            title = p.get('title') or p.get('name')
+            title_key = f"title:{title.lower().strip()}" if title else None
+
+            # Look up score by ID first, then by title
+            sem_score = semantic_scores.get(pid, 0) if pid else 0
+            if sem_score == 0 and title_key:
+                sem_score = semantic_scores.get(title_key, 0)
+
+            # Use ID or title as key
+            lookup_key = pid or title_key or str(id(p))
+            all_products[lookup_key] = p.copy()
+            all_products[lookup_key]['_semantic_score'] = sem_score
+            all_products[lookup_key]['_visual_score'] = 0
 
         for p in visual_products:
-            pid = p.get('id', p.get('_id', str(id(p))))
-            if pid in all_products:
-                all_products[pid]['_visual_score'] = visual_scores.get(pid, 0)
+            pid = p.get('id') or p.get('_id') or p.get('product_id')
+            title = p.get('title') or p.get('name')
+            title_key = f"title:{title.lower().strip()}" if title else None
+
+            # Look up score by ID first, then by title
+            vis_score = visual_scores.get(pid, 0) if pid else 0
+            if vis_score == 0 and title_key:
+                vis_score = visual_scores.get(title_key, 0)
+
+            # Use title as fallback key if no ID
+            lookup_key = pid or title_key or str(id(p))
+
+            if lookup_key in all_products:
+                all_products[lookup_key]['_visual_score'] = vis_score
             else:
-                all_products[pid] = p.copy()
-                all_products[pid]['_semantic_score'] = 0
-                all_products[pid]['_visual_score'] = visual_scores.get(pid, 0)
+                all_products[lookup_key] = p.copy()
+                all_products[lookup_key]['_semantic_score'] = 0
+                all_products[lookup_key]['_visual_score'] = vis_score
 
         # Calculate fused scores and track source
         for pid, product in all_products.items():
             sem = product.get('_semantic_score', 0)
             vis = product.get('_visual_score', 0)
 
-            # Track which search(es) contributed
+            # Track which search(es) contributed (only if score > 0)
             if sem > 0 and vis > 0:
                 product['_source'] = 'both'
             elif sem > 0:
                 product['_source'] = 'semantic'
-            else:
+            elif vis > 0:
                 product['_source'] = 'visual'
+            else:
+                product['_source'] = 'unknown'
 
             if strategy == "weighted_average":
                 # Normalize: only count weights for available scores
