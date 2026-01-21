@@ -2542,10 +2542,18 @@ If you can't interpret the feedback, return "UNCLEAR"."""
                 all_products[pid]['_semantic_score'] = 0
                 all_products[pid]['_visual_score'] = visual_scores.get(pid, 0)
 
-        # Calculate fused scores
+        # Calculate fused scores and track source
         for pid, product in all_products.items():
             sem = product.get('_semantic_score', 0)
             vis = product.get('_visual_score', 0)
+
+            # Track which search(es) contributed
+            if sem > 0 and vis > 0:
+                product['_source'] = 'both'
+            elif sem > 0:
+                product['_source'] = 'semantic'
+            else:
+                product['_source'] = 'visual'
 
             if strategy == "weighted_average":
                 # Normalize: only count weights for available scores

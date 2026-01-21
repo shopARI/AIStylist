@@ -557,13 +557,23 @@ class ARIDemoCLI:
             else:
                 print(f"      Price: {price} | Category: {category}")
 
-            # Show score as percentage with visual bar
+            # Show score as percentage with visual bar and source
             if score and score > 0:
                 pct = int(score * 100)
                 filled = int(score * 5)
                 empty = 5 - filled
                 bar = "[" + "*" * filled + "-" * empty + "]"
-                print(f"      Match: {pct}% {bar}")
+                # Show search source if available
+                source = product.get("_source", "")
+                if source == "both":
+                    src_tag = " [S+V]"
+                elif source == "semantic":
+                    src_tag = " [S]"
+                elif source == "visual":
+                    src_tag = " [V]"
+                else:
+                    src_tag = ""
+                print(f"      Match: {pct}% {bar}{src_tag}")
 
             # Show product explanation if available (handle various structures)
             if narrative:
@@ -1269,14 +1279,30 @@ class ARIDemoCLI:
 
                 print(f"  {i:<3} {title:<25} {behav:>5.2f} {multi:>5.2f} {rules:>5.2f} {visual:>5.2f}")
 
-            # Show semantic scores if available
-            has_semantic = any(p.get("_semantic_score") for p in response.products[:5])
-            if has_semantic:
-                print("\n  SEMANTIC SIMILARITY SCORES:")
-                for i, product in enumerate(response.products[:5], 1):
-                    title = (product.get("title") or product.get("name") or "Unknown")[:35]
-                    sem_score = product.get("_semantic_score", 0)
-                    print(f"    [{i}] {title}: {sem_score:.4f}")
+            # Show search source and embedding scores
+            print("\n  SEARCH SOURCE & EMBEDDING SCORES:")
+            print("  " + "-"*62)
+            print(f"  {'#':<3} {'Title':<22} {'Source':<8} {'Semantic':>8} {'Visual':>8} {'Fused':>8}")
+            print("  " + "-"*62)
+
+            for i, product in enumerate(response.products[:5], 1):
+                title = (product.get("title") or product.get("name") or "Unknown")[:21]
+                source = product.get("_source", "unknown")
+                sem_score = product.get("_semantic_score", 0)
+                vis_score = product.get("_visual_score", 0)
+                fused = product.get("_fused_score", 0)
+
+                # Source indicator
+                if source == "both":
+                    src_display = "S+V"
+                elif source == "semantic":
+                    src_display = "S"
+                elif source == "visual":
+                    src_display = "V"
+                else:
+                    src_display = "-"
+
+                print(f"  {i:<3} {title:<22} {src_display:<8} {sem_score:>8.4f} {vis_score:>8.4f} {fused:>8.4f}")
 
         print("~"*60)
 
