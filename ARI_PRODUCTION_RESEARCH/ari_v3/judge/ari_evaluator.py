@@ -434,7 +434,13 @@ class ARIEvaluator:
 
         # Handle dimension mismatch (e.g., 1536-dim semantic vs 1024-dim visual)
         if product_vec.shape != current_vec.shape:
-            return 0.5  # Neutral score when dimensions don't match
+            # Use search score as proxy when dimensions don't match
+            # This allows visual products to be differentiated by their search relevance
+            search_score = product.get('_visual_score', 0) or product.get('_semantic_score', 0) or product.get('_fused_score', 0)
+            if search_score > 0:
+                # Map search score (0-1) to smoothness range (0.3-0.8)
+                return 0.3 + (search_score * 0.5)
+            return 0.5  # Neutral only if no search score
 
         distance = self._cosine_distance(current_vec, product_vec)
 
@@ -483,7 +489,13 @@ class ARIEvaluator:
 
         # Handle dimension mismatch (e.g., 1536-dim semantic vs 1024-dim visual)
         if product_vec.shape != current_vec.shape or product_vec.shape != traj_dir.shape:
-            return 0.8  # Neutral coherence when dimensions don't match
+            # Use search score as proxy when dimensions don't match
+            search_score = product.get('_visual_score', 0) or product.get('_semantic_score', 0) or product.get('_fused_score', 0)
+            if search_score > 0:
+                # Map search score (0-1) to coherence range (0.5-0.9)
+                # Higher search scores suggest better alignment with user intent
+                return 0.5 + (search_score * 0.4)
+            return 0.8  # Neutral only if no search score
 
         movement = product_vec - current_vec
         movement_norm = np.linalg.norm(movement)

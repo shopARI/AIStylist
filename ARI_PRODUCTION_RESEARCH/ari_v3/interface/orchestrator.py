@@ -538,6 +538,8 @@ class ARIOrchestrator:
                             # Attach vector as 'embedding' field for MMR selector
                             if hit.vector is not None:
                                 product['embedding'] = hit.vector
+                                product['_embedding_dim'] = len(hit.vector)
+                                product['_embedding_type'] = 'semantic'
                             semantic_products.append(product)
 
                         # Store scores using consistent ID lookup (also by title for fallback)
@@ -2438,6 +2440,8 @@ If you can't interpret the feedback, return "UNCLEAR"."""
                 product = hit.payload.copy()
                 if hit.vector is not None:
                     product['embedding'] = hit.vector
+                    product['_embedding_dim'] = len(hit.vector)
+                    product['_embedding_type'] = 'visual'
                 visual_products.append(product)
 
             # Store scores using the SAME id lookup used in fusion
