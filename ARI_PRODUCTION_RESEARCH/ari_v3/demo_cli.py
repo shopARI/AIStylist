@@ -1242,7 +1242,7 @@ class ARIDemoCLI:
             print("  " + "-"*56)
 
             for i, product in enumerate(response.products[:5], 1):
-                title = product.get("title", "Unknown")[:24]
+                title = (product.get("title") or product.get("name") or "Unknown")[:24]
                 breakdown = product.get("_score_breakdown", {})
 
                 total = product.get("_total_score", 0) or product.get("score", 0) or 0
@@ -1259,7 +1259,7 @@ class ARIDemoCLI:
             print("  " + "-"*56)
 
             for i, product in enumerate(response.products[:5], 1):
-                title = product.get("title", "Unknown")[:24]
+                title = (product.get("title") or product.get("name") or "Unknown")[:24]
                 breakdown = product.get("_score_breakdown", {})
 
                 behav = breakdown.get("behavioral_consistency", 0)
@@ -1274,7 +1274,7 @@ class ARIDemoCLI:
             if has_semantic:
                 print("\n  SEMANTIC SIMILARITY SCORES:")
                 for i, product in enumerate(response.products[:5], 1):
-                    title = product.get("title", "Unknown")[:35]
+                    title = (product.get("title") or product.get("name") or "Unknown")[:35]
                     sem_score = product.get("_semantic_score", 0)
                     print(f"    [{i}] {title}: {sem_score:.4f}")
 
