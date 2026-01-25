@@ -5,11 +5,99 @@ Instructions for restoring the ARI product database from snapshots.
 ## Prerequisites
 
 1. Qdrant must be running (run `setup_qdrant.sh` first)
-2. You have the snapshot files:
-   - `fashion_products.snapshot` (43GB) - Semantic search embeddings
-   - `fashion_visual.snapshot` (30GB) - Visual search embeddings
+2. Google Cloud SDK installed (`gcloud` and `gsutil` commands)
+3. Access to the GCS bucket with snapshots
 
-## Step 1: Copy Snapshots to Your Machine
+## Quick Start (All-in-One)
+
+Run this script to download and restore everything:
+
+```bash
+#!/bin/bash
+set -e
+
+echo "=== ARI Qdrant Data Setup ==="
+
+# 1. Authenticate with Google Cloud
+echo "[1/4] Authenticating with Google Cloud..."
+gcloud auth login
+
+# 2. Download snapshots
+echo "[2/4] Downloading snapshots from GCS (73GB total - this will take a while)..."
+mkdir -p ~/qdrant_snapshots
+gsutil cp gs://shopari_bucket/qdrant-snapshots/*.snapshot ~/qdrant_snapshots/
+
+# 3. Verify Qdrant is running
+echo "[3/4] Checking Qdrant..."
+if ! curl -s http://localhost:6333/collections > /dev/null; then
+    echo "ERROR: Qdrant is not running. Run setup_qdrant.sh first."
+    exit 1
+fi
+
+# 4. Restore snapshots
+echo "[4/4] Restoring snapshots to Qdrant..."
+echo "  Restoring fashion_products (43GB)..."
+curl -X POST "http://localhost:6333/collections/fashion_products/snapshots/upload?priority=snapshot" \
+    -F "snapshot=@$HOME/qdrant_snapshots/fashion_products.snapshot"
+
+echo "  Restoring fashion_visual (30GB)..."
+curl -X POST "http://localhost:6333/collections/fashion_fashionsig_neo4j_1024d/snapshots/upload?priority=snapshot" \
+    -F "snapshot=@$HOME/qdrant_snapshots/fashion_visual.snapshot"
+
+# 5. Verify
+echo ""
+echo "=== Verifying restoration ==="
+curl -s http://localhost:6333/collections/fashion_products | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+count = data['result']['points_count']
+print(f'fashion_products: {count:,} products')
+"
+curl -s http://localhost:6333/collections/fashion_fashionsig_neo4j_1024d | python3 -c "
+import sys, json
+data = json.load(sys.stdin)
+count = data['result']['points_count']
+print(f'fashion_visual: {count:,} products')
+"
+
+echo ""
+echo "=== Done! ==="
+```
+
+Save this as `restore_from_gcs.sh`, make it executable (`chmod +x restore_from_gcs.sh`), and run it.
+
+---
+
+## Step-by-Step Instructions
+
+### Step 1: Download Snapshots from Google Cloud Storage
+
+Snapshots are stored in Google Cloud Storage:
+
+```
+gs://shopari_bucket/qdrant-snapshots/fashion_products.snapshot   (43GB)
+gs://shopari_bucket/qdrant-snapshots/fashion_visual.snapshot     (30GB)
+```
+
+Download them:
+
+```bash
+# Install Google Cloud SDK if needed
+# https://cloud.google.com/sdk/docs/install
+
+# Authenticate (opens browser)
+gcloud auth login
+
+# Create directory and download
+mkdir -p ~/qdrant_snapshots
+gsutil cp gs://shopari_bucket/qdrant-snapshots/*.snapshot ~/qdrant_snapshots/
+```
+
+This will take 10-20 minutes depending on your connection speed.
+
+---
+
+## Step 2: Restore Snapshots to Qdrant
 
 Get the snapshot files from your team lead and place them in a directory:
 
